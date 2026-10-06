@@ -352,7 +352,7 @@ function flash(msg, bad) {
 }
 
 async function api(action, body) {
-  const r = await fetch("/api/" + action, {
+  const r = await fetch("api/" + action, {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify(body || {}),
   });
@@ -362,7 +362,7 @@ async function api(action, body) {
 }
 
 async function refresh(keepPrefs) {
-  const r = await fetch("/api/state");
+  const r = await fetch("api/state");
   S = await r.json();
   document.getElementById("meta").textContent =
     `backend: ${S.backend} - ${S.active.length} active` +

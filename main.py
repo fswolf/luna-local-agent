@@ -1070,31 +1070,31 @@ def handle_input(text):
         _toggle_portrait(obs=text.endswith("obs"))
         return
 
-    if text == "/thoughts":
-        # One command, one job: open the page. Everything about reading
-        # her reasoning lives in the viewer, not here.
-        import socket
-        import subprocess
+    if text in ("/thoughts", "/memory"):
+        # Both pages live on the live monitor's server while she runs -
+        # one port, no extra process. With the monitor off, the old
+        # standalone servers still work.
         import webbrowser
 
         import thoughtlog
 
-        url = "http://127.0.0.1:8791"
+        page = text[1:]
+        if config.MONITOR_ENABLED:
+            import livefeed
 
-        with socket.socket() as probe:
-            probe.settimeout(0.3)
-            live = probe.connect_ex(("127.0.0.1", 8791)) == 0
-
-        if live:
+            url = f"{livefeed.url()}/{page}/"
             webbrowser.open(url)
         else:
-            subprocess.Popen(
-                [sys.executable,
-                 os.path.join(config.BASE_DIR, "thought-viewer", "viewer.py")],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
+            import subprocess
 
-        ui.add_message("system", f"{thoughtlog.summary()} - {url}")
+            folder, file, port = (("thought-viewer", "viewer.py", 8791) if page == "thoughts"
+                                  else ("memory-manager", "manager.py", 8790))
+            url = f"http://127.0.0.1:{port}"
+            subprocess.Popen([sys.executable, os.path.join(config.BASE_DIR, folder, file)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        ui.add_message("system", (f"{thoughtlog.summary()} - " if page == "thoughts" else "Memory editor: ")
+                       + url)
         return
 
     if text == "/mcp":

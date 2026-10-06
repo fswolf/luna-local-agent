@@ -405,9 +405,9 @@ PAGE = r"""<!DOCTYPE html>
     <button id="daychip" style="display:none" onclick="setDay('')"></button>
     <button id="rec" onclick="toggleRecording()" title="record her reasoning - saved to config.json, same as /set thoughts.enabled"><span class="dot"></span><span id="rectext">recording</span></button>
     <button class="live on" onclick="toggleLive()" title="refresh as new turns arrive">live</button>
-    <a href="/report?kind=starred" target="_blank" title="a printable page of your starred turns - Save as PDF from there"><button>starred → PDF</button></a>
+    <a href="report?kind=starred" target="_blank" title="a printable page of your starred turns - Save as PDF from there"><button>starred → PDF</button></a>
     <a id="livelink" href="http://127.0.0.1:8792/" target="_blank" title="watch her think as it happens (Luna has to be running)"><button>live ↗</button></a>
-    <a href="/api/export" download><button>export</button></a>
+    <a href="api/export" download><button>export</button></a>
     <button class="danger" onclick="clearAll()">clear</button>
   </div>
   <div class="row" id="flagchips" style="margin-top:8px"></div>
@@ -431,7 +431,7 @@ function flash(msg, bad) {
   el.style.opacity = 1; setTimeout(() => el.style.opacity = 0, 1800);
 }
 async function api(action, body) {
-  const r = await fetch("/api/" + action, {method: "POST",
+  const r = await fetch("api/" + action, {method: "POST",
     headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.ok) { flash(d.error || "failed", true); throw new Error(); }
@@ -469,7 +469,7 @@ function dayLabel(ts) {
 async function load(quiet) {
   const p = new URLSearchParams({offset: S.offset, kind: S.kind, flag: S.flag, day: S.day, model: S.model});
   if (S.q) p.set("q", S.q);
-  const d = await fetch("/api/rows?" + p).then(r => r.json());
+  const d = await fetch("api/rows?" + p).then(r => r.json());
   const top = d.rows.length ? d.rows[0].id : 0;
   if (quiet && top === S.newest && d.total === S.total) return;
   S.newest = top; S.total = d.total; S.pageSize = d.page_size; S.budget = d.budget; S.rows = d.rows;
@@ -656,7 +656,7 @@ function detail(r) {
     tt.style.marginTop = "8px";
     tb.append(tt, thk);
     d.appendChild(tb);
-    fetch("/api/tokens?id=" + r.id).then(x => x.json()).then(({runs}) => {
+    fetch("api/tokens?id=" + r.id).then(x => x.json()).then(({runs}) => {
       if (S.sel !== r.id) return;
       ans.replaceChildren();
       const answer = runs.flat().filter(t => t[1] === "a");

@@ -2054,10 +2054,10 @@ install. What changes:
 <img width="1067" alt="The memory manager" src="assets/memory-manager.png" />
 
 ```bash
-memory-manager/start.sh        # or: python memory-manager/manager.py
+/memory                        # in Luna, or: memory-manager/start.sh
 ```
 
-opens a local page (127.0.0.1:8790, and only 127.0.0.1) to view,
+opens a local page (127.0.0.1:8792/memory/, and only 127.0.0.1) to view,
 search, add, edit, retire, restore and delete facts, plus edit the
 `user_preferences` block of `memory.json` - whichever backend is
 active. On sqlite it's safe to use while she's running; on json the
@@ -2146,7 +2146,7 @@ when it went off is sometimes worth knowing.
 
 ### Reading it
 
-The viewer (127.0.0.1:8791, and only 127.0.0.1) is two panes. Down
+The viewer (127.0.0.1:8792/thoughts/, and only 127.0.0.1) is two panes. Down
 the left, every turn, newest first, grouped by day, with one line
 pulled out of each scratchpad so a session can be skimmed without
 opening anything. On the right, whichever turn is selected, laid out
@@ -2449,7 +2449,19 @@ is. The flags appear the moment the turn is reviewed. A page opened
 mid-session picks up where things stand, and with no page open it costs
 nothing.
 
-Nothing on it is stored; the thought log is the record. It refuses any
+Nothing on it is stored; the thought log is the record.
+
+**One server for all of it.** The monitor's server also serves the
+portrait (`/portrait/`), her thoughts (`/thoughts/`) and her memory
+editor (`/memory/`). That's one port and one process, with a small
+switcher in the corner of each page to hop between them. The thought
+viewer and the memory manager are still their own programs in their own
+folders, and they're only mounted here. `thought-viewer/start.sh` and
+`memory-manager/start.sh` open the page on Luna's server if she's
+running, and start the shared server (`python livefeed.py`) if she
+isn't. Each one also still runs entirely on its own, on its old port:
+`python thought-viewer/viewer.py` (:8791) and
+`python memory-manager/manager.py` (:8790). It refuses any
 request whose `Host` or `Origin` isn't itself, so a web page on another
 site can't read what you say to her, even through a DNS name pointed at
 127.0.0.1.

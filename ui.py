@@ -1385,7 +1385,7 @@ _HELP_SECTIONS = [
         "sqlite backend (experimental): permanent, searched, and a new",
         "fact can retire the old one it contradicts. Switch live with",
         "/set long_term_memory.backend sqlite|json - loses nothing.",
-        "memory-manager/start.sh opens the editor in your browser.",
+        ("/memory", "the memory editor in your browser"),
         "",
         ("/thoughts", "her reasoning, turn by turn, in the browser"),
         ("/monitor", "watch her think live - stages, tokens, tools, mood"),
