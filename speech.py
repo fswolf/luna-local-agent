@@ -644,8 +644,40 @@ def _synthesize(text):
     return np.clip(samples * config.TTS_VOLUME, -1.0, 1.0), rate
 
 
+def _lip_sync(samples, rate, fps=30):
+    """What the portrait's mouth needs for one chunk: loudness and
+    hissiness (zero-crossing rate) per frame. Sent only while a page is
+    watching - with none open it's skipped entirely."""
+    try:
+        import livefeed
+
+        if not livefeed.watching():
+            return
+
+        hop = max(1, int(rate / fps))
+        n = len(samples) // hop
+        frames = np.asarray(samples[:n * hop], dtype=np.float32).reshape(n, hop)
+        rms = np.sqrt((frames ** 2).mean(axis=1))
+        env = np.clip(rms / 0.12, 0, 1) ** 0.7
+        zcr = (np.abs(np.diff(np.signbit(frames).astype(np.int8), axis=1)).sum(axis=1) / hop)
+        livefeed.emit("voice", fps=fps, env=[round(float(x), 2) for x in env],
+                      zcr=[round(float(x), 3) for x in zcr])
+    except Exception:
+        pass  # decoration - never the reason she goes quiet
+
+
+def _lip_stop():
+    try:
+        import livefeed
+
+        livefeed.emit("voice", stop=True)
+    except Exception:
+        pass
+
+
 def _play(samples, rate):
     """Play one chunk; return False if HOME interrupted it."""
+    _lip_sync(samples, rate)
     sd.play(samples, rate)
 
     while True:
@@ -656,6 +688,7 @@ def _play(samples, rate):
 
         if state.stop_speaking:
             sd.stop()
+            _lip_stop()
             return False
 
         sd.sleep(50)

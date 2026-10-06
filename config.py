@@ -619,6 +619,20 @@ SELF_HEDGE_LINE = str(_self_cfg.get("hedge_line",
                                     "I'm not totally sure about that one, though."))
 SELF_GREET = bool(_self_cfg.get("greet", True))
 
+# The portrait window (portrait/, served by the live monitor at
+# /portrait/): a VRM model that blinks, looks around, twitches its ears
+# and moves its mouth with her voice. /portrait opens it.
+#   "portrait": { "model": "models/luna.vrm", "ear_bones": [],
+#                 "browser": "", "size": "420x560" }
+_portrait_cfg = setting("portrait", {})
+PORTRAIT_MODEL = str(_portrait_cfg.get("model", "models/luna.vrm"))
+PORTRAIT_EAR_BONES = list(_portrait_cfg.get("ear_bones", []) or [])
+PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))
+PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
+# Live2D only: which expression is which (portrait/add_live2d.py fills it
+# in), and which parameters are the ears if their names don't say so.
+PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
+
 # The live monitor (livefeed.py): a page served by the assistant on
 # 127.0.0.1, showing each turn as it happens. Read at startup.
 #   "monitor": { "enabled": true, "port": 8792 }
@@ -809,6 +823,10 @@ SETTINGS = {
     "self.hedge_below":           ("SELF_HEDGE_BELOW",             True),
     "self.hedge_line":            ("SELF_HEDGE_LINE",              True),
     "self.greet":                 ("SELF_GREET",                   True),
+
+    "portrait.model":             ("PORTRAIT_MODEL",               True),
+    "portrait.browser":           ("PORTRAIT_BROWSER",             True),
+    "portrait.size":              ("PORTRAIT_SIZE",                True),
 }
 
 _TRUE = ("1", "true", "yes", "on", "y")

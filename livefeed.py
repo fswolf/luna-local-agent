@@ -19,6 +19,7 @@ she thinks, and a page on any other site must not be able to read it -
 including through a DNS name pointed at 127.0.0.1.
 """
 import json
+import os
 import queue
 import threading
 import time
@@ -101,9 +102,47 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif self.path == "/events":
             self._stream()
+        elif self.path.split("?")[0] == "/portrait":
+            self.send_response(301)
+            self.send_header("Location", "/portrait/" + self.path[len("/portrait"):])
+            self.end_headers()
+        elif self.path.startswith("/portrait/"):
+            self._portrait(self.path.split("?", 1)[0][len("/portrait/"):])
         else:
             self.send_response(404)
             self.end_headers()
+
+    _TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+              ".json": "application/json", ".vrm": "model/gltf-binary", ".glb": "model/gltf-binary",
+              ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp",
+              ".moc3": "application/octet-stream"}
+
+    def _portrait(self, rel):
+        """The portrait page and its files, from portrait/ - and nothing
+        outside it, whatever the path says."""
+        if rel == "config.json":
+            return self._body(json.dumps(portrait_config()).encode(), "application/json")
+
+        root = os.path.realpath(os.path.join(config.BASE_DIR, "portrait"))
+        full = os.path.realpath(os.path.join(root, rel or "index.html"))
+        ext = os.path.splitext(full)[1].lower()
+
+        if not full.startswith(root + os.sep) or ext not in self._TYPES or not os.path.isfile(full):
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        with open(full, "rb") as f:
+            self._body(f.read(), self._TYPES[ext], cache=ext in (".vrm", ".glb", ".png", ".jpg", ".webp", ".moc3")
+                       and "vendor" not in full)
+
+    def _body(self, body, kind, cache=False):
+        self.send_response(200)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "max-age=60" if cache else "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _stream(self):
         self.send_response(200)
@@ -135,6 +174,23 @@ class _Handler(BaseHTTPRequestHandler):
     def _send(self, event):
         self.wfile.write(b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n\n")
         self.wfile.flush()
+
+
+def portrait_config():
+    """What the portrait page needs from config.json: which model, and
+    which nodes are her ears if their names don't say so."""
+    model = str(getattr(config, "PORTRAIT_MODEL", "") or "models/luna.vrm")
+    root = os.path.join(config.BASE_DIR, "portrait")
+
+    if not os.path.isfile(os.path.join(root, model)):
+        model = "models/placeholder.vrm"
+
+    return {"model": model, "ear_bones": list(getattr(config, "PORTRAIT_EAR_BONES", []) or []),
+            "live2d": dict(getattr(config, "PORTRAIT_LIVE2D", {}) or {})}
+
+
+def portrait_url(transparent=False):
+    return url() + "/portrait/" + ("?bg=transparent" if transparent else "")
 
 
 def start():

@@ -209,6 +209,74 @@ def _process(text):
         state.assistant_busy = False
 
 
+_portrait = {"proc": None}
+_APP_BROWSERS = ("chromium", "chromium-browser", "google-chrome-stable", "google-chrome",
+                 "brave-browser", "brave", "microsoft-edge", "vivaldi")
+
+
+def _toggle_portrait(obs=False):
+    """/portrait opens her portrait in a small window of its own, and
+    closes it again. /portrait obs prints the URL for a browser source."""
+    import shlex
+    import shutil
+    import subprocess
+    import webbrowser
+
+    import livefeed
+
+    if not config.MONITOR_ENABLED:
+        ui.add_message("system", "The portrait is served by the live monitor, which is off - "
+                       "set monitor.enabled to true in config.json and restart.")
+        return
+
+    if obs:
+        ui.add_message("system", "For OBS: add a Browser source with this URL, any size "
+                       f"you like - the background is see-through:\n{livefeed.portrait_url(True)}")
+        return
+
+    proc = _portrait["proc"]
+
+    if proc and proc.poll() is None:
+        proc.terminate()
+        _portrait["proc"] = None
+        ui.add_message("system", "Portrait closed.")
+        return
+
+    url = livefeed.portrait_url()
+
+    try:
+        w, h = (int(x) for x in config.PORTRAIT_SIZE.lower().split("x"))
+    except ValueError:
+        w, h = 420, 560
+
+    if config.PORTRAIT_BROWSER:
+        cmd = shlex.split(config.PORTRAIT_BROWSER.format(url=url, w=w, h=h))
+    else:
+        found = next((b for b in _APP_BROWSERS if shutil.which(b)), None)
+        # Its own profile, so it's its own process: one we can close again,
+        # rather than a tab handed to a browser that's already open.
+        profile = os.path.join(os.path.expanduser("~"), ".cache", "luna-portrait")
+        cmd = [found, f"--app={url}", f"--window-size={w},{h}", f"--user-data-dir={profile}",
+               "--no-first-run", "--no-default-browser-check"] if found else None
+
+    if not cmd:
+        webbrowser.open(url)
+        ui.add_message("system", f"Portrait: {url} (no Chromium-style browser found for a "
+                       "window of its own - set portrait.browser to choose one)")
+        return
+
+    try:
+        _portrait["proc"] = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                             stderr=subprocess.DEVNULL)
+        import atexit
+
+        atexit.register(lambda p=_portrait["proc"]: p.poll() is None and p.terminate())
+        ui.add_message("system", f"Portrait open - /portrait again closes it. ({url})")
+    except OSError as e:
+        ui.add_message("system", f"Couldn't start {cmd[0]}: {e} - opening it in your browser.")
+        webbrowser.open(url)
+
+
 def handle_input(text):
     """Called on the UI thread - dispatch fast, never block here."""
     if text in ("/quit", "/exit"):
@@ -971,6 +1039,10 @@ def handle_input(text):
 
         webbrowser.open(livefeed.url())
         ui.add_message("system", f"Live monitor: {livefeed.url()}")
+        return
+
+    if text in ("/portrait", "/portrait obs"):
+        _toggle_portrait(obs=text.endswith("obs"))
         return
 
     if text == "/thoughts":
