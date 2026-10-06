@@ -1,53 +1,14 @@
 #!/usr/bin/env bash
-# Start the assistant from anywhere - the script knows where it lives.
+# Start Luna from anywhere - see launch.py. It starts her voice server
+# too, if installer/install.py set one up, and stops it when she exits.
 cd "$(dirname "$(realpath "$0")")" || exit 1
 
-# Activate the venv unless one is already active. Checked in the order
-# they're likely to exist: the README's, then two common in-tree names.
-if [ -z "$VIRTUAL_ENV" ]; then
-    for venv in ~/ai-voice-venv ./ai-voice-venv ./venv; do
-        if [ -f "$venv/bin/activate" ]; then
-            # shellcheck disable=SC1091
-            source "$venv/bin/activate"
-            break
-        fi
-    done
-fi
+for py in "$(python3 -c 'import json;print(json.load(open("install.json")).get("venv_python",""))' 2>/dev/null)" \
+          "$VIRTUAL_ENV/bin/python" ~/ai-voice-venv/bin/python ./ai-voice-venv/bin/python ./venv/bin/python ./.venv/bin/python; do
+    if [ -n "$py" ] && [ -x "$py" ]; then
+        exec "$py" launch.py "$@"
+    fi
+done
 
-if [ -z "$VIRTUAL_ENV" ]; then
-    echo "No virtualenv found - running against system python3." >&2
-    echo "  python3.12 -m venv ~/ai-voice-venv" >&2
-fi
-
-# Both of these are warnings, never blockers: she degrades to a text
-# chat without speech, and says so herself if the model is missing.
-# Starting anyway beats a launcher that refuses to launch.
-# Prints on stdout so the caller can capture it; the caller decides
-# whether there is anything worth saying before it redirects to stderr.
-check() {
-    command -v curl >/dev/null || return 0
-    curl -fsS --max-time 2 "$1" >/dev/null 2>&1 || echo "  $2"
-}
-
-# Either model server will do - main.py picks whichever is up,
-# llama-server first. Only worth a word when neither is.
-model_server() {
-    command -v curl >/dev/null || return 0
-    curl -fsS --max-time 2 "http://127.0.0.1:8080/health" >/dev/null 2>&1 && return 0
-    curl -fsS --max-time 2 "http://localhost:1234/v1/models" >/dev/null 2>&1 && return 0
-    echo "  No model server - open LM Studio's Local Server, or run llama/start.sh."
-}
-
-warnings=$(
-    model_server
-    check "http://127.0.0.1:8899/health" \
-          "kokoro-reader isn't answering on :8899 - she'll start mute."
-)
-
-if [ -n "$warnings" ]; then
-    echo "Starting anyway:" >&2
-    echo "$warnings" >&2
-    echo >&2
-fi
-
-exec python3 main.py "$@"
+echo "No virtualenv found - run ./installer/install.sh first (trying system python3)." >&2
+exec python3 launch.py "$@"

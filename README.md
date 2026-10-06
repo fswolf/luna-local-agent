@@ -43,136 +43,81 @@ Everything runs locally. No cloud APIs required.
 
 ---
 
-# Requirements
-
-- Python 3.12+
-- LM Studio
-- A downloaded language model
-- LM Studio Local Server enabled
-- [kokoro-reader](https://github.com/fswolf/kokoro-reader) running locally
-
-Speech is **not** synthesized in this process. The assistant is a client
-of the kokoro-reader server and stays silent without it.
-
----
-
-# Create a Virtual Environment
+# Install
 
 ```bash
-python3.12 -m venv ai-voice-venv
-
-source ai-voice-venv/bin/activate
+git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
+cd ~/ai-voice
+./installer/install.sh                 # Linux, macOS
 ```
 
-# Python Dependencies
-
-```text
-requests>=2.32.0
-numpy>=2.2.0
-scipy>=1.15.0
-sounddevice>=0.5.2
-silero-vad
-faster-whisper>=1.1.0
-ctranslate2>=4.6.0
-kokoro>=0.9.4
-torch>=2.8.0
-torchaudio>=2.8.0
-huggingface_hub>=0.34.0
-pynput>=1.8.1
-evdev>=1.9.2
-prompt_toolkit>=3.0.0
-wcwidth>=0.8.2
-ddgs>=9.14.4
-
-openwakeword        # optional - "hey Luna" instead of a keypress
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\install.ps1    # Windows
 ```
 
-Install dependencies:
+The installer walks through it, asking before anything that touches the
+system:
+
+1. **Checks.** Python 3.10-3.13 (it offers to install 3.12 if there's
+   none), your GPU, disk space.
+2. **System packages** through your package manager (dnf, apt, pacman,
+   zypper, brew or winget): PortAudio for audio, espeak-ng for the
+   voice, git. On Linux it also offers grim, slurp, wl-clipboard and
+   unrar. It shows the exact command first.
+3. **Luna's Python environment.** It reuses `~/ai-voice-venv` if you
+   already have one, otherwise it makes `.venv`. PyTorch comes as the
+   small CPU build, since only voice detection uses it here.
+4. **Her voice.** It clones [kokoro-reader](https://github.com/fswolf/kokoro-reader)
+   next to this folder, in its own environment, with PyTorch for your GPU
+   (NVIDIA, AMD with ROCm, Apple) or the CPU. If a voice server is
+   already answering on :8899, it uses that instead.
+5. **Her brain.** LM Studio (it tells you what to click), or llama.cpp
+   built here (Linux) for the research features.
+6. **Extras, pick any:** wake word, MCP, portrait tools, Live2D runtime,
+   embedding model, the pomf chat plugin.
+7. **Launchers.** A `luna` command and an app-launcher entry on Linux,
+   `Luna.command` on macOS, `luna.cmd` and a Start menu shortcut on
+   Windows.
+8. **A health check**, then a summary of what's ready and what isn't.
+
+Then start her:
 
 ```bash
-pip install \
-requests \
-numpy \
-scipy \
-sounddevice \
-silero-vad \
-faster-whisper \
-ctranslate2 \
-kokoro \
-torch \
-torchaudio \
-huggingface_hub \
-pynput \
-evdev \
-prompt_toolkit \
-wcwidth \
-ddgs
+luna            # or ./start.sh, or luna.cmd on Windows
 ```
 
-Optional, for the wake word:
+The launcher starts her voice server too if the installer set one up,
+and stops it again when she exits. One you were already running is
+left alone.
+
+Run the installer again any time to repair or update. It picks up
+where it left off and only does what's missing. `--yes` takes every
+default, and `--check` only runs the health check. Other options:
+`--backend lmstudio|llama|skip`,
+`--voice install|url:http://host:port|skip`,
+`--gpu auto|cpu|cuda|rocm`, `--extras wakeword,mcp,portrait,...`.
+`python installer/uninstall.py` removes what it added and never touches
+your memory, history or settings.
+
+**Platforms, honestly:** Linux is where Luna lives and is tested. On
+macOS and Windows she installs and runs as a voice and text companion.
+The Linux-only parts (the global hotkey through evdev, Hyprland window
+tools, grim screenshots) say "not available" instead of working, and
+nobody has run her there much yet, so reports are welcome.
+
+### By hand
 
 ```bash
-pip install openwakeword
+python3.12 -m venv ~/ai-voice-venv && source ~/ai-voice-venv/bin/activate
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install -r installer/requirements.txt
 ```
 
-`kokoro`, `torch` and `torchaudio` are for the **TTS server**, not the
-assistant. If the server has its own venv, the assistant only needs
-`requests` to speak.
-
----
-
-Upgrade pip:
-
-```bash
-pip install --upgrade pip
-```
-
----
-
-# Linux Dependencies
-
-## Debian / Ubuntu
-
-```bash
-sudo apt install \
-python3-dev \
-build-essential \
-portaudio19-dev \
-ffmpeg
-```
-
-Optional, for vision on Wayland:
-
-```bash
-sudo apt install grim slurp
-```
-
-## Fedora
-
-```bash
-sudo dnf install \
-ffmpeg \
-portaudio-devel \
-python3-devel \
-gcc
-```
-
-For vision on Wayland, add `grim` (screenshots) and `slurp` (the region
-picker). Both are optional and only needed if you turn vision on.
-
-```bash
-sudo dnf install grim slurp
-```
-
----
-
-# macOS Dependencies
-
-Install Homebrew if needed, then:
-
-```bash
-brew install portaudio ffmpeg
-```
+You'll also need PortAudio (`portaudio-devel` / `portaudio19-dev` /
+`brew install portaudio`), a model server (below) and
+[kokoro-reader](https://github.com/fswolf/kokoro-reader) running on
+:8899. Speech isn't synthesized inside Luna: she's a client of that
+server, and stays text-only without it.
 
 ---
 
@@ -385,14 +330,16 @@ Point `tts.url` at the new port and nothing else changes.
 # Run the Assistant
 
 ```bash
-./start.sh
+luna            # or ./start.sh, or luna.cmd on Windows
 ```
 
-Finds the virtualenv itself, works from any directory, and passes any
-arguments through. It checks LM Studio and kokoro-reader on the way past
-and *says* if either is down rather than refusing to start — she runs as
-a text chat without speech, and a launcher that won't launch is worse
-than one that tells you why it'll be quiet.
+These find the virtualenv themselves, work from any directory, and pass
+any arguments through. If the installer set up her voice server, the
+launcher (`launch.py`) starts it first and stops it when she exits.
+It checks the model server and the voice on the way past and *says* if
+either is down rather than refusing to start. She runs as a text chat
+without speech, and a launcher that won't launch is worse than one that
+tells you why it'll be quiet.
 
 Or without it:
 
@@ -2964,6 +2911,8 @@ python3 kokoro-say.py                 # read the clipboard aloud through
 ```text
 ai-voice/
 │
+├── installer/        # install.sh, install.ps1, install.py, uninstall.py, requirements.txt
+├── launch.py         # what start.sh / luna / luna.cmd run: voice server, then Luna
 ├── ai-voice-ctl.py
 ├── alarm.py
 ├── assistant.py

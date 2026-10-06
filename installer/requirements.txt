@@ -1,0 +1,21 @@
+# Luna's own Python packages. The installer adds PyTorch (CPU build) first,
+# because silero-vad needs it and the default wheel drags in 2+ GB of CUDA.
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r installer/requirements.txt
+requests>=2.32
+numpy>=1.26
+scipy>=1.13
+sounddevice>=0.5
+silero-vad>=5.1
+faster-whisper>=1.1
+prompt_toolkit>=3.0.43
+wcwidth>=0.2.13
+ddgs>=9.0
+pynput>=1.7
+evdev>=1.7; sys_platform == "linux"
+
+# Extras (the installer asks):
+#   openwakeword       "hey Luna" instead of a key press
+#   mcp                tools from MCP servers
+#   pillow             portrait tools (Live2D import, textures)
+#   websocket-client   the pomf.tv chat plugin

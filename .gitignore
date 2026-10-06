@@ -82,3 +82,9 @@ portrait/models/*/
 portrait/models/luna.glb
 portrait/vendor/live2dcubismcore.min.js
 *.blend1
+
+# Made by installer/install.py on this machine
+install.json
+.venv/
+luna.cmd
+Luna.command
