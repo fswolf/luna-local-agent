@@ -112,6 +112,14 @@ def set_status(status: str):
         state["status"] = status
     _refresh()
 
+    # The live monitor's stage pill follows the same status line.
+    try:
+        import livefeed
+
+        livefeed.emit("stage", status=status)
+    except Exception:
+        pass
+
 
 def set_voice_server(label: str):
     """Update the server shown beside the TTS voice name."""
@@ -1356,6 +1364,7 @@ _HELP_SECTIONS = [
         "memory-manager/start.sh opens the editor in your browser.",
         "",
         ("/thoughts", "her reasoning, turn by turn, in the browser"),
+        ("/monitor", "watch her think live - stages, tokens, tools, mood"),
         "/set thoughts.enabled false stops recording it.",
     ]),
     ("Tools", [

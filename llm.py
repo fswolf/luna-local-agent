@@ -1,9 +1,11 @@
 import hashlib
 import json
+import math
 import requests
 import re
 import time
 
+import config
 import state
 from datetime import datetime
 
@@ -11,6 +13,7 @@ from config import LM_URL, TOOLS_ENABLED, MAX_TOOL_ROUNDS, LLM_HEADERS
 from config import AGENT_NAME, PERSONALITY, TONE, TRAITS, RULES, GENERATION
 from config import memory
 import history
+import livefeed
 import lmstudio
 import logbook
 import mood
@@ -86,6 +89,9 @@ and the user finds out later that it didn't.
   Don't say you don't remember until you've looked.
 - A durable fact about them worth recalling weeks later ->
   remember_fact; a correction to one -> update_fact or forget_fact.
+- Asked how sure you were, why you said something, or whether you were
+  guessing -> introspect. It reports measured numbers about an earlier
+  reply; say what they show, not what you'd like them to.
 - Writing a script or file for them -> write_file; changing one ->
   read_file first, then edit_file. They approve every write on screen.
   If the result says denied, say so and stop - never retry a denied
@@ -836,6 +842,20 @@ def _streamed_message(payload, narrator):
         if delta.get("content"):
             _last_raw["content"] += 1
 
+        # To the live monitor, with how likely the chunk's last token was
+        # when llama-server says. Inline <think> text (LM Studio with
+        # reasoning parsing off) arrives as content and shows as reply.
+        if livefeed.watching() and (piece or delta.get("content")):
+            p = None
+
+            try:
+                p = round(math.exp(delta["_logprobs"]["content"][-1]["logprob"]), 3)
+            except (KeyError, IndexError, TypeError, ValueError):
+                pass
+
+            livefeed.emit("tok", p="t" if piece else "a",
+                          s=piece or delta["content"], c=p)
+
         if state.stop_generating:
             # HOME was pressed - stop pulling tokens rather than finish
             # a reply nobody is going to hear. Deliberately not
@@ -958,6 +978,7 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
 
     for _round in range(MAX_TOOL_ROUNDS):
         _last_raw["tool_rounds"] = _round + 1
+        livefeed.emit("round", n=_round)
         narrator = _Narrator(on_text, on_sentence)
         message = _chat_completion(payload, narrator)
         calls = message.get("tool_calls") or []
@@ -997,7 +1018,10 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             arguments = function.get("arguments", "{}")
             _last_raw["called"].add(name)
             logbook.info("tools", "%s(%s)", name, str(arguments)[:300])
+            livefeed.emit("tool", name=name, args=" ".join(str(arguments).split())[:300])
             result = tools.call(name, arguments)
+            livefeed.emit("tool_result", name=name,
+                          result=result if len(result) <= 200 else result[:197] + "...")
             logbook.info("tools", "%s -> %s", name, str(result)[:300])
             _last_raw["exchanges"].append(
                 {"name": name, "arguments": arguments, "result": result}
@@ -1092,6 +1116,18 @@ def _call_label(function):
     return f"{name}({args[:90]}{'…' if len(args) > 90 else ''})"
 
 
+_window_cache = {"at": 0.0, "n": 0}
+
+
+def _window():
+    """The context length, asked for at most once a minute - it's an
+    HTTP round trip, and it only changes when a model is reloaded."""
+    if time.monotonic() - _window_cache["at"] > 60:
+        _window_cache.update(at=time.monotonic(), n=lmstudio.context_length())
+
+    return _window_cache["n"]
+
+
 def _record_thoughts(user_text, answer, started, source=None, model="",
                      prompt_hash=""):
     """This turn's scratchpad, to the thought log.
@@ -1119,7 +1155,7 @@ def _record_thoughts(user_text, answer, started, source=None, model="",
         except Exception:
             known = []
 
-        thoughtlog.record(
+        flags = thoughtlog.record(
             user_text, rounds, answer,
             source=source or state.turn_source or "typed",
             tools=called,
@@ -1132,6 +1168,7 @@ def _record_thoughts(user_text, answer, started, source=None, model="",
             model=model,
             prompt_hash=prompt_hash,
         )
+        livefeed.emit("flags", flags=flags or [])
     except Exception:
         logbook.exception("llm", "thought log write failed")
 
@@ -1274,6 +1311,19 @@ def ask(text, model, on_text=None, on_sentence=None,
 
     payload.update(build_generation_params())
 
+    # The live monitor's view of the turn's start. Chat turns pass a
+    # context of their own, which is how they're told apart here.
+    livefeed.emit("turn", text=text,
+                  source=source or ("chat" if context is not None else state.turn_source))
+    livefeed.emit("server", model=payload["model"], backend=getattr(config, "LLM_BACKEND", ""))
+    livefeed.emit("context", used=lmstudio.estimate_tokens(payload), window=_window())
+
+    try:
+        label, energy, warmth, _why = mood.state()
+        livefeed.emit("mood", label=label, energy=energy, warmth=warmth)
+    except Exception:
+        pass
+
     if _tools_supported:
         payload["tools"] = tools.specs(only=tools_allowed)
 
@@ -1330,6 +1380,18 @@ def ask(text, model, on_text=None, on_sentence=None,
                 messages[0]["content"].encode("utf-8", "replace")
             ).hexdigest()[:12],
         )
+
+    conf = None
+
+    if _last_raw.get("tokens"):
+        try:
+            import thoughtlog
+
+            conf = thoughtlog.confidence(_last_raw["tokens"])["conf"]
+        except Exception:
+            pass
+
+    livefeed.emit("done", seconds=round(time.monotonic() - started, 1), conf=conf)
 
     if not remember:
         # A turn from outside leaves nothing behind: not in history, not

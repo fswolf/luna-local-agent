@@ -17,11 +17,15 @@ Localhost only, and read-mostly: a turn can be starred, annotated or
 deleted, but the reasoning is never edited. What the model thought is
 what it thought.
 """
+import html
 import json
+import math
 import os
 import sys
 import threading
 import webbrowser
+
+from datetime import datetime
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -88,6 +92,10 @@ class Handler(BaseHTTPRequestHandler):
                 "budget": _budget(),
                 "rows": log.rows(limit=PAGE_SIZE, offset=offset, **where),
             }))
+        elif url.path == "/report":
+            where = dict(search=arg("q"), kind=arg("kind") or "starred",
+                         flag=arg("flag"), day=arg("day"), model=arg("model"))
+            self._send(200, report(where), "text/html")
         elif url.path == "/api/tokens":
             self._send(200, json.dumps({"runs": _log().tokens_for(int(arg("id") or 0))}))
         elif url.path == "/api/export":
@@ -120,6 +128,109 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, '{"ok":true}')
         except Exception as e:
             self._send(400, json.dumps({"ok": False, "error": str(e)}))
+
+
+# ---------------------------------------------------------------------------
+# The printable report - /report, starred turns by default
+# ---------------------------------------------------------------------------
+def _e(text):
+    return html.escape(str(text or ""))
+
+
+def _tokens_html(runs, part):
+    """A part of the turn as token spans, shaded by probability - the
+    same scale as the viewer, in colours that survive a printer."""
+    out = []
+
+    for run in runs:
+        for text, kind, lp, _alts in run:
+            if kind != part:
+                continue
+
+            p = math.exp(lp)
+            cls = "" if p >= 0.9 else "p2" if p >= 0.6 else "p3" if p >= 0.3 else "p4"
+            out.append(f'<span class="{cls}">{_e(text)}</span>' if cls else _e(text))
+
+    return "".join(out)
+
+
+def report(where):
+    log = _log()
+    rows = log.rows(limit=500, **where)
+    rows.reverse()  # oldest first reads like a diary
+    what = {"starred": "Starred turns", "flagged": "Flagged turns",
+            "scored": "Turns with confidence"}.get(where.get("kind"), "Selected turns")
+    parts = []
+
+    for r in rows:
+        when = r["timestamp"].replace("T", "  ")
+        meta = [m for m in (
+            r.get("source") if r.get("source") not in ("", "typed") else "",
+            " · ".join(x for x in (r.get("mood_e"), r.get("mood_w")) if x),
+            f"{r['seconds']}s" if r.get("seconds") else "",
+            f"{r['conf']:.0%} sure" if r.get("conf") is not None else "",
+            ", ".join(r.get("tools") or []),
+            r.get("model") or "",
+        ) if m]
+        runs = log.tokens_for(r["id"]) if r.get("n_tokens") else []
+        said = _tokens_html(runs, "a") if runs else ""
+        flags = "".join(
+            f"<li><b>{_e(f.split(': ', 1)[0])}</b>"
+            f"{(' &mdash; ' + _e(f.split(': ', 1)[1])) if ': ' in f else ''}</li>"
+            for f in r.get("flags") or []
+        )
+        parts.append(f"""
+<section class="turn">
+  <div class="when">{_e(when)}{' &middot; ' + _e(' · '.join(meta)) if meta else ''}{' &nbsp;&#9733;' if r.get('starred') else ''}</div>
+  <h3>You said</h3><p class="you">{_e(r['user_text'])}</p>
+  <h3>She said</h3><p class="said">{said or _e(r['answer'] or '(nothing)')}</p>
+  {f'<h3>Flags</h3><ul class="flags">{flags}</ul>' if flags else ''}
+  {f'<h3>Your note</h3><p class="note">{_e(r["note"])}</p>' if r.get('note') else ''}
+  {f'<h3>What she thought</h3><pre class="think">{_e(r["reasoning"])}</pre>' if r.get('reasoning') else ''}
+</section>""")
+
+    shading = any(r.get("n_tokens") for r in rows)
+    legend = ('<p class="legend">Her replies are shaded by how sure she was of each word: '
+              'unshaded 90%+, <span class="p2">60&ndash;90%</span>, '
+              '<span class="p3">30&ndash;60%</span>, <span class="p4">under 30%</span>.</p>'
+              if shading else "")
+    body = "".join(parts) or "<p>Nothing here yet &mdash; star a turn in the viewer first.</p>"
+
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luna's thoughts - {_e(what.lower())}</title>
+<style>
+  @page {{ margin: 18mm 16mm; }}
+  body {{ font: 11.5pt/1.55 Georgia, "Noto Serif", serif; color: #1d1a26; background: #fff;
+          max-width: 760px; margin: 0 auto; padding: 24px 18px 60px; }}
+  header {{ border-bottom: 2px solid #7c5cc4; margin-bottom: 18px; padding-bottom: 8px; }}
+  h1 {{ font: 600 20pt system-ui, sans-serif; color: #5b3fa6; margin: 0; }}
+  .sub {{ font: 10pt system-ui, sans-serif; color: #6b6480; margin-top: 2px; }}
+  .bar {{ position: sticky; top: 0; background: #fff; padding: 8px 0; text-align: right; }}
+  .bar button {{ font: 600 11pt system-ui, sans-serif; background: #7c5cc4; color: #fff;
+                 border: 0; border-radius: 6px; padding: 7px 14px; cursor: pointer; }}
+  .turn {{ border-top: 1px solid #ddd6ee; padding: 14px 0 6px; break-inside: avoid-page; }}
+  .when {{ font: 9.5pt system-ui, sans-serif; color: #6b6480; }}
+  h3 {{ font: 600 8.5pt system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em;
+        color: #8a80a8; margin: 10px 0 2px; }}
+  p {{ margin: 0; white-space: pre-wrap; }}
+  .you {{ font-weight: 600; }}
+  .said {{ border-left: 3px solid #5fb88a; padding-left: 10px; }}
+  .note {{ background: #fbf6e3; padding: 6px 9px; border-radius: 4px; }}
+  .flags {{ margin: 0; padding-left: 18px; color: #8a2a48; font-size: 10.5pt; }}
+  .think {{ font: 9.5pt/1.5 ui-monospace, "DejaVu Sans Mono", monospace; white-space: pre-wrap;
+            word-break: break-word; background: #f5f2fb; border: 1px solid #e4dcf4; border-radius: 6px;
+            padding: 8px 10px; margin: 0; color: #3a3350; }}
+  .legend {{ font: 9.5pt system-ui, sans-serif; color: #6b6480; margin-bottom: 8px; }}
+  .p2 {{ background: #ece4fb; }} .p3 {{ background: #f8e3bf; }} .p4 {{ background: #f6c4d0; }}
+  .p2, .p3, .p4 {{ border-radius: 2px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+  @media print {{ .bar {{ display: none; }} body {{ padding: 0; }} }}
+</style></head><body>
+<div class="bar"><button onclick="print()">Save as PDF</button></div>
+<header><h1>Luna's thoughts</h1>
+<div class="sub">{_e(what)} &middot; {len(rows)} turn{'s' if len(rows) != 1 else ''} &middot; exported {datetime.now():%d %B %Y, %H:%M}</div></header>
+{legend}{body}
+</body></html>"""
 
 
 PAGE = r"""<!DOCTYPE html>
@@ -288,10 +399,13 @@ PAGE = r"""<!DOCTYPE html>
       <button data-kind="starred">★ starred</button>
       <button data-kind="flagged">flagged</button>
       <button data-kind="scored" title="turns recorded on llama-server, with token confidence">confidence</button>
+      <button data-kind="introspect" title="turns where she looked at her own numbers">introspected</button>
     </span>
     <button id="daychip" style="display:none" onclick="setDay('')"></button>
     <button id="rec" onclick="toggleRecording()" title="record her reasoning - saved to config.json, same as /set thoughts.enabled"><span class="dot"></span><span id="rectext">recording</span></button>
     <button class="live on" onclick="toggleLive()" title="refresh as new turns arrive">live</button>
+    <a href="/report?kind=starred" target="_blank" title="a printable page of your starred turns - Save as PDF from there"><button>starred → PDF</button></a>
+    <a id="livelink" href="http://127.0.0.1:8792/" target="_blank" title="watch her think as it happens (Luna has to be running)"><button>live ↗</button></a>
     <a href="/api/export" download><button>export</button></a>
     <button class="danger" onclick="clearAll()">clear</button>
   </div>

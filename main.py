@@ -124,6 +124,10 @@ ui.set_memory(longterm.status())
 # person. Everything after this is drift off that.
 mood.start()
 
+import livefeed  # noqa: E402
+
+livefeed.start()
+
 # Seed the on-screen conversation with what was loaded from disk, so
 # past turns are visible right away instead of starting on a blank screen.
 for msg in history.get_messages():
@@ -947,6 +951,20 @@ def handle_input(text):
                 wakeword.scores["detections"],
             ),
         )
+        return
+
+    if text == "/monitor":
+        import webbrowser
+
+        import livefeed
+
+        if not config.MONITOR_ENABLED:
+            ui.add_message("system", "The live monitor is off - set monitor.enabled "
+                           "to true in config.json and restart.")
+            return
+
+        webbrowser.open(livefeed.url())
+        ui.add_message("system", f"Live monitor: {livefeed.url()}")
         return
 
     if text == "/thoughts":
