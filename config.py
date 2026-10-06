@@ -1,6 +1,12 @@
 import json
 import os
 
+from datetime import datetime as _datetime
+
+# When this run started - config is the first thing everything imports.
+# reflect.py uses it to tell this session's turns from the last one's.
+STARTED = _datetime.now()
+
 from urllib.parse import urlparse
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -593,6 +599,26 @@ ADAPTIVE_SPEAK_CORRECTIONS = bool(_adaptive_cfg.get("speak_corrections", True))
 ADAPTIVE_PREFIX = str(_adaptive_cfg.get("correction_prefix",
                                         "Hang on, let me correct that."))
 
+# Growing up a little (reflect.py, notebook.py): lessons from her own
+# mistakes, notes on each conversation, fact cleanup, saying when she's
+# unsure, and picking up where the last session left off.
+#   "self": { "lessons": true, "episodes": true, "tidy_facts": true,
+#             "calibration": true, "greet": true, ... }
+_self_cfg = setting("self", {})
+SELF_LESSONS = bool(_self_cfg.get("lessons", True))
+SELF_LESSONS_IN_PROMPT = int(_self_cfg.get("lessons_in_prompt", 4))
+SELF_MAX_LESSONS = int(_self_cfg.get("max_lessons", 40))
+SELF_REFLECT_HOURS = float(_self_cfg.get("reflect_every_hours", 20))
+SELF_EPISODES = bool(_self_cfg.get("episodes", True))
+SELF_EPISODES_IN_PROMPT = int(_self_cfg.get("episodes_in_prompt", 2))
+SELF_IDLE_MINUTES = int(_self_cfg.get("idle_minutes", 30))
+SELF_TIDY_FACTS = bool(_self_cfg.get("tidy_facts", True))
+SELF_CALIBRATION = bool(_self_cfg.get("calibration", True))
+SELF_HEDGE_BELOW = float(_self_cfg.get("hedge_below", 0.6))
+SELF_HEDGE_LINE = str(_self_cfg.get("hedge_line",
+                                    "I'm not totally sure about that one, though."))
+SELF_GREET = bool(_self_cfg.get("greet", True))
+
 # The live monitor (livefeed.py): a page served by the assistant on
 # 127.0.0.1, showing each turn as it happens. Read at startup.
 #   "monitor": { "enabled": true, "port": 8792 }
@@ -770,6 +796,19 @@ SETTINGS = {
     "adaptive.rethink_below":     ("ADAPTIVE_RETHINK_BELOW",       True),
     "adaptive.min_gain":          ("ADAPTIVE_MIN_GAIN",            True),
     "adaptive.speak_corrections": ("ADAPTIVE_SPEAK_CORRECTIONS",   True),
+
+    "self.lessons":               ("SELF_LESSONS",                 True),
+    "self.lessons_in_prompt":     ("SELF_LESSONS_IN_PROMPT",       True),
+    "self.max_lessons":           ("SELF_MAX_LESSONS",             True),
+    "self.reflect_every_hours":   ("SELF_REFLECT_HOURS",           True),
+    "self.episodes":              ("SELF_EPISODES",                True),
+    "self.episodes_in_prompt":    ("SELF_EPISODES_IN_PROMPT",      True),
+    "self.idle_minutes":          ("SELF_IDLE_MINUTES",            True),
+    "self.tidy_facts":            ("SELF_TIDY_FACTS",              True),
+    "self.calibration":           ("SELF_CALIBRATION",             True),
+    "self.hedge_below":           ("SELF_HEDGE_BELOW",             True),
+    "self.hedge_line":            ("SELF_HEDGE_LINE",              True),
+    "self.greet":                 ("SELF_GREET",                   True),
 }
 
 _TRUE = ("1", "true", "yes", "on", "y")

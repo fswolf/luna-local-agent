@@ -14,6 +14,14 @@ agent/facts.db-shm
 agent/thoughts.db
 agent/thoughts.db-wal
 agent/thoughts.db-shm
+# Cached embeddings of her facts - derived from personal data, rebuilt on demand.
+agent/embeddings.db
+agent/embeddings.db-wal
+agent/embeddings.db-shm
+# Lessons and session notes (notebook.py) - about your conversations.
+agent/notebook.db
+agent/notebook.db-wal
+agent/notebook.db-shm
 
 # llama.cpp is built in place by llama/install.sh; only the scripts and
 # the settings file are ours.
@@ -23,6 +31,10 @@ llama/slots/
 llama/*.log
 # The key llama/start.sh makes - a secret, never committed.
 llama/.api_key
+
+# Injection experiments: her answers (personal) and vectors (model-specific).
+introspection/results/
+introspection/vectors/
 
 # Screenshots and previews dropped here while working
 Claude outputs/

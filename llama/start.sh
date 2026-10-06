@@ -143,6 +143,11 @@ args=(
 # shellcheck disable=SC2206
 [ -n "$EXTRA" ] && args+=($EXTRA)
 
+# From the environment rather than server.env: introspection/blind.py
+# passes a control vector here for one session without editing a file.
+# shellcheck disable=SC2206
+[ -n "${EXTRA_ARGS:-}" ] && args+=($EXTRA_ARGS)
+
 echo "chat: $ALIAS"
 echo "  $MODEL"
 echo "  http://$HOST:$PORT  (Ctrl+C stops both)"
@@ -150,4 +155,13 @@ echo
 
 # Not exec: this shell has to outlive the server, to stop the embedding
 # one when it goes.
-"$BIN" "${args[@]}" "$@"
+#
+# QUIET_LOG sends the server's own output to a file instead of this
+# terminal. A blind session needs it: llama-server announces the control
+# vector it loaded, which would give the game away.
+if [ -n "${QUIET_LOG:-}" ]; then
+    echo "  (server output is going to ${QUIET_LOG} - don't read it until you reveal)"
+    "$BIN" "${args[@]}" "$@" > "$QUIET_LOG" 2>&1
+else
+    "$BIN" "${args[@]}" "$@"
+fi

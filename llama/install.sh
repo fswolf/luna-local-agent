@@ -66,7 +66,7 @@ BUILD="$SRC/build-$KIND"
 cmake -S "$SRC" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release \
       -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF "${FLAGS[@]}"
 cmake --build "$BUILD" --config Release -j"$(nproc)" \
-      --target llama-server llama-bench
+      --target llama-server llama-bench llama-cvector-generator
 
 ln -sfn "$BUILD/bin" bin
 

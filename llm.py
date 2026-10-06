@@ -62,14 +62,82 @@ def build_memory_prompt(query=""):
     return prompt
 
 
-def build_tools_prompt():
+# Set after a remembered turn whose answer measured unsure, read (and
+# cleared) by the next prompt - so "are you sure?" gets an honest answer
+# without her having to call introspect for it.
+_calibration_note = {"text": ""}
+
+# Whether the turn in flight is Ryan's own (True) or came from stream
+# chat. The self tools refuse on a chat turn even if a model names them
+# without being offered them, and they read this to know.
+turn = {"private": True, "lessons": []}
+
+
+def build_self_prompt(query=""):
+    """What she knows about herself rather than about him: lessons from
+    her own mistakes, what happened last time, older conversations that
+    bear on this one, and how sure her last reply measured. Everything
+    in it comes from reflect.py / notebook.py; "" when it's all off."""
+    blocks = []
+
+    try:
+        import notebook
+        import timeutil
+
+        if getattr(config, "SELF_LESSONS", True):
+            lessons = notebook.relevant_lessons(query)
+            turn["lessons"] = lessons
+
+            if lessons:
+                blocks.append("Lessons you've learned from your own past mistakes "
+                              "(follow them):\n" + "\n".join(f"- {l}" for l in lessons))
+
+        if getattr(config, "SELF_EPISODES", True):
+            def when(iso):
+                try:
+                    return timeutil.relative(datetime.fromisoformat(iso), datetime.now())
+                except ValueError:
+                    return iso
+
+            last = notebook.latest_episode()
+
+            if last:
+                blocks.append(f"Your notes from the last conversation ({when(last['ended'])}):\n"
+                              f"{last['summary']}")
+
+            older = notebook.relevant_episodes(query)
+
+            if older:
+                blocks.append("Earlier conversations that may be related:\n" + "\n".join(
+                    f"- ({when(e['ended'])}) {e['summary']}" for e in older))
+    except Exception:
+        logbook.exception("llm", "self prompt failed")
+
+    if _calibration_note["text"]:
+        blocks.append(_calibration_note["text"])
+
+    return ("\n" + "\n\n".join(blocks) + "\n") if blocks else ""
+
+
+_SELF_NUDGE = """- Asked how you're doing, how today has gone, what you've learned, or
+  anything about yourself -> self_status. It is measured; report it,
+  don't embellish.
+- Asked about an earlier conversation ("what did we decide about...") ->
+  recall_episodes, your own notes on past sessions; search_history if
+  you need the exact words.
+- Corrected on how you did something (not on a fact about them) ->
+  note_lesson, one line you'll follow from now on.
+"""
+
+
+def build_tools_prompt(private=True):
     """A short nudge about the tools. The schemas are sent separately in
     the payload; this is about *when* to reach for them, which schemas
     don't convey well to smaller models."""
     if not _tools_supported:
         return ""
 
-    return """
+    return f"""
 You have tools. Call them - do not describe calling them. Saying "I'll
 set that for you" without calling set_reminder means nothing happens,
 and the user finds out later that it didn't.
@@ -92,7 +160,7 @@ and the user finds out later that it didn't.
 - Asked how sure you were, why you said something, or whether you were
   guessing -> introspect. It reports measured numbers about an earlier
   reply; say what they show, not what you'd like them to.
-- Writing a script or file for them -> write_file; changing one ->
+{_SELF_NUDGE if private else ""}- Writing a script or file for them -> write_file; changing one ->
   read_file first, then edit_file. They approve every write on screen.
   If the result says denied, say so and stop - never retry a denied
   write.
@@ -101,8 +169,10 @@ Chat normally when no tool is needed.
 """
 
 
-def build_system_prompt(query="", timing=""):
-    summary = history.get_summary()
+def build_system_prompt(query="", timing="", private=True):
+    # Ryan's history summary, his facts and her notes are his business -
+    # a turn from stream chat gets the persona and the clock, not them.
+    summary = history.get_summary() if private else ""
     summary_block = f"\nEarlier conversation summary:\n{summary}\n" if summary else ""
 
     # A "now" anchor, plus enough calendar context that the model never
@@ -130,8 +200,9 @@ Traits:
 
 Rules:
 {', '.join(RULES)}
-{build_tools_prompt()}
-{build_memory_prompt(query)}
+{build_tools_prompt(private)}
+{build_memory_prompt(query) if private else ""}
+{build_self_prompt(query) if private else ""}
 {summary_block}
 """
 
@@ -1019,7 +1090,18 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             _last_raw["called"].add(name)
             logbook.info("tools", "%s(%s)", name, str(arguments)[:300])
             livefeed.emit("tool", name=name, args=" ".join(str(arguments).split())[:300])
-            result = tools.call(name, arguments)
+
+            # Only what this turn was offered. A model can name any tool
+            # it has heard of - from the prompt, from history - and a
+            # stream-chat turn's narrow list means nothing if a name
+            # outside it still runs.
+            offered = {(t.get("function") or {}).get("name") for t in payload.get("tools") or ()}
+
+            if name not in offered:
+                result = f"Error: {name} isn't available right now."
+                logbook.warn("tools", "refused %s - not offered this turn", name)
+            else:
+                result = tools.call(name, arguments)
             livefeed.emit("tool_result", name=name,
                           result=result if len(result) <= 200 else result[:197] + "...")
             logbook.info("tools", "%s -> %s", name, str(result)[:300])
@@ -1244,6 +1326,60 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
             "corrected": corrected, "conf": conf, "conf2": conf2, "outcome": outcome}
 
 
+def _calibrate(answer, second, remember, on_text, on_sentence):
+    """Make what she says match how sure she measured.
+
+    When her own token probabilities say she didn't know and the answer
+    doesn't admit it, a short hedge is spoken after it (self.hedge_line),
+    and the next prompt tells her how sure that reply was - so a "you
+    sure?" gets the truth. Only for Ryan's own turns on llama-server - a
+    reminder she's delivering isn't a claim she can be unsure of - never
+    after a tool call (wording a tool result back can be low-probability
+    without being a guess), and never on top of a spoken correction.
+    """
+    if not (remember and getattr(config, "SELF_CALIBRATION", True)
+            and _last_raw.get("tokens") and not _last_raw.get("exchanges")):
+        return answer
+
+    try:
+        import thoughtlog
+
+        if second:
+            shape = thoughtlog.confidence(second["second" if second["corrected"] else "first"]["tokens"])
+        else:
+            shape = thoughtlog.confidence(_last_raw["tokens"])
+    except Exception:
+        return answer
+
+    conf = shape["conf"]
+
+    if conf is None or conf >= config.SELF_HEDGE_BELOW:
+        return answer
+
+    shaky = f" - shakiest on {shape['shaky'].split(', ', 1)[-1]}" if shape["shaky"] else ""
+    _calibration_note["text"] = (
+        f"About your previous reply: your own token probabilities say you were "
+        f"only {conf:.0%} sure of it{shaky}. If it comes up, be upfront that you "
+        "weren't sure."
+    )
+
+    # Said out loud only when the doubt has a place - a run of coin-flip
+    # tokens (a name, a number, a date) - not when a playful reply simply
+    # had a lot of ways to be worded. Banter averages low; it isn't a guess.
+    if (second and second["corrected"]) or thoughtlog._HEDGED.search(answer) \
+            or not config.SELF_HEDGE_LINE or not shape["shaky"]:
+        return answer
+
+    line = config.SELF_HEDGE_LINE.strip()
+    speaker = _Narrator(on_text, on_sentence)
+    speaker.feed(" " + line + " ")
+    speaker.finish()
+    _log_tool_call("calibration", f"{conf:.0%} sure - added \"{line}\"")
+    livefeed.emit("rethink", step="done", outcome=f"hedged - only {conf:.0%} sure", conf=conf)
+
+    return f"{answer} {line}"
+
+
 _window_cache = {"at": 0.0, "n": 0}
 
 
@@ -1329,10 +1465,12 @@ def prompt_budget(text="hello"):
     specs = tools.specs() if _tools_supported else []
     memory_block = build_memory_prompt(text)
     tools_block = build_tools_prompt()
+    self_block = build_self_prompt(text)
 
     parts = {
-        "persona + rules": lmstudio.estimate_tokens(system) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block),
+        "persona + rules": lmstudio.estimate_tokens(system) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block) - lmstudio.estimate_tokens(self_block),
         "memory (facts + preferences)": lmstudio.estimate_tokens(memory_block),
+        "lessons + past sessions": lmstudio.estimate_tokens(self_block),
         "tools nudge": lmstudio.estimate_tokens(tools_block),
         "tool schemas": lmstudio.estimate_tokens(specs),
         "tool example": lmstudio.estimate_tokens(demo),
@@ -1380,10 +1518,18 @@ def ask(text, model, on_text=None, on_sentence=None,
     _last_raw["tokens"] = []
 
     past = [] if context is not None else history.get_messages_full()
+    turn["private"] = context is None
+    turn["lessons"] = []
     messages = [{
         "role": "system",
-        "content": build_system_prompt(text, _timing_note(past)),
+        # A turn from stream chat never sees her notes on Ryan's
+        # conversations - "last time" is his business, not the room's.
+        "content": build_system_prompt(text, _timing_note(past),
+                                       private=context is None),
     }]
+
+    if context is None:
+        _calibration_note["text"] = ""  # read once, by the prompt just built
 
     # get_messages_full() keeps each message's stored timestamp, so
     # the model can see how much time passed between past turns too,
@@ -1524,6 +1670,13 @@ def ask(text, model, on_text=None, on_sentence=None,
         # transcript keep the correction, not a tidier version of events.
         answer = f"{first_answer}\n\n{second['said']}"
 
+    spoken = _calibrate(answer, second, remember and source is None, on_text, on_sentence)
+
+    if spoken != answer and not (second and second["corrected"]):
+        first_answer = spoken  # the log records what she said, hedge included
+
+    answer = spoken
+
     if remember:
         # The hash is of the system prompt as sent, so a changed persona,
         # rule or memory selection is a different hash - and a flag rate
@@ -1558,6 +1711,18 @@ def ask(text, model, on_text=None, on_sentence=None,
             pass
 
     livefeed.emit("done", seconds=round(time.monotonic() - started, 1), conf=conf)
+
+    try:
+        import reflect
+
+        reflect.touch()  # any turn, chat included - she's not idle
+
+        if remember and turn["lessons"]:
+            import notebook
+
+            notebook.credit(turn["lessons"])
+    except Exception:
+        pass
 
     if not remember:
         # A turn from outside leaves nothing behind: not in history, not

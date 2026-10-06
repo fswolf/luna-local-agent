@@ -171,6 +171,12 @@ threading.Thread(target=reminders.run_scanner, args=(MODEL,), daemon=True).start
 for _line in plugins.start_enabled(MODEL):
     ui.add_message("system", _line)
 
+# Lessons, session notes and fact cleanup while she's idle - and first,
+# notes on the last session, so she can pick up where it left off.
+import reflect  # noqa: E402
+
+reflect.start(MODEL, show=lambda line: ui.add_message("system", line))
+
 
 # -------------------------
 # Turn handling
@@ -992,6 +998,79 @@ def handle_input(text):
             )
 
         ui.add_message("system", f"{thoughtlog.summary()} - {url}")
+        return
+
+    if text == "/reflect":
+        import reflect
+
+        def run():
+            ui.set_status("Reflecting...")
+
+            try:
+                reflect.run_all(MODEL, report=lambda line: ui.add_message("system", line))
+            except Exception as e:
+                ui.add_message("system", f"Reflection failed: {e}")
+            finally:
+                ui.set_status("Idle")
+
+        ui.add_message("system", "Reflecting - session notes, then lessons, then "
+                       "fact cleanup. A minute or two.")
+        threading.Thread(target=run, daemon=True).start()
+        return
+
+    if text == "/lessons" or text.startswith("/lessons "):
+        import notebook
+
+        words = text.split()
+
+        if len(words) == 3 and words[1] in ("forget", "restore") and words[2].isdigit():
+            ok = (notebook.retire_lesson if words[1] == "forget"
+                  else notebook.restore_lesson)(int(words[2]))
+            done = "restored" if words[1] == "restore" else "hidden from her"
+            ui.add_message("system", f"Lesson {words[2]} {done}." if ok
+                           else f"No lesson {words[2]} to {words[1]}.")
+            return
+
+        retired = len(words) > 1 and words[1] == "retired"
+        rows = notebook.lessons(retired=retired)
+
+        if not rows:
+            ui.add_message("system", "No retired lessons." if retired else
+                           "No lessons yet - they come from the dream pass "
+                           "(/reflect, or on its own once a day while she's idle).")
+            return
+
+        ui.add_message("system", "\n".join(
+            [f"{'Retired' if retired else 'Lessons'} ({len(rows)}):"]
+            + [f"{l['id']:>3}. {l['text']}"
+               + (f"  [from #{', #'.join(map(str, l['from']))}]" if l["from"]
+                  else "  [noted herself]" if l.get("origin") == "self" else "")
+               + (f"  ×{l['hits']}" if l["hits"] else "") for l in rows]
+            + ["/lessons forget <n> hides one; /lessons retired lists hidden ones."]))
+        return
+
+    if text == "/episodes" or text.startswith("/episodes "):
+        import notebook
+
+        words = text.split()
+
+        if len(words) == 3 and words[1] == "forget" and words[2].isdigit():
+            ok = notebook.delete_episode(int(words[2]))
+            ui.add_message("system", f"Episode {words[2]} forgotten." if ok
+                           else f"No episode {words[2]}.")
+            return
+
+        rows = notebook.episodes(8)
+
+        if not rows:
+            ui.add_message("system", "No session notes yet - a conversation is "
+                           f"written up after {config.SELF_IDLE_MINUTES} quiet "
+                           "minutes, or at the next startup.")
+            return
+
+        ui.add_message("system", "\n\n".join(
+            f"{e['id']}. {e['started'][:16].replace('T', ' ')} ({e['turns']} lines)\n{e['summary']}"
+            for e in rows) + "\n\n/episodes forget <n> deletes one.")
         return
 
     if text == "/help":

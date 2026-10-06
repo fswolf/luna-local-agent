@@ -187,6 +187,9 @@ def _wake_line(model, text):
             "Say one short, daft, affectionate line to wake them up. "
             "One sentence. No preamble.)",
             model,
+            # Labels it in the thought log, and keeps calibration off a
+            # line that's meant to be silly, not right.
+            source="alarm",
         )
     except Exception as e:
         logbook.warn("alarm", "couldn't get a wake-up line: %s", e)

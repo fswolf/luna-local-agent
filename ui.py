@@ -730,6 +730,29 @@ _THOUGHT_FEATURES = (
 )
 
 
+# Learning and continuity (reflect.py). Each costs a little context -
+# a few lines of lessons and notes - or a model call while she's idle.
+_SELF_FEATURES = (
+    ("lessons (dream pass)", "SELF_LESSONS", "self.lessons", "/reflect, /lessons"),
+    ("episodic memory", "SELF_EPISODES", "self.episodes", "/episodes"),
+    ("fact cleanup", "SELF_TIDY_FACTS", "self.tidy_facts", "sqlite memory"),
+    ("calibration", "SELF_CALIBRATION", "self.calibration", "says when unsure"),
+    ("startup greeting", "SELF_GREET", "self.greet", "after a break"),
+)
+
+
+def _self_group():
+    try:
+        import config
+    except Exception:
+        return None
+
+    members = [(label, bool(getattr(config, key, False)), True, note, 0, path)
+               for label, key, path, note in _SELF_FEATURES]
+
+    return ("Learning", members, 0, 0)
+
+
 def _thoughts_group():
     try:
         import config
@@ -782,7 +805,7 @@ def _tool_groups():
     except Exception:
         groups = []
 
-    extra = [g for g in (_feature_group(), _thoughts_group()) if g]
+    extra = [g for g in (_feature_group(), _thoughts_group(), _self_group()) if g]
 
     return groups + extra
 
@@ -1367,6 +1390,11 @@ _HELP_SECTIONS = [
         ("/thoughts", "her reasoning, turn by turn, in the browser"),
         ("/monitor", "watch her think live - stages, tokens, tools, mood"),
         "/set thoughts.enabled false stops recording it.",
+        "",
+        ("/reflect", "dream pass now: lessons, session notes, fact cleanup"),
+        ("/lessons", "what she's learned - /lessons forget|restore <n>"),
+        ("/episodes", "her notes on past conversations - /episodes forget <n>"),
+        "the Learning group in the tools pane switches each part.",
     ]),
     ("Tools", [
         "Tab twice opens the tools pane: every tool, what its schema",
@@ -1405,7 +1433,8 @@ _HELP_SECTIONS = [
         "in the tools pane: up/down or the wheel choose, space toggles.",
         "the Mood group at the bottom switches moods, her voice tint",
         "and warmth sensing from the same place; Thoughts switches the",
-        "reasoning log.",
+        "reasoning log; Learning switches lessons, episodes, fact cleanup,",
+        "calibration and the startup greeting.",
         "the pane grabs the mouse while it's open so one notch is one",
         "option - F2 and text selection go back to normal on the way out.",
         ("/mouse", "same as F2, and saves the choice"),
