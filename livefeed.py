@@ -18,6 +18,7 @@ isn't this server is refused. The stream carries what you say and what
 she thinks, and a page on any other site must not be able to read it -
 including through a DNS name pointed at 127.0.0.1.
 """
+import importlib.util
 import json
 import os
 import queue
@@ -93,7 +94,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/":
-            body = PAGE.encode()
+            body = with_switcher(PAGE, "live").encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -102,6 +103,8 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif self.path == "/events":
             self._stream()
+        elif self._mounted("GET"):
+            pass
         elif self.path.split("?")[0] == "/portrait":
             self.send_response(301)
             self.send_header("Location", "/portrait/" + self.path[len("/portrait"):])
@@ -111,6 +114,45 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_POST(self):
+        if not self._allowed() or not self._mounted("POST"):
+            self.send_response(403 if not self._allowed() else 404)
+            self.end_headers()
+
+    def _mounted(self, method):
+        """The thought viewer and the memory manager, served from here at
+        /thoughts/ and /memory/ - their own handler code, run against this
+        request. Returns False when the path isn't one of theirs."""
+        for name in MOUNTS:
+            prefix = "/" + name
+            if self.path == prefix or self.path.startswith(prefix + "?"):
+                self.send_response(301)
+                self.send_header("Location", prefix + "/" + self.path[len(prefix):])
+                self.end_headers()
+                return True
+            if not self.path.startswith(prefix + "/"):
+                continue
+            try:
+                cls = _mount_class(name)
+            except Exception as e:
+                logbook.warn("monitor", "couldn't load %s: %s", name, e)
+                body = f"couldn't load the {name} page: {e}".encode()
+                self.send_response(500)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return True
+            original_path, original_cls = self.path, self.__class__
+            self.path = self.path[len(prefix):] or "/"
+            self.__class__ = cls
+            try:
+                (self.do_POST if method == "POST" else self.do_GET)()
+            finally:
+                self.path, self.__class__ = original_path, original_cls
+            return True
+        return False
 
     _TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
               ".json": "application/json", ".vrm": "model/gltf-binary", ".glb": "model/gltf-binary",
@@ -174,6 +216,60 @@ class _Handler(BaseHTTPRequestHandler):
     def _send(self, event):
         self.wfile.write(b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n\n")
         self.wfile.flush()
+
+
+# ---------------------------------------------------------------------------
+# The other pages, under one roof
+#
+# The thought viewer and the memory manager stay their own programs in
+# their own folders - each still runs on its own with its own start.sh.
+# When this server is up (Luna running, or `python livefeed.py`), it
+# serves them too, so one port and one process covers the monitor, the
+# portrait, her thoughts and her memory, with a small switcher on each.
+# ---------------------------------------------------------------------------
+MOUNTS = {"thoughts": ("thought-viewer", "viewer.py", "her thoughts"),
+          "memory": ("memory-manager", "manager.py", "her memory")}
+_mount_classes = {}
+
+
+def _mount_class(name):
+    """The app's own request handler, with the page switcher slipped into
+    every HTML page it sends."""
+    if name not in _mount_classes:
+        folder, file, _label = MOUNTS[name]
+        spec = importlib.util.spec_from_file_location(f"luna_{name}_page",
+                                                      os.path.join(config.BASE_DIR, folder, file))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        base = mod.Handler
+
+        def _send(self, code, body, content_type="application/json", *rest):
+            if content_type.startswith("text/html") and isinstance(body, str):
+                body = with_switcher(body, name)
+            return base._send(self, code, body, content_type, *rest)
+
+        _mount_classes[name] = type(f"Mounted_{name}", (base,), {"_send": _send})
+    return _mount_classes[name]
+
+
+def with_switcher(html, here):
+    """A small pill bottom-right linking the pages this server serves."""
+    links = [("", "live"), ("portrait/", "portrait"), ("thoughts/", "thoughts"), ("memory/", "memory")]
+    items = "".join(
+        f'<a href="/{href}"{" class=on" if (href.rstrip("/") or "live") == here else ""}>{label}</a>'
+        for href, label in links)
+    nav = ("<style>#luna-nav{position:fixed;right:12px;bottom:10px;z-index:9999;display:flex;gap:2px;"
+           "background:#120d1ccc;border:1px solid #3a2d55;border-radius:999px;padding:3px;"
+           "font:12px system-ui,sans-serif;backdrop-filter:blur(6px)}"
+           "#luna-nav a{color:#a99cc8;text-decoration:none;padding:3px 10px;border-radius:999px}"
+           "#luna-nav a:hover{color:#e6dcff;background:#2a2040}"
+           "#luna-nav a.on{color:#14081c;background:#c49dff}"
+           f"@media print{{#luna-nav{{display:none}}}}</style><nav id=luna-nav>{items}</nav>")
+    i = html.find("<body")
+    if i < 0:
+        return html
+    j = html.find(">", i)
+    return html[:j + 1] + nav + html[j + 1:]
 
 
 def portrait_config():
@@ -394,3 +490,36 @@ connect();
 </script>
 </body></html>
 """
+
+
+def main():
+    """`python livefeed.py [--open thoughts|memory|portrait]`: the pages
+    without Luna. If the server's already up (Luna's running), this just
+    opens the page in your browser."""
+    import socket
+    import sys
+    import webbrowser
+
+    page = ""
+    if "--open" in sys.argv[1:-1]:
+        page = sys.argv[sys.argv.index("--open") + 1].strip("/")
+    target = url() + ("/" + page + "/" if page and page != "live" else "/")
+    with socket.socket() as probe:
+        probe.settimeout(0.3)
+        running = probe.connect_ex(("127.0.0.1", port())) == 0
+    if running:
+        webbrowser.open(target)
+        print(target)
+        return
+    server = ThreadingHTTPServer(("127.0.0.1", port()), _Handler)
+    server.daemon_threads = True
+    print(f"{url()}  - live, /portrait/, /thoughts/, /memory/  (Ctrl+C stops it)")
+    threading.Timer(0.4, lambda: webbrowser.open(target)).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print()
+
+
+if __name__ == "__main__":
+    main()
