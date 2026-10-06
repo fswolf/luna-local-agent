@@ -9,7 +9,7 @@ import requests
 import threading
 
 import config
-from config import AGENT_NAME, VOICE, TTS_URL, LM_URL
+from config import AGENT_NAME, VOICE, TTS_URL, LM_URL, LLM_BACKEND
 from speech import load_models
 from input import start_keyboard
 import assistant
@@ -56,9 +56,13 @@ MODEL = lmstudio.probe()
 
 if not MODEL:
     print(
-        f"\nCouldn't reach LM Studio at {LM_URL}\n"
-        "Make sure LM Studio is open, a model is loaded, and its local "
-        "server is started (Developer tab) before running this.\n"
+        f"\nCouldn't reach a model server at {LM_URL}\n"
+        "Either open LM Studio, load a model and start its local server "
+        "(Developer tab), or start llama.cpp with llama/start.sh.\n"
+        if LLM_BACKEND != "llama" else
+        f"\nllama-server isn't answering at {LM_URL}\n"
+        "Start it with llama/start.sh, or set llm.backend to auto in "
+        "config.json to fall back to LM Studio.\n"
     )
     raise SystemExit(1)
 

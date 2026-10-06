@@ -29,9 +29,17 @@ check() {
     curl -fsS --max-time 2 "$1" >/dev/null 2>&1 || echo "  $2"
 }
 
+# Either model server will do - main.py picks whichever is up,
+# llama-server first. Only worth a word when neither is.
+model_server() {
+    command -v curl >/dev/null || return 0
+    curl -fsS --max-time 2 "http://127.0.0.1:8080/health" >/dev/null 2>&1 && return 0
+    curl -fsS --max-time 2 "http://localhost:1234/v1/models" >/dev/null 2>&1 && return 0
+    echo "  No model server - open LM Studio's Local Server, or run llama/start.sh."
+}
+
 warnings=$(
-    check "http://localhost:1234/v1/models" \
-          "LM Studio isn't answering on :1234 - enable its Local Server."
+    model_server
     check "http://127.0.0.1:8899/health" \
           "kokoro-reader isn't answering on :8899 - she'll start mute."
 )

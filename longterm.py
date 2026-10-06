@@ -10,7 +10,7 @@ import logbook
 
 # The tunables are read as config.X at each use rather than imported by
 # value, so /set changes actually reach them.
-from config import memory, LM_URL, BASE_DIR
+from config import memory, LM_URL, LLM_HEADERS, BASE_DIR
 
 MEMORY_FILE = os.path.join(BASE_DIR, "agent", "memory.json")
 
@@ -154,10 +154,25 @@ def relevant_facts(query, limit=None):
     limit = limit or config.LONG_TERM_MEMORY_CONTEXT_FACTS
     _announce()  # cheap, and it catches edits made in the memory manager
 
+    # By meaning first, when the embedding server is running and there are
+    # more facts than fit - under the limit every fact travels anyway.
+    # None means it couldn't (server down, request failed), and the
+    # word matching below takes over exactly as before.
+    facts = get_facts()
+
+    if len(facts) > limit:
+        try:
+            import embedmem
+
+            chosen = embedmem.select(query, facts, limit)
+        except Exception:
+            chosen = None
+
+        if chosen is not None:
+            return chosen
+
     if backend() == "sqlite":
         return factstore.search(query, limit)
-
-    facts = get_facts()
 
     if len(facts) <= limit:
         return facts
@@ -366,7 +381,7 @@ def add_fact(fact: str, subject: str = "") -> bool:
 
 def _ask_extractor(model, prompt):
     response = requests.post(
-        LM_URL,
+        LM_URL, headers=LLM_HEADERS,
         json={"model": model, "messages": [{"role": "user", "content": prompt}]},
     )
 
@@ -518,7 +533,7 @@ def _extract_fact(model, user_text, answer):
     )
     try:
         response = requests.post(
-            LM_URL,
+            LM_URL, headers=LLM_HEADERS,
             json={"model": model, "messages": [{"role": "user", "content": prompt}]},
         )
         result = response.json()["choices"][0]["message"]["content"].strip()

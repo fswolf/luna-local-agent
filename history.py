@@ -28,6 +28,7 @@ from datetime import datetime
 
 from config import (
     LM_URL,
+    LLM_HEADERS,
     MAX_RAW_MESSAGES,
     SUMMARIZE_CHUNK,
     SUMMARY_MAX_CHARS,
@@ -254,7 +255,7 @@ def clear():
 # ---------------------------------------------------------------------------
 def _ask_model(model, prompt):
     response = requests.post(
-        LM_URL,
+        LM_URL, headers=LLM_HEADERS,
         json={"model": model, "messages": [{"role": "user", "content": prompt}]},
         timeout=180,
     )

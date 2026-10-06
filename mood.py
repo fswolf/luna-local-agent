@@ -438,10 +438,10 @@ def _rate_affection(text, model):
     """Ask the model for a 0-3, defensively. 0 on anything unexpected."""
     import requests
 
-    from config import LM_URL
+    from config import LM_URL, LLM_HEADERS
 
     try:
-        response = requests.post(LM_URL, json={
+        response = requests.post(LM_URL, headers=LLM_HEADERS, json={
             "model": model,
             "messages": [{"role": "user",
                           "content": _AFFECTION_PROMPT.format(text=text[:600])}],

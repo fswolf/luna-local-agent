@@ -88,6 +88,8 @@ class Handler(BaseHTTPRequestHandler):
                 "budget": _budget(),
                 "rows": log.rows(limit=PAGE_SIZE, offset=offset, **where),
             }))
+        elif url.path == "/api/tokens":
+            self._send(200, json.dumps({"runs": _log().tokens_for(int(arg("id") or 0))}))
         elif url.path == "/api/export":
             self._send(200, _log().export(), "application/x-ndjson",
                        [("Content-Disposition",
@@ -234,6 +236,23 @@ PAGE = r"""<!DOCTYPE html>
     white-space: pre-wrap; word-break: break-word; color: #c8c0e0;
   }
   .think .cut { color: var(--danger); font-style: italic; }
+
+  /* token confidence - colour is the probability the model gave the
+     token it actually picked */
+  .tokbox { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+            padding: 12px 14px; white-space: pre-wrap; word-break: break-word; line-height: 1.75; }
+  .tokbox.thinking { background: var(--think-bg); border-color: var(--think-border);
+                     font: 13px/1.75 ui-monospace, "Cascadia Mono", monospace; color: #c8c0e0; }
+  .tk { border-radius: 3px; cursor: default; }
+  .tk.p2 { background: rgba(196,157,255,.10); }
+  .tk.p3 { background: rgba(224,176,108,.28); }
+  .tk.p4 { background: rgba(224,108,138,.42); color: #fff; }
+  .tk:hover, .tk.pin { outline: 1px solid var(--accent); }
+  .legend { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 11.5px; color: var(--dim); margin: 4px 0 6px; }
+  .legend .tk { padding: 0 5px; }
+  .tokinfo { min-height: 22px; font-size: 12.5px; color: var(--text); margin: 6px 0 2px; }
+  .tokinfo code { background: var(--panel2); border-radius: 4px; padding: 0 5px; color: var(--accent); }
+  .tokinfo .alt { color: var(--dim); }
   textarea.note {
     width: 100%; min-height: 40px; resize: vertical; margin-top: 4px;
     background: var(--bg); color: #e8dca8; border: 1px dashed var(--line); border-radius: 6px;
@@ -268,6 +287,7 @@ PAGE = r"""<!DOCTYPE html>
       <button data-kind="reminder">reminders</button>
       <button data-kind="starred">★ starred</button>
       <button data-kind="flagged">flagged</button>
+      <button data-kind="scored" title="turns recorded on llama-server, with token confidence">confidence</button>
     </span>
     <button id="daychip" style="display:none" onclick="setDay('')"></button>
     <button id="rec" onclick="toggleRecording()" title="record her reasoning - saved to config.json, same as /set thoughts.enabled"><span class="dot"></span><span id="rectext">recording</span></button>
@@ -434,6 +454,7 @@ function item(r) {
   if (r.tools.length > 3) l1.appendChild(el("span", "pill tool", "+" + (r.tools.length - 3)));
   if (r.flags.length) l1.appendChild(el("span", "pill flag", r.flags.length === 1 ? r.flags[0].split(":")[0] : r.flags.length + " flags"));
   if (S.budget && tokens(r) > S.budget * 0.6) l1.appendChild(el("span", "pill warn", "~" + k(tokens(r)) + " tok"));
+  if (r.conf != null) l1.appendChild(el("span", "pill" + (r.conf < 0.6 ? " warn" : ""), pct(r.conf) + " sure"));
   it.appendChild(l1);
   const you = el("div", "you"); you.appendChild(marked(r.user_text)); it.appendChild(you);
   if (r.highlight) { const h = el("div", "hl"); h.appendChild(marked(r.highlight)); it.appendChild(h); }
@@ -475,6 +496,11 @@ function detail(r) {
   head.appendChild(tp);
   if (r.seconds) head.appendChild(el("span", "pill", r.seconds + "s"));
   if (r.rounds > 1) head.appendChild(el("span", "pill", r.rounds + " rounds"));
+  if (r.conf != null) {
+    const cp = el("span", "pill" + (r.conf < 0.6 ? " warn" : ""), `${pct(r.conf)} sure`);
+    cp.title = `mean probability of the reply's tokens · ${r.low_tokens} of them under 30%`;
+    head.appendChild(cp);
+  }
   if (r.model) { const mp = el("span", "pill model", shortModel(r.model)); mp.title = `${r.model} · prompt ${r.prompt_hash || "?"} · session ${r.session || "?"}`; head.appendChild(mp); }
   head.appendChild(el("span", "sp"));
   const back = el("button", null, "← list"); back.id = "back";
@@ -494,6 +520,43 @@ function detail(r) {
       fb.appendChild(line);
     }
     d.appendChild(fb);
+  }
+
+  // Token confidence, when the turn came from llama-server. Fetched on
+  // its own: a few KB compressed that only this view ever needs.
+  if (r.n_tokens > 0) {
+    const tb = el("div", "block");
+    tb.appendChild(el("div", "lab", "her reply, token by token"));
+    const lg = el("div", "legend");
+    lg.appendChild(document.createTextNode("how sure she was of each token:"));
+    for (const [c, t] of [["p1", "90%+"], ["p2", "60-90%"], ["p3", "30-60%"], ["p4", "under 30%"]]) lg.appendChild(el("span", "tk " + c, t));
+    tb.appendChild(lg);
+    const info = el("div", "tokinfo", "hover or tap a token for what it nearly said instead");
+    const ans = el("div", "tokbox", "loading…");
+    tb.append(ans, info);
+    const tt = el("button", null, "show her thinking token by token too");
+    const thk = el("div"); thk.style.display = "none";
+    tt.onclick = () => { const on = thk.style.display === "none"; thk.style.display = on ? "" : "none";
+                         tt.textContent = on ? "hide thinking tokens" : "show her thinking token by token too"; };
+    tt.style.marginTop = "8px";
+    tb.append(tt, thk);
+    d.appendChild(tb);
+    fetch("/api/tokens?id=" + r.id).then(x => x.json()).then(({runs}) => {
+      if (S.sel !== r.id) return;
+      ans.replaceChildren();
+      const answer = runs.flat().filter(t => t[1] === "a");
+      if (!answer.length) ans.textContent = "(no reply tokens were reported)";
+      for (const t of answer) ans.appendChild(tokSpan(t, info));
+      runs.forEach((run, i) => {
+        const thinking = run.filter(t => t[1] === "t");
+        if (!thinking.length) return;
+        if (runs.length > 1) thk.appendChild(el("div", "lab", `round ${i + 1} of ${runs.length}`)).style.marginTop = "8px";
+        const box = el("div", "tokbox thinking");
+        for (const t of thinking) box.appendChild(tokSpan(t, info));
+        thk.appendChild(box);
+      });
+      if (!thk.childNodes.length) tt.remove();
+    });
   }
 
   // The scratchpad, round by round. thoughtlog._join writes a heading
@@ -542,6 +605,35 @@ function detail(r) {
   foot.append(copy, del); d.appendChild(foot);
   d.scrollTop = 0;
 }
+function pct(p) { return Math.round(p * 100) + "%"; }
+
+function shown(text) {
+  // A special token (end of turn and so on) has no text to show.
+  return text === "" ? "⟨special⟩" : JSON.stringify(text).slice(1, -1).replace(/\\"/g, '"');
+}
+
+function tokSpan(t, info) {
+  // t = [text, part, logprob, [[alt, logprob], ...]] - see llm._note_tokens
+  const p = Math.exp(t[2]);
+  const s = el("span", "tk " + (p >= 0.9 ? "p1" : p >= 0.6 ? "p2" : p >= 0.3 ? "p3" : "p4"), t[0]);
+  const describe = () => {
+    info.replaceChildren();
+    info.appendChild(el("code", null, shown(t[0])));
+    info.appendChild(document.createTextNode(` ${pct(p)}`));
+    if (t[3].length) {
+      info.appendChild(el("span", "alt", "  ·  nearly said "));
+      t[3].forEach(([a, lp], i) => {
+        if (i) info.appendChild(el("span", "alt", ", "));
+        info.appendChild(el("code", null, shown(a)));
+        info.appendChild(el("span", "alt", ` ${pct(Math.exp(lp))}`));
+      });
+    }
+  };
+  s.onmouseenter = describe;
+  s.onclick = () => { document.querySelectorAll(".tk.pin").forEach(x => x.classList.remove("pin")); s.classList.add("pin"); describe(); };
+  return s;
+}
+
 function block(parent, cls, label, text) {
   const b = el("div", "block " + cls); b.appendChild(el("div", "lab", label));
   const t = el("div", "txt"); t.appendChild(marked(text)); b.appendChild(t); parent.appendChild(b);
@@ -617,6 +709,13 @@ def main():
         return
 
     print(f"thought viewer: {url}  (Ctrl+C stops it)")
+
+    repaired = _log().repair_from_transcript()
+
+    if repaired:
+        print(f"restored the full text of {repaired} turn(s) recorded "
+              "before replies were kept whole")
+
     print(_log().summary())
     threading.Timer(0.4, lambda: webbrowser.open(url)).start()
 

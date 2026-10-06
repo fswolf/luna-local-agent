@@ -22,7 +22,7 @@ import time
 
 import requests
 
-from config import LM_URL
+from config import LM_URL, LLM_HEADERS
 
 import tools
 
@@ -72,7 +72,7 @@ PROBE_TIMEOUT = 60
 
 
 def _blocking(model, text, specs):
-    response = requests.post(LM_URL, json={
+    response = requests.post(LM_URL, headers=LLM_HEADERS, json={
         "model": model,
         "messages": [
             {"role": "system", "content": INSTRUCTION},
@@ -106,7 +106,7 @@ def _streamed(model, text, specs):
     content = ""
     reasoning = False
 
-    with requests.post(LM_URL, json={
+    with requests.post(LM_URL, headers=LLM_HEADERS, json={
         "model": model,
         "messages": [
             {"role": "system", "content": INSTRUCTION},
@@ -381,7 +381,7 @@ def _probe_with(model, messages, specs, extra):
     calls = {}
     content = ""
 
-    with requests.post(LM_URL, json=payload, stream=True,
+    with requests.post(LM_URL, headers=LLM_HEADERS, json=payload, stream=True,
                        timeout=PROBE_TIMEOUT) as response:
         if response.status_code != 200:
             return {"error": f"HTTP {response.status_code}"}
