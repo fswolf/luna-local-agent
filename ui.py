@@ -726,6 +726,7 @@ _FEATURES = (
 # - so it carries no token figure, just what it does.
 _THOUGHT_FEATURES = (
     ("reasoning log", "THOUGHTS_ENABLED", "thoughts.enabled", "/thoughts to read"),
+    ("adaptive thinking", "ADAPTIVE_ENABLED", "adaptive.enabled", "llama-server only"),
 )
 
 

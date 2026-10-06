@@ -209,6 +209,9 @@ PAGE = r"""<!DOCTYPE html>
            padding: 7px 11px; font-size: 13px; color: #e8b8c8; }
   .flags b { color: var(--danger); }
   .end { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  .rethink { margin: 12px 0 4px; padding: 6px 11px; border-radius: 8px; font-size: 13px;
+             background: #2a2416; border: 1px solid #6a5a2a; color: #f0d9a8; }
+  .rethink b { color: var(--amber); }
   .p2 { background: rgba(196,157,255,.10); border-radius: 3px; }
   .p3 { background: rgba(224,176,108,.28); border-radius: 3px; }
   .p4 { background: rgba(224,108,138,.42); color: #fff; border-radius: 3px; }
@@ -309,6 +312,15 @@ const handlers = {
       f.appendChild(line);
     }
     turn.appendChild(f);
+  },
+  rethink(ev) {
+    const w = nearBottom();
+    if (!turn) return;
+    document.querySelectorAll(".cursor").forEach(c => c.classList.remove("cursor"));
+    const r = el("div", "rethink");
+    r.append(el("b", null, ev.step === "start" ? "taking a second look" : "second look: "),
+             document.createTextNode(ev.step === "start" ? ` — ${ev.reason}` : ev.outcome));
+    turn.appendChild(r); box = null; boxKind = ""; follow(w);
   },
   done(ev) {
     document.querySelectorAll(".cursor").forEach(c => c.classList.remove("cursor"));

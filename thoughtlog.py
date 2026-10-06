@@ -437,6 +437,9 @@ _KINDS = {
     # Turns where she looked at her own numbers - to compare against the
     # ones where she didn't.
     "introspect": "tools LIKE '%\"introspect\"%'",
+    # Second looks from adaptive thinking - each sits right after the
+    # turn it reconsidered.
+    "rethink": "source = 'rethink'",
 }
 
 

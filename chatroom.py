@@ -185,6 +185,20 @@ class ChatRoom:
         self._last_user_reply[who.lower()] = time.time()
         self._queue.put((who, message, time.time()))
 
+    def remember(self, who, message):
+        """Context only - a message to know about but never answer.
+
+        For the backlog a transport sees on joining: the conversation
+        that was already happening. Replying to it would be answering
+        questions from before she arrived; not knowing it would leave
+        her missing what everyone else in the room just read.
+        """
+        who = str(who or "").strip()
+        message = str(message or "").strip()
+
+        if who and message and not self._is_ignored(who):
+            self._recent.append((who, message[:self.max_chars]))
+
     def _is_ignored(self, who):
         lowered = who.lower()
 
