@@ -1,4 +1,8 @@
-"""Whether LM Studio is actually there, and which model it's holding.
+"""Whether the model server is actually there, and which model it's holding.
+
+LM Studio or llama-server - config.LLM_BACKEND says which was found at
+startup. The name is history; the two speak the same API for
+everything here except context_length(), which asks each its own way.
 
 The TTS server has had reachability tracking since the kokoro-reader
 migration: a failed request flips a flag, the header shows [offline],
@@ -14,12 +18,14 @@ import threading
 
 import requests
 
-from config import LM_URL
+from config import LM_URL, LLM_BACKEND, LLM_HEADERS
 
 MODELS_URL = LM_URL.replace("/chat/completions", "/models")
 # LM Studio's own (non-OpenAI) endpoint: the only place it reports the
 # context length a model was actually loaded with.
 NATIVE_MODELS_URL = LM_URL.split("/v1/")[0] + "/api/v0/models"
+# llama-server's equivalent: what it was started with, n_ctx included.
+PROPS_URL = LM_URL.split("/v1/")[0] + "/props"
 
 _lock = threading.Lock()
 
@@ -33,14 +39,16 @@ changed_to = ""
 
 def label():
     """The Model row: what's loaded, or why nothing is."""
+    tag = " · llama.cpp" if LLM_BACKEND == "llama" else ""
+
     with _lock:
         if ok:
-            return model or "unknown"
+            return (model or "unknown") + tag
 
         if not model:
             return f"offline ({error})" if error else "offline"
 
-        return f"{model} [offline]"
+        return f"{model}{tag} [offline]"
 
 
 def probe(timeout=5):
@@ -48,7 +56,7 @@ def probe(timeout=5):
     global ok, error, model, changed_to
 
     try:
-        response = requests.get(MODELS_URL, timeout=timeout)
+        response = requests.get(MODELS_URL, headers=LLM_HEADERS, timeout=timeout)
         response.raise_for_status()
         data = response.json()
         loaded = (data.get("data") or [{}])[0].get("id", "")
@@ -132,6 +140,17 @@ def context_length(timeout=3):
     schemas - has to fit in it, and the schemas alone are a few
     thousand tokens now.
     """
+    if LLM_BACKEND == "llama":
+        try:
+            response = requests.get(PROPS_URL, headers=LLM_HEADERS, timeout=timeout)
+            response.raise_for_status()
+            props = response.json()
+
+            return int((props.get("default_generation_settings") or {}).get("n_ctx")
+                       or props.get("n_ctx") or 0)
+        except Exception:
+            return 0
+
     try:
         response = requests.get(NATIVE_MODELS_URL, timeout=timeout)
         response.raise_for_status()

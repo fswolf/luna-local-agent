@@ -169,6 +169,102 @@ http://localhost:1234
 
 ---
 
+## Or llama.cpp directly
+
+LM Studio runs llama.cpp underneath but only lets the chat API through.
+Running llama.cpp's own server instead serves the same GGUF file and
+opens up what LM Studio keeps inside: token probabilities, control
+vectors, LoRA adapters, saved KV-cache slots. Luna works with either and
+picks by herself at startup, llama-server first if both are up.
+
+```bash
+llama/install.sh          # build it - Vulkan; "rocm" for ROCm/HIP instead
+llama/start.sh            # serve on 127.0.0.1:8080
+./start.sh                # Luna finds it; the header says "· llama.cpp"
+```
+
+`install.sh` clones llama.cpp into `llama/llama.cpp/` and builds only
+`llama-server` and `llama-bench`, for this card. If a build tool is
+missing it prints the exact `dnf install` line and stops. It doesn't
+run sudo itself. Vulkan and ROCm builds can sit side by side; `bin/`
+points at whichever was built last. Run `llama/bin/llama-bench -m
+<model>` under each to see which is faster on your GPU.
+`install.sh update` pulls the latest llama.cpp and rebuilds.
+
+`start.sh` reads `llama/server.env`, which holds the same load settings
+as LM Studio's model page: context 16384, every layer on the GPU, 9
+threads, batch 4096/2048, 4 parallel slots sharing one KV cache, 32
+context checkpoints. Edit it there. With `MODEL` left empty it finds the
+GGUF in LM Studio's own model folders (the Flatpak's included), so there's no second 10 GB copy.
+If LM Studio still has a model loaded it says so, because two copies
+won't fit in 16 GB of VRAM. Eject it in LM Studio first.
+
+Thinking comes back in `reasoning_content`, where the thought log
+already looks. How much she thinks is `REASONING_BUDGET` in
+`server.env` (-1 unlimited, 0 off). `generation.reasoning` in
+`config.json` is an LM Studio setting and llama-server ignores it.
+
+Which server she uses:
+
+```json
+"llm": {
+    "backend": "auto",
+    "lmstudio_url": "http://localhost:1234/v1/chat/completions",
+    "llama_url":    "http://127.0.0.1:8080/v1/chat/completions"
+}
+```
+
+`auto` checks once at startup. `lmstudio` or `llama` forces one. To
+switch servers mid-session, restart her.
+
+**The key.** The first time `start.sh` runs it makes a random key in
+`llama/.api_key` (gitignored, readable only by you) and starts the
+server with it, with CORS limited to localhost. Luna reads the same
+file and sends it with every request; LM Studio never sees it. Without
+it, any web page open in your browser could reach a server on
+localhost, and this one can write files (saved slots) and keep the GPU
+busy. llama-server's own web page at :8080 will ask for the key too:
+paste the contents of `llama/.api_key`.
+
+**Token confidence.** On llama-server every turn also records the
+probability of each token she produced, and the top alternatives
+whenever she was less than 90% sure. LM Studio doesn't expose this.
+See *Her reasoning* below for what the viewer does with it. Switch it
+off with `/set thoughts.token_probs false`.
+
+### Recalling facts by meaning
+
+`llama/start.sh` also starts a small embedding model on
+127.0.0.1:8081, beside the chat server, whenever it finds one. Its
+output goes to `llama/embed.log`, and Ctrl+C stops both.
+
+With more facts than fit in a prompt, she normally picks the ones that
+share words with what you said. With the embedding server running she
+picks the ones closest in *meaning*, so "I got a new graphics card"
+finds the fact about the 6950 XT even though no word is shared. The
+newest few facts still always travel, and a fact has to clear a
+similarity floor (`llm.embed_min_score`, 0.35) to come along at all.
+
+The model is Qwen3-Embedding-0.6B. Either download it into
+`llama/models`:
+
+```bash
+mkdir -p ~/ai-voice/llama/models
+curl -L -o ~/ai-voice/llama/models/Qwen3-Embedding-0.6B-Q8_0.gguf \
+  https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf
+```
+
+or search for it in LM Studio and download the Q8_0 GGUF. `start.sh`
+looks in both places. It needs about 0.6 GB of VRAM. Without the model,
+`start.sh` says so and starts the chat server alone. `EMBED` in
+`server.env` is `auto` (start it if found), `off`, or `on` (refuse to
+start without it).
+Each fact is embedded once and cached in `agent/embeddings.db`; per
+turn only what you said is embedded. If the server isn't answering she
+goes back to matching words, with nothing to switch.
+
+---
+
 # Running the Kokoro Server
 
 Speech is synthesized by [kokoro-reader](https://github.com/fswolf/kokoro-reader)
@@ -1876,8 +1972,8 @@ responses, and the first is almost always the answer to "why did she
 say nothing" — when a reply comes back empty, the explanation in the
 conversation now ends with `/thoughts shows what it was thinking`.
 
-What goes in the row: the thinking, the first 300 characters of what
-you said, the first 600 of what she said, the tools she called in the
+What goes in the row: the thinking, what you said and what she said in
+full, the tools she called in the
 order she called them, how many rounds it took, how long the whole turn
 took, the mood she was in, any flags from the review below — and who
 answered: the agent name, a session id minted when the app started,
@@ -1979,9 +2075,47 @@ What the model thought is what it thought.
 }
 ```
 
-Both live: `/set thoughts.enabled false` stops recording without
-touching what is there; `max_records` trims the oldest on every insert.
-Two thousand turns of a chatty model is a few megabytes.
+Recording can be switched three ways, and they are the same switch:
+the **recording** button in the viewer's top bar (red dot when on),
+**reasoning log** under *Thoughts* in the settings pane (Tab twice,
+beside Mood), or `/set thoughts.enabled false`. All three write
+`thoughts.enabled` in `config.json`, and the running app re-reads it
+whenever the file changes, so a switch flipped in the browser applies
+from her next turn with nothing restarted. Turning it off stops new
+turns being kept and leaves what is there alone. It costs nothing in
+context either way — it records what the model already produced.
+
+`max_records` trims the oldest on every insert. Two thousand turns of
+a chatty model is a few megabytes, plus a few more on llama-server for
+the token data, which is stored compressed beside the rows.
+
+### Token confidence (llama-server)
+
+A turn recorded on llama-server carries the probability the model gave
+every token it actually picked, and for any token it was less than 90%
+sure of, the two runners-up. That isn't her account of herself; it's
+measured, and it's the most direct look at her internal state this
+setup gets. The viewer shows it three ways:
+
+* **"N% sure"** on each turn: the average probability of the reply's
+  tokens. It turns amber under 60%. The **confidence** filter lists
+  only the turns that have this data.
+* **Her reply, token by token**, coloured by how sure she was of each
+  piece: plain at 90%+, faint at 60–90%, amber at 30–60%, red under
+  30%. Hover or tap a token to see what she nearly said instead and how
+  likely it was. "around **March** 2024", with *June* at 81% beside it,
+  is the difference between knowing and guessing. Her thinking can be
+  shown the same way, round by round.
+* **The low confidence flag**: three or more tokens in a row under 30%
+  in the reply, quoted, with the lowest probability. Only the reply
+  counts; a scratchpad trying out phrasings is meant to wander.
+
+A low probability isn't automatically a mistake. With sampling on, she
+will sometimes pick a less likely word on purpose, and that's where the
+personality comes from. A run of them on a fact or a date is the thing
+to look at.
+
+`/set thoughts.token_probs false` stops collecting it.
 
 ## Conversation history
 
@@ -2157,6 +2291,8 @@ ai-voice/
 ├── machine.py
 ├── main.py
 ├── mood.py
+├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
+├── embedmem.py       # recalling facts by meaning, when the embedding server is up
 ├── memory-manager/
 │   ├── manager.py
 │   └── start.sh

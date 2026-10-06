@@ -31,6 +31,7 @@ import timeutil
 
 from config import (
     LM_URL,
+    LLM_HEADERS,
     AGENT_NAME,
     REMINDERS_ENABLED,
     REMINDER_CHECK_INTERVAL_SECONDS,
@@ -393,7 +394,7 @@ def _extract_fields(model, text, timeout=60):
     says nothing, the other is worth complaining about.
     """
     response = requests.post(
-        LM_URL,
+        LM_URL, headers=LLM_HEADERS,
         json={"model": model,
               "messages": [{"role": "user", "content": _PROMPT % text}]},
         timeout=timeout,

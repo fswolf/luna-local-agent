@@ -15,6 +15,15 @@ agent/thoughts.db
 agent/thoughts.db-wal
 agent/thoughts.db-shm
 
+# llama.cpp is built in place by llama/install.sh; only the scripts and
+# the settings file are ours.
+llama/llama.cpp/
+llama/bin/
+llama/slots/
+llama/*.log
+# The key llama/start.sh makes - a secret, never committed.
+llama/.api_key
+
 # Screenshots and previews dropped here while working
 Claude outputs/
 

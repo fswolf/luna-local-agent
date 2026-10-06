@@ -20,10 +20,12 @@ have it open. Nothing in here raises: a log that can't be written is
 a warning in the log, never a turn that fails.
 """
 import json
+import math
 import os
 import re
 import sqlite3
 import threading
+import zlib
 
 from datetime import datetime
 
@@ -40,6 +42,7 @@ _COLUMNS = (
     "id", "timestamp", "source", "user_text", "reasoning", "answer",
     "tools", "rounds", "seconds", "mood_e", "mood_w", "starred", "note",
     "flags", "agent", "session", "model", "prompt_hash",
+    "conf", "low_tokens", "n_tokens",
 )
 
 FALLBACK_ANSWER = "...sorry, I got tangled up there. Say that again?"
@@ -62,9 +65,9 @@ def _conn():
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp  TEXT NOT NULL,
             source     TEXT,     -- typed | voice
-            user_text  TEXT,     -- what he said, first 300 chars
+            user_text  TEXT,     -- what he said, in full
             reasoning  TEXT,     -- the scratchpad, rounds joined
-            answer     TEXT,     -- what she said, first 600 chars
+            answer     TEXT,     -- what she said, in full
             tools      TEXT,     -- JSON list of tool names, in call order
             rounds     INTEGER,  -- how many times the model was run
             seconds    REAL,     -- wall time for the whole turn
@@ -83,9 +86,17 @@ def _conn():
                          ("mood_w", "TEXT DEFAULT ''"), ("starred", "INTEGER DEFAULT 0"),
                          ("note", "TEXT DEFAULT ''"), ("flags", "TEXT DEFAULT '[]'"),
                          ("agent", "TEXT DEFAULT ''"), ("session", "TEXT DEFAULT ''"),
-                         ("model", "TEXT DEFAULT ''"), ("prompt_hash", "TEXT DEFAULT ''")):
+                         ("model", "TEXT DEFAULT ''"), ("prompt_hash", "TEXT DEFAULT ''"),
+                         ("conf", "REAL"), ("low_tokens", "INTEGER DEFAULT 0"),
+                         ("n_tokens", "INTEGER DEFAULT 0")):
         if column not in have:
             conn.execute(f"ALTER TABLE thoughts ADD COLUMN {column} {kind}")
+
+    # Token data lives beside the rows, not in them: a few KB compressed
+    # per turn that only the detail view ever reads, so listing a page
+    # of turns never has to drag it along.
+    conn.execute("CREATE TABLE IF NOT EXISTS thought_tokens "
+                 "(id INTEGER PRIMARY KEY, data BLOB)")
 
     conn.commit()
 
@@ -155,7 +166,7 @@ def set_enabled(on):
 # ---------------------------------------------------------------------------
 def record(user_text, rounds, answer, source="typed", tools=(),
            seconds=0.0, mood=("", ""), results=(), known_tools=(),
-           agent="", model="", prompt_hash="", checks=None):
+           agent="", model="", prompt_hash="", checks=None, tokens=()):
     """One turn. `rounds` is a list of {"text": ..., "called": [...]} in
     the order the model ran, from llm._record_thoughts. Nothing is
     stored for a turn with no reasoning in it.
@@ -173,27 +184,41 @@ def record(user_text, rounds, answer, source="typed", tools=(),
         return
 
     rounds = [r for r in rounds or () if (r.get("text") or "").strip()]
+    runs = [run for run in tokens or () if run]
 
-    if not rounds:
+    if not rounds and not runs:
         return
 
     reasoning = _join(rounds)
     names = [str(t) for t in tools or ()]
     flags = review(reasoning, str(answer or ""), names, results, known_tools,
                    checks=checks)
+    shape = confidence(runs)
+
+    if shape["shaky"] and (checks is None or "low confidence" in checks):
+        flags.append(f"low confidence: {shape['shaky']}")
 
     def write(conn):
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO thoughts (timestamp, source, user_text, reasoning, "
             "answer, tools, rounds, seconds, mood_e, mood_w, flags, "
-            "agent, session, model, prompt_hash) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "agent, session, model, prompt_hash, conf, low_tokens, n_tokens) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (datetime.now().isoformat(timespec="seconds"), source,
-             str(user_text or "")[:300], reasoning, str(answer or "")[:600],
+             str(user_text or ""), reasoning, str(answer or ""),
              json.dumps(names), len(rounds), round(float(seconds or 0), 1),
              mood[0], mood[1], json.dumps(flags),
-             str(agent or ""), SESSION, str(model or ""), str(prompt_hash or "")),
+             str(agent or ""), SESSION, str(model or ""), str(prompt_hash or ""),
+             shape["conf"], shape["low"], shape["n"]),
         )
+
+        if runs:
+            conn.execute(
+                "INSERT INTO thought_tokens (id, data) VALUES (?, ?)",
+                (cursor.lastrowid,
+                 zlib.compress(json.dumps(runs, ensure_ascii=False).encode(), 6)),
+            )
+
         _trim(conn)
         conn.commit()
 
@@ -231,17 +256,137 @@ def _trim(conn):
         "DELETE FROM thoughts WHERE id NOT IN "
         "(SELECT id FROM thoughts ORDER BY id DESC LIMIT ?)", (cap,)
     )
+    _sweep(conn)
+
+
+def _sweep(conn):
+    """Token data whose turn has gone."""
+    conn.execute("DELETE FROM thought_tokens WHERE id NOT IN (SELECT id FROM thoughts)")
+
+
+def tokens_for(row_id):
+    """A turn's token runs, or [] - see llm._note_tokens for the shape."""
+    def read(conn):
+        row = conn.execute("SELECT data FROM thought_tokens WHERE id=?",
+                           (int(row_id),)).fetchone()
+
+        return json.loads(zlib.decompress(row[0])) if row else []
+
+    return _run(read, [])
+
+
+# ---------------------------------------------------------------------------
+# Confidence
+# ---------------------------------------------------------------------------
+LOW = 0.30          # a token picked with less than this is a coin flip
+SHAKY_RUN = 3       # this many low tokens in a row is a shaky span
+
+
+def confidence(runs):
+    """What the answer's token probabilities add up to.
+
+    Only the answer counts. Thinking is meant to wander - a scratchpad
+    trying three phrasings is doing its job - but a reply that was a
+    string of near coin flips is one she didn't know, however sure it
+    sounds. conf is the mean probability of the answer's tokens; low
+    how many fell under LOW; shaky the worst run of low ones, quoted,
+    when there's a run long enough to mean something.
+    """
+    answer = [t for run in runs for t in run if t[1] == "a"]
+
+    if not answer:
+        return {"conf": None, "low": 0, "n": sum(len(r) for r in runs), "shaky": ""}
+
+    probs = [math.exp(t[2]) for t in answer]
+    low = [p < LOW for p in probs]
+    worst, start, best = 0, None, (0, 0)
+
+    for i, flag in enumerate(low + [False]):
+        if flag and start is None:
+            start = i
+        elif not flag and start is not None:
+            if i - start > worst:
+                worst, best = i - start, (start, i)
+
+            start = None
+
+    shaky = ""
+
+    if worst >= SHAKY_RUN:
+        a, b = best
+        span = "".join(t[0] for t in answer[a:b]).strip()
+        lowest = min(probs[a:b])
+        shaky = (f"{worst} uncertain tokens in a row in the answer, "
+                 f"\"{span[:60]}\" (lowest {lowest:.0%})")
+
+    return {
+        "conf": round(sum(probs) / len(probs), 3),
+        "low": sum(low),
+        "n": sum(len(r) for r in runs),
+        "shaky": shaky,
+    }
+
+def repair_from_transcript():
+    """Put back the full text of turns recorded before it was kept.
+
+    Early versions cut what he said at 300 characters and her reply at
+    600. The transcript has both in full, so each cut row is matched to
+    the transcript by its truncated text - a user line that starts with
+    the stored prefix, followed by her reply that starts with the stored
+    answer - and filled in. Only ever lengthens a field whose stored
+    text is a prefix of what it's replaced with, so it can't overwrite
+    a row with the wrong turn. Safe to run any number of times.
+    """
+    path = os.path.join(BASE_DIR, "history", "transcript.jsonl")
+
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = [json.loads(l) for l in handle if l.strip().startswith("{")]
+    except (OSError, ValueError):
+        return 0
+
+    pairs = [
+        (a.get("text", ""), b.get("text", ""))
+        for a, b in zip(lines, lines[1:])
+        if a.get("role") == "user" and b.get("role") == "assistant"
+    ]
+
+    def fix(conn):
+        fixed = 0
+        cut = conn.execute(
+            "SELECT id, user_text, answer FROM thoughts "
+            "WHERE LENGTH(user_text) = 300 OR LENGTH(answer) = 600"
+        ).fetchall()
+
+        for row_id, said, answer in cut:
+            for full_said, full_answer in reversed(pairs):
+                if (full_said.startswith(said.strip()) and
+                        full_answer.startswith(answer.strip())):
+                    if len(full_said) > len(said) or len(full_answer) > len(answer):
+                        conn.execute(
+                            "UPDATE thoughts SET user_text=?, answer=? WHERE id=?",
+                            (full_said, full_answer, row_id),
+                        )
+                        fixed += 1
+
+                    break
+
+        conn.commit()
+
+        return fixed
+
+    return _run(fix, 0)
 
 
 def delete_row(row_id):
     _run(lambda c: (c.execute("DELETE FROM thoughts WHERE id=?",
-                              (int(row_id),)), c.commit()), None)
+                              (int(row_id),)), _sweep(c), c.commit()), None)
 
 
 def clear(keep_starred=True):
     """Everything, or everything you didn't star."""
     sql = "DELETE FROM thoughts" + (" WHERE starred = 0" if keep_starred else "")
-    _run(lambda c: (c.execute(sql), c.commit()), None)
+    _run(lambda c: (c.execute(sql), _sweep(c), c.commit()), None)
 
 
 def star(row_id, on=True):
@@ -275,6 +420,7 @@ _KINDS = {
     "reminder": "source = 'reminder'",
     "starred": "starred = 1",
     "flagged": "flags != '[]'",
+    "scored": "n_tokens > 0",
 }
 
 
@@ -464,7 +610,7 @@ _WORD = re.compile(r"[a-z][a-z0-9_]+")
 # evidence than the ones that read the thinking, which is the model's
 # own account of itself and not always a faithful one.
 CHECKS = ("promised a tool", "guessed", "date math", "leaked", "tool failed",
-          "no answer", "cut off", "broke character")
+          "no answer", "cut off", "broke character", "low confidence")
 
 
 def review(reasoning, answer, called, results=(), known_tools=(),

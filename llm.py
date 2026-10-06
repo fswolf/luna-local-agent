@@ -7,7 +7,7 @@ import time
 import state
 from datetime import datetime
 
-from config import LM_URL, TOOLS_ENABLED, MAX_TOOL_ROUNDS
+from config import LM_URL, TOOLS_ENABLED, MAX_TOOL_ROUNDS, LLM_HEADERS
 from config import AGENT_NAME, PERSONALITY, TONE, TRAITS, RULES, GENERATION
 from config import memory
 import history
@@ -142,6 +142,17 @@ def build_generation_params():
     if reasoning:
         params["reasoning"] = reasoning
 
+    # Token confidence, llama-server only. n_probs rather than the OpenAI
+    # "logprobs": llama-server refuses logprobs on a streamed request
+    # that offers tools, which is every turn she takes, and n_probs is
+    # its own name for the same data with no such rule. LM Studio never
+    # gets it.
+    import config
+
+    if (config.LLM_BACKEND == "llama" and config.THOUGHTS_ENABLED
+            and getattr(config, "THOUGHTS_TOKEN_PROBS", True)):
+        params["n_probs"] = 3
+
     return params
 
 
@@ -163,7 +174,7 @@ def _chat_completion(payload, narrator=None):
         return _streamed_message(payload, narrator)
 
     try:
-        response = requests.post(LM_URL, json=payload)
+        response = requests.post(LM_URL, headers=LLM_HEADERS, json=payload)
     except requests.exceptions.RequestException as e:
         lmstudio.mark_failed(e)
         logbook.error("llm", "request failed: %s", e)
@@ -420,11 +431,51 @@ _last_raw = {"deltas": 0, "content": 0, "reasoning": 0, "tool_rounds": 0,
              # _record_thoughts. Per run rather than one buffer because
              # a tool turn thinks twice, and the first time - deciding
              # to call something - is the one worth reading.
-             "thinking": []}
+             "thinking": [],
+             # Per model run, the tokens llama-server reported with their
+             # probabilities - see _note_tokens. Empty on LM Studio.
+             "tokens": []}
 
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
 _THINK_INNER = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
 _THINK_OPEN = re.compile(r"<think>", re.IGNORECASE)
+
+
+def _note_tokens(tokens, delta):
+    """One streamed chunk's tokens, as [text, part, logprob, alternatives].
+
+    part is which stream the token went to: "t" thinking, "a" the
+    answer, "c" a tool call. The delta it rode in on says which. A token
+    that produced no delta of its own - the <think> tag, half of a tool
+    call's syntax - arrives with no probabilities at all, so there is
+    nothing to drop. Alternatives are kept only when the model wasn't
+    sure (p < 0.9): the near-misses are the point, and a confident
+    token's runners-up are noise that would triple the size.
+    """
+    if _reasoning_field(delta):
+        part = "t"
+    elif delta.get("content"):
+        part = "a"
+    elif delta.get("tool_calls"):
+        part = "c"
+    else:
+        part = "o"
+
+    for entry in (delta["_logprobs"] or {}).get("content") or []:
+        try:
+            text = str(entry.get("token", ""))
+            lp = float(entry.get("logprob"))
+        except (TypeError, ValueError):
+            continue
+
+        alts = []
+
+        if lp < -0.105:  # p < 0.9
+            alts = [[str(a.get("token", "")), round(float(a.get("logprob")), 3)]
+                    for a in entry.get("top_logprobs") or []
+                    if a.get("token") != text and a.get("logprob") is not None][:2]
+
+        tokens.append([text, part, round(lp, 3), alts])
 
 
 def _reasoning_field(part):
@@ -700,7 +751,7 @@ def _stream_deltas(payload):
     """
     try:
         response = requests.post(
-            LM_URL, json=dict(payload, stream=True), stream=True, timeout=600
+            LM_URL, headers=LLM_HEADERS, json=dict(payload, stream=True), stream=True, timeout=600
         )
     except requests.exceptions.RequestException as e:
         lmstudio.mark_failed(e)
@@ -740,7 +791,16 @@ def _stream_deltas(payload):
             if choices:
                 lmstudio.mark_worked()
 
-                yield choices[0].get("delta") or {}
+                delta = choices[0].get("delta") or {}
+
+                # llama-server hangs each token's probabilities off the
+                # choice, beside the delta that token produced. Carried
+                # inside the delta under a private key, so nothing that
+                # only reads content or tool_calls has to change.
+                if choices[0].get("logprobs"):
+                    delta = dict(delta, _logprobs=choices[0]["logprobs"])
+
+                yield delta
 
 
 def _streamed_message(payload, narrator):
@@ -753,10 +813,14 @@ def _streamed_message(payload, narrator):
     """
     calls = {}
     reasoning = []
+    tokens = []
     _last_raw.update({"deltas": 0, "content": 0, "reasoning": 0})
 
     for delta in _stream_deltas(payload):
         _last_raw["deltas"] += 1
+
+        if delta.get("_logprobs"):
+            _note_tokens(tokens, delta)
 
         # Some servers stream a reasoning model's scratchpad in its own
         # field rather than inside <think> tags. It is never spoken, but
@@ -801,6 +865,9 @@ def _streamed_message(payload, narrator):
 
     # The screen and the speaker never see the think block; the log does.
     _note_thinking(narrator.raw, "".join(reasoning))
+
+    if tokens:
+        _last_raw["tokens"].append(tokens)
 
     message = {"role": "assistant", "content": narrator.raw}
 
@@ -1038,7 +1105,9 @@ def _record_thoughts(user_text, answer, started, source=None, model="",
 
         rounds = _last_raw.get("thinking") or []
 
-        if not rounds:
+        # A turn with token data is worth keeping even when the model
+        # didn't think - the confidence of the answer is the point.
+        if not rounds and not _last_raw.get("tokens"):
             return
 
         # In the order they were called, with repeats, which is what the
@@ -1058,6 +1127,7 @@ def _record_thoughts(user_text, answer, started, source=None, model="",
             mood=mood.bands(),
             results=[x.get("result", "") for x in _last_raw.get("exchanges") or []],
             known_tools=known,
+            tokens=_last_raw.get("tokens") or [],
             agent=AGENT_NAME,
             model=model,
             prompt_hash=prompt_hash,
@@ -1142,6 +1212,7 @@ def ask(text, model, on_text=None, on_sentence=None,
     now = datetime.now()
     started = time.monotonic()
     _last_raw["thinking"] = []
+    _last_raw["tokens"] = []
 
     past = [] if context is not None else history.get_messages_full()
     messages = [{
