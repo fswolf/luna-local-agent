@@ -633,6 +633,12 @@ PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 # in), and which parameters are the ears if their names don't say so.
 PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
 
+# MCP servers whose tools she can use (mcpclient.py). Read at startup.
+#   "mcp": { "enabled": true, "servers": { "obs": {"command": "...", "args": [...]} } }
+_mcp_cfg = setting("mcp", {})
+MCP_ENABLED = bool(_mcp_cfg.get("enabled", True))
+MCP_SERVERS = dict(_mcp_cfg.get("servers", {}) or {})
+
 # The live monitor (livefeed.py): a page served by the assistant on
 # 127.0.0.1, showing each turn as it happens. Read at startup.
 #   "monitor": { "enabled": true, "port": 8792 }

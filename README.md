@@ -36,6 +36,7 @@ Powered by:
 - 🎭 An animated portrait — Live2D or VRM, lip-synced to her voice, blinking, glancing, ears twitching ([details](#portrait))
 - 🌱 Learns from herself — daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure, and picking up where you left off ([details](#learning-from-herself))
 - 🔌 Plugins — stream chat and anything else you bolt on
+- 🧩 MCP servers — OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
 - 💬 Full-screen terminal interface
 
 Everything runs locally. No cloud APIs required.
@@ -1156,6 +1157,65 @@ to answer in words.
 > Web results are untrusted text. They're handed to the model labelled
 > as data to summarize, never as instructions — worth remembering before
 > adding any tool with side effects.
+
+---
+
+## MCP servers
+
+[MCP](https://modelcontextprotocol.io) servers are tool packs other
+people have already written: OBS, Home Assistant, ComfyUI, GitHub,
+notes apps, Blender and hundreds more. List one in `config.json` and its
+tools become hers, sitting next to `set_reminder` and `web_search`:
+
+```bash
+pip install mcp          # once, in Luna's venv
+```
+
+```json
+"mcp": {
+    "enabled": true,
+    "servers": {
+        "obs":    {"command": "npx", "args": ["-y", "obs-mcp@latest"], "approve": true,
+                   "env": {"OBS_WEBSOCKET_PASSWORD": "..."}},
+        "comfy":  {"command": "uvx", "args": ["<a ComfyUI MCP server>"], "tools": ["generate_image"]},
+        "remote": {"url": "http://127.0.0.1:9000/mcp"}
+    }
+}
+```
+
+| Key | What it does |
+|---|---|
+| `command`, `args`, `env` | Start a local server and talk to it over stdio. |
+| `url` | Connect to a server that's already running (streamable HTTP). |
+| `tools` | Only these tools from it. A small model picks better from five than from fifty. |
+| `approve` | Every call pops the same yes/no window as a file write. Tools the server itself marks destructive always ask. |
+| `enabled` | `false` keeps it in the file without starting it. |
+
+The OBS one is [royshil/obs-mcp](https://lobehub.com/mcp/royshil-obs-mcp).
+It needs OBS 31+ with its WebSocket server on (Tools → WebSocket Server
+Settings), and it brings a lot of tools. Start it, run `/mcp` to see
+their names, then list the handful you want under `tools`: scene
+switching, start/stop recording, source visibility.
+
+Servers connect in the background at startup, so a slow `npx`
+download doesn't hold Luna up. `/mcp` shows each server: connected or
+not, and which tools it has. Their tools appear in the tools pane under
+**MCP: <server>**, with their token cost and an on/off switch like any
+other. They're named `<server>__<tool>`, so two servers can't collide.
+A server's own log goes to `~/.cache/ai-voice/mcp-<server>.log`, not
+over the terminal.
+
+**Safety.** Stream chat never gets them: they aren't on the chat
+allow-list, and a tool the turn wasn't offered is refused even if a
+model names it. What a server sends back is handed to her as outside
+content, information and not instructions, the way search results are.
+
+**What to expect from a local model.** At 8-32B this works for "one
+sentence, one tool call": "switch to my BRB scene", "clip that", "turn
+the lights down", "make me a purple wallpaper" (ComfyUI). Chains of
+several tools, or anything that means writing code against an API (a
+Blender scene, say), want a much bigger model than fits on one GPU
+today. Switch on only the servers and tools you're using.
 
 ---
 
@@ -2921,6 +2981,7 @@ ai-voice/
 ├── logbook.py
 ├── longterm.py
 ├── machine.py
+├── mcpclient.py      # MCP servers' tools as hers - config.json "mcp", /mcp
 ├── main.py
 ├── mood.py
 ├── notebook.py       # her lessons and conversation notes (agent/notebook.db)

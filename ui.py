@@ -1422,6 +1422,7 @@ _HELP_SECTIONS = [
     ]),
     ("Plugins", [
         ("/plugins", "list add-ons and whether each is running"),
+        ("/mcp", "MCP servers: connected or not, and their tools"),
         ("/pomf on", "stream chat - /<name> on|off|status for any plugin"),
         "chat-triggered turns get a restricted tool set and never",
         "touch conversation history.",

@@ -57,6 +57,17 @@ def tool(name, description, properties, required=(), available=None, why=None):
     return decorator
 
 
+_EXTERNAL_GROUPS = {}   # tool name -> group, for tools registered at run time
+
+
+def register_external(name, description, properties, required=(), run=None, group="Other",
+                      available=None, why=None):
+    """A tool that isn't in this package - an MCP server's, say. Same
+    shape as @tool, registered at run time, grouped as given."""
+    tool(name, description, properties, required, available, why)(run)
+    _EXTERNAL_GROUPS[name] = group
+
+
 def specs(only=None):
     """The tool list sent to the model.
 
@@ -121,6 +132,9 @@ _GROUPS = (
 
 
 def group_of(name):
+    if name in _EXTERNAL_GROUPS:
+        return _EXTERNAL_GROUPS[name]
+
     for label, members in _GROUPS:
         if name in members:
             return label
@@ -141,7 +155,7 @@ def grouped():
     for row in inventory():
         rows.setdefault(group_of(row[0]), []).append(row)
 
-    order = [label for label, _members in _GROUPS] + ["Other"]
+    order = [label for label, _members in _GROUPS] + ["Other"] + sorted(set(_EXTERNAL_GROUPS.values()))
     out = []
 
     for label in order:
