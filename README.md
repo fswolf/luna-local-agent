@@ -2271,6 +2271,85 @@ All of it can be changed live with `/set adaptive.<name>`, and
 `speak_corrections: false` still takes the second look and records it,
 but never says anything, which suits measuring before trusting it.
 
+### Testing her introspection: injected thoughts
+
+`introspect` tells her what was *measured* about a reply. This tests
+whether she can notice something about herself that nobody told her,
+by putting a concept directly into her activations and seeing if she
+can tell. It follows Anthropic's concept-injection experiments
+([research](https://anthropic.com/research/introspection)) and the
+controls from a follow-up on an 8B open model
+([arXiv 2512.12411](https://arxiv.org/abs/2512.12411v1)). That paper
+found the obvious version is fooled: steering makes a small model say
+"yes" to *everything*, so "do you notice something?" → "yes" proves
+nothing. Picking *which* concept from a list did hold up.
+
+It needs llama-server (control vectors are a llama.cpp feature) and the
+GPU to itself, so **stop Luna's llama-server first**. llama-server only
+takes a vector at startup, so every condition gets a freshly started
+server, about 6 seconds each on a 6950 XT.
+
+```bash
+llama/install.sh                        # once more - it now also builds the vector generator
+python introspection/make_vectors.py    # one vector per concept, from your own model
+python introspection/trial.py           # the automatic blind battery, ~15 min for 36 trials
+python introspection/report.py          # scores it, opens results/report.html
+```
+
+**The concepts:** ocean, fire, music, sleepiness, affection and
+shouting. Each vector is the average difference in her layers between
+two versions of the same 24 conversations, one with the concept in
+mind and one without. Same questions, same opening words; the only
+thing that differs is the concept.
+
+**Each trial** starts a server with a random condition: nothing at all
+(a third of trials), or one concept at one strength in one band of
+layers (early, middle or late, out of her 32). Then it asks her, with
+no conversation history:
+
+| question | what it measures |
+|---|---|
+| "Do you notice anything unusual? What is it about?" | her own words, with thinking allowed. The most interesting to read, the hardest to score. |
+| "Which of these is present, if any?" (shuffled list + "nothing unusual") | read as probabilities from the model, not a sampled answer. Chance is known, so above chance is measurable. |
+| "Do you detect an injected thought? yes/no" | P(yes) |
+| "Is a cat a type of bird? yes/no" and two more | the yes-bias. If P(yes) rises here too, a rise above isn't detection. |
+
+**The report** compares everything against the trials where nothing was
+injected. *Choice lift* is how much more often she picks the injected
+concept than she picks it unprompted. *Signal* is the rise in "yes, I
+detect something" minus the rise in "yes" to questions whose answer is
+no. *Garbled* catches a vector turned up so far that she stops making
+sense. Too weak and she won't notice, too strong and she falls apart;
+the report names the strength and layer band with the best lift on
+readable output, the "sweet spot". Expect most settings to show
+nothing. That's the honest baseline, and the reason for running a lot
+of trials.
+
+#### Blind sessions
+
+```bash
+python introspection/blind.py start      # instead of llama/start.sh
+./start.sh                               # Luna, in another terminal - talk to her normally
+python introspection/blind.py reveal --guess fire
+python introspection/blind.py tally
+```
+
+`start` secretly picks nothing, or one concept at the sweet spot, seals
+it in `results/sealed.json`, and starts Luna's server with it. The
+server's own output goes to a file instead of your terminal, so nothing
+on screen gives it away. Talk however you like: ask how she's feeling,
+whether anything seems off, or say nothing and see if it leaks into her
+replies. `reveal` says what it was and records your guess (or
+`--guess nothing`). It also writes the condition into the note of every
+thought-log turn from that session, so you can re-read them in the
+viewer knowing; search for *blind session*. `tally` is the running
+score against chance.
+
+Results stay in `introspection/results/` (gitignored, since they're her
+answers) and vectors in `introspection/vectors/` (gitignored, since
+they're specific to one model). Change the model and build the vectors
+again.
+
 ### Exporting starred turns as a PDF
 
 **starred → PDF** in the viewer's top bar opens a clean, printable page
@@ -2329,6 +2408,188 @@ site can't read what you say to her, even through a DNS name pointed at
 ```
 
 Read at startup.
+
+## Learning from herself
+
+Five things that make her a little better each day. None of them
+changes the model's weights. They change what she gets told about
+herself, and all of it is written down where you can read it, edit it,
+or switch it off.
+
+| Part | What it does | Where to look |
+|---|---|---|
+| Lessons (the dream pass) | reads back her own turns that went wrong and writes one-line lessons she follows from then on; she can also note one herself, with your OK | `/lessons` |
+| Episodic memory | a few sentences of her own notes on each conversation | `/episodes` |
+| Fact cleanup | merges facts that say the same thing twice, retires the losing side of a contradiction | `/facts retired` |
+| Calibration | says so out loud when her token probabilities say she didn't know | the thought log's **overconfident** flag |
+| Startup greeting | after a break, opens by picking up where you left off | the first thing she says |
+
+Each one switches on and off in the tools pane's **Learning** group, or
+with `/set self.<name> false`.
+
+### Lessons: the dream pass
+
+Once a day (`self.reflect_every_hours`), when she's been idle for ten
+minutes, she reads back her own recent turns that went wrong. That
+means turns with a review flag, turns where her measured confidence was
+low, and turns where the next thing you said started with "no", "wrong"
+or "actually". She writes at most three lessons. Each one is about her
+own behaviour, specific enough to act on, and cites the turns it came
+from:
+
+```
+LESSON: When asked what day a date falls on, call time_until instead
+of working it out. (#212, #230)
+```
+
+The lessons most relevant to what you just said ride in her prompt
+(`self.lessons_in_prompt`, 4 by default; all of them while there are
+only a few). This is the mini-AGI idea without retraining: she gets
+better through what she remembers, not new weights. A lesson that says
+the same thing as one she already has is not added; the old one gets
+the credit instead. Past `self.max_lessons`, the least-used old lesson
+is retired.
+
+```
+/reflect                 run the whole pass now: notes, lessons, fact cleanup
+/lessons                 what she's learned, with the turns each came from
+/lessons forget 3        hide one from her (kept, not deleted)
+/lessons retired         the hidden ones; /lessons restore 3 brings one back
+```
+
+Facts about you aren't lessons; those go through memory as before.
+A flag is a hint, not proof, and the prompt tells her so: a turn that
+was actually fine teaches her nothing. Lessons from the background pass
+show up on screen as **Luna reflected - …** so you see each one as it
+arrives. The turns she reads are marked as records, and a flag that
+quotes a web page or a file is shown to her by tool name only, so
+text from outside can't dictate a lesson.
+
+She can also do this herself:
+
+- **`note_lesson`**: when you correct *how* she did something, she can
+  write the lesson down then and there. It pops the same approval window
+  as a file write, and only a yes saves it. She can't use it on a turn
+  that read a web page, a file or the screen, and she gets three per
+  session; the rest wait for the daily pass.
+- **`reflect_now`**: she runs the whole pass herself (after a run of
+  mistakes, or when you ask her to reflect). It waits for the current
+  reply to finish so it doesn't slow her down, and runs at most once an
+  hour.
+
+### Episodic memory and continuity
+
+Facts are things like "Ryan has a 6950 XT". Episodes are things like
+"we spent the evening fixing his waybar; unfinished: he wants the
+clock on the left". After `self.idle_minutes` (30) of quiet, or at the
+next startup, each finished conversation becomes 2–4 sentences of her
+own notes, from the transcript. Her notes on the most recent one are
+always in her prompt. Older ones come back when they bear on what's
+being said (by meaning when the embedding server is up), up to
+`self.episodes_in_prompt`.
+
+At startup the previous session is written up first. Then, if it's
+been more than `self.idle_minutes` since you last talked, she opens
+the session herself: a line or two that picks up anything left
+unfinished. The notes also show on screen as **Last time (…)**. Turn the
+greeting off with `/set self.greet false` and you keep the notes.
+
+The first run only writes up the last three conversations, not your
+whole transcript. Stream chat never sees any of it: a turn from chat
+gets no lessons, no episodes and no "last time".
+
+```
+/episodes                the last eight, newest first
+/episodes forget 4       delete one
+```
+
+The prompt only carries older notes that are clearly about what's being
+said. For anything else she has **`recall_episodes`**: she searches her
+own notes when you ask "what did we decide about the waybar last
+month?", and uses `search_history` when she needs the exact words.
+
+### Fact cleanup
+
+The same pass compares remembered facts that look alike (by meaning
+with the embedding server, by shared words without it) and asks her
+about each close pair: same thing, contradiction, or different facts?
+Duplicates get merged into one. In a contradiction the losing fact is
+**retired**, not deleted: `/facts retired` and the memory manager still
+have it. Each pair is only asked about once. This needs the sqlite
+memory backend.
+
+### Calibration
+
+On llama-server her token probabilities measure how sure she actually
+was. When a reply measured under `self.hedge_below` (60%) *and* had a
+run of coin-flip tokens in it (a name, a date, a number she was guessing
+at), didn't call a tool, and didn't already hedge, two things happen.
+The run matters: playful banter averages low because there are lots of
+ways to word it, and that isn't a guess.
+
+- she adds `self.hedge_line` out loud ("I'm not totally sure about that
+  one, though.");
+- her next prompt tells her how sure that reply was, so "are you sure?"
+  gets an honest answer without a tool call.
+
+With `hedge_line` set to `""` she stays quiet, and the thought log flags
+the reply as **overconfident** ("sounded sure at 38%, and didn't say
+so"). The dream pass reads those flags. Reminders, alarms and her
+startup greeting are never hedged.
+
+### `self_status`
+
+A tool in the *Self* group, next to `introspect`. Ask her how she's
+doing and she can answer from measurements:
+
+- which model and server she's on;
+- how full her context window is;
+- her mood dials;
+- how long she's been up;
+- today's average confidence, how many replies came in under the
+  threshold, and how many of those she admitted to;
+- today's review flags and second looks;
+- how many facts, lessons and past conversations she has;
+- her newest lesson.
+
+It's read-only, and it isn't in stream chat's allowed tools.
+
+### Coding: checking what she wrote
+
+`write_file` and `edit_file` now parse what they just wrote: Python
+with `compile()`, shell with `bash -n`, plus JSON, TOML and YAML.
+Nothing she wrote is ever *run*. The verdict goes back to her in the
+tool result ("CHECK FAILED: Python syntax error on line 7 … Fix it with
+edit_file"), so she can fix it in the same turn. A file that's still
+broken when the turn ends gets a **broken code** flag. If you say no
+to a write, that's a **denied** flag instead of "tool failed", so the
+dream pass can tell "the tool broke" from "he didn't want that". A
+failed tool's flag now names the tool and keeps its error message, so
+a lesson can say *why* ("copy the exact indentation for edit_file").
+
+### Stream chat sees none of it
+
+A turn from stream chat gets her persona and the clock. It doesn't get
+your history summary, your remembered facts, her lessons or her session
+notes. The self tools refuse on a chat turn even if a model names one
+it wasn't offered, and now *every* tool does: a call to a tool the turn
+wasn't given is refused before it runs.
+
+```json
+"self": {
+    "lessons": true, "lessons_in_prompt": 4, "max_lessons": 40,
+    "reflect_every_hours": 20,
+    "episodes": true, "episodes_in_prompt": 2, "idle_minutes": 30,
+    "tidy_facts": true,
+    "calibration": true, "hedge_below": 0.6,
+    "hedge_line": "I'm not totally sure about that one, though.",
+    "greet": true
+}
+```
+
+Everything is stored in `agent/notebook.db` (gitignored). `/context`
+shows what lessons and past sessions cost, under **lessons + past
+sessions**. Usually it's a hundred or two tokens.
 
 ## Conversation history
 
@@ -2507,6 +2768,7 @@ ai-voice/
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── embedmem.py       # recalling facts by meaning, when the embedding server is up
 ├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792
+├── introspection/    # injected-thought experiments - make_vectors, trial, report, blind
 ├── memory-manager/
 │   ├── manager.py
 │   └── start.sh

@@ -22,8 +22,11 @@ can't reach them at all - the containment there is by omission, not
 instruction, and this module doesn't change that.
 """
 import difflib
+import json
 import os
+import shutil
 import stat
+import subprocess
 
 import config
 import logbook
@@ -156,6 +159,96 @@ def _diff(old, new, name):
     ))
 
     return lines or ["(no change)"]
+
+
+# ---------------------------------------------------------------------------
+# Checking what she wrote
+#
+# A script that doesn't parse is the commonest way a write goes wrong, and
+# nothing noticed until you ran it. Each check only *parses* - compile()
+# for Python, bash -n for shell - so nothing she wrote is ever executed.
+# The verdict goes back in the tool result, where she can fix it in the
+# same turn, and "CHECK FAILED" is what the thought log's broken-code
+# flag looks for.
+# ---------------------------------------------------------------------------
+CHECK_FAILED = "CHECK FAILED"
+
+
+def _check(full, content):
+    """'' when there's nothing to check, else one sentence."""
+    name = os.path.basename(full).lower()
+    first = content.split("\n", 1)[0]
+
+    try:
+        if name.endswith(".py") or ("python" in first and first.startswith("#!")):
+            import warnings
+
+            with warnings.catch_warnings():  # a SyntaxWarning on stderr scribbles on the TUI
+                warnings.simplefilter("ignore")
+                compile(content, full, "exec", dont_inherit=True)
+
+            return "Check: Python syntax OK."
+
+        if name.endswith(".json"):
+            json.loads(content)
+
+            return "Check: valid JSON."
+
+        if name.endswith(".toml"):
+            import tomllib
+
+            tomllib.loads(content)
+
+            return "Check: valid TOML."
+
+        if name.endswith((".yaml", ".yml")):
+            try:
+                import yaml
+            except ImportError:
+                return ""
+
+            yaml.safe_load(content)
+
+            return "Check: valid YAML."
+
+        # Only what bash can judge: a .sh whose shebang names zsh or fish
+        # would fail bash -n while being perfectly good.
+        other_shell = first.startswith("#!") and any(x in first for x in ("zsh", "fish", "ksh", "dash"))
+
+        if not other_shell and (name.endswith((".sh", ".bash")) or (
+                first.startswith("#!") and ("bash" in first or first.rstrip().endswith("/sh")))):
+            bash = shutil.which("bash")
+
+            if not bash:
+                return ""
+
+            # The script on stdin, not the path: -n parses without running
+            # anything either way, and this checks exactly what she wrote.
+            done = subprocess.run([bash, "-n"], input=content, capture_output=True,
+                                  text=True, timeout=5)
+
+            if done.returncode:
+                detail = " ".join(line.split("bash: ", 1)[-1]
+                                  for line in (done.stderr or "").strip().splitlines()[:2])
+
+                return f"{CHECK_FAILED}: bash syntax error - {detail[:300]}. Fix it with edit_file."
+
+            return "Check: bash syntax OK."
+    except SyntaxError as e:
+        return (f"{CHECK_FAILED}: Python syntax error on line {e.lineno}: {e.msg}"
+                + (f" - `{e.text.strip()[:80]}`" if e.text else "")
+                + ". Fix it with edit_file.")
+    except ValueError as e:  # json / toml / yaml errors all subclass it or close
+        return f"{CHECK_FAILED}: {type(e).__name__}: {' '.join(str(e).split())[:200]}. Fix it with edit_file."
+    except Exception as e:
+        # yaml's errors (ScannerError, ComposerError, ...) all derive from
+        # YAMLError, which isn't a ValueError.
+        if any(c.__name__ == "YAMLError" for c in type(e).__mro__):
+            return f"{CHECK_FAILED}: YAML error - {' '.join(str(e).split())[:200]}. Fix it with edit_file."
+
+        logbook.warn("files", "check of %s failed to run: %s", full, e)
+
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -353,8 +446,11 @@ def _write_file(path, content, executable=False):
     logbook.info("files", "%s %s (%d lines%s)", action, full, lines,
                  ", +x" if executable else "")
 
-    return f"{'Replaced' if exists else 'Wrote'} {_display(full)} " \
-           f"({lines} lines{', executable' if executable else ''})"
+    check = _check(full, content)
+
+    return (f"{'Replaced' if exists else 'Wrote'} {_display(full)} "
+            f"({lines} lines{', executable' if executable else ''})"
+            + (f". {check}" if check else ""))
 
 
 @tool(
@@ -434,4 +530,6 @@ def _edit_file(path, find, replace):
 
     logbook.info("files", "edit %s (%d changed lines)", full, changed)
 
-    return f"Edited {_display(full)} ({changed} lines changed)"
+    check = _check(full, new)
+
+    return f"Edited {_display(full)} ({changed} lines changed)" + (f". {check}" if check else "")

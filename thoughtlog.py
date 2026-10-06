@@ -198,6 +198,19 @@ def record(user_text, rounds, answer, source="typed", tools=(),
     if shape["shaky"] and (checks is None or "low confidence" in checks):
         flags.append(f"low confidence: {shape['shaky']}")
 
+    # Calibration: the number says she didn't know, the words say she
+    # did. Only for answers that rest on nothing but her - a turn that
+    # called a tool is reading its result, and wording that back is
+    # often low-probability without being a guess.
+    hedge_below = float(getattr(config, "SELF_HEDGE_BELOW", 0.6))
+
+    if (shape["conf"] is not None and shape["conf"] < hedge_below and shape["shaky"]
+            and not names and source in ("typed", "voice")
+            and not _HEDGED.search(str(answer or ""))
+            and (checks is None or "overconfident" in checks)):
+        flags.append(f"overconfident: sounded sure at {shape['conf']:.0%} "
+                     "measured confidence, and didn't say so")
+
     def write(conn):
         cursor = conn.execute(
             "INSERT INTO thoughts (timestamp, source, user_text, reasoning, "
@@ -454,7 +467,7 @@ def _where(search, kind="", flag="", day="", model=""):
         like = f"%{search}%"
         terms.append("(reasoning LIKE ? OR user_text LIKE ? OR answer LIKE ? "
                      "OR note LIKE ?)")
-        params = (like, like, like, like)
+        params += (like, like, like, like)
 
     if kind in _KINDS:
         terms.append(_KINDS[kind])
@@ -595,7 +608,8 @@ _UNSURE = re.compile(
     r"(invent|fabricat)\w*)\b", re.IGNORECASE,
 )
 _HEDGED = re.compile(
-    r"\b(don't know|not sure|can't|couldn't|no idea|unsure|"
+    r"\b(don't know|not (totally |really |entirely |completely |100% )?sure|"
+    r"can't|couldn't|no idea|unsure|"
     r"i('m| am) not certain|i think|probably|might|maybe)\b", re.IGNORECASE,
 )
 _DATE_MATH = re.compile(
@@ -612,6 +626,7 @@ _SCRATCH_OPENING = re.compile(
 )
 _TOOL_ERROR = re.compile(
     r"^\s*(error|denied|failed|couldn't|could not|can't|cannot|unable|"
+    r"that text (isn't|appears)|\S+ (doesn't exist|isn't a)|"
     r"no (results?|such)|not found|timed? ?out|refused)\b", re.IGNORECASE,
 )
 _OUT_OF_CHARACTER = re.compile(
@@ -620,6 +635,7 @@ _OUT_OF_CHARACTER = re.compile(
     re.IGNORECASE,
 )
 _WORD = re.compile(r"[a-z][a-z0-9_]+")
+_WROTE = re.compile(r"^(?:Wrote|Replaced|Edited) (.+?) \(\d+ lines?")
 
 # The checks, by name, so an agent can say which apply to it. Luna
 # gets all of them; an agent with no date tools would drop "date math",
@@ -629,7 +645,8 @@ _WORD = re.compile(r"[a-z][a-z0-9_]+")
 # evidence than the ones that read the thinking, which is the model's
 # own account of itself and not always a faithful one.
 CHECKS = ("promised a tool", "guessed", "date math", "leaked", "tool failed",
-          "no answer", "cut off", "broke character", "low confidence")
+          "no answer", "cut off", "broke character", "low confidence",
+          "overconfident", "broken code", "denied")
 
 
 def review(reasoning, answer, called, results=(), known_tools=(),
@@ -637,7 +654,8 @@ def review(reasoning, answer, called, results=(), known_tools=(),
     """Flags for one turn, as "code: detail" strings. Empty is good."""
     on = set(CHECKS if checks is None else checks)
     flags = []
-    called = set(called or ())
+    order = list(called or ())  # in call order, with repeats - pairs with results
+    called = set(order)
     body = _HEADING.sub("", reasoning)
     mentioned = set(_WORD.findall(body.lower())) & set(known_tools or ())
 
@@ -657,11 +675,41 @@ def review(reasoning, answer, called, results=(), known_tools=(),
     if "leaked" in on and ("<think" in answer.lower() or _SCRATCH_OPENING.match(answer)):
         flags.append("leaked: the answer reads like the scratchpad, not a reply")
 
-    if "tool failed" in on:
-        for result in results or ():
-            if _TOOL_ERROR.match(str(result or "")):
-                flags.append(f"tool failed: {str(result).strip()[:90]}")
+    results = [str(r or "") for r in results or ()]
+
+    def tool_name(i):
+        return order[i] if len(order) == len(results) else "a tool"
+
+    # Saying no to a write is feedback about what she proposed, not a
+    # broken tool - it gets its own flag so the dream pass can tell them apart.
+    if "denied" in on:
+        for i, result in enumerate(results):
+            if result.startswith("Denied by the user"):
+                flags.append(f"denied: the user said no to {tool_name(i)} - "
+                             f"{result[len('Denied by the user - '):][:120]}")
                 break
+
+    if "tool failed" in on:
+        for i, result in enumerate(results):
+            if _TOOL_ERROR.match(result) and not result.startswith("Denied by the user"):
+                flags.append(f"tool failed: {tool_name(i)} said \"{result.strip()[:240]}\"")
+                break
+
+    # Code she wrote that doesn't parse - unless a later write in the
+    # same turn fixed it.
+    if "broken code" in on:
+        last = {}
+
+        for result in results:
+            m = _WROTE.match(result)
+
+            if m and ("Check:" in result or "CHECK FAILED" in result):
+                last[m.group(1)] = result
+
+        for path, result in last.items():
+            if "CHECK FAILED" in result:
+                detail = result.split("CHECK FAILED:", 1)[1].split(". Fix it", 1)[0].strip()
+                flags.append(f"broken code: {path} - {detail[:200]}")
 
     if "no answer" in on and answer.strip() == fallback:
         flags.append("no answer: nothing usable came back after the thinking")

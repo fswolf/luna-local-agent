@@ -115,7 +115,8 @@ _GROUPS = (
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",
                  "focus_window", "system_status")),
     ("Web", ("web_search", "read_page")),
-    ("Self", ("introspect",)),
+    ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
+              "reflect_now")),
 )
 
 

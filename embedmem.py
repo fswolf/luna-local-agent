@@ -128,6 +128,47 @@ def _vectors(facts):
     return found
 
 
+def vectors(texts):
+    """{text: vector} through the cache, or None when the server's down.
+    For the background jobs (lesson dedup, fact cleanup) that compare
+    stored texts with each other rather than with a query."""
+    if not texts or not available():
+        return None
+
+    try:
+        return _vectors(list(dict.fromkeys(texts)))
+    except Exception as e:
+        logbook.warn("embed", "vectors failed: %s", e)
+        _state.update(up=False, checked=time.monotonic())
+
+        return None
+
+
+def cosine(a, b):
+    """The server normalises, so the dot product is the cosine."""
+    return sum(x * y for x, y in zip(a, b))
+
+
+_queries = {}
+
+
+def _query_vector(query):
+    """One turn ranks facts, lessons and past sessions against the same
+    words - embed them once, not three times."""
+    key = (_state["model"], query)
+    vector = _queries.get(key)
+
+    if vector is None:
+        vector = _embed([config.EMBED_QUERY_PREFIX + query])[0]
+
+        if len(_queries) > 16:
+            _queries.clear()
+
+        _queries[key] = vector
+
+    return vector
+
+
 def rank(query, facts):
     """[(score, fact)] best first, or None if it couldn't be done - the
     caller falls back to word matching on None, never on an empty list.
@@ -139,7 +180,7 @@ def rank(query, facts):
 
     try:
         vectors = _vectors(list(dict.fromkeys(facts)))
-        q = _embed([config.EMBED_QUERY_PREFIX + str(query)])[0]
+        q = _query_vector(str(query))
     except Exception as e:
         logbook.warn("embed", "falling back to word matching: %s", e)
         _state.update(up=False, checked=time.monotonic())
