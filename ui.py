@@ -1389,6 +1389,8 @@ _HELP_SECTIONS = [
         "",
         ("/thoughts", "her reasoning, turn by turn, in the browser"),
         ("/monitor", "watch her think live - stages, tokens, tools, mood"),
+        ("/portrait", "her animated portrait in its own window (again closes it)"),
+        ("/portrait obs", "the see-through URL for an OBS browser source"),
         "/set thoughts.enabled false stops recording it.",
         "",
         ("/reflect", "dream pass now: lessons, session notes, fact cleanup"),
