@@ -473,6 +473,13 @@ MOOD_AFFECTION = bool(_mood_cfg.get("affection", True))
 _files_cfg = setting("files", {})
 FILES_ENABLED = bool(_files_cfg.get("enabled", True))
 FILES_APPROVAL_TIMEOUT = float(_files_cfg.get("approval_timeout", 120))
+# Folders a scheduled job (plugins/cron.py) may write in without the
+# popup. Yours to set - a plugin can't widen it. The deny list still
+# wins, ~ itself and this app's own folder are ignored, and every other
+# write still asks.
+#   "files": { ..., "job_write_dirs": ["~/luna-jobs"] }
+FILES_JOB_WRITE_DIRS = [os.path.expanduser(str(p)) for p in
+                        _files_cfg.get("job_write_dirs", []) if str(p).strip()]
 # Separate from the rest, because reading the clipboard means whatever
 # you last copied - a password, an API key - can land in the model's
 # context and from there in history on disk. On by default, but it is

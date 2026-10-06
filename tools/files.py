@@ -128,10 +128,47 @@ def _note_denied():
         pass
 
 
+def job_write_dirs():
+    """files.job_write_dirs, minus the ones that would defeat the point:
+    anything not strictly under ~ (so not ~ itself - every file you own),
+    and anything overlapping this app's folder - a job that can quietly
+    rewrite her own code can switch this check off."""
+    app = os.path.realpath(config.BASE_DIR)
+    out = []
+
+    for folder in config.FILES_JOB_WRITE_DIRS:
+        folder = os.path.realpath(folder)
+
+        if not folder.startswith(HOME + os.sep):
+            continue
+
+        if folder == app or folder.startswith(app + os.sep) or app.startswith(folder + os.sep):
+            continue
+
+        out.append(folder)
+
+    return out
+
+
+def _job_may_write(full):
+    """A scheduled job writing inside job_write_dirs(). `full` has been
+    through resolve() already, so the deny list has had its say."""
+    if not getattr(state.job, "name", None):
+        return False
+
+    return any(full.startswith(folder + os.sep) for folder in job_write_dirs())
+
+
 def _ask(action, full, body_lines, note=""):
     """Block until the user answers the popup. False on timeout or when
     there's no TUI to ask (headless = deny; never write unasked)."""
     import ui
+
+    if _job_may_write(full):
+        logbook.info("files", "job %s: %s %s - job_write_dirs, not asked",
+                     state.job.name, action, full)
+
+        return True
 
     if state.turn_source != "typed":
         # Voice: a one-liner so you know to look at the screen. The

@@ -138,6 +138,48 @@ def respond_to_chat(prompt, model, source, who, said,
             ui.set_status("Idle")
 
 
+def respond_to_job(prompt, model, job, tools_allowed, speak=True):
+    """A scheduled job firing (plugins/cron.py).
+
+    Waits its turn like chat does. Fresh context and nothing stored, so a
+    job's tool output never lands in history. state.job is set here and
+    only here, under the lock, on this thread - that's what lets files.py
+    tell a job's write from yours.
+    """
+    with _turn:
+        state.stop_speaking = False
+        state.stop_generating = False
+        player = speech.Player() if speak else None
+
+        ui.add_message("system", f"Job: {job}")
+        ui.set_status(f"Job {job}...")
+        ui.begin_message(AGENT_NAME.lower())
+        state.job.name = job
+
+        def on_sentence(sentence):
+            if not state.stop_speaking:
+                player.say(sentence)
+
+        try:
+            answer = ask(prompt, model, on_text=ui.extend_message,
+                         on_sentence=on_sentence if speak else None,
+                         context=[], tools_allowed=tools_allowed,
+                         remember=False, source=f"job:{job}")
+            ui.replace_message(answer)
+            ui.end_message()
+
+            if player is not None:
+                player.wait()
+
+            return answer
+        except Exception:
+            ui.end_message()
+            raise
+        finally:
+            state.job.name = None
+            ui.set_status("Idle")
+
+
 def _respond(text, model):
     # Only now, holding the lock: resetting this any earlier would
     # clear the stop we just set on the turn we're waiting for.
