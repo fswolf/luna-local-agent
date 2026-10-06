@@ -577,6 +577,13 @@ THOUGHTS_MAX_RECORDS = int(_thoughts_cfg.get("max_records", 2000))
 # when it was unsure). Nothing on LM Studio, which doesn't expose them.
 THOUGHTS_TOKEN_PROBS = bool(_thoughts_cfg.get("token_probs", True))
 
+# The live monitor (livefeed.py): a page served by the assistant on
+# 127.0.0.1, showing each turn as it happens. Read at startup.
+#   "monitor": { "enabled": true, "port": 8792 }
+_monitor_cfg = setting("monitor", {})
+MONITOR_ENABLED = bool(_monitor_cfg.get("enabled", True))
+MONITOR_PORT = int(_monitor_cfg.get("port", 8792))
+
 # -------------------------
 # Tool calling
 # -------------------------

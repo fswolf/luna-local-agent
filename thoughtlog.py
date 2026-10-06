@@ -181,13 +181,13 @@ def record(user_text, rounds, answer, source="typed", tools=(),
     the day there are several, or one prompt is changed and the flag
     rate moves, they are the only way to say which."""
     if not enabled():
-        return
+        return []
 
     rounds = [r for r in rounds or () if (r.get("text") or "").strip()]
     runs = [run for run in tokens or () if run]
 
     if not rounds and not runs:
-        return
+        return []
 
     reasoning = _join(rounds)
     names = [str(t) for t in tools or ()]
@@ -223,6 +223,9 @@ def record(user_text, rounds, answer, source="typed", tools=(),
         conn.commit()
 
     _run(write, None)
+
+    # Handed back so the live monitor can show them the moment they exist.
+    return flags
 
 
 def _join(rounds):
@@ -262,6 +265,16 @@ def _trim(conn):
 def _sweep(conn):
     """Token data whose turn has gone."""
     conn.execute("DELETE FROM thought_tokens WHERE id NOT IN (SELECT id FROM thoughts)")
+
+
+def shakiest(runs, n=3):
+    """The answer's least likely tokens, lowest first, as
+    (text, p, [(alternative, p), ...])."""
+    answer = [t for run in runs for t in run if t[1] == "a" and t[0].strip()]
+    answer.sort(key=lambda t: t[2])
+
+    return [(t[0], math.exp(t[2]), [(a, math.exp(lp)) for a, lp in t[3]])
+            for t in answer[:n] if math.exp(t[2]) < LOW]
 
 
 def tokens_for(row_id):
@@ -421,6 +434,9 @@ _KINDS = {
     "starred": "starred = 1",
     "flagged": "flags != '[]'",
     "scored": "n_tokens > 0",
+    # Turns where she looked at her own numbers - to compare against the
+    # ones where she didn't.
+    "introspect": "tools LIKE '%\"introspect\"%'",
 }
 
 

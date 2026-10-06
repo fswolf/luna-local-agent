@@ -1,11 +1,27 @@
-<img width="1210" alt="Luna AI Assistant" src="assets/ui-conversation.png" />
+<img width="1210" alt="Luna, the local agent" src="assets/ui-conversation.png" />
 
-# AI Voice Assistant
+# luna-local-agent
 
-A local AI voice assistant powered by:
+**A local voice companion you can see inside: reasoning, confidence and
+memory, all on your own machine.**
+
+Luna listens, thinks, talks back and uses tools, and every turn leaves a
+record you can open. That record holds what she thought before she
+answered, how sure she was of each word, which turns look off, and a
+live view of it all while it happens. It started as a voice front end
+for LM Studio (this repo used to be called *LM-Studio-AI-Voice*) and
+grew into a small research rig for watching a local model think.
+
+```bash
+git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
+```
+
+(The folder is still `~/ai-voice`; every path below assumes it.)
+
+Powered by:
 
 - 🎤 Faster-Whisper (Speech-to-Text)
-- 🧠 LM Studio (Local LLM) with tool calling
+- 🧠 LM Studio or llama.cpp (local LLM) with tool calling, picked automatically
 - 🗣️ [kokoro-reader](https://github.com/fswolf/kokoro-reader) (Kokoro TTS over local HTTP)
 - 🎹 Push-to-talk, three modes including hands free
 - ⚡ Streaming replies — she starts talking a sentence in, not at the end
@@ -16,6 +32,7 @@ A local AI voice assistant powered by:
 - 🌙 Moods — she runs warmer or flatter with the clock and the session
 - 📚 Long-term memory — optional permanent SQLite store with its own browser editor
 - 💭 Her reasoning, kept — the model's scratchpad per turn, with a browser viewer for reading it back
+- 🔬 See inside her — token-by-token confidence, automatic flags for guesses and slips, an `introspect` tool she can use on herself, and a live monitor
 - 🔌 Plugins — stream chat and anything else you bolt on
 - 💬 Full-screen terminal interface
 
@@ -423,7 +440,8 @@ you can't turn a dial that isn't there.
     "alarms":     { ... },
     "history":    { ... },
     "long_term_memory": { ... },
-    "thoughts":   { ... }
+    "thoughts":   { ... },
+    "monitor":    { ... }
 }
 ```
 
@@ -2117,6 +2135,65 @@ to look at.
 
 `/set thoughts.token_probs false` stops collecting it.
 
+### Exporting starred turns as a PDF
+
+**starred → PDF** in the viewer's top bar opens a clean, printable page
+of every turn you've starred, oldest first: what you said, what she
+said (shaded by confidence when it was recorded on llama-server), the
+flags, your note, and her thinking round by round. **Save as PDF** on
+that page opens the browser's print dialog, and the PDF it makes keeps
+the shading and her emoji. The page takes the viewer's filters as
+address parameters, so `/report?kind=flagged` gives the flagged turns
+instead.
+
+### Letting her look: `introspect`
+
+The numbers above are measured from outside her. `introspect` hands one
+turn of them back to her: how sure she was across the reply, the
+least likely words with what she nearly said instead, the review flags,
+the tools she called, and her mood. Ask her "how sure were you about
+that?" and she can answer from data instead of from vibes.
+
+It's a tool she calls when she wants it, never something added to every
+prompt. A model that knows its scratchpad is being read starts writing
+it for an audience, and then the log stops being honest. It only reads
+her own recorded turns, and it isn't in stream chat's allowed tools, so
+a viewer can't use it. The result is worded as measurement ("your token
+probabilities, not an opinion"). What she *says* about it is generated
+text like anything else, which is why the viewer keeps the numbers next
+to it. The **introspected** filter lists the turns where she used it,
+so you can compare how she behaves with and without it.
+
+On LM Studio it still reports flags, tools and mood; confidence needs
+llama-server. It sits in its own *Self* group in the tools pane.
+
+### Watching live: `/monitor`
+
+```
+/monitor                       # or "live ↗" in the viewer
+```
+
+opens `http://127.0.0.1:8792`, served by Luna herself while she runs.
+It shows the turn as it happens: the stage (listening, transcribing,
+thinking, speaking), what you said, her thinking streaming in, each tool
+call with its arguments and the start of its result, then her reply.
+On llama-server every piece is coloured by confidence as it arrives.
+Along the top are her mood dials, the model, and how full the context
+is. The flags appear the moment the turn is reviewed. A page opened
+mid-session picks up where things stand, and with no page open it costs
+nothing.
+
+Nothing on it is stored; the thought log is the record. It refuses any
+request whose `Host` or `Origin` isn't itself, so a web page on another
+site can't read what you say to her, even through a DNS name pointed at
+127.0.0.1.
+
+```json
+"monitor": { "enabled": true, "port": 8792 }
+```
+
+Read at startup.
+
 ## Conversation history
 
 Older turns are folded into a running summary once there are more than
@@ -2293,6 +2370,7 @@ ai-voice/
 ├── mood.py
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── embedmem.py       # recalling facts by meaning, when the embedding server is up
+├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792
 ├── memory-manager/
 │   ├── manager.py
 │   └── start.sh
@@ -2316,7 +2394,8 @@ ai-voice/
 │   ├── memory.py
 │   ├── files.py
 │   ├── desktop.py
-│   └── web.py
+│   ├── web.py
+│   └── introspect.py # her own numbers, on request - the Self group
 ├── transcript.py
 ├── ui.py
 ├── vision.py
