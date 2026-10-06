@@ -1,3 +1,5 @@
+import threading
+
 # -------------------------
 # Assistant State
 # -------------------------
@@ -29,3 +31,9 @@ barged_in = False
 # True once a compositor-level hotkey is registered, so the evdev
 # listener doesn't warn about a hotkey you already have.
 hotkey_bound = False
+
+# Which scheduled job owns the turn on *this thread*, if any. Set only
+# by assistant.respond_to_job, under the turn lock. Thread-local rather
+# than a plain flag because a reminder can fire a turn on its own thread
+# mid-job, and its writes must not inherit the job's pass.
+job = threading.local()
