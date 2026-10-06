@@ -33,6 +33,22 @@ import wakeword
 def shutdown(code=0):
     """os._exit skips atexit, so every exit path comes through here."""
     control.cleanup()
+
+    # The portrait window is its own process; MCP servers end when their
+    # pipes close, but are asked nicely first.
+    try:
+        proc = _portrait["proc"]
+        if proc and proc.poll() is None:
+            proc.terminate()
+    except Exception:
+        pass
+    try:
+        import mcpclient
+
+        mcpclient.stop()
+    except Exception:
+        pass
+
     os._exit(code)
 
 
@@ -171,6 +187,18 @@ threading.Thread(target=reminders.run_scanner, args=(MODEL,), daemon=True).start
 for _line in plugins.start_enabled(MODEL):
     ui.add_message("system", _line)
 
+# Tools from MCP servers in config.json. Connecting can take a few
+# seconds per server (npx/uvx may download on first run), so it happens
+# on its own thread; tools appear in the pane as each server answers.
+def _start_mcp():
+    import mcpclient
+
+    for _l in mcpclient.start():
+        ui.add_message("system", _l)
+
+
+threading.Thread(target=_start_mcp, daemon=True, name="mcp-start").start()
+
 # Lessons, session notes and fact cleanup while she's idle - and first,
 # notes on the last session, so she can pick up where it left off.
 import reflect  # noqa: E402
@@ -268,9 +296,6 @@ def _toggle_portrait(obs=False):
     try:
         _portrait["proc"] = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                                              stderr=subprocess.DEVNULL)
-        import atexit
-
-        atexit.register(lambda p=_portrait["proc"]: p.poll() is None and p.terminate())
         ui.add_message("system", f"Portrait open - /portrait again closes it. ({url})")
     except OSError as e:
         ui.add_message("system", f"Couldn't start {cmd[0]}: {e} - opening it in your browser.")
@@ -1070,6 +1095,12 @@ def handle_input(text):
             )
 
         ui.add_message("system", f"{thoughtlog.summary()} - {url}")
+        return
+
+    if text == "/mcp":
+        import mcpclient
+
+        ui.add_message("system", mcpclient.status())
         return
 
     if text == "/reflect":
