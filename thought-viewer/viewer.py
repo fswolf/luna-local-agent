@@ -400,6 +400,7 @@ PAGE = r"""<!DOCTYPE html>
       <button data-kind="flagged">flagged</button>
       <button data-kind="scored" title="turns recorded on llama-server, with token confidence">confidence</button>
       <button data-kind="introspect" title="turns where she looked at her own numbers">introspected</button>
+      <button data-kind="rethink" title="second looks: the same question again with more thinking, because the first answer was shaky">rethinks</button>
     </span>
     <button id="daychip" style="display:none" onclick="setDay('')"></button>
     <button id="rec" onclick="toggleRecording()" title="record her reasoning - saved to config.json, same as /set thoughts.enabled"><span class="dot"></span><span id="rectext">recording</span></button>

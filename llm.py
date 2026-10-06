@@ -1116,6 +1116,134 @@ def _call_label(function):
     return f"{name}({args[:90]}{'…' if len(args) > 90 else ''})"
 
 
+# ---------------------------------------------------------------------------
+# Adaptive thinking
+#
+# A small echo of mini-AGI's halting rule - stop when another step
+# wouldn't change the answer - built from what's already measured. Every
+# turn thinks on a modest budget. If the reply comes out shaky by its
+# own token probabilities, the same question is asked again with the
+# budget lifted, silently, and the second answer only replaces the
+# first, out loud, when it is both different and surer. A confident
+# reply never pays for the second look.
+# ---------------------------------------------------------------------------
+def _adaptive_on(remember):
+    """Only for turns from Ryan, only on llama-server, and only while
+    token probabilities are being collected - they are the signal."""
+    return bool(remember and getattr(config, "ADAPTIVE_ENABLED", True)
+                and getattr(config, "LLM_BACKEND", "") == "llama"
+                and getattr(config, "THOUGHTS_ENABLED", True)
+                and getattr(config, "THOUGHTS_TOKEN_PROBS", True))
+
+
+def _same_answer(a, b):
+    """Do two replies say the same thing? By meaning when the embedding
+    server is up, by shared words otherwise - stricter, so a rephrasing
+    isn't mistaken for a correction."""
+    a, b = str(a or "").strip(), str(b or "").strip()
+
+    if not a or not b:
+        return a == b
+
+    try:
+        import embedmem
+
+        if embedmem.available():
+            va, vb = embedmem._embed([a, b])
+
+            return sum(x * y for x, y in zip(va, vb)) >= 0.88
+    except Exception:
+        pass
+
+    wa, wb = set(re.findall(r"\w+", a.lower())), set(re.findall(r"\w+", b.lower()))
+
+    return len(wa & wb) / max(1, len(wa | wb)) >= 0.6
+
+
+def _rethink(payload, base_messages, answer, on_text, on_sentence):
+    """A deeper second look at a shaky reply. Returns None when the
+    first reply was sure enough, otherwise a dict with both passes'
+    thinking and tokens, the outcome, and what (if anything) was said."""
+    import thoughtlog
+
+    first = {"thinking": _last_raw.get("thinking") or [],
+             "tokens": _last_raw.get("tokens") or [],
+             "exchanges": [], "called": set()}
+    shape = thoughtlog.confidence(first["tokens"])
+    conf = shape["conf"]
+
+    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shape["shaky"]):
+        return None
+
+    reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shape["shaky"]
+              else f"only {conf:.0%} sure")
+
+    try:
+        import ui
+
+        ui.set_status("Rethinking...")
+    except Exception:
+        pass
+
+    livefeed.emit("rethink", step="start", reason=reason, conf=conf)
+    logbook.info("llm", "rethinking - %s", reason)
+
+    deep = {k: v for k, v in payload.items() if k not in ("tools", "tool_choice")}
+    deep["messages"] = list(base_messages)
+    deep["reasoning_budget_tokens"] = int(config.ADAPTIVE_DEEP_BUDGET)
+
+    _last_raw.update(thinking=[], tokens=[], exchanges=[], called=set())
+    quiet = _Narrator()  # nothing to the screen or the voice yet
+
+    try:
+        _chat_completion(deep, quiet)
+    except Exception as e:
+        logbook.warn("llm", "rethink failed: %s", e)
+        _last_raw.update(first)
+        livefeed.emit("rethink", step="done", outcome=f"failed: {e}"[:120])
+
+        return None
+
+    second_text = _strip_leading_timestamps(quiet.finish())
+    second = {"thinking": _last_raw.get("thinking") or [],
+              "tokens": _last_raw.get("tokens") or [],
+              "exchanges": [], "called": set()}
+    shape2 = thoughtlog.confidence(second["tokens"])
+    conf2 = shape2["conf"]
+    same = _same_answer(answer, second_text)
+
+    # Surer than the first, and sure in its own right: trading a 25%
+    # guess for a 30% guess out loud is worse than leaving it.
+    surer = (conf2 is not None and not shape2["shaky"]
+             and conf2 >= max(conf + config.ADAPTIVE_MIN_GAIN,
+                              config.ADAPTIVE_RETHINK_BELOW))
+    corrected = bool(second_text) and not same and surer and config.ADAPTIVE_SPEAK_CORRECTIONS
+    said = ""
+
+    if corrected:
+        said = f"{config.ADAPTIVE_PREFIX} {second_text}".strip()
+        speaker = _Narrator(on_text, on_sentence)
+        speaker.feed("\n\n" + said + " ")
+        speaker.finish()
+        outcome = f"corrected herself - {conf:.0%} → {conf2:.0%} sure"
+    elif not second_text:
+        outcome = "second look came back empty - kept the first answer"
+    elif same:
+        outcome = f"held - same answer on a second look ({conf2:.0%} sure)"
+    elif not surer:
+        outcome = (f"kept the first answer - the second wasn't sure enough "
+                   f"either ({conf2:.0%} vs {conf:.0%})" if conf2 is not None
+                   else "kept the first answer")
+    else:
+        outcome = f"would have corrected ({conf2:.0%} sure) - speak_corrections is off"
+
+    _log_tool_call("rethink", f"{reason} → {outcome}")
+    livefeed.emit("rethink", step="done", outcome=outcome, conf=conf2)
+
+    return {"first": first, "second": second, "answer": second_text, "said": said,
+            "corrected": corrected, "conf": conf, "conf2": conf2, "outcome": outcome}
+
+
 _window_cache = {"at": 0.0, "n": 0}
 
 
@@ -1311,6 +1439,16 @@ def ask(text, model, on_text=None, on_sentence=None,
 
     payload.update(build_generation_params())
 
+    # Adaptive thinking: a modest budget up front, a deeper second look
+    # only if the answer comes out shaky. The messages are copied now,
+    # before tool rounds append to them, so a rethink asks the same
+    # question afresh rather than continuing the first attempt.
+    adaptive = _adaptive_on(remember)
+    base_messages = list(messages)
+
+    if adaptive and config.ADAPTIVE_FIRST_BUDGET >= 0:
+        payload["reasoning_budget_tokens"] = int(config.ADAPTIVE_FIRST_BUDGET)
+
     # The live monitor's view of the turn's start. Chat turns pass a
     # context of their own, which is how they're told apart here.
     livefeed.emit("turn", text=text,
@@ -1370,20 +1508,48 @@ def ask(text, model, on_text=None, on_sentence=None,
         _log_tool_call("empty reply", reason)
         answer = "...sorry, I got tangled up there. Say that again?"
 
+    # A turn that called tools is never re-run: a second pass could set
+    # the reminder twice or write the file twice. Nor is the fallback
+    # apology - there's nothing there to double-check.
+    second = None
+
+    if (adaptive and not _last_raw.get("exchanges") and _last_raw.get("tokens")
+            and answer != "...sorry, I got tangled up there. Say that again?"):
+        second = _rethink(payload, base_messages, answer, on_text, on_sentence)
+
+    first_answer = answer
+
+    if second and second["corrected"]:
+        # What she actually said, both parts - history and the
+        # transcript keep the correction, not a tidier version of events.
+        answer = f"{first_answer}\n\n{second['said']}"
+
     if remember:
         # The hash is of the system prompt as sent, so a changed persona,
         # rule or memory selection is a different hash - and a flag rate
         # that moves can be lined up against the prompt that moved it.
-        _record_thoughts(
-            text, answer, started, source, model=payload.get("model", ""),
-            prompt_hash=hashlib.sha1(
-                messages[0]["content"].encode("utf-8", "replace")
-            ).hexdigest()[:12],
-        )
+        prompt_hash = hashlib.sha1(
+            messages[0]["content"].encode("utf-8", "replace")
+        ).hexdigest()[:12]
+
+        if second:
+            _last_raw.update(second["first"])
+
+        _record_thoughts(text, first_answer, started, source,
+                         model=payload.get("model", ""), prompt_hash=prompt_hash)
+
+        # The second look as a row of its own, beside the first, so the
+        # two can be compared - same question, more thinking.
+        if second:
+            _last_raw.update(second["second"])
+            _record_thoughts(text, second["answer"], started, "rethink",
+                             model=payload.get("model", ""), prompt_hash=prompt_hash)
 
     conf = None
 
-    if _last_raw.get("tokens"):
+    if second:
+        conf = second["conf2"] if second["corrected"] else second["conf"]
+    elif _last_raw.get("tokens"):
         try:
             import thoughtlog
 

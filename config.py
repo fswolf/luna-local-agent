@@ -577,6 +577,22 @@ THOUGHTS_MAX_RECORDS = int(_thoughts_cfg.get("max_records", 2000))
 # when it was unsure). Nothing on LM Studio, which doesn't expose them.
 THOUGHTS_TOKEN_PROBS = bool(_thoughts_cfg.get("token_probs", True))
 
+# Adaptive thinking (llama-server only): a modest thinking budget for
+# every turn, and a second, deeper look only when the reply came out
+# shaky by its own token probabilities. See llm._rethink.
+#   "adaptive": { "enabled": true, "first_budget": 1024, "deep_budget": -1,
+#                 "rethink_below": 0.75, "min_gain": 0.05,
+#                 "speak_corrections": true }
+_adaptive_cfg = setting("adaptive", {})
+ADAPTIVE_ENABLED = bool(_adaptive_cfg.get("enabled", True))
+ADAPTIVE_FIRST_BUDGET = int(_adaptive_cfg.get("first_budget", 1024))
+ADAPTIVE_DEEP_BUDGET = int(_adaptive_cfg.get("deep_budget", -1))
+ADAPTIVE_RETHINK_BELOW = float(_adaptive_cfg.get("rethink_below", 0.75))
+ADAPTIVE_MIN_GAIN = float(_adaptive_cfg.get("min_gain", 0.05))
+ADAPTIVE_SPEAK_CORRECTIONS = bool(_adaptive_cfg.get("speak_corrections", True))
+ADAPTIVE_PREFIX = str(_adaptive_cfg.get("correction_prefix",
+                                        "Hang on, let me correct that."))
+
 # The live monitor (livefeed.py): a page served by the assistant on
 # 127.0.0.1, showing each turn as it happens. Read at startup.
 #   "monitor": { "enabled": true, "port": 8792 }
@@ -747,6 +763,13 @@ SETTINGS = {
     "thoughts.enabled":           ("THOUGHTS_ENABLED",             True),
     "thoughts.max_records":       ("THOUGHTS_MAX_RECORDS",         True),
     "thoughts.token_probs":       ("THOUGHTS_TOKEN_PROBS",         True),
+
+    "adaptive.enabled":           ("ADAPTIVE_ENABLED",             True),
+    "adaptive.first_budget":      ("ADAPTIVE_FIRST_BUDGET",        True),
+    "adaptive.deep_budget":       ("ADAPTIVE_DEEP_BUDGET",         True),
+    "adaptive.rethink_below":     ("ADAPTIVE_RETHINK_BELOW",       True),
+    "adaptive.min_gain":          ("ADAPTIVE_MIN_GAIN",            True),
+    "adaptive.speak_corrections": ("ADAPTIVE_SPEAK_CORRECTIONS",   True),
 }
 
 _TRUE = ("1", "true", "yes", "on", "y")

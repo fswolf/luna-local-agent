@@ -441,6 +441,7 @@ you can't turn a dial that isn't there.
     "history":    { ... },
     "long_term_memory": { ... },
     "thoughts":   { ... },
+    "adaptive":   { ... },
     "monitor":    { ... }
 }
 ```
@@ -1247,10 +1248,8 @@ _room.saw(who, message)
 That one call does the lot — decides whether it was meant for her,
 applies the rate limits, queues it, waits for a gap, and answers out
 loud. A real transport lands at a couple of hundred lines, nearly all
-of it connection handling. `plugins/example.py` is a working template
-with the YouTube specifics written out (it's polled, not pushed — the
-response carries `pollingIntervalMillis` telling you when to come
-back).
+of it connection handling. `plugins/example.py` is a working template.
+`plugins/` ships with pomf, IRC, Twitch and YouTube.
 
 ### This is the one input that isn't you
 
@@ -1398,6 +1397,94 @@ the repo, beside the pomf ones in `~/.config/ai-voice/irc.json`:
 SASL authenticates *during* registration rather than after it, which
 matters: a channel with `+r` rejects the JOIN of an unidentified nick,
 and a NickServ message sent after JOIN is sent after it was refused.
+
+### Twitch
+
+```
+/twitch on            /twitch off            /twitch     (status)
+```
+
+```json
+"twitch": {
+    "enabled": false,
+    "channel": "beerus",
+    "speak": true,
+    "post_replies": false,
+    "ignore": ["Nightbot", "StreamElements", "Streamlabs", "Moobot", "Fossabot"]
+}
+```
+
+Reading needs nothing at all. Twitch lets anyone read a public chat
+anonymously, so by default she joins as a nameless reader and answers
+out loud on stream. A full channel URL works as `channel` too. Common
+chat bots are ignored out of the box, so a bot can't start a loop with
+her.
+
+To have her reply *in chat* as well, give her **her own** Twitch
+account, not yours. Get that account a user access token with the
+`chat:read` and `chat:edit` scopes and put it outside the repo:
+
+```jsonc
+// ~/.config/ai-voice/twitch.json
+{"username": "lunabot", "oauth": "oauth:abc123..."}
+```
+
+Then set `"post_replies": true`. Without the file, `/twitch on` says
+so instead of failing quietly. Replies are cut to `max_reply_chars`
+(450; Twitch allows 500), sent at most one every two seconds (well
+inside Twitch's 20 per 30 seconds), and can't start with `/` or `.`,
+so nothing she writes can be read as a chat command. Her account is
+added to the ignore list automatically.
+
+It uses Twitch's IRC gateway (`irc.chat.twitch.tv`). Twitch recommends
+EventSub for new bots, but IRC needs no registered app and reads
+anonymously, which EventSub can't. `/twitch` with no argument shows
+whether anything is arriving and, if she's quiet, why.
+
+### YouTube
+
+```
+/youtube on           /youtube off           /youtube    (status)
+```
+
+```json
+"youtube": {
+    "enabled": false,
+    "video": "",
+    "channel": "@YourHandle",
+    "poll_seconds": 5,
+    "speak": true
+}
+```
+
+Read-only. She answers out loud, never in chat. Posting to YouTube
+chat needs a full Google sign-in and costs 50 quota units a message.
+
+It needs a YouTube Data API key, and no sign-in. In Google Cloud
+Console: create a project, enable *YouTube Data API v3*, create an API
+key (restrict it to that API), and put it outside the repo:
+
+```jsonc
+// ~/.config/ai-voice/youtube.json
+{"api_key": "AIza..."}
+```
+
+(or set `YOUTUBE_API_KEY`). Then tell it which stream. `video` takes a
+watch URL, a `youtu.be` link, a `/live/` link or a bare id. `channel`
+takes your handle and finds whatever you have live, from the channel's
+public `/live` page. That page lookup costs no quota but isn't an API,
+so if YouTube changes the page, set `video` instead. Before the stream
+starts it checks again every minute.
+
+**Quota.** A key gets 10,000 units a day: 1 to find the stream, then
+1 per poll. It waits whatever YouTube asks between polls, and never
+less than `poll_seconds`, so 5 seconds lasts about 14 hours of stream
+a day. If the quota runs out it says so in `/youtube` and waits for the
+reset at midnight Pacific instead of retrying a key that will only say
+no. The chat that was already there when she joins is read for context
+but not answered, so she doesn't reply to questions from before she
+arrived.
+
 
 ---
 
@@ -2135,6 +2222,55 @@ to look at.
 
 `/set thoughts.token_probs false` stops collecting it.
 
+### Adaptive thinking (llama-server)
+
+An idea borrowed from [mini-AGI](https://github.com/volotat/mini-AGI):
+stop thinking when another step wouldn't change the answer. Its version
+decides per character, inside the network. Luna's is built from what
+the thought log already measures:
+
+1. **Every turn thinks on a modest budget** (`first_budget`, 1024
+   tokens), which also makes easy questions answer sooner.
+2. **If the reply came out shaky**, meaning under `rethink_below` (75%)
+   sure on average or with a run of coin-flip tokens, the same question
+   is asked again, silently, with the thinking budget lifted
+   (`deep_budget`, -1 = unlimited).
+3. **The second answer replaces the first only if it's different and
+   genuinely sure**: above the same 75%, at least `min_gain` surer than
+   the first, and with no shaky stretch of its own. Then she says *"Hang
+   on, let me correct that."* and gives it. Otherwise she keeps what she
+   said, and the conversation shows a note: *held — same answer on a
+   second look*, or *kept the first answer — the second wasn't sure
+   enough either*.
+
+A confident reply never pays for a second look. A turn that called a
+tool is never re-run, so a reminder can't be set twice or a file written
+twice, and the second look gets no tools at all. It only runs on
+llama-server, for your turns, never stream chat. It needs the token
+probabilities, so LM Studio gets neither the budget nor the rethink.
+
+Both passes are kept: the second look is its own row in the thought log,
+marked **rethink**, right after the turn it reconsidered. The
+**rethinks** filter lists them, and the live monitor shows the second
+look as it happens. Over time that answers the research question
+directly: when she was unsure, did more thinking actually help?
+
+```json
+"adaptive": {
+    "enabled": true,
+    "first_budget": 1024,
+    "deep_budget": -1,
+    "rethink_below": 0.75,
+    "min_gain": 0.05,
+    "speak_corrections": true
+}
+```
+
+All of it can be changed live with `/set adaptive.<name>`, and
+**adaptive thinking** is a toggle under *Thoughts* in the settings pane.
+`speak_corrections: false` still takes the second look and records it,
+but never says anything, which suits measuring before trusting it.
+
 ### Exporting starred turns as a PDF
 
 **starred → PDF** in the viewer's top bar opens a clean, printable page
@@ -2380,8 +2516,11 @@ ai-voice/
 │   └── start.sh
 ├── plugins/
 │   ├── __init__.py   # the loader
-│   └── example.py    # template - copy this
-│                     # (anything else here is yours, gitignored)
+│   ├── example.py    # template - copy this
+│   ├── pomf.py       # pomf.tv stream chat
+│   ├── irc.py        # an IRC channel
+│   ├── twitch.py     # Twitch chat (reads anonymously; posts with a bot account)
+│   └── youtube.py    # YouTube live chat (read-only, API key)
 ├── ptt.py
 ├── reminders.py
 ├── speech.py
