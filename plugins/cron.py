@@ -90,7 +90,12 @@ def parse(schedule):
         if every < 5:
             raise ValueError("every needs to be at least 5m")
 
-        return (lambda t: int(t.timestamp()) // 60 % every == 0), False
+        # Minutes on the local wall clock, not since the UTC epoch -
+        # otherwise "every 1d" fires at UTC midnight (evening here) and
+        # "every 5h" lines up with nothing you'd expect.
+        epoch = datetime(1970, 1, 1)
+
+        return (lambda t: int((t - epoch).total_seconds()) // 60 % every == 0), False
 
     parts = s.split()
 

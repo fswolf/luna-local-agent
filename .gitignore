@@ -22,6 +22,8 @@ agent/embeddings.db-shm
 agent/notebook.db
 agent/notebook.db-wal
 agent/notebook.db-shm
+# Scheduled jobs (plugins/cron.py) - yours, like reminders.
+agent/cron.json
 
 # llama.cpp is built in place by llama/install.sh; only the scripts and
 # the settings file are ours.
@@ -67,6 +69,7 @@ tts/*/voices/*
 # code by accident.
 pomf.json
 irc.json
+discord.json
 *.key
 
 # Editor / OS noise

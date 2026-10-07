@@ -37,3 +37,8 @@ hotkey_bound = False
 # than a plain flag because a reminder can fire a turn on its own thread
 # mid-job, and its writes must not inherit the job's pass.
 job = threading.local()
+
+# Which remote plugin owns the turn on this thread ("discord"), if any.
+# Set only by assistant.respond_remote. files.py lets it write without
+# the popup when the source is listed in files.auto_approve_sources.
+remote = threading.local()

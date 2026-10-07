@@ -478,6 +478,12 @@ FILES_APPROVAL_TIMEOUT = float(_files_cfg.get("approval_timeout", 120))
 # wins, ~ itself and this app's own folder are ignored, and every other
 # write still asks.
 #   "files": { ..., "job_write_dirs": ["~/luna-jobs"] }
+# Remote plugins whose owner turns write without the popup - remote
+# access, where nobody is at the desk to answer it. The deny list still
+# applies. Empty = every remote write asks (and times out as a no).
+#   "files": { ..., "auto_approve_sources": ["discord"] }
+FILES_AUTO_APPROVE_SOURCES = [str(s).strip().lower() for s in
+                              _files_cfg.get("auto_approve_sources", []) if str(s).strip()]
 FILES_JOB_WRITE_DIRS = [os.path.expanduser(str(p)) for p in
                         _files_cfg.get("job_write_dirs", []) if str(p).strip()]
 # Separate from the rest, because reading the clipboard means whatever
