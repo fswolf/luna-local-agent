@@ -125,7 +125,7 @@ _GROUPS = (
     ("Files", ("list_files", "read_file", "write_file", "edit_file")),
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",
                  "focus_window", "system_status")),
-    ("Web", ("web_search", "read_page")),
+    ("Web", ("web_search", "research", "read_page")),
     ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
               "reflect_now")),
 )

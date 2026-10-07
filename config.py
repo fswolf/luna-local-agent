@@ -705,6 +705,13 @@ PAGE_FETCH_ENABLED = bool(_web_search_cfg.get("fetch_pages", True))
 # 4000 characters, so this is the main cost control.
 PAGE_MAX_CHARS = int(_web_search_cfg.get("page_max_chars", 6000))
 PAGE_TIMEOUT = float(_web_search_cfg.get("page_timeout", 20))
+# read_page and research refuse this machine and the local network
+# (your router, llama-server, the monitor) unless this is on. A page
+# can ask her to "read" http://192.168.1.1/ as easily as you can.
+PAGE_ALLOW_LOCAL = bool(_web_search_cfg.get("allow_local", False))
+# research: how many pages it reads, and how much of them in total.
+RESEARCH_PAGES = max(1, int(_web_search_cfg.get("research_pages", 3)))
+RESEARCH_MAX_CHARS = int(_web_search_cfg.get("research_max_chars", 9000))
 
 
 # ---------------------------------------------------------------------------
@@ -799,6 +806,9 @@ SETTINGS = {
     "web_search.max_results":     ("WEB_SEARCH_MAX_RESULTS",       True),
     "web_search.fetch_pages":     ("PAGE_FETCH_ENABLED",           True),
     "web_search.page_max_chars":  ("PAGE_MAX_CHARS",               True),
+    "web_search.allow_local":     ("PAGE_ALLOW_LOCAL",             True),
+    "web_search.research_pages":  ("RESEARCH_PAGES",               True),
+    "web_search.research_max_chars": ("RESEARCH_MAX_CHARS",        True),
 
     "reminders.enabled":          ("REMINDERS_ENABLED",            True),
 
