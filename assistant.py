@@ -180,6 +180,53 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True):
             ui.set_status("Idle")
 
 
+def respond_remote(text, model, source, who, tools_allowed=None,
+                   speak=False, remember=True):
+    """The owner talking to her from somewhere else - Discord.
+
+    A normal private turn (his history, his tools) that waits for the
+    lock rather than cutting you off. state.remote is set here, on this
+    thread, so files.py can apply files.auto_approve_sources to it and
+    to nothing else.
+    """
+    with _turn:
+        state.stop_speaking = False
+        state.stop_generating = False
+        player = speech.Player() if speak else None
+
+        # As "user", tagged: ui.py labels any speaker it doesn't know
+        # (not user/system/chat:) as her, so "discord:Ryan" rendered
+        # your message under her name.
+        ui.add_message("user", f"[{source}] {text}")
+        ui.set_status(f"{source.title()}...")
+        ui.begin_message(AGENT_NAME.lower())
+        state.remote.source = source
+
+        def on_sentence(sentence):
+            if not state.stop_speaking:
+                player.say(sentence)
+
+        try:
+            answer = ask(text, model, on_text=ui.extend_message,
+                         on_sentence=on_sentence if speak else None,
+                         context=None if remember else [],
+                         tools_allowed=tools_allowed, remember=remember,
+                         source=source)
+            ui.replace_message(answer)
+            ui.end_message()
+
+            if player is not None:
+                player.wait()
+
+            return answer
+        except Exception:
+            ui.end_message()
+            raise
+        finally:
+            state.remote.source = None
+            ui.set_status("Idle")
+
+
 def _respond(text, model):
     # Only now, holding the lock: resetting this any earlier would
     # clear the stop we just set on the turn we're waiting for.

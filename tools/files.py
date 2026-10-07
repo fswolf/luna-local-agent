@@ -159,10 +159,37 @@ def _job_may_write(full):
     return any(full.startswith(folder + os.sep) for folder in job_write_dirs())
 
 
+def _remote_may_write(full):
+    """auto_approve_sources covers ~, minus the places where a write is
+    really code that runs later: her own folder (config.json could add
+    sources, files.py could drop this check) and ~/.config / ~/.local
+    (autostart, systemd user units, ~/.local/bin). A web page she reads
+    mid-turn can steer a write as well as the owner can, so those still
+    pop the window."""
+    remote = getattr(state.remote, "source", None)
+
+    if not remote or remote not in config.FILES_AUTO_APPROVE_SOURCES:
+        return False
+
+    real = os.path.realpath(full)
+    guarded = [os.path.realpath(config.BASE_DIR),
+               os.path.join(HOME, ".config"), os.path.join(HOME, ".local")]
+
+    return not any(real == g or real.startswith(g + os.sep) for g in guarded)
+
+
 def _ask(action, full, body_lines, note=""):
     """Block until the user answers the popup. False on timeout or when
     there's no TUI to ask (headless = deny; never write unasked)."""
     import ui
+
+    remote = getattr(state.remote, "source", None)
+
+    if _remote_may_write(full):
+        logbook.info("files", "%s: %s %s - auto_approve_sources, not asked",
+                     remote, action, full)
+
+        return True
 
     if _job_may_write(full):
         logbook.info("files", "job %s: %s %s - job_write_dirs, not asked",

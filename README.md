@@ -1189,16 +1189,17 @@ Plugins:
   [on ] youtube      answers live chat out loud
   [off] example      a template - connects to nothing, answers nothing
   [--] twitch        no API key - see plugins/twitch.py
-  [!!] discord       didn't load: ModuleNotFoundError: No module named 'aiohttp'
+  [--] discord       no bot token - put it in ~/.config/ai-voice/discord.json
+  [!!] mygame        didn't load: ModuleNotFoundError: No module named 'pygame'
 ```
 
 `[--]` is loaded but can't run and says why; `[!!]` didn't import at
 all. Neither stops the app starting.
 
-**Plugins are private by default.** `.gitignore` excludes `plugins/*`
-apart from the loader and the template, because what you wire her up to
-is yours — channel names, account names, whatever. Whitelist one there
-if you do want to publish it.
+**Plugins are tracked in git, all of them**, including any you add
+later, so keep anything private out of the file itself. Credentials go
+in `~/.config/ai-voice/`, and channel or account names in
+`config.json`.
 
 ## Writing one
 
@@ -1515,22 +1516,25 @@ no. The chat that was already there when she joins is read for context
 but not answered, so she doesn't reply to questions from before she
 arrived.
 
-## Sysadmin: cron, with Discord next
+## Sysadmin: cron and Discord
 
-Every other plugin connects her to a *conversation*. This one is
-different: it's the start of a sysadmin side for her. She looks after
-the machine on a schedule and reports back, the way a homelab bot
-would. It's adapted from CR0N, a friend's Discord sysadmin bot. The
-useful ideas came over and its permission model didn't (see *What
-didn't come across*).
+Every other plugin connects her to a *conversation*. These two give
+her a sysadmin side: she looks after the machine on a schedule, and
+she can be reached from anywhere, the way a homelab bot would be.
+They're adapted from CR0N, a friend's Discord sysadmin bot. Its
+scheduler and remote control came over; its regex-gated shell didn't
+(see *What came across*).
 
-The plugin is `plugins/cron.py`. It's built in two layers, and only
-the first exists yet:
+| Layer | What it is | Out of the box |
+|-------|------------|----------------|
+| **Scheduler**: `plugins/cron.py` | Jobs she runs on her own on a timer, reporting out loud and in the TUI | off |
+| **Discord**: `plugins/discord.py` | Remote access: the owner talks to her from a private channel or DM | off, and its writes ask |
 
-| Layer | Status | What it is |
-|-------|--------|------------|
-| **Scheduler** | working | Jobs she runs on her own on a timer, reporting out loud and in the TUI |
-| **Discord** | planned | The same jobs and their reports, reachable from your phone through a private channel |
+**Both are off until you switch them on**, and neither does anything
+on a fresh install. `/cron on` and `/discord on` save `"enabled": true`
+into `config.json` so they come back next launch. If you share your
+folder with someone, check those two keys (and
+`files.auto_approve_sources`) first, or they get your switches too.
 
 ### Scheduled jobs
 
@@ -1551,10 +1555,12 @@ Ask for one in plain words: *"every weekday at 8, check disk and VRAM
 and note anything low in ~/luna-jobs/disk.md"*. She calls
 `schedule_job`, and **you approve it in the popup** before it's saved.
 This is the step where you hand her permission to act later, so it's
-the step that asks. `list_jobs` and `cancel_job` cover the rest, and
-all three sit in the **Jobs** group of the tools pane.
+the step that asks. `list_jobs` and `cancel_job` cover the rest. All
+three sit in the **Jobs** group of the tools pane, and they're only
+offered while `/cron` is on.
 
-Jobs live in `agent/cron.json` and can be edited by hand:
+Jobs live in `agent/cron.json` (gitignored, since it's yours) and can
+be edited by hand:
 
 ```json
 [{"name": "disk-check", "schedule": "0 8 * * 1-5",
@@ -1566,17 +1572,19 @@ Jobs live in `agent/cron.json` and can be edited by hand:
 |----------|-------|
 | `0 8 * * 1-5` | cron line: weekdays at 08:00 |
 | `*/15 * * * *` | every quarter hour |
-| `every 30m` / `every 2h` / `every 1d` | an interval, 5 minutes minimum |
+| `every 30m` / `every 2h` / `every 1d` | an interval, 5 minutes minimum, counted on your local clock (`every 1d` = local midnight, `every 2h` = 00:00, 02:00, ...) |
 | `2026-10-07 08:00` | once, then removed |
 
-Day-of-month and weekday are ANDed, not cron's OR. Runs missed while
-the app was closed are skipped, not caught up: a 08:00 disk check is
-no use at 14:00.
-
-A broken `agent/cron.json` stops `/cron on` with the parse error
-rather than starting with no jobs, so a stray comma doesn't look like
-everything got cancelled. A single bad entry is skipped, shown in
-`/cron`, and kept in the file when she saves.
+* **`speak` defaults to `true`.** A job reads its report aloud, so set
+  `"speak": false` on anything that fires at night.
+* **Day-of-month and weekday are ANDed,** not cron's OR.
+* **Missed runs are skipped, not caught up.** A 08:00 disk check is no
+  use at 14:00. A one-off whose time passed while the app was closed
+  shows in `/cron` as skipped and stays in the file until you delete it.
+* **A broken `agent/cron.json` stops `/cron on`** with the parse error
+  rather than starting with no jobs, so a stray comma doesn't look like
+  everything got cancelled. A single bad entry is skipped, shown in
+  `/cron`, and kept in the file when she saves.
 
 ### What a job turn is
 
@@ -1620,31 +1628,107 @@ Everything else is unchanged:
 * **Symlinks don't escape.** Paths are resolved first, so
   `~/luna-jobs/up -> ~` writes to `~` and asks.
 
+`read_page` is in the default `job_tools`, so a page a job reads can
+try to steer what it writes. The worst it can do unasked is write
+inside `~/luna-jobs`. Drop `read_page` from the list if that's still
+too much.
+
 A plugin is a file in a folder, and a permission a plugin can grant
 itself is not a permission. The plugin only *labels* its turns as
 jobs. Which folders that label unlocks is decided by you, in core
 config.
 
-### Discord (planned)
+### Discord: remote access
 
-The second layer is CR0N's best idea: a private Discord channel as a
-remote control. You'd get job reports on your phone, and you could
-start one, or ask her something, from anywhere. It will be
-`plugins/discord.py`, and it's deliberately not built yet, because it
-changes what she is. From your desk, Luna is an assistant. Through
-Discord, she's **a remote shell into this PC for anyone holding your
-Discord account.** So it lands with these rules or not at all:
+```
+/discord on           /discord off           /discord    (status)
+```
 
-| Rule | Why |
-|------|-----|
-| One owner, by numeric user id, in `~/.config/ai-voice/discord.json` with the bot token | A username can be changed; an id can't. The token is a credential, so it stays out of the repo |
-| Everyone else in the channel goes through `chatroom.py` and its `TOOL_CEILING` | Same as stream chat: strangers get the stranger tool list |
-| Approval by ✅/❌ reaction from the owner id, as a **core** gate beside `ui.ask_approval` | The popup can't be answered from a phone, but a plugin that answers its own approvals approves everything |
-| No auto-approve by pattern | CR0N ran `bash` unless a regex flagged it; `python3 -c`, `find -delete` and `base64 -d \| sh` all walked past that |
-| Reports post as text and aren't spoken unless you're home | Same reasoning as IRC's `speak: false` |
-| No password store | Secrets fetched into the model's context end up in LM Studio's logs, whatever gets redacted on the way out |
+The second layer is CR0N's best idea: a private Discord channel (or a
+DM) as a remote control. From your phone you get the same Luna as at
+the desk. It's a normal private turn with your history and the full
+tool list, and it waits its turn instead of cutting off whatever is
+happening at the keyboard. Your message shows in the TUI as yours,
+tagged `[discord]`.
 
-Until then, `/cron` from the keyboard is the whole interface.
+#### Setup
+
+```bash
+pip install discord.py
+```
+
+Credentials go outside the repo:
+
+```jsonc
+// ~/.config/ai-voice/discord.json
+{"token": "your-bot-token", "owner_ids": [123456789012345678]}
+```
+
+In the [Developer Portal](https://discord.com/developers/applications):
+New Application → **Bot** → Reset Token (that's `token`), and switch on
+**Message Content Intent** on the same page. Invite it under OAuth2 →
+URL Generator with the `bot` scope and *Send Messages* / *Read Message
+History*. For `owner_ids`: Discord Settings → Advanced → Developer
+Mode, then right-click your name → *Copy User ID*. `DISCORD_TOKEN` in
+the environment works instead of the file. With no token, or no owner
+ids, `/plugins` shows it as `[--]` and says which is missing.
+
+```json
+"discord": {
+    "enabled": false,
+    "channel": "",
+    "speak": false,
+    "remember": true,
+    "tools": null
+}
+```
+
+| Key | |
+|-----|--|
+| `channel` | name or id of the one server channel she listens in. `""` = DMs only |
+| `speak` | also read replies aloud at the desk. Off: whoever's in the room didn't ask |
+| `remember` | `true` = part of your normal history, like a typed turn |
+| `tools` | `null` = every tool. A list narrows it. **Don't delete the key**: missing, it falls back to the stream-chat list |
+
+Every tool includes `clipboard` and `look_at_screen`, which means
+"what's on my clipboard?" from your phone sends it to Discord. That's
+the point of remote access, but if a password manager copies through
+your clipboard, give `tools` a list without those two.
+
+In Discord, `!stop` cuts off the reply in progress (CR0N's `!kill`)
+and `!status` shows what `/discord` does. Long replies are split
+under Discord's 2000-character limit. `/discord` also tells you why
+it's quiet: a rejected token, Message Content Intent switched off, or
+a non-owner it's been ignoring.
+
+#### Writes from Discord
+
+**Out of the box, a write from Discord pops the window on screen,**
+the same as one you asked for at the desk, and times out as a no when
+nobody's home. If you want remote writes to go through, opt in, in
+core config rather than in the plugin:
+
+```json
+"files": { ..., "auto_approve_sources": ["discord"] }
+```
+
+With `discord` in that list, a write or edit from a Discord owner turn
+goes straight through and is logged as `auto_approve_sources, not
+asked`. Security is then the owner's to assume: **whoever holds the
+bot token, or an owner's Discord account, can write any file under ~
+outside the guarded places below.** These guards stay on either way:
+
+| Guard | Why |
+|-------|-----|
+| Only `owner_ids` are obeyed; everyone else is ignored and logged | Without it, anyone who can type in the channel has remote access |
+| The deny list (`.ssh`, `.gnupg`, `.env`, `~/.config/ai-voice`, keys, shell startup files) | Refused before approval is even considered, so no remote turn reads or writes them, including the bot token |
+| Luna's own folder, `~/.config`, `~/.local` still pop the window | A write there is code that runs later (her config and source, autostart, systemd units, `~/.local/bin`), and a web page she reads mid-turn can steer a write as well as you can |
+
+The flag is thread-local and set only by `assistant.respond_remote`,
+so a reminder or a job firing while a Discord turn is running still
+follows its own rules. Luna has no shell tool, so "remote access" means
+her tools (files, web, desktop, memory, reminders, jobs), not a command
+line.
 
 ### What came across from CR0N, and what didn't
 
@@ -1654,14 +1738,16 @@ Until then, `/cron` from the keyboard is the whole interface.
 | Reminders vs tasks ("who holds the verb?") | `set_reminder` pings *you*; `schedule_job` is work *she* does |
 | Every action logged | logbook, plus the `Job:` line on screen |
 | Turn budget and stuck-loop detection | not yet. Jobs run under the normal tool-round limit |
-| `!btw` corrections mid-run | not yet. It comes with Discord |
+| `!kill` mid-run | `!stop` in Discord |
 | Helper delegation to other PCs | not planned |
-| `bash` with regex auto-approve | **no** |
+| Remote access over Discord, no approval | `plugins/discord.py`; skipping the popup is opt-in via `files.auto_approve_sources` |
+| `bash` with regex auto-approve | **no.** There's no shell tool |
 | `pass` password store | **no** |
 | Write-guard on its own code by path string | **no.** Paths are resolved, and the app folder is excluded outright |
 
-`plugins/cron.py` is caught by the `plugins/*` line in `.gitignore`
-like every other plugin. Whitelist it there if you want it published.
+Both plugins are tracked in git like every other plugin. Neither holds
+anything personal: the token lives in `~/.config/ai-voice/`, and your
+jobs in the gitignored `agent/cron.json`.
 
 
 ---
@@ -3113,7 +3199,9 @@ ai-voice/
 │   ├── pomf.py       # pomf.tv stream chat
 │   ├── irc.py        # an IRC channel
 │   ├── twitch.py     # Twitch chat (reads anonymously; posts with a bot account)
-│   └── youtube.py    # YouTube live chat (read-only, API key)
+│   ├── youtube.py    # YouTube live chat (read-only, API key)
+│   ├── cron.py       # scheduled jobs - /cron, agent/cron.json
+│   └── discord.py    # remote access for the owner over Discord
 ├── ptt.py
 ├── reminders.py
 ├── speech.py
@@ -3143,6 +3231,7 @@ ai-voice/
 │   ├── thoughts.db   # the reasoning log (gitignored)
 │   ├── notebook.db   # lessons and conversation notes (gitignored)
 │   ├── embeddings.db # cached embeddings (gitignored)
+│   ├── cron.json     # scheduled jobs (gitignored)
 │   └── memory.json
 │
 ├── assets/
@@ -3192,6 +3281,8 @@ ai-voice/
 - Writes and edits your files, with every change approved on screen first
 - A tools pane showing what each schema costs, and switches to turn them off
 - Web search the model reaches for on its own
+- Scheduled jobs she runs on her own, approved once, with writes fenced to folders you pick
+- Remote access from Discord for the owner only, off until you switch it on
 - Searchable archive of every conversation, which pruning never deletes
 - Her reasoning kept per turn, with token confidence, review flags and a browser viewer
 - Adaptive thinking — a deeper second look only when an answer comes out shaky
