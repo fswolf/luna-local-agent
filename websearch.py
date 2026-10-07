@@ -1,6 +1,6 @@
 import re
 
-from config import WEB_SEARCH_ENABLED, WEB_SEARCH_MAX_RESULTS
+import config
 
 _TRIGGER_PATTERN = re.compile(r"\bweb[\s\-_]*search\b", re.IGNORECASE)
 
@@ -9,7 +9,7 @@ _TRAILING_FILLER = re.compile(r"\b(please|nya|thanks|thank you)\W*$", re.IGNOREC
 
 
 def looks_like_search(text: str) -> bool:
-    return bool(WEB_SEARCH_ENABLED and _TRIGGER_PATTERN.search(text))
+    return bool(config.WEB_SEARCH_ENABLED and _TRIGGER_PATTERN.search(text))
 
 
 def extract_query(text: str) -> str:
@@ -31,7 +31,7 @@ def search(query: str, max_results: int = None) -> list:
     raising, so a flaky search never breaks the conversation - Luna
     just answers without it, or says she couldn't find anything.
     """
-    max_results = max_results or WEB_SEARCH_MAX_RESULTS
+    max_results = max_results or config.WEB_SEARCH_MAX_RESULTS
 
     try:
         from ddgs import DDGS

@@ -144,6 +144,19 @@ def vectors(texts):
         return None
 
 
+def embed_fresh(texts, batch=8):
+    """Vectors for text that mustn't be cached - web passages, which
+    have no business in agent/embeddings.db. Raises on failure; the
+    caller has its own fallback. Small batches: the server's context
+    is short (EMBED_CTX), and a passage is a paragraph, not a fact."""
+    out = []
+
+    for start in range(0, len(texts), batch):
+        out.extend(_embed(texts[start:start + batch]))
+
+    return out
+
+
 def cosine(a, b):
     """The server normalises, so the dot product is the cosine."""
     return sum(x * y for x, y in zip(a, b))
