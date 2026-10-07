@@ -1515,6 +1515,154 @@ no. The chat that was already there when she joins is read for context
 but not answered, so she doesn't reply to questions from before she
 arrived.
 
+## Sysadmin: cron, with Discord next
+
+Every other plugin connects her to a *conversation*. This one is
+different: it's the start of a sysadmin side for her. She looks after
+the machine on a schedule and reports back, the way a homelab bot
+would. It's adapted from CR0N, a friend's Discord sysadmin bot. The
+useful ideas came over and its permission model didn't (see *What
+didn't come across*).
+
+The plugin is `plugins/cron.py`. It's built in two layers, and only
+the first exists yet:
+
+| Layer | Status | What it is |
+|-------|--------|------------|
+| **Scheduler** | working | Jobs she runs on her own on a timer, reporting out loud and in the TUI |
+| **Discord** | planned | The same jobs and their reports, reachable from your phone through a private channel |
+
+### Scheduled jobs
+
+```
+/cron on              /cron off              /cron       (jobs, last runs)
+```
+
+```json
+"cron": {
+    "enabled": false,
+    "job_tools": ["get_datetime", "time_until", "system_status", "web_search",
+                  "read_page", "list_files", "read_file", "write_file",
+                  "edit_file", "recall_facts"]
+}
+```
+
+Ask for one in plain words: *"every weekday at 8, check disk and VRAM
+and note anything low in ~/luna-jobs/disk.md"*. She calls
+`schedule_job`, and **you approve it in the popup** before it's saved.
+This is the step where you hand her permission to act later, so it's
+the step that asks. `list_jobs` and `cancel_job` cover the rest, and
+all three sit in the **Jobs** group of the tools pane.
+
+Jobs live in `agent/cron.json` and can be edited by hand:
+
+```json
+[{"name": "disk-check", "schedule": "0 8 * * 1-5",
+  "task": "Check free disk and VRAM; note anything under 10% in ~/luna-jobs/disk.md",
+  "speak": false}]
+```
+
+| Schedule | Means |
+|----------|-------|
+| `0 8 * * 1-5` | cron line: weekdays at 08:00 |
+| `*/15 * * * *` | every quarter hour |
+| `every 30m` / `every 2h` / `every 1d` | an interval, 5 minutes minimum |
+| `2026-10-07 08:00` | once, then removed |
+
+Day-of-month and weekday are ANDed, not cron's OR. Runs missed while
+the app was closed are skipped, not caught up: a 08:00 disk check is
+no use at 14:00.
+
+A broken `agent/cron.json` stops `/cron on` with the parse error
+rather than starting with no jobs, so a stray comma doesn't look like
+everything got cancelled. A single bad entry is skipped, shown in
+`/cron`, and kept in the file when she saves.
+
+### What a job turn is
+
+A job firing is a turn of its own, not one of yours:
+
+* **Fresh context, nothing stored.** It doesn't see your history, and
+  its tool output (web pages, file contents) never lands in history,
+  where it would be replayed into your private turns.
+* **Its own tool list:** `job_tools`, enforced the same way as chat's.
+  A job can never call `schedule_job`, so jobs don't breed jobs.
+* **It waits its turn.** If you're mid-conversation it queues behind
+  you, and a slow job isn't fired again on top of itself.
+* **It's echoed** as `Job: disk-check` in the conversation and in the
+  logbook. `/cron` shows the last result of each.
+
+### Writing without asking: `job_write_dirs`
+
+A job that can't write is half a job, and a popup at 3am is a no. So
+there's one carve-out, and **it lives in `files`, not in the plugin**:
+
+```json
+"files": { "enabled": true, "approval_timeout": 120,
+           "job_write_dirs": ["~/luna-jobs"] }
+```
+
+Inside those folders, a *job's* `write_file` / `edit_file` goes through
+without the popup and is logged as `job_write_dirs, not asked`.
+Everything else is unchanged:
+
+* **Anywhere else asks.** Away from the keyboard that times out as a
+  no, and her report says what she would have written.
+* **The deny list still wins.** `.ssh`, `.env`, keys and the rest are
+  refused before this check is ever reached.
+* **`~` itself is ignored,** since that would be every file you own,
+  and so is **anything overlapping this app's folder**. A job that can
+  quietly rewrite her own code can switch this check off. (That's the
+  exact hole CR0N had.)
+* **Only job turns get it.** The flag is thread-local and set only by
+  `assistant.respond_to_job`, under the turn lock. A reminder firing
+  mid-job, or anything you type, still asks.
+* **Symlinks don't escape.** Paths are resolved first, so
+  `~/luna-jobs/up -> ~` writes to `~` and asks.
+
+A plugin is a file in a folder, and a permission a plugin can grant
+itself is not a permission. The plugin only *labels* its turns as
+jobs. Which folders that label unlocks is decided by you, in core
+config.
+
+### Discord (planned)
+
+The second layer is CR0N's best idea: a private Discord channel as a
+remote control. You'd get job reports on your phone, and you could
+start one, or ask her something, from anywhere. It will be
+`plugins/discord.py`, and it's deliberately not built yet, because it
+changes what she is. From your desk, Luna is an assistant. Through
+Discord, she's **a remote shell into this PC for anyone holding your
+Discord account.** So it lands with these rules or not at all:
+
+| Rule | Why |
+|------|-----|
+| One owner, by numeric user id, in `~/.config/ai-voice/discord.json` with the bot token | A username can be changed; an id can't. The token is a credential, so it stays out of the repo |
+| Everyone else in the channel goes through `chatroom.py` and its `TOOL_CEILING` | Same as stream chat: strangers get the stranger tool list |
+| Approval by ✅/❌ reaction from the owner id, as a **core** gate beside `ui.ask_approval` | The popup can't be answered from a phone, but a plugin that answers its own approvals approves everything |
+| No auto-approve by pattern | CR0N ran `bash` unless a regex flagged it; `python3 -c`, `find -delete` and `base64 -d \| sh` all walked past that |
+| Reports post as text and aren't spoken unless you're home | Same reasoning as IRC's `speak: false` |
+| No password store | Secrets fetched into the model's context end up in LM Studio's logs, whatever gets redacted on the way out |
+
+Until then, `/cron` from the keyboard is the whole interface.
+
+### What came across from CR0N, and what didn't
+
+| From CR0N | Here |
+|-----------|------|
+| Scheduled autonomous tasks, 👍 before scheduling | `schedule_job` + popup approval |
+| Reminders vs tasks ("who holds the verb?") | `set_reminder` pings *you*; `schedule_job` is work *she* does |
+| Every action logged | logbook, plus the `Job:` line on screen |
+| Turn budget and stuck-loop detection | not yet. Jobs run under the normal tool-round limit |
+| `!btw` corrections mid-run | not yet. It comes with Discord |
+| Helper delegation to other PCs | not planned |
+| `bash` with regex auto-approve | **no** |
+| `pass` password store | **no** |
+| Write-guard on its own code by path string | **no.** Paths are resolved, and the app folder is excluded outright |
+
+`plugins/cron.py` is caught by the `plugins/*` line in `.gitignore`
+like every other plugin. Whitelist it there if you want it published.
+
 
 ---
 
