@@ -834,14 +834,18 @@ def handle_input(text):
         plugin = plugins.get(word)
 
         if plugin is not None:
-            argument = argument.strip().lower()
+            raw = argument.strip()
+            argument = raw.lower()
 
             if argument in ("on", "start"):
                 ok, message = plugin.start(MODEL)
             elif argument in ("off", "stop"):
                 ok, message = plugin.stop()
             else:
-                ui.add_message("system", plugin.status())
+                # Anything else is the plugin's own command, if it has any
+                # ("/minecraft goal build a hut"); otherwise its status.
+                answer = plugin.command(raw) if raw else None
+                ui.add_message("system", answer if answer is not None else plugin.status())
                 return
 
             if ok:

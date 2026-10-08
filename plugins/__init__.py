@@ -17,6 +17,8 @@ A plugin is a module with a NAME and whichever of these it needs:
     stop()          (ok, message)
     running()       bool
     status()        str    the block /<name> prints with no argument
+    command(text)   str    anything else after /<name> - "/minecraft goal
+                           build a hut" calls command("goal build a hut")
 
 Only NAME is required; anything missing gets a sensible default, so a
 plugin that only needs start() is four lines long. `plugins/example.py`
@@ -76,6 +78,7 @@ class Plugin:
         )
         self._running = _default(module, "running", lambda: False)
         self._status = _default(module, "status", None)
+        self._command = _default(module, "command", None)
 
     def available(self):
         try:
@@ -108,6 +111,18 @@ class Plugin:
             return self._stop()
         except Exception as e:
             return False, f"{self.name} failed to stop: {e}"
+
+    def command(self, text):
+        """None when the plugin has no commands of its own."""
+        if self._command is None:
+            return None
+
+        try:
+            return str(self._command(text))
+        except Exception as e:
+            logbook.exception("plugins", "%s command failed", self.name)
+
+            return f"{self.name}: that failed ({e})"
 
     def status(self):
         if self._status is not None:
