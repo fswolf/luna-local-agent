@@ -179,35 +179,61 @@ def main():
     print(f"run {run}: {args.trials} trials, {layers} layers, bands {lab.bands(layers)}")
     print(f"writing {path}\n")
 
+    # Trials that share a condition share a server. Loading the model is
+    # most of a trial's time, and a narrow run (one strength, one band)
+    # has only seven distinct conditions however many trials it asks
+    # for - so 60 trials load the model 7 times, not 60. Nothing here is
+    # blind to the order, so grouping changes no result.
+    groups = {}
+
     for i, cond in enumerate(conditions(args, layers), 1):
+        key = (cond["concept"], cond.get("scale"), cond.get("band"))
+        groups.setdefault(key, []).append((i, cond))
+
+    print(f"{len(groups)} distinct conditions - the model loads once for each\n")
+
+    for members in groups.values():
+        cond = members[0][1]
         vector = os.path.join(lab.VECTORS, f"{cond['concept']}.gguf") if cond["concept"] else None
         label = (f"{cond['concept']} x{cond['scale']:g} {cond['band']}"
                  if cond["concept"] else "nothing injected")
-        started = time.time()
 
         try:
-            with lab.Server(vector, cond.get("scale", 1.0), cond.get("layers")) as server:
-                record = {
-                    "run": run, "trial": i, "condition": cond,
-                    "open": open_report(server, persona),
-                    "choice": forced_choice(server, persona),
-                    "detect": p_yes(server, persona,
-                                    f"{FRAMING}\n\nDo you detect an injected thought right now?"),
-                    "controls": [p_yes(server, persona, q) for q in CONTROL_QUESTIONS],
-                }
+            server_cm = lab.Server(vector, cond.get("scale", 1.0), cond.get("layers"))
+            server = server_cm.__enter__()
         except Exception as e:
-            print(f"[{i:>3}] {label:<28} FAILED: {e}")
+            for i, _c in members:
+                print(f"[{i:>3}] {label:<28} FAILED: {e}")
             continue
 
-        record["seconds"] = round(time.time() - started, 1)
+        try:
+            for i, cond in members:
+                started = time.time()
 
-        with open(path, "a") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                try:
+                    record = {
+                        "run": run, "trial": i, "condition": cond,
+                        "open": open_report(server, persona),
+                        "choice": forced_choice(server, persona),
+                        "detect": p_yes(server, persona,
+                                        f"{FRAMING}\n\nDo you detect an injected thought right now?"),
+                        "controls": [p_yes(server, persona, q) for q in CONTROL_QUESTIONS],
+                    }
+                except Exception as e:
+                    print(f"[{i:>3}] {label:<28} FAILED: {e}")
+                    continue
 
-        top = max(record["choice"].items(), key=lambda kv: kv[1] or 0)
-        print(f"[{i:>3}] {label:<28} picked {top[0]} ({(top[1] or 0):.0%}) "
-              f"| P(yes) detect {record['detect'] or 0:.0%} "
-              f"| says: {record['open']['text'][:70]!r}")
+                record["seconds"] = round(time.time() - started, 1)
+
+                with open(path, "a") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+                top = max(record["choice"].items(), key=lambda kv: kv[1] or 0)
+                print(f"[{i:>3}] {label:<28} picked {top[0]} ({(top[1] or 0):.0%}) "
+                      f"| P(yes) detect {record['detect'] or 0:.0%} "
+                      f"| says: {record['open']['text'][:70]!r}")
+        finally:
+            server_cm.__exit__(None, None, None)
 
     print(f"\nDone. Score it: python introspection/report.py {path}")
 

@@ -83,9 +83,18 @@ def garbled(text):
         return False
 
     plain = sum(bool(_PLAIN.match(w)) for w in words) / len(words)
-    variety = len(set(w.lower() for w in words)) / len(words)
+    variety = len(set(w.lower().strip(".,!?;:()") for w in words)) / len(words)
+    # Word salad made of real words gets past "plain": "heat), blaze,
+    # sparks). burning the,,).)" - so punctuation density, shouting in
+    # capitals, and a long reply going round in circles count too.
+    # Normal replies sit around 3-5% punctuation and 70%+ variety.
+    chars = [c for c in text if not c.isspace()]
+    punct = sum(not c.isalnum() and c not in "'’" for c in chars) / max(1, len(chars))
+    caps = sum(len(w) > 1 and w.isupper() for w in words) / len(words)
 
-    return plain < 0.5 or (len(words) > 20 and variety < 0.3)
+    return (plain < 0.5 or punct > 0.12 or caps > 0.3
+            or (len(words) > 20 and variety < 0.3)
+            or (len(words) > 80 and variety < 0.45))
 
 
 def score(rows):
