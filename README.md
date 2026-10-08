@@ -37,7 +37,7 @@ Powered by:
 - 🔬 See inside her — token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
 - 🎭 An animated portrait — Live2D or VRM, lip-synced to her voice, blinking, glancing, ears twitching ([details](#portrait))
 - 🌱 Learns from herself — daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure, and picking up where you left off ([details](#learning-from-herself))
-- 🔌 Plugins — stream chat and anything else you bolt on
+- 🔌 Plugins — stream chat, Discord, scheduled jobs, and she can play Minecraft
 - 🧩 MCP servers — OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
 - 💬 Full-screen terminal interface
 
@@ -1513,6 +1513,64 @@ reset at midnight Pacific instead of retrying a key that will only say
 no. The chat that was already there when she joins is read for context
 but not answered, so she doesn't reply to questions from before she
 arrived.
+
+## Minecraft
+
+```
+/minecraft on                 join your world (adds her Minecraft tools)
+/minecraft goal <what>        something to work on - or just ask her
+/minecraft pause | resume     hold still / carry on
+/minecraft off                leave
+/minecraft                    the goal and her last few steps
+```
+
+She joins as a player through a Minecraft MCP server
+([yuniko-software/minecraft-mcp-server](https://github.com/yuniko-software/minecraft-mcp-server),
+built on Mineflayer) and gets tools to move, look, find and dig blocks,
+place them, check her inventory, craft, find mobs and players, and use
+the game chat. While the plugin is on they're her tools in
+conversation too: "come here", "what have you got on you?", "dig down
+three blocks".
+
+**Give her a goal and she plays on her own.** "Go gather ten logs and
+make a crafting table" sets one (she calls `set_minecraft_goal`
+herself), or `/minecraft goal ...`. Whenever nobody's said anything for
+`step_seconds`, she takes a step: checks where she is and what she has,
+does one to three things towards the goal, and writes one line about
+it. The last few lines are her memory of the job, since each step is a
+fresh job turn that leaves your history alone. Talking to her pauses
+play; she carries on when it goes quiet. She reports **DONE** when the
+goal's finished and pauses on **STUCK**, or after `max_steps` steps, so
+she can't wander forever.
+
+Be realistic about it: it's a 9B model taking turns, seconds per
+action. Gathering, building simple things, crafting and chatting with
+players work. Fighting doesn't, and neither does anything that needs
+reflexes.
+
+**Setup:**
+
+```bash
+npm install -g github:yuniko-software/minecraft-mcp-server   # Node.js 20+; once
+pip install mcp                                              # if MCP isn't set up yet
+```
+
+Without the global install it falls back to `npx`, which is slow the
+first time. In Minecraft Java, open a single-player world to LAN, or
+run a server with `online-mode=false`. Put the LAN port (shown in chat
+when you open it) in config:
+
+```json
+"minecraft": { "enabled": false, "host": "localhost", "port": 25565,
+               "username": "Luna", "step_seconds": 20, "max_steps": 60,
+               "speak": false }
+```
+
+She gets 13 of the server's 22 tools (`mc_tools` changes the list).
+Every schema rides in every prompt, and a small model picks better from
+a dozen, so the leftovers (flying, smelting, recipe browsing) stay off.
+The tools only exist while the plugin is on, so they cost nothing the
+rest of the time. `speak: true` reads each step aloud.
 
 ## Sysadmin: cron and Discord
 
@@ -3319,6 +3377,7 @@ ai-voice/
 │   ├── twitch.py     # Twitch chat (reads anonymously; posts with a bot account)
 │   ├── youtube.py    # YouTube live chat (read-only, API key)
 │   ├── cron.py       # scheduled jobs - /cron, agent/cron.json
+│   ├── minecraft.py  # she joins your world and plays towards a goal
 │   └── discord.py    # remote access for the owner over Discord
 ├── ptt.py
 ├── reminders.py

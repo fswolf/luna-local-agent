@@ -115,7 +115,7 @@ async def _serve(name, spec, ready):
         ready.set()
 
 
-def _connect(name, spec):
+def _connect(name, spec, timeout=None):
     ready = threading.Event()
     _servers[name] = {"session": None, "tools": [], "error": "", "approve": bool(spec.get("approve")),
                       "only": set(spec.get("tools") or []), "stop": None, "spec": spec}
@@ -126,8 +126,10 @@ def _connect(name, spec):
 
     asyncio.run_coroutine_threadsafe(start(), _loop).result(5)
 
-    if not ready.wait(CONNECT_TIMEOUT):
-        _servers[name]["error"] = f"didn't answer within {CONNECT_TIMEOUT}s"
+    wait = timeout or CONNECT_TIMEOUT
+
+    if not ready.wait(wait):
+        _servers[name]["error"] = f"didn't answer within {wait:g}s"
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +211,7 @@ def _register(server):
     import tools
 
     entry = _servers[server]
+    entry["registered"] = []
     count = 0
     for t in entry["tools"]:
         if entry["only"] and t.name not in entry["only"]:
@@ -225,8 +228,49 @@ def _register(server):
             available=lambda s=server: _servers.get(s, {}).get("session") is not None,
             why=lambda s=server: f"the {s} MCP server isn't connected - /mcp shows why",
         )
+        entry["registered"].append(name)
         count += 1
     return count
+
+
+# ---------------------------------------------------------------------------
+# For plugins: a server that comes and goes with the plugin rather than
+# living in config.json for the whole session - a game, say, whose tools
+# have no business in the prompt while you're not playing.
+# ---------------------------------------------------------------------------
+def connect_server(name, spec, timeout=None):
+    """(ok, message, [tool names as she sees them])."""
+    if not available():
+        return False, "the MCP SDK isn't installed - pip install mcp", []
+
+    if _loop is None:
+        threading.Thread(target=_run_loop, daemon=True, name="mcp").start()
+        _started.wait(5)
+
+    entry = _servers.get(name)
+
+    if entry and entry.get("session") is not None:
+        return True, "already connected", list(entry.get("registered") or [])
+
+    _connect(name, spec, timeout)
+    entry = _servers[name]
+
+    if entry["session"] is None:
+        return False, entry["error"] or "it didn't connect", []
+
+    n = _register(name)
+    logbook.info("mcp", "%s: %d tools (connected by a plugin)", name, n)
+
+    return True, f"{n} tools", list(entry["registered"])
+
+
+def disconnect_server(name):
+    """Stop one server. Its tools stay registered but show as unavailable,
+    so they drop out of the prompt until it's connected again."""
+    entry = _servers.get(name)
+
+    if entry and entry.get("stop") is not None and _loop is not None:
+        _loop.call_soon_threadsafe(entry["stop"].set)
 
 
 # ---------------------------------------------------------------------------
