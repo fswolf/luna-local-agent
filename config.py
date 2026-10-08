@@ -609,6 +609,9 @@ ADAPTIVE_DEEP_BUDGET = int(_adaptive_cfg.get("deep_budget", -1))
 ADAPTIVE_RETHINK_BELOW = float(_adaptive_cfg.get("rethink_below", 0.75))
 ADAPTIVE_MIN_GAIN = float(_adaptive_cfg.get("min_gain", 0.05))
 ADAPTIVE_SPEAK_CORRECTIONS = bool(_adaptive_cfg.get("speak_corrections", True))
+# "Let me read the file~" and then nothing: run the step she announced.
+# Any backend, any of your turns that had tools - not just shaky ones.
+FOLLOW_THROUGH = bool(_adaptive_cfg.get("follow_through", True))
 ADAPTIVE_PREFIX = str(_adaptive_cfg.get("correction_prefix",
                                         "Hang on, let me correct that."))
 
@@ -839,6 +842,7 @@ SETTINGS = {
     "adaptive.rethink_below":     ("ADAPTIVE_RETHINK_BELOW",       True),
     "adaptive.min_gain":          ("ADAPTIVE_MIN_GAIN",            True),
     "adaptive.speak_corrections": ("ADAPTIVE_SPEAK_CORRECTIONS",   True),
+    "adaptive.follow_through":    ("FOLLOW_THROUGH",               True),
 
     "self.lessons":               ("SELF_LESSONS",                 True),
     "self.lessons_in_prompt":     ("SELF_LESSONS_IN_PROMPT",       True),

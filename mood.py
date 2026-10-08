@@ -441,13 +441,14 @@ def _rate_affection(text, model):
     from config import LM_URL, LLM_HEADERS
 
     try:
-        response = requests.post(LM_URL, headers=LLM_HEADERS, json={
+        import lmstudio
+
+        response = requests.post(LM_URL, headers=LLM_HEADERS, json=lmstudio.chore({
             "model": model,
             "messages": [{"role": "user",
                           "content": _AFFECTION_PROMPT.format(text=text[:600])}],
-            "max_tokens": 200,
             "temperature": 0,
-        }, timeout=30)
+        }, max_tokens=200), timeout=30)
         reply = response.json()["choices"][0]["message"]["content"]
     except Exception as e:
         logbook.info("mood", "couldn't rate warmth: %s", e)

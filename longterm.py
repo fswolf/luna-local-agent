@@ -379,13 +379,23 @@ def add_fact(fact: str, subject: str = "") -> bool:
     return stored
 
 
+def _strip_think(text):
+    """LM Studio with reasoning parsing off sends the scratchpad inline."""
+    return re.sub(r"<think>.*?(</think>|$)", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+
+
 def _ask_extractor(model, prompt):
+    import lmstudio
+
     response = requests.post(
         LM_URL, headers=LLM_HEADERS,
-        json={"model": model, "messages": [{"role": "user", "content": prompt}]},
+        json=lmstudio.chore({"model": model,
+                             "messages": [{"role": "user", "content": prompt}]},
+                            max_tokens=300),
+        timeout=120,
     )
 
-    return response.json()["choices"][0]["message"]["content"].strip()
+    return _strip_think(response.json()["choices"][0]["message"].get("content") or "")
 
 
 def _extract_fact_sqlite(model, user_text, answer):
@@ -532,11 +542,16 @@ def _extract_fact(model, user_text, answer):
         f"User: {user_text}\nAssistant: {answer}"
     )
     try:
+        import lmstudio
+
         response = requests.post(
             LM_URL, headers=LLM_HEADERS,
-            json={"model": model, "messages": [{"role": "user", "content": prompt}]},
+            json=lmstudio.chore({"model": model,
+                                 "messages": [{"role": "user", "content": prompt}]},
+                                max_tokens=120),
+            timeout=120,
         )
-        result = response.json()["choices"][0]["message"]["content"].strip()
+        result = _strip_think(response.json()["choices"][0]["message"].get("content") or "")
     except Exception:
         return  # extraction failing shouldn't ever break the conversation
 

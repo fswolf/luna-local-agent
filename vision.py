@@ -31,9 +31,22 @@ _pending = None
 last_error = ""
 
 
+def _model_is_blind():
+    """The server says this model can't take images. Unknown counts as
+    able, so a server that doesn't say still gets to try."""
+    try:
+        import lmstudio
+
+        return lmstudio.accepts_images() is False
+    except Exception:
+        return False
+
+
 def available():
-    """grim is the hard requirement; hyprctl only narrows it to a window."""
-    return config.VISION_ENABLED and shutil.which("grim") is not None
+    """grim is the hard requirement; hyprctl only narrows it to a window.
+    A model that can't see doesn't get offered look_at_screen at all."""
+    return (config.VISION_ENABLED and shutil.which("grim") is not None
+            and not _model_is_blind())
 
 
 def why_unavailable():
@@ -42,6 +55,13 @@ def why_unavailable():
 
     if shutil.which("grim") is None:
         return "grim isn't installed - it's the Wayland screenshot tool (dnf install grim)"
+
+    if _model_is_blind():
+        if getattr(config, "LLM_BACKEND", "") == "llama":
+            return ("llama-server has no vision adapter - put the model's mmproj "
+                    "GGUF next to it (or set MMPROJ in llama/server.env) and restart it")
+
+        return "the loaded model can't see images - load a vision model in LM Studio"
 
     return ""
 
