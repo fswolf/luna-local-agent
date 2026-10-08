@@ -1,12 +1,12 @@
 # Her reasoning
 
 Reasoning models think before they answer, and on a local model that
-scratchpad is the most honest thing it produces — it is where "I'll
+scratchpad is the most honest thing it produces: it is where "I'll
 just make something up" gets written down, a sentence before it gets
 said. Every turn from you keeps it, in `agent/thoughts.db`, for reading
 back later.
 
-<img width="1380" alt="The thought viewer - every turn down the left, the selected one laid out in full on the right, with the flags the review raised" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/thought-viewer.png" />
+<img width="1380" alt="The thought viewer: every turn down the left, the selected one laid out in full on the right, with the flags the review raised" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/thought-viewer.png" />
 
 ```bash
 /thoughts                      # the viewer, in your browser
@@ -21,15 +21,15 @@ reasoning parsing on (the default) it arrives in a `reasoning_content`
 field of its own, streamed alongside the reply; with it off, or on
 another server, it is inline in the reply inside `<think>…</think>`
 tags. `llm.py` takes both: the field is accumulated delta by delta,
-and the tags are cut out of the reply text after the stream ends — the
+and the tags are cut out of the reply text after the stream ends. It's the
 same cut that already keeps them off the screen and away from the
 voice, pointed at a database instead of the bin. Nothing is ever
 re-requested; the thinking is recorded as a side effect of the reply
 being generated at all.
 
 It is kept **per run of the model, not per turn**. A turn that calls a
-tool runs the model at least twice — once deciding to call it, once
-with the result in hand — and the first run is the one worth reading:
+tool runs the model at least twice (once deciding to call it, once
+with the result in hand) and the first run is the one worth reading:
 that is where "I shouldn't guess the time, I have `get_datetime`" is
 written. Each run is stored separately and labelled with what it went
 on to do:
@@ -47,21 +47,21 @@ A think block that never closes is kept too, and flagged with why:
 `[cut off - the model ran out of tokens…]` or `[cut off - you pressed
 HOME…]`. The two look identical in the text and call for opposite
 responses, and the first is almost always the answer to "why did she
-say nothing" — when a reply comes back empty, the explanation in the
+say nothing": when a reply comes back empty, the explanation in the
 conversation now ends with `/thoughts shows what it was thinking`.
 
 What goes in the row: the thinking, what you said and what she said in
 full, the tools she called in the
 order she called them, how many rounds it took, how long the whole turn
-took, the mood she was in, any flags from the review below — and who
+took, the mood she was in, any flags from the review below, and who
 answered: the agent name, a session id minted when the app started,
 the model that was loaded, and a hash of the system prompt as sent.
 One assistant doesn't need those four; they are there so the database
 is already the right shape the day there are two, or the day a prompt
 change moves the flag rate and you want to know which change. What
-does not: tool *results* — they are looked at once, for errors, and
+does not: tool *results* (they are looked at once, for errors, and
 dropped; that is where a file she read would land, and the files
-deny-list exists for a reason — and anything from stream chat or IRC. Those turns are
+deny-list exists for a reason), and anything from stream chat or IRC. Those turns are
 forgotten on purpose, the same way they stay out of history. A
 reminder firing is recorded, labelled `reminder`, since what she thought
 when it went off is sometimes worth knowing.
@@ -73,39 +73,39 @@ the left, every turn, newest first, grouped by day, with one line
 pulled out of each scratchpad so a session can be skimmed without
 opening anything. On the right, whichever turn is selected, laid out
 in the order you'd ask the questions: what you said, what the thinking
-concluded, what she actually said, any flags — and then the scratchpad
+concluded, what she actually said, any flags, and then the scratchpad
 itself, verbatim, round by round. `j`/`k` or the arrows walk the list
 and the right side follows.
 That line is the end of the thinking, not the start: a think block
 opens by restating your question, which you already know, and ends
-with the decision — "So I'll call `get_datetime` and tell him plainly" —
+with the decision, "So I'll call `get_datetime` and tell him plainly",
 which you don't. It takes the last paragraph that reads as a
 conclusion, and since this model writes its scratchpad as one long
 paragraph, cuts from the front at a sentence boundary, never the back.
 
 Along the top:
 
-* **flags** — a rule-based review of every turn, run as it's
+* **flags**: a rule-based review of every turn, run as it's
   recorded. Not a model's opinion of itself; each one is a check you
   can repeat by eye, and a flag means *look at this one*, never *this
   was wrong*:
 
   | flag | what was seen |
   |---|---|
-  | promised a tool | the thinking names a tool she never called — "I'll set that for you", nothing scheduled |
+  | promised a tool | the thinking names a tool she never called: "I'll set that for you", nothing scheduled |
   | guessed | the thinking admits it doesn't know, no tool was called, and the answer doesn't say so |
   | did date math | a date or duration worked out in the scratchpad instead of asking `get_datetime` / `time_until` |
   | leaked | the answer reads like the scratchpad ("Okay, the user wants…") or contains a `<think` tag |
   | tool failed | a tool result that reads as an error, shown with its first line |
   | no answer | the "I got tangled up" fallback went out |
   | cut off | the think block never closed |
-  | broke character | the answer says "as an AI", "language model", "I don't have feelings" — the small-model regression that shows up when the context gets crowded |
+  | broke character | the answer says "as an AI", "language model", "I don't have feelings": the small-model regression that shows up when the context gets crowded |
 
   Each flag that has fired is a chip under the search box with its
   count; click one to see only those turns.
 
-  The checks that read *behaviour* — was a tool called, did the answer
-  hedge, did a result come back as an error — are stronger evidence
+  The checks that read *behaviour* (was a tool called, did the answer
+  hedge, did a result come back as an error) are stronger evidence
   than the ones that read the *thinking*. A scratchpad is the model's
   own account of itself, and models do things their stated reasoning
   never mentions. Treat it as a witness statement; the tool calls and
@@ -113,27 +113,27 @@ Along the top:
   (`thoughtlog.CHECKS`) and `review()` takes which to run and which
   tools count as date tools, so another agent with a different tool
   set or a different persona gets a review that fits it.
-* **filters** — all / used tools / voice / reminders / starred /
+* **filters**: all / used tools / voice / reminders / starred /
   flagged, and a click on any day heading narrows to that day. Once
   more than one model has answered, a row of model chips appears with
-  each one's turn count and flag rate — "which model lies less", as a
-  number from your own turns — and clicking one filters to it.
+  each one's turn count and flag rate ("which model lies less", as a
+  number from your own turns) and clicking one filters to it.
   *Flagged* is the one to have open after a stream; the *cut off* flag
   chip is the one for tuning `max_tokens`.
-* **★ and a note** on each turn. Star the ones worth coming back to —
+* **★ and a note** on each turn. Star the ones worth coming back to:
   *clear* leaves starred turns alone, and the note box under a turn is
   the one editable thing on the page: yours, next to hers.
 * **~tokens**, from the length of the think block, against
   `generation.max_tokens`. It turns amber past 60%, which is the
   warning you get *before* the next long question comes back empty.
-* **the numbers** — median scratchpad length and turn time, how many
+* **the numbers**: median scratchpad length and turn time, how many
   turns used tools, how many were cut off. The cut-off share turns
   amber past 15% and says what to change: that is the sign that
   `generation.reasoning` is set higher than `max_tokens` leaves room
   for, and you otherwise only find it out one empty reply at a time.
-* **search**, across the thinking, what you said and what she said —
+* **search**, across the thinking, what you said and what she said:
   `/` focuses it, `Esc` clears it.
-* **live** — on the first page with no filter, the list refreshes
+* **live**: on the first page with no filter, the list refreshes
   itself every few seconds without closing whatever you have open, so
   it can sit on a second monitor and show what she was thinking as she
   says it.
@@ -161,7 +161,7 @@ beside Mood), or `/set thoughts.enabled false`. All three write
 whenever the file changes, so a switch flipped in the browser applies
 from her next turn with nothing restarted. Turning it off stops new
 turns being kept and leaves what is there alone. It costs nothing in
-context either way — it records what the model already produced.
+context either way: it records what the model already produced.
 
 `max_records` trims the oldest on every insert. Two thousand turns of
 a chatty model is a few megabytes, plus a few more on llama-server for
@@ -179,7 +179,7 @@ setup gets. The viewer shows it three ways:
   tokens. It turns amber under 60%. The **confidence** filter lists
   only the turns that have this data.
 * **Her reply, token by token**, coloured by how sure she was of each
-  piece: plain at 90%+, faint at 60–90%, amber at 30–60%, red under
+  piece: plain at 90%+, faint at 60-90%, amber at 30-60%, red under
   30%. Hover or tap a token to see what she nearly said instead and how
   likely it was. "around **March** 2024", with *June* at 81% beside it,
   is the difference between knowing and guessing. Her thinking can be
@@ -212,8 +212,8 @@ the thought log already measures:
    genuinely sure**: above the same 75%, at least `min_gain` surer than
    the first, and with no shaky stretch of its own. Then she says *"Hang
    on, let me correct that."* and gives it. Otherwise she keeps what she
-   said, and the conversation shows a note: *held — same answer on a
-   second look*, or *kept the first answer — the second wasn't sure
+   said, and the conversation shows a note: *held: same answer on a
+   second look*, or *kept the first answer: the second wasn't sure
    enough either*.
 
 4. **If the second look decides she should have checked** (read the

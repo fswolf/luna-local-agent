@@ -220,7 +220,7 @@ curl -s localhost:8899/voices
 
 Replies are streamed. Each sentence is sent to the server the moment the
 model finishes writing it, so she starts talking about a sentence in
-rather than after the whole reply exists — and the next chunk is
+rather than after the whole reply exists, and the next chunk is
 synthesized while the current one plays, so there's no gap between them.
 Chunks stay under the server's 1200-character limit.
 
@@ -238,7 +238,7 @@ In `config.json`:
 }
 ```
 
-`pitch` is in semitones, applied to the audio after it comes back — so
+`pitch` is in semitones, applied to the audio after it comes back, so
 it works with whatever engine is on the port, not just Kokoro. `+3` is
 noticeably younger, `-3` older, and past about `±6` it stops sounding
 like a person.
@@ -253,13 +253,13 @@ together is what reads as a different person.
 /set tts.pitch 3
 ```
 
-applies immediately — no restart, so you can dial it in while she talks.
+applies immediately: no restart, so you can dial it in while she talks.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `TTS_URL` | `http://127.0.0.1:8899` | Server address |
 | `TTS_VOICE` | `config.json` → `voice` | Voice (`af_bella`, `am_adam`, ...) |
-| `TTS_SPEED` | `1.0` | 0.5 – 2.0 |
+| `TTS_SPEED` | `1.0` | 0.5 - 2.0 |
 | `TTS_PITCH` | `0.0` | Semitones. `+3` younger, `-3` older |
 | `TTS_VOLUME` | `1.0` | Playback gain |
 
@@ -279,8 +279,8 @@ GET  /voices                                           ->  the voice list
 
 Two things worth knowing if you write your own:
 
-Text arrives **pre-chunked** — split on sentence boundaries, under 1000
-characters — and the next chunk is requested while the current one is
+Text arrives **pre-chunked** (split on sentence boundaries, under 1000
+characters) and the next chunk is requested while the current one is
 still playing. So the server never sees a wall of text and doesn't need
 to stream; it just needs to return a sentence's worth of audio promptly.
 

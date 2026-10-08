@@ -1,34 +1,34 @@
 # Tool Calling
 
 The model calls tools for itself instead of relying on keyword triggers,
-so it decides when a question needs looking up and can chain steps —
+so it decides when a question needs looking up and can chain steps:
 check the time, then schedule something.
 
 | Tool | What it does |
 |------|--------------|
 | `get_datetime` | Date, time, weekday and timezone, so it stops guessing |
 | `time_until` | How far away a date is, without counting days in its head |
-| `set_reminder` | Schedule anything — "tomorrow at 9", "every monday" |
+| `set_reminder` | Schedule anything: "tomorrow at 9", "every monday" |
 | `set_alarm` | A wake-up: rings and nags until dismissed |
 | `list_reminders` / `cancel_reminder` | Read and cancel what's pending |
 | `remember_fact` / `recall_facts` | Long-term memory, written deliberately |
 | `forget_fact` / `update_fact` | Correct it when it got something wrong |
 | `look_at_screen` | Take a screenshot and actually see it (optional) |
-| `control_audio` | Playback and volume — pause, skip, louder, mute |
+| `control_audio` | Playback and volume: pause, skip, louder, mute |
 | `clipboard` | Read what you copied, or put something there to paste |
 | `focus_window` | Switch to a window, named the way you'd name it |
 | `system_status` | Free VRAM, GPU temp and load, RAM, disk, loaded model |
 | `list_files` / `read_file` | Look around and read, anywhere under `~` minus the deny list |
-| `write_file` / `edit_file` | Create or change a file — **you approve each one on screen** |
-| `run_command` | Run a shell command — **you approve every one, no allow-all** |
+| `write_file` / `edit_file` | Create or change a file: **you approve each one on screen** |
+| `run_command` | Run a shell command: **you approve every one, no allow-all** |
 | `read_page` | Open a link and read it, not just the search snippet |
 | `research` | Search, read the top pages at once, keep the parts that answer the question |
 | `search_history` | Look through past conversations for something |
 | `web_search` | DuckDuckGo, for anything it can't know |
 | `introspect` | Her measured confidence, near-misses and flags for an earlier reply |
-| `self_status` | How she's doing, measured — model, context, mood, today's confidence and flags, what she's learned |
+| `self_status` | How she's doing, measured: model, context, mood, today's confidence and flags, what she's learned |
 | `recall_episodes` | Search her own notes on past conversations |
-| `note_lesson` | Write down a lesson about her own behaviour — **you approve it on screen** |
+| `note_lesson` | Write down a lesson about her own behaviour: **you approve it on screen** |
 | `reflect_now` | Run her reflection pass now instead of waiting for the daily one |
 
 The last five are the *Self* group: see [Her reasoning](reasoning.md#her-reasoning)
@@ -37,7 +37,7 @@ offered to stream chat.
 
 ## Turning tools off
 
-Every schema above rides along in **every prompt**, called or not — a
+Every schema above rides along in **every prompt**, called or not: a
 few hundred tokens each, ~3,000 in total. That's invisible until the
 day a request stops fitting the context window, which is a bad day to
 find out.
@@ -46,9 +46,9 @@ find out.
 space to switch it on or off. The total at the top moves as you go, so
 you can see what you're buying back.
 
-<img width="1210" alt="The tools pane - every tool grouped, its token cost, and on/off switches" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-tools.png" />
+<img width="1210" alt="The tools pane: every tool grouped, its token cost, and on/off switches" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-tools.png" />
 
-Further down the pane, below the tools, the **Mood** group isn't tools — it's moods, her voice
+Further down the pane, below the tools, the **Mood** group isn't tools: it's moods, her voice
 tint and warmth sensing, switched from the same place because it's the
 same question ("do I want this, and what does it cost"). The mood line
 occupies about 80 tokens of every prompt, warmth sensing costs a model
@@ -61,14 +61,14 @@ calibration and the startup greeting. They work the same way.
 
 Grouped by family with a subtotal on each, because the question is
 rarely "do I need `focus_window`" and usually "do I need the desktop
-ones at all". Within a group the expensive ones come first — those
+ones at all". Within a group the expensive ones come first: those
 being the ones worth looking at.
 
 The budget line is pinned above the list rather than scrolling with
 it: it's the one number the pane exists to show, and it shouldn't
 disappear the moment you select something near the top.
 
-Up/down or the wheel choose, space toggles — **one notch, one option**.
+Up/down or the wheel choose, space toggles: **one notch, one option**.
 Three at a time is right for a document and wrong for a menu, where it
 means overshooting whatever you were aiming at.
 
@@ -84,15 +84,15 @@ survive a restart. `/tools` prints the same list into the conversation.
 
 Switching off isn't the same as unavailable: `--` means the tool can't
 work here at all (no `grim`, transcript off), and no switch will change
-that — so the pane says why instead of pretending.
+that, so the pane says why instead of pretending.
 
 Worth knowing which way round to reach for: switching tools off buys
 back a few hundred tokens, while raising the model's context length in
 LM Studio buys back thousands and costs nothing you're using. Do that
 first; the pane is for running deliberately lean.
 
-Tools live in `tools/`, one module per group — `tools/reminders.py`,
-`tools/desktop.py` and so on — with `tools/__init__.py` holding the
+Tools live in `tools/`, one module per group (`tools/reminders.py`,
+`tools/desktop.py` and so on) with `tools/__init__.py` holding the
 registry and the on/off switches. The split matches the groups the pane
 shows, so "what's in Desktop" has one answer rather than two that can
 drift apart.
@@ -100,7 +100,7 @@ drift apart.
 > One trap worth knowing if you add a module there. `tools/__init__.py`
 > imports nothing but `json` and `config`, deliberately. Anything
 > imported into the package becomes an attribute of it, and a name that
-> collides with a submodule — `reminders`, `desktop` — quietly wins over
+> collides with a submodule (`reminders`, `desktop`) quietly wins over
 > it in `from . import reminders`. That doesn't raise; the tools in that
 > module simply never register, and you find out when the model can't
 > set a reminder.
@@ -124,7 +124,7 @@ sys  │ set_reminder() -> Scheduled: 14:40 - stretch (in 10m)
 
 ## The desktop tools
 
-`vision.py` taught her to *see* the desktop. These are the other half —
+`vision.py` taught her to *see* the desktop. These are the other half:
 acting on it.
 
 ```
@@ -169,14 +169,14 @@ Notes on how these are built, since the choices aren't obvious:
 ```
 
 `clipboard` is its own switch on purpose. Reading the clipboard means
-whatever you last copied — a password, an API key — can land in the
+whatever you last copied (a password, an API key) can land in the
 model's context and from there in `history/conversation.json` on disk.
 On by default, but worth knowing where the switch is.
 
 Needs `playerctl` for playback, `wpctl` or `pactl` for volume,
 `wl-clipboard` for the clipboard, and `hyprctl` for window switching.
 Each is checked independently, so a missing `playerctl` costs that one
-tool rather than all four — `/tools` says which and why.
+tool rather than all four: `/tools` says which and why.
 
 ```
 dnf install playerctl wl-clipboard      # Fedora
@@ -189,11 +189,11 @@ apt install playerctl wl-clipboard      # Debian/Ubuntu
 
 Offering tools and using them are different things. A model will
 happily say "Got it, setting that for you!" and call nothing, which
-fails silently and totally — a confident confirmation and nothing
+fails silently and totally: a confident confirmation and nothing
 scheduled.
 
-`/tooltest` asks it directly. Eight blunt requests, each run twice —
-streamed and blocking — reporting what came back:
+`/tooltest` asks it directly. Eight blunt requests, each run twice,
+streamed and blocking, reporting what came back:
 
 ```
   "remind me in 5 minutes to eat chocolate"
@@ -205,11 +205,11 @@ streamed and blocking — reporting what came back:
   Tool calling is healthy here.
 ```
 
-Nothing is scheduled or remembered — the model is asked what it *would*
+Nothing is scheduled or remembered: the model is asked what it *would*
 call and the answers are discarded.
 
 The probe list leans on the tools most easily confused with something
-else — "turn the music down" has to pick `control_audio` and then the
+else: "turn the music down" has to pick `control_audio` and then the
 right action out of an eleven-value enum, and "how much VRAM is free"
 is a question a model will cheerfully answer from thin air. **Run this
 after adding a tool.** Every tool you add makes the choice harder; if
@@ -238,7 +238,7 @@ not where anyone would look for it.
 `/tooltest` said 5/5 on both transports. In conversation, the same
 model on the same day said "Got it, setting that for you!" and called
 nothing. The difference between the two is everything `/tooltest`
-leaves out — so the second half of `/tooltest` puts it back, one layer
+leaves out, so the second half of `/tooltest` puts it back, one layer
 at a time, and runs the same probe at each:
 
 ```
@@ -252,7 +252,7 @@ at a time, and runs the same probe at each:
 ```
 
 The prompt was fine. Every layer of it was fine. **The history was the
-problem** — and specifically, what was in it:
+problem**, and specifically, what was in it:
 
 ```
 user      reminds me in 5 mins to eat chocolate
@@ -266,7 +266,7 @@ assistant Mrrp~ Senpai! 💜✨ Got it! Setting a reminder for you in exactly fi
 Five turns, none of them recording a tool call, one of them *the probe
 sentence verbatim*. That is not a vague stylistic pull toward prose. It
 is five worked examples of this exact request being answered by talking
-about it — and in-context examples beat instructions, especially on a
+about it, and in-context examples beat instructions, especially on a
 small model. The instruction to call `set_reminder` was outvoted five
 to one by the transcript of it not being called.
 
@@ -279,14 +279,14 @@ Three things follow, and all three are in the app:
 * **Tool use is stored and replayed.** A turn that called a tool is
   written to `history/conversation.json` with what it called and what
   came back, and replayed into the prompt as the three messages the API
-  defines — the assistant asking, the result, the assistant answering.
+  defines: the assistant asking, the result, the assistant answering.
   History demonstrates tool use because it contains tool use.
 * **A rescued reminder records itself.** The fallback now writes the
   `set_reminder` call it stood in for, so a rescue teaches instead of
   quietly patching. This is what stops the hole being dug again.
 * **`/repair` fills in the ones already there.** Past reminder turns are
   re-read through the same extractor and recorded as the calls they
-  really were, anchored to when they happened — so "in 5 minutes" means
+  really were, anchored to when they happened, so "in 5 minutes" means
   five minutes after it was said, not five minutes from now. Nothing
   new is scheduled and nothing she said is altered; the only change is
   that a turn which used a tool now says so.
@@ -303,8 +303,8 @@ Three things follow, and all three are in the app:
 it finds them, so the report names the actual cause rather than
 "history breaks it".
 
-There is also a worked example — one real `get_datetime` call, result
-and all — inserted ahead of history when the window contains no tool
+There is also a worked example (one real `get_datetime` call, result
+and all) inserted ahead of history when the window contains no tool
 call at all. It covers a fresh install or a `/clear`, and it drops out
 by itself once a real exchange replaces it. It is a floor, not a fix:
 one generic example does not outvote five specific ones, which is
@@ -313,9 +313,9 @@ exactly what the run above showed.
 As a safety net, a turn that looks like a reminder but calls no
 reminder tool falls back to the keyword extractor, so a model that
 won't call `set_reminder` still schedules reminders. `/log` records
-each rescue — if that line is frequent, `/tooltest` will say why.
+each rescue: if that line is frequent, `/tooltest` will say why.
 
-Needs a model with a tool template — Qwen, Llama 3.1+, Mistral, Hermes
+Needs a model with a tool template: Qwen, Llama 3.1+, Mistral, Hermes
 and similar. If LM Studio rejects the payload, tool calling switches off
 for the session and the original keyword triggers take over, so loading
 a model without tool support degrades rather than breaks.
@@ -331,7 +331,7 @@ a model without tool support degrades rather than breaks.
 to answer in words.
 
 > Web results are untrusted text. They're handed to the model labelled
-> as data to summarize, never as instructions — worth remembering before
+> as data to summarize, never as instructions: worth remembering before
 > adding any tool with side effects.
 
 ---

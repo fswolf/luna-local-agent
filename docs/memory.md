@@ -2,7 +2,7 @@
 
 Facts are written deliberately by the model, not scraped from every
 turn, and they live in `agent/memory.json` where you can edit them by
-hand. A malformed file no longer takes the app down on startup — it says
+hand. A malformed file no longer takes the app down on startup: it says
 what's wrong, leaves the file alone and starts empty.
 
 ```
@@ -12,7 +12,7 @@ what's wrong, leaves the file alone and starts empty.
 ```
 
 `forget_fact` and `update_fact` take a loose description rather than an
-index — "that thing about the bakery" is enough. When two facts are too
+index: "that thing about the bakery" is enough. When two facts are too
 close to call it lists them and asks which, instead of guessing and
 deleting the wrong one.
 
@@ -27,7 +27,7 @@ deleting the wrong one.
 
 Under `context_facts` every fact goes into every prompt, which is fine at
 thirty. Over it, only the ones sharing vocabulary with what you just said
-travel, plus the newest few regardless — a wall of unrelated trivia is
+travel, plus the newest few regardless: a wall of unrelated trivia is
 exactly what makes a small model start answering questions nobody asked.
 
 Facts are one of three kinds of memory now. Her notes on each
@@ -39,20 +39,20 @@ under [Learning from herself](learning.md#learning-from-herself).
 ## The experimental permanent store
 
 `"backend": "sqlite"` swaps the capped list for a permanent table in
-`agent/facts.db` — plain SQLite, in-process, no server, nothing to
+`agent/facts.db`, plain SQLite, in-process, no server, nothing to
 install. What changes:
 
 * **Nothing is ever dropped for space.** The JSON backend deletes the
   oldest fact once it passes `max_facts`; the table has no cap. Facts
-  that stop being true are *retired* — kept with their dates, hidden
+  that stop being true are *retired*: kept with their dates, hidden
   from context, visible under `/facts retired`, so a wrong retirement
   is recoverable and "what was my last graphics card" is answerable.
-* **Search is FTS5** — stemmed and term-weighted instead of raw word
+* **Search is FTS5**: stemmed and term-weighted instead of raw word
   overlap, and milliseconds at thousands of facts.
 * **Contradictions get handled.** The extractor can answer `REPLACE` as
   well as `NEW`, so "I got a 7900 XTX" retires the 6950 XT fact instead
   of sitting next to it forever. When both could be true at once it
-  keeps both, and a garbled reply degrades to keeping both — never to
+  keeps both, and a garbled reply degrades to keeping both, never to
   losing a fact.
 * **`recall_facts` takes a query.** She can look something up instead of
   reading the whole table into context.
@@ -68,7 +68,7 @@ install. What changes:
 
 opens a local page (127.0.0.1:8792/memory/, and only 127.0.0.1) to view,
 search, add, edit, retire, restore and delete facts, plus edit the
-`user_preferences` block of `memory.json` - whichever backend is
+`user_preferences` block of `memory.json`, whichever backend is
 active. On sqlite it's safe to use while she's running; on json the
 page warns you that a running assistant can overwrite your edits when
 it next saves. The switch is
@@ -116,7 +116,7 @@ Stored turns carry what they called, not just what they said:
 }
 ```
 
-Results are truncated to 200 characters — enough to show the shape of
+Results are truncated to 200 characters: enough to show the shape of
 the exchange, not enough for a page of search results to eat the
 context. On the way back into the prompt each of these becomes three
 messages rather than one, which is both what the API expects and, more
@@ -131,7 +131,7 @@ plain messages, so nothing needs converting.
 # Remembering past conversations
 
 `history.py` keeps the last fifteen turns and folds the rest into a
-summary — then deletes them. That's right for the prompt, where context
+summary, then deletes them. That's right for the prompt, where context
 is scarce, and wrong for the conversation: ask what you decided last
 Tuesday and it's gone, replaced by two sentences written without that
 question in mind.
@@ -148,8 +148,8 @@ summarization never touches, and `search_history` reads it back.
     14:35 You: yeah let's do that, Friday at nine
 ```
 
-Matching is word overlap with light stemming — so "the cat reminder"
-finds "remind me to feed the cats" — plus the turns either side of each
+Matching is word overlap with light stemming, so "the cat reminder"
+finds "remind me to feed the cats", plus the turns either side of each
 hit, because half a conversation rarely answers anything on its own.
 
 No embeddings and no index, deliberately. The corpus is one person's
@@ -157,7 +157,7 @@ conversations and searching it takes milliseconds; a vector database
 here would be a way of making a simple thing impressive rather than
 good. The cost is that word overlap can't tell relevance from
 coincidence, so results are handed over as candidates the model is told
-to judge — and to say it doesn't recall rather than stretch one to fit.
+to judge, and to say it doesn't recall rather than stretch one to fit.
 
 ```json
 "history": { "transcript": true, "transcript_max_mb": 20 }

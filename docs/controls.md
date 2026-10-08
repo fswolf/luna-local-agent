@@ -2,13 +2,13 @@
 
 | Key | Action |
 |------|--------|
-| Home | Push to talk — depends on the voice mode below |
+| Home | Push to talk: depends on the voice mode below |
 | Home *(while she's thinking or talking)* | Cancel the turn |
 | Enter | Send typed message |
 | Tab | Open / close the help panel |
-| PgUp / PgDn | Scroll the conversation - or the help, when it's open |
+| PgUp / PgDn | Scroll the conversation, or the help when it's open |
 | Tab | Cycle conversation → help → tools; the input bar names the next stop |
-| F2 | Toggle mouse capture — see below |
+| F2 | Toggle mouse capture: see below |
 | End | Jump back to the newest message |
 | Esc | Quit |
 
@@ -39,30 +39,30 @@ Slash commands:
 
 | Command | Action |
 |---------|--------|
-| `/mode` | `auto`, `manual` or `open` — switch without restarting |
+| `/mode` | `auto`, `manual` or `open`: switch without restarting |
 | `/mic` | What the voice detector measured on the last recording |
 | `/barge` | Whether talking over her will work, and the levels |
 | `/wake` | Wake word status and live scores |
 | `/reminders` | List what's scheduled, with countdowns |
 | `/cancel N` | Cancel reminder N |
 | `/when ...` | Test how a time phrase is read, without scheduling it |
-| `/alarm ...` | Set a wake-up — `/alarm 7:30am`, `/alarm every weekday at 6` |
+| `/alarm ...` | Set a wake-up: `/alarm 7:30am`, `/alarm every weekday at 6` |
 | `/alarms` | List them, numbered for `/cancel` |
 | `/snooze [n]` | Ring again in n minutes |
 | `/alarm off` | Stop one that's ringing; `/alarm test` hears the tone |
 | `/look` | List windows, or test a screenshot |
 | `/log` | Tail the debug log without leaving the app |
-| `/mood` | How she's feeling, and what moved it — `/mood reset` to clear |
-| `/facts` | What she remembers — `/facts all`, `/facts retired` |
-| `/voice` | List voices, or switch — blends too |
+| `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |
+| `/facts` | What she remembers: `/facts all`, `/facts retired` |
+| `/voice` | List voices, or switch: blends too |
 | `/context` | What every turn sends, in tokens, against the model's context length |
 | `/mouse` | Wheel scrolling vs. being able to select text |
-| `/scroll` | Why the wheel isn't scrolling — pane sizes and what the terminal sent |
-| `/set` | List every setting, or change one — saved to `config.json` |
-| `/tools` | Which tools the model can call, what each costs — Tab twice to change |
+| `/scroll` | Why the wheel isn't scrolling: pane sizes and what the terminal sent |
+| `/set` | List every setting, or change one: saved to `config.json` |
+| `/tools` | Which tools the model can call, what each costs: Tab twice to change |
 | `/tooltest` | Whether this model *actually* calls them |
 | `/repair` | Record past reminders as the tool calls they really were |
-| `/plugins` | What's installed — then `/<name> on`, `off`, or status |
+| `/plugins` | What's installed, then `/<name> on`, `off`, or status |
 | `/help` | Points at Tab, and says which mode you're in |
 | `/keys` | Hotkey + socket diagnostics |
 | `/clear` | Wipe the conversation and saved history |
@@ -94,7 +94,7 @@ How HOME behaves. Set `stt.mode` in `config.json` or switch live with
 |------|------|---------------------|
 | `auto` | starts listening | you stop talking (default) |
 | `manual` | starts recording immediately | you press HOME again |
-| `open` | arms the mic and leaves it armed | you stop talking — then it re-arms |
+| `open` | arms the mic and leaves it armed | you stop talking, then it re-arms |
 
 ```
 auto   - the quick question. Waits for you to speak, stops on silence.
@@ -115,13 +115,13 @@ difference is decided by whether the microphone is open:
 | `manual` | start recording | **finish, and answer** | cancel it |
 
 In manual mode the second press is a request for an answer, not a
-change of mind — so it ends the recording and leaves the turn alone. If
+change of mind, so it ends the recording and leaves the turn alone. If
 you do want to abandon one, press again once she's thinking. A cancel
 during recording throws the audio away rather than transcribing it and
 then refusing to answer.
 
 Open mode only records *between* turns, never while Luna is speaking,
-and waits `settle_seconds` after she finishes before re-arming —
+and waits `settle_seconds` after she finishes before re-arming:
 otherwise her own voice out of the speakers retriggers the mic and she
 talks to herself. Headphones make it moot.
 
@@ -136,7 +136,7 @@ starting on any speech at all.
 Speech is detected with [Silero VAD](https://github.com/snakers4/silero-vad),
 a small speech/not-speech model, rather than by measuring loudness. A
 level meter can't tell your voice from a fan, so the bar has to sit high
-enough to ignore the room — which makes it late to trigger *and* prone
+enough to ignore the room, which makes it late to trigger *and* prone
 to cutting off quiet syllables. Silero knows the difference, and only
 ends a turn below `threshold - 0.15`, so trailing off doesn't end the
 recording.
@@ -149,8 +149,8 @@ vad=silero | speech above 0.40, ends below 0.25 | last peak=0.0210 |
 triggered=True | captured=3.4s | mode=auto
 ```
 
-Cutting off or slow to start? Lower `vad_threshold` to 0.25–0.3.
-Triggering on background noise? Raise it to 0.5–0.6.
+Cutting off or slow to start? Lower `vad_threshold` to 0.25-0.3.
+Triggering on background noise? Raise it to 0.5-0.6.
 
 ```json
 "stt": {
@@ -173,7 +173,7 @@ Triggering on background noise? Raise it to 0.5–0.6.
 | `mode` | `auto` | `auto`, `manual` or `open` |
 | `vad` | `auto` | `silero`, `energy`, or `auto` |
 | `vad_threshold` | `0.4` | Silero speech probability. Lower picks up sooner |
-| `model` | `small` | Whisper size — `tiny`, `base`, `small`, `medium` |
+| `model` | `small` | Whisper size: `tiny`, `base`, `small`, `medium` |
 | `language` | `en` | `null` to auto-detect (unreliable on short clips) |
 | `sensitivity` | `1.0` | Energy fallback only. >1 triggers more easily |
 | `silence_seconds` | `1.2` | Quiet time before it stops and transcribes |
@@ -221,7 +221,7 @@ how loud you are? Lower it, or wear headphones.
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `barge_in` | `true` | Needs Silero — the energy detector can't do this |
+| `barge_in` | `true` | Needs Silero: the energy detector can't do this |
 | `barge_in_seconds` | `0.35` | How long you must keep talking. Lower and a cough cuts her off |
 | `barge_in_margin` | `2.5` | How much louder than her own bleed you have to be |
 | `barge_in_boost` | `0.25` | Added to the VAD threshold while she's talking |
@@ -229,7 +229,7 @@ how loud you are? Lower it, or wear headphones.
 In open mode a barge-in skips the settle pause, because you're already
 mid-sentence and waiting would eat the start of it.
 
-A barge-in stops the *audio* only — the reply keeps generating and stays
+A barge-in stops the *audio* only: the reply keeps generating and stays
 on screen. Without echo cancellation to lean on this will misfire
 occasionally, and when it does it should cost you the sound, never the
 answer. Pressing HOME is the one that stops both.
@@ -241,7 +241,7 @@ answer. Pressing HOME is the one that stops both.
 Optional. Replaces HOME in open mode: say her name and she listens.
 
 [openWakeWord](https://github.com/dscripka/openWakeWord) runs a small
-ONNX classifier over 80ms frames — cheap enough to leave running all day
+ONNX classifier over 80ms frames, cheap enough to leave running all day
 without Whisper or the language model ever waking up.
 
 There is no pretrained "hey Luna", and there won't be unless you make
@@ -283,8 +283,8 @@ HOME works while the assistant's window is focused, everywhere, with no
 permissions and nothing to configure. That covers normal use and is all
 most setups need.
 
-If you want to start a turn *without* focusing it — mid-game, or with
-the browser in front — there's a control socket at
+If you want to start a turn *without* focusing it (mid-game, or with
+the browser in front) there's a control socket at
 `$XDG_RUNTIME_DIR/ai-voice.sock`. Bind a key to poke it:
 
 ```conf
@@ -302,7 +302,7 @@ because `exec` runs outside it. It takes `ptt`, `stop` or `quit`, so any
 script or panel button can drive the assistant.
 
 > Keep a modifier. A bare `HOME` bind is swallowed compositor-wide, so
-> `Home` stops working in your terminal, editor and browser — including
+> `Home` stops working in your terminal, editor and browser, including
 > the assistant's own prompt.
 
 This is also the better way to use vision: focus the window you care
