@@ -699,6 +699,12 @@ _reminders_cfg = setting("reminders", {})
 REMINDERS_ENABLED = _reminders_cfg.get("enabled", True)
 REMINDER_CHECK_INTERVAL_SECONDS = _reminders_cfg.get("check_interval_minutes", 10) * 60
 
+_shell_cfg = setting("shell", {})
+# run_command: she runs a shell command, and every one asks first.
+SHELL_ENABLED = bool(_shell_cfg.get("enabled", True))
+SHELL_TIMEOUT = float(_shell_cfg.get("timeout", 60))
+SHELL_MAX_OUTPUT = int(_shell_cfg.get("max_output_chars", 6000))
+
 _web_search_cfg = setting("web_search", {})
 WEB_SEARCH_ENABLED = _web_search_cfg.get("enabled", True)
 WEB_SEARCH_MAX_RESULTS = _web_search_cfg.get("max_results", 5)
@@ -804,6 +810,10 @@ SETTINGS = {
 
     "tools.enabled":              ("TOOLS_ENABLED",                False),
     "tools.max_rounds":           ("MAX_TOOL_ROUNDS",              True),
+
+    "shell.enabled":              ("SHELL_ENABLED",                True),
+    "shell.timeout":              ("SHELL_TIMEOUT",                True),
+    "shell.max_output_chars":     ("SHELL_MAX_OUTPUT",             True),
 
     "web_search.enabled":         ("WEB_SEARCH_ENABLED",           True),
     "web_search.max_results":     ("WEB_SEARCH_MAX_RESULTS",       True),

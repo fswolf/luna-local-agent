@@ -1107,11 +1107,15 @@ class _ToolControl(FormattedTextControl):
 # place the model's turn waits on you rather than the other way round -
 # and the reason it can be trusted with a write tool at all.
 # ---------------------------------------------------------------------------
-def ask_approval(title, body, note="", timeout=120):
+def ask_approval(title, body, note="", timeout=120, allow_all=None):
     """Show the request and wait. Returns True only on an explicit yes.
 
     Safe to call from any thread. Headless (no app running) is a no:
     nothing gets written on the strength of a question nobody saw.
+
+    allow_all, when given, is what an A answers ("all file changes this
+    session"): the call then returns "all" - truthy, so it reads as a
+    yes - and the caller decides what "all" switches on.
     """
     global _approval, _approval_scroll
 
@@ -1125,6 +1129,7 @@ def ask_approval(title, body, note="", timeout=120):
             "note": note,
             "body": [str(line) for line in body],
             "answer": None,
+            "allow_all": allow_all,
             "event": answered,
             "deadline": time.monotonic() + max(5, float(timeout)),
         }
@@ -1156,7 +1161,7 @@ def ask_approval(title, body, note="", timeout=120):
 
         _refresh()
 
-        return answer is True
+        return "all" if answer == "all" else answer is True
 
 
 def approving():
@@ -1170,7 +1175,7 @@ def _answer_approval(yes):
     if request is None:
         return
 
-    request["answer"] = bool(yes)
+    request["answer"] = yes if yes == "all" else bool(yes)
     request["event"].set()
 
 
@@ -1181,6 +1186,9 @@ def _approval_title():
         return "Permission"
 
     left = max(0, int(request["deadline"] - time.monotonic()))
+
+    if request.get("allow_all"):
+        return f"Permission - Y allow, A allow {request['allow_all']}, N deny - {left}s"
 
     return f"Permission - Y to allow, N to deny - {left}s"
 
@@ -1417,8 +1425,18 @@ _HELP_SECTIONS = [
         "and shell startup files), and write or edit with your say-so:",
         "every write pops a permission window with the content or the",
         "diff. Y or Enter allows, N or Esc denies, PgUp/PgDn scrolls.",
+        "A allows all file changes until you restart (her own folder,",
+        "~/.config and ~/.local still ask) - /allow off ends it early.",
         "No answer in files.approval_timeout seconds is a no.",
         "/set files.enabled false turns the whole thing off.",
+    ]),
+    ("Commands", [
+        "\"check if the kokoro service is running\", \"what's using port",
+        "8080?\", \"run my test script\" - she can run shell commands,",
+        "and every one asks first: the popup shows the command and the",
+        "folder. There is no allow-all for commands. Output is capped,",
+        "commands time out (shell.timeout), and sudo can't prompt.",
+        "/set shell.enabled false takes the tool away.",
     ]),
     ("Plugins", [
         ("/plugins", "list add-ons and whether each is running"),
@@ -1429,6 +1447,7 @@ _HELP_SECTIONS = [
     ]),
     ("Session", [
         ("/look", "list windows, or test a screenshot"),
+        ("/allow", "is allow-all on for file changes? /allow off ends it"),
         ("/log", "tail the debug log without leaving the app"),
         ("/context", "how big every prompt is vs the model's context"),
         ("/scroll", "why the wheel isn't scrolling, if it isn't"),
@@ -1623,6 +1642,14 @@ def _build_keys():
     @keys.add("N", filter=asking)
     def _(event):
         _answer_approval(False)
+
+    # Only on a popup that offers it; anywhere else A is swallowed below.
+    offers_all = Condition(lambda: bool(_approval and _approval.get("allow_all")))
+
+    @keys.add("a", filter=asking & offers_all)
+    @keys.add("A", filter=asking & offers_all)
+    def _(event):
+        _answer_approval("all")
 
     @keys.add(Keys.Any, filter=asking)
     def _(event):
@@ -1892,6 +1919,8 @@ def run(on_submit, on_hotkey=None):
                 _rule(_HORIZONTAL),
                 Window(
                     content=FormattedTextControl(lambda: _keyed(
+                        " (Y) allow  (A) allow all this session  (N) deny  (PgUp/PgDn) scroll"
+                        if _approval and _approval.get("allow_all") else
                         " (Y) allow  (N) deny  (PgUp/PgDn) scroll  (Esc) deny"
                     )),
                     height=1,

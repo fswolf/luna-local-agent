@@ -1070,6 +1070,20 @@ def handle_input(text):
         _toggle_portrait(obs=text.endswith("obs"))
         return
 
+    if text in ("/allow", "/allow off"):
+        from tools import files as file_tools
+
+        if text.endswith("off"):
+            file_tools.allow_all(False)
+            ui.add_message("system", "File changes ask again.")
+        else:
+            ui.add_message("system", "File changes: " + (
+                "allowed without asking until restart (her own folder, ~/.config and "
+                "~/.local still ask) - /allow off" if file_tools.allow_all()
+                else "every one asks. Press A on a file popup to stop asking this session.")
+                + " Commands always ask.")
+        return
+
     if text in ("/thoughts", "/memory"):
         # Both pages live on the live monitor's server while she runs -
         # one port, no extra process. With the monitor off, the old

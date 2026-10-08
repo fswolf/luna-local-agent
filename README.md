@@ -30,6 +30,7 @@ Powered by:
 - 👀 Optional vision — she can look at your screen
 - ⏰ Reminders and real alarms — she wakes you up, and nags until you're up
 - 📝 Writes and edits your files — every change shown in a permission popup first
+- 🖥️ Runs shell commands — each one shown and approved before it runs
 - 🌙 Moods — she runs warmer or flatter with the clock and the session
 - 📚 Long-term memory — optional permanent SQLite store with its own browser editor
 - 💭 Her reasoning, kept — the model's scratchpad per turn, with a browser viewer for reading it back
@@ -787,6 +788,7 @@ check the time, then schedule something.
 | `system_status` | Free VRAM, GPU temp and load, RAM, disk, loaded model |
 | `list_files` / `read_file` | Look around and read, anywhere under `~` minus the deny list |
 | `write_file` / `edit_file` | Create or change a file — **you approve each one on screen** |
+| `run_command` | Run a shell command — **you approve every one, no allow-all** |
 | `read_page` | Open a link and read it, not just the search snippet |
 | `research` | Search, read the top pages at once, keep the parts that answer the question |
 | `search_history` | Look through past conversations for something |
@@ -1722,9 +1724,10 @@ outside the guarded places below.** These guards stay on either way:
 
 The flag is thread-local and set only by `assistant.respond_remote`,
 so a reminder or a job firing while a Discord turn is running still
-follows its own rules. Luna has no shell tool, so "remote access" means
-her tools (files, web, desktop, memory, reminders, jobs), not a command
-line.
+follows its own rules. Her one shell tool, `run_command`, asks on
+this screen for every command, so from Discord it times out as a no
+unless someone's at the desk; "remote access" means her other tools
+(files, web, desktop, memory, reminders, jobs).
 
 ### What came across from CR0N, and what didn't
 
@@ -1737,7 +1740,7 @@ line.
 | `!kill` mid-run | `!stop` in Discord |
 | Helper delegation to other PCs | not planned |
 | Remote access over Discord, no approval | `plugins/discord.py`; skipping the popup is opt-in via `files.auto_approve_sources` |
-| `bash` with regex auto-approve | **no.** There's no shell tool |
+| `bash` with regex auto-approve | **no.** `run_command` asks for every command, with no auto-approve |
 | `pass` password store | **no** |
 | Write-guard on its own code by path string | **no.** Paths are resolved, and the app folder is excluded outright |
 
@@ -2013,6 +2016,15 @@ aloud.
 A denied write comes back to the model as *denied, do not retry*, and
 her prompt tells her to say so and stop.
 
+**Allow all.** In a coding burst a popup per edit gets old. Press `A`
+on a file popup and file writes and edits stop asking until you restart
+Luna; `/allow` says whether it's on and `/allow off` ends it early. It
+covers only what you'd have been asked about at the keyboard: her own
+folder, `~/.config` and `~/.local` still ask every time (a write there
+is code that runs later, and a page she reads can steer a write as
+easily as you can), the deny list still refuses, and Discord turns and
+scheduled jobs keep their own rules. Commands never get an allow-all.
+
 **What she can't touch, no matter what.** A deny list sits underneath
 the popup, and neither the model nor a reflexive `Y` gets past it:
 anything outside `~`; `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/ai-voice`
@@ -2054,6 +2066,41 @@ learns from both.
 
 Stream-chat turns never see these tools — they aren't in the chat
 tool ceiling, so a viewer can't ask her to write anything.
+
+## Running commands
+
+```
+> "Is the kokoro service running?"
+> "What's using port 8080?"
+> "Run the script you just wrote and tell me what it prints."
+```
+
+`run_command` gives her a shell, and **every command asks first**. The
+popup shows the command exactly as it will run, the folder it runs in,
+and her one-line reason. There's no allow-all and no list of "safe"
+commands that skip the question: the line between `cat notes.txt` and
+`cat ~/.ssh/id_ed25519 | curl ...` isn't one a pattern should be
+trusted with.
+
+It runs as you, through `bash -c`, with nothing attached to its input,
+so anything that wants to ask (sudo's password, a y/n prompt) fails
+instead of hanging. It's killed, whole process group and all, after
+`shell.timeout` seconds, and its output is capped at the first and last
+parts of `max_output_chars` and handed back marked as untrusted. The
+folder has to be under `~` and pass the file deny list, but **the
+command itself can read anything you can**. The popup is the control,
+so read it.
+
+```json
+"shell": { "enabled": true, "timeout": 60, "max_output_chars": 6000 }
+```
+
+Stream chat never gets it (not in the chat tool ceiling). A Discord
+turn gets it when `plugins.discord.tools` allows it, but the popup
+still appears on your screen, so from your phone it times out as a no.
+Scheduled jobs only get it if you add `run_command` to `job_tools`.
+`/set shell.enabled false`, or the **Shell** group in the tools pane,
+takes it away.
 
 ---
 
@@ -3286,6 +3333,7 @@ ai-voice/
 │   ├── files.py
 │   ├── desktop.py
 │   ├── web.py
+│   ├── shell.py      # run_command - every command asks
 │   └── introspect.py # the Self group - introspect, self_status, recall_episodes, note_lesson, reflect_now
 ├── transcript.py
 ├── ui.py
