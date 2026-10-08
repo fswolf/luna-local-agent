@@ -1,0 +1,25 @@
+# Publishes docs/ to the GitHub wiki on every push that changes it.
+# docs/ is the source of truth: edit the files here, not the wiki pages -
+# the wiki is overwritten from docs/ each time. docs/README.md becomes the
+# wiki's Home page and docs/_Sidebar.md its sidebar.
+name: Publish wiki
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - .github/workflows/publish-wiki.yml
+  workflow_dispatch:
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  publish-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Andrew-Chen-Wang/github-wiki-action@v5
+        with:
+          path: docs/
