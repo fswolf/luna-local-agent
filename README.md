@@ -1,4 +1,5 @@
-<img width="1210" alt="Luna, the local agent" src="assets/ui-conversation.png" />
+<img width="1210" alt="Luna in the terminal beside her animated Live2D portrait" src="assets/luna-desktop.png" />
+<img width="1210" alt="A conversation in the full-screen terminal interface" src="assets/ui-conversation.png" />
 
 # luna-local-agent
 
@@ -811,28 +812,9 @@ find out.
 space to switch it on or off. The total at the top moves as you go, so
 you can see what you're buying back.
 
-```
- 1475 tokens of tool schemas in every prompt (1608 saved), of a 16384-token context
- (space) toggle  (up/down or wheel) choose
- ─────────────────────────────────────────────────────────────────────
- Reminders   251 of 578 tok
-   off set_alarm         226 tok
-   on  set_reminder      191 tok
-   off cancel_reminder   101 tok
- > on  list_reminders     60 tok
+<img width="1210" alt="The tools pane - every tool grouped, its token cost, and on/off switches" src="assets/ui-tools.png" />
 
- Desktop   328 of 757 tok
-   off control_audio     198 tok
-   on  look_at_screen    178 tok
-   --  clipboard             wl-clipboard isn't installed
-
- Mood   81 tok
-   on  mood               81 tok
-   on  mood voice          0 tok   tints the TTS
-   on  warmth sensing      0 tok   1 call/turn
-```
-
-The **Mood** group at the bottom isn't tools — it's moods, her voice
+Further down the pane, below the tools, the **Mood** group isn't tools — it's moods, her voice
 tint and warmth sensing, switched from the same place because it's the
 same question ("do I want this, and what does it cost"). The mood line
 occupies about 80 tokens of every prompt, warmth sensing costs a model
@@ -2990,9 +2972,26 @@ windowrulev2 = float, title:^(Luna)$
 windowrulev2 = pin, title:^(Luna)$
 ```
 
+**She looks at the conversation.** On Hyprland the live monitor checks
+twice a second where the portrait window and Luna's terminal are, and
+tells the page. She turns her head and eyes towards the terminal while
+you talk and while she answers, and drifts back to it when idle. Move
+either window and she follows. Anywhere that can't be worked out (another
+compositor, OBS, the terminal on another workspace) she looks straight
+ahead as before. If a model was rigged mirrored and looks the wrong way,
+set `"flip_gaze": true` in `portrait.live2d`.
+
+**Thinking is something you can watch.** She looks up and away from
+you, to the side, then down for a moment as if weighing it, switches
+sides, and glances back at you now and then. Her eyes dart in small
+movements, her head follows further and wanders on its own, tilts
+towards the side she's looking, and her brow lifts a little. It's the
+same for the Live2D and the 3D portrait (`portrait/look.js`).
+
 Page options: `?bg=transparent` (OBS), `?frame=face` (closer crop),
-`?debug=1` (test buttons for every reaction), `?demo=1` (acts out a
-conversation on its own).
+`?debug=1` (test buttons for every reaction, including *you: left /
+right / ahead* to try the looking), `?demo=1` (acts out a conversation
+on its own).
 
 ## Live2D models
 
@@ -3308,10 +3307,12 @@ ai-voice/
 │
 ├── assets/
 │   ├── alarm.wav
+│   ├── luna-desktop.png
 │   ├── memory-manager.png
 │   ├── thought-viewer.png
 │   ├── ui-conversation.png
-│   └── ui-help.png
+│   ├── ui-help.png
+│   └── ui-tools.png
 │
 ├── history/
 │   ├── conversation.json
