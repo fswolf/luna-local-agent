@@ -14,7 +14,9 @@ indication of why.
 
 That is the same problem twice, so this is the same solution twice.
 """
+import re
 import threading
+import time
 
 import requests
 
@@ -165,12 +167,85 @@ def context_length(timeout=3):
     return 0
 
 
+_vision = {"at": 0.0, "answer": None}
+
+
+def accepts_images(max_age=30):
+    """True / False if the server says whether the loaded model can see,
+    None if it won't say. llama-server reports it in /props (it's False
+    when started without --mmproj); LM Studio marks vision models
+    "type": "vlm". Cached, so the tool list can ask every turn."""
+    now = time.monotonic()
+
+    if now - _vision["at"] < max_age:
+        return _vision["answer"]
+
+    answer = None
+
+    try:
+        if LLM_BACKEND == "llama":
+            props = requests.get(PROPS_URL, headers=LLM_HEADERS, timeout=1).json()
+            modalities = props.get("modalities")
+
+            if isinstance(modalities, dict):
+                answer = bool(modalities.get("vision"))
+        else:
+            for entry in requests.get(NATIVE_MODELS_URL, timeout=1).json().get("data") or []:
+                if entry.get("state") == "loaded" and entry.get("type") in ("llm", "vlm"):
+                    answer = entry.get("type") == "vlm"
+                    break
+    except Exception:
+        pass
+
+    _vision.update(at=now, answer=answer)
+
+    return answer
+
+
+# A screenshot travels as base64, hundreds of KB of it, but the model
+# sees a few hundred to a couple of thousand tokens per image. Counting
+# the base64 as text made every turn with a screenshot look 2-3x over
+# the window, and the error hint blamed the context for it.
+_IMAGE = re.compile(r"data:image/[A-Za-z0-9.+-]+;base64,[A-Za-z0-9+/=]*")
+_IMAGE_TOKENS = 1500
+
+
 def estimate_tokens(payload):
     """Rough size of a chat payload. 3.5 chars/token is close enough for
     English plus JSON to say "this is 90% of the window"."""
     try:
         import json
 
-        return int(len(json.dumps(payload)) / 3.5)
+        text = json.dumps(payload)
+        images = len(_IMAGE.findall(text))
+
+        return int(len(_IMAGE.sub("", text)) / 3.5) + images * _IMAGE_TOKENS
     except Exception:
         return 0
+
+
+def chore(body, max_tokens, think=0):
+    """Make a background request (fact extraction, a summary, the mood
+    rating) behave like the chore it is.
+
+    Left alone, a thinking model on llama-server with REASONING_BUDGET=-1
+    thinks without limit before replying NONE - a minute of the GPU
+    flat out after every turn, for a one-word answer. On llama-server
+    the budget goes to `think` (0 = off); LM Studio has no budget, so it
+    gets room to think plus the same reasoning setting a turn uses."""
+    import config
+
+    body = dict(body)
+    body.setdefault("temperature", 0.2)
+
+    if LLM_BACKEND == "llama":
+        body["reasoning_budget_tokens"] = int(think)
+        body["max_tokens"] = int(max_tokens) + max(0, int(think))
+    else:
+        body["max_tokens"] = int(max_tokens) + 2048
+        reasoning = (getattr(config, "GENERATION", None) or {}).get("reasoning")
+
+        if reasoning:
+            body["reasoning"] = reasoning
+
+    return body

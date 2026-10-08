@@ -393,10 +393,13 @@ def _extract_fields(model, text, timeout=60):
     mean different things to the caller - one is a non-reminder and
     says nothing, the other is worth complaining about.
     """
+    import lmstudio
+
     response = requests.post(
         LM_URL, headers=LLM_HEADERS,
-        json={"model": model,
-              "messages": [{"role": "user", "content": _PROMPT % text}]},
+        json=lmstudio.chore(
+            {"model": model, "messages": [{"role": "user", "content": _PROMPT % text}]},
+            max_tokens=200),
         timeout=timeout,
     )
     raw = response.json()["choices"][0]["message"]["content"].strip()

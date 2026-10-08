@@ -182,6 +182,18 @@ Which server she uses:
 `auto` checks once at startup. `lmstudio` or `llama` forces one. To
 switch servers mid-session, restart her.
 
+**Vision.** llama-server only takes images when it's started with the
+model's vision adapter, a separate `mmproj-*.gguf`. `start.sh` looks
+for one in the model's own folder, which is where LM Studio puts it,
+and prints `vision: <file>` or `vision: off` when it starts. Without
+one, every screenshot comes back "image input is not supported". A
+finetune that doesn't ship its own mmproj uses its base model's (a
+Qwen3.5-9B finetune takes the Qwen3.5-9B one): drop it beside the
+model, or set `MMPROJ` in `server.env` to its full path (`off` disables
+it). Luna asks the server whether the loaded model can see, and when
+it can't, `look_at_screen` is left out of her tools and the tools pane
+says why, instead of a turn failing.
+
 **The key.** The first time `start.sh` runs it makes a random key in
 `llama/.api_key` (gitignored, readable only by you) and starts the
 server with it, with CORS limited to localhost. Luna reads the same
@@ -1912,9 +1924,11 @@ Optional. Lets her look at your screen.
 > "What's on my screen?"
 ```
 
-Needs `grim`, and a **vision model** loaded in LM Studio. A text-only
-model rejects the image and says so plainly rather than inventing a
-description.
+Needs `grim`, and a model that can see: a vision model in LM Studio,
+or on llama-server the model's `mmproj` file (see *Or llama.cpp
+directly*). When the server says the loaded model can't take images,
+`look_at_screen` isn't offered at all, and the tools pane says what's
+missing.
 
 ```json
 "vision": {
@@ -2530,9 +2544,24 @@ the thought log already measures:
    second look*, or *kept the first answer — the second wasn't sure
    enough either*.
 
-A confident reply never pays for a second look. A turn that called a
-tool is never re-run, so a reminder can't be set twice or a file written
-twice, and the second look gets no tools at all. It only runs on
+4. **If the second look decides she should have checked** (read the
+   file, run the search) instead of answering from memory or asking you
+   to paste something, she says *"Hang on, let me check."* and does it,
+   as a normal tool turn with the usual approvals, then gives the
+   corrected answer.
+
+**Follow-through.** Separate from the second look, and on any server:
+when a reply ends with a step she announced ("let me read the file and
+fix it~") but she called no tool, the turn doesn't end there. She's
+told she skipped it, and the step runs as a normal tool turn, carrying
+on from what she said. Small models announce more often than they act,
+and from outside it looked like she'd stalled. `/set
+adaptive.follow_through false` turns it off.
+
+A confident reply never pays for a second look. A turn that already
+called a tool is never re-run, so a reminder can't be set twice or a
+file written twice. The second look is offered the same tools, but
+only so it can say it wants one; the call itself runs afterwards, once. It only runs on
 llama-server, for your turns, never stream chat. It needs the token
 probabilities, so LM Studio gets neither the budget nor the rethink.
 
@@ -2549,7 +2578,8 @@ directly: when she was unsure, did more thinking actually help?
     "deep_budget": -1,
     "rethink_below": 0.75,
     "min_gain": 0.05,
-    "speak_corrections": true
+    "speak_corrections": true,
+    "follow_through": true
 }
 ```
 

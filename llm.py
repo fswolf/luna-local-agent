@@ -270,7 +270,7 @@ def _chat_completion(payload, narrator=None):
     if "choices" not in data:
         detail = data.get("error", data)
         logbook.error("llm", "response had no choices: %s", str(detail)[:500])
-        raise RuntimeError(f"LM Studio error: {detail}")
+        raise RuntimeError(f"{config.llm_backend_label()} error: {detail}")
 
     lmstudio.mark_worked()
 
@@ -797,24 +797,31 @@ def _explain_refusal(status, body, payload):
 
     sent = lmstudio.estimate_tokens(payload)
     window = lmstudio.context_length()
+    llama = getattr(config, "LLM_BACKEND", "") == "llama"
+    name = config.llm_backend_label()
+    raise_ctx = "raise CTX in llama/server.env" if llama else "raise the context length in LM Studio"
+    server_log = "the llama-server terminal" if llama else "LM Studio's server log"
     hint = ""
 
-    if window and sent >= window * 0.8:
+    if "image input is not supported" in body or "mmproj" in body:
+        # Not a size problem at all - don't send anyone off to /clear.
+        hint = ""
+    elif window and sent >= window * 0.8:
         hint = (f" This request was ~{sent} tokens against a {window}-token "
                 "context - almost certainly the prompt no longer fits. "
                 "/context shows the breakdown; /clear resets the "
-                "conversation, or raise the context length in LM Studio.")
+                f"conversation, or {raise_ctx}.")
     elif window:
         hint = (f" (~{sent} tokens sent, {window} available - so probably "
-                "the model itself, not the size. Check LM Studio's server "
-                "log; reloading the model usually clears it.)")
+                f"the model itself, not the size. Check {server_log}; "
+                "reloading the model usually clears it.)")
     else:
         hint = (f" (~{sent} tokens sent.) Usually the prompt outgrew the "
-                "model's context, or the model crashed - check LM Studio's "
-                "server log. /context shows what's being sent; /clear "
-                "resets the conversation.")
+                f"model's context, or the model crashed - check {server_log}. "
+                "/context shows what's being sent; /clear resets the "
+                "conversation.")
 
-    return f"LM Studio error (HTTP {status}): {detail}.{hint}"
+    return f"{name} error (HTTP {status}): {detail}.{hint}"
 
 
 def _stream_deltas(payload):
@@ -1243,6 +1250,64 @@ def _same_answer(a, b):
     return len(wa & wb) / max(1, len(wa | wb)) >= 0.6
 
 
+# "Let me read the file and fix it~" - and then the turn ends, with no
+# tool called. Small models announce the step instead of taking it, and
+# from the outside that looks like she stalled. Only the closing stretch
+# of the reply is checked: a promise in the middle that she went on to
+# keep in words isn't one.
+_PROMISE = re.compile(
+    r"\b(let me|lemme|i'll|i will|i'm going to|gonna|going to)\s+"
+    r"(?:just\s+|quickly\s+|actually\s+|now\s+)?"
+    r"(read|check(?!\s+(?:back|in)\b)|look(?!\s+forward)|open|search|find|list|fix|edit|rewrite|update|write|"
+    r"run|test|grab|pull up|see what|take a look)\b",
+    re.IGNORECASE)
+
+
+def _promised_action(answer):
+    tail = str(answer or "")[-240:]
+
+    return bool(_PROMISE.search(tail)) and not tail.rstrip().endswith("?")
+
+
+def _follow_through(payload, base_messages, answer, model, on_text, on_sentence,
+                    prefix, nudge):
+    """Run a proper tool turn after a reply that should have been one.
+    Returns the full answer: what she said, the prefix, and the rest."""
+    follow = dict(payload)
+    follow.pop("reasoning_budget_tokens", None)
+
+    if getattr(config, "LLM_BACKEND", "") == "llama":
+        # The normal budget, not the rethink's unlimited one - a silent
+        # minute of thinking is what "stalled" looks like from outside.
+        follow["reasoning_budget_tokens"] = int(getattr(config, "ADAPTIVE_FIRST_BUDGET", 1024))
+    follow["messages"] = list(base_messages) + [
+        {"role": "assistant", "content": answer},
+        {"role": "user", "content": nudge},
+    ]
+
+    if prefix:
+        say = _Narrator(on_text, on_sentence)
+        say.feed("\n\n" + prefix + " ")
+        say.finish()
+
+    try:
+        more = _tool_rounds(follow, model, on_text, on_sentence)
+    except Exception as e:
+        logbook.warn("llm", "follow-through failed: %s", e)
+        more = "...actually, I couldn't get at it. Can you paste it for me?"
+        say = _Narrator(on_text, on_sentence)
+        say.feed("\n\n" + more + " ")
+        say.finish()
+
+    return f"{answer}\n\n{prefix} {more}".replace("\n\n ", "\n\n").strip()
+
+
+# A tool call written out as text, which a model falls back to when the
+# request it's answering offers no tools (Qwen's XML form, and the JSON
+# one inside <tool_call> tags).
+_TOOL_MARKUP = re.compile(r"<tool_call>|<function=", re.IGNORECASE)
+
+
 def _rethink(payload, base_messages, answer, on_text, on_sentence):
     """A deeper second look at a shaky reply. Returns None when the
     first reply was sure enough, otherwise a dict with both passes'
@@ -1271,7 +1336,12 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
     livefeed.emit("rethink", step="start", reason=reason, conf=conf)
     logbook.info("llm", "rethinking - %s", reason)
 
-    deep = {k: v for k, v in payload.items() if k not in ("tools", "tool_choice")}
+    # Tools stay in the request. Without them a model that decides on a
+    # second look it should check something writes the call out as text
+    # - "<tool_call><function=list_files>..." - and that was being spoken
+    # as her correction. With them it comes back as a real tool call,
+    # which is caught below and handed back to run properly.
+    deep = {k: v for k, v in payload.items() if k != "tool_choice"}
     deep["messages"] = list(base_messages)
     deep["reasoning_budget_tokens"] = int(config.ADAPTIVE_DEEP_BUDGET)
 
@@ -1279,7 +1349,7 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
     quiet = _Narrator()  # nothing to the screen or the voice yet
 
     try:
-        _chat_completion(deep, quiet)
+        reply = _chat_completion(deep, quiet)
     except Exception as e:
         logbook.warn("llm", "rethink failed: %s", e)
         _last_raw.update(first)
@@ -1288,6 +1358,29 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
         return None
 
     second_text = _strip_leading_timestamps(quiet.finish())
+
+    wants_tool = (reply or {}).get("tool_calls") or _TOOL_MARKUP.search(second_text or "")
+
+    if wants_tool and not payload.get("tools"):
+        # No tools this turn to do it with: the first answer stands.
+        _last_raw.update(first)
+        outcome = "kept the first answer - the second look reached for a tool"
+        _log_tool_call("rethink", f"{reason} → {outcome}")
+        livefeed.emit("rethink", step="done", outcome=outcome)
+
+        return None
+
+    if wants_tool:
+        # The second look's answer is "I should go and check" - which is
+        # better than either reply. ask() runs that as a proper tool turn.
+        _last_raw.update(first)
+        outcome = "second look wants to check with a tool - doing that"
+        _log_tool_call("rethink", f"{reason} → {outcome}")
+        livefeed.emit("rethink", step="done", outcome=outcome)
+
+        return {"wants_tools": True, "corrected": False, "answer": "", "said": "",
+                "conf": conf, "conf2": None, "outcome": outcome}
+
     second = {"thinking": _last_raw.get("thinking") or [],
               "tokens": _last_raw.get("tokens") or [],
               "exchanges": [], "called": set()}
@@ -1616,9 +1709,16 @@ def ask(text, model, on_text=None, on_sentence=None,
             answer = _tool_rounds(payload, model, on_text, on_sentence)
         except RuntimeError as e:
             if "image" in str(e).lower() or "vision" in str(e).lower():
+                if getattr(config, "LLM_BACKEND", "") == "llama":
+                    fix = ("llama-server was started without the model's vision "
+                           "adapter - put its mmproj GGUF next to the model (or "
+                           "set MMPROJ in llama/server.env) and restart it")
+                else:
+                    fix = "load a vision model in LM Studio"
+
                 raise RuntimeError(
-                    "This model can't accept images - load a vision model "
-                    f"in LM Studio, or turn vision off in agent.json. ({e})"
+                    f"This model can't accept images - {fix}, or turn vision "
+                    f"off in agent.json. ({e})"
                 ) from e
 
             # Most likely this model has no tool template. Drop tools for
@@ -1659,10 +1759,36 @@ def ask(text, model, on_text=None, on_sentence=None,
     # the reminder twice or write the file twice. Nor is the fallback
     # apology - there's nothing there to double-check.
     second = None
+    kept_promise = False
 
-    if (adaptive and not _last_raw.get("exchanges") and _last_raw.get("tokens")
+    if (remember and payload.get("tools") and not _last_raw.get("exchanges")
+            and getattr(config, "FOLLOW_THROUGH", True) and _promised_action(answer)):
+        # She said she'd do it and stopped. Do it - no prefix, the reply
+        # already said what's coming.
+        _log_tool_call("follow-through", "said she'd do it but called nothing - doing it now")
+        livefeed.emit("rethink", step="done", outcome="follow-through: promised a step, taking it")
+        answer = _follow_through(
+            payload, base_messages, answer, model, on_text, on_sentence, "",
+            "(Not from Ryan: you said what you'd do next but didn't call a "
+            "tool. Do it now with your tools, then finish the job.)")
+        kept_promise = True
+
+    if (adaptive and not kept_promise and not _last_raw.get("exchanges")
+            and _last_raw.get("tokens")
             and answer != "...sorry, I got tangled up there. Say that again?"):
         second = _rethink(payload, base_messages, answer, on_text, on_sentence)
+
+    if second and second.get("wants_tools"):
+        # She answered without looking, and the second look says she
+        # should have. Go and look now, out loud, as a normal tool turn:
+        # the first pass called nothing, so nothing runs twice.
+        second = None
+        answer = _follow_through(
+            payload, base_messages, answer, model, on_text, on_sentence,
+            "Hang on, let me check.",
+            "(Not from Ryan - your own second look: you can check this "
+            "yourself with your tools instead of asking. Do it now, then "
+            "give the corrected answer.)")
 
     first_answer = answer
 

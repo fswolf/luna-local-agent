@@ -254,9 +254,13 @@ def clear():
 # Summarization
 # ---------------------------------------------------------------------------
 def _ask_model(model, prompt):
+    import lmstudio
+
     response = requests.post(
         LM_URL, headers=LLM_HEADERS,
-        json={"model": model, "messages": [{"role": "user", "content": prompt}]},
+        json=lmstudio.chore({"model": model,
+                             "messages": [{"role": "user", "content": prompt}]},
+                            max_tokens=800),
         timeout=180,
     )
     data = response.json()

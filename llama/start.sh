@@ -52,6 +52,29 @@ serving() { curl -fsS --max-time 1 "http://$HOST:$1/health" >/dev/null 2>&1; }
 [ -f "$MODEL" ] || { echo "Model file not found: $MODEL" >&2; exit 1; }
 [ -n "$ALIAS" ] || ALIAS="$(basename "$MODEL" .gguf)"
 
+# The vision adapter. LM Studio downloads it beside the model as
+# mmproj-*.gguf, so the model's own folder is the first place to look.
+MMPROJ="${MMPROJ:-}"
+MMPROJ_MATCH="${MMPROJ_MATCH:-}"
+if [ "$MMPROJ" = off ]; then
+    MMPROJ=""
+elif [ -z "$MMPROJ" ]; then
+    mapfile -t mm < <(find "$(dirname "$MODEL")" -maxdepth 1 -iname "*mmproj*.gguf" 2>/dev/null | sort)
+    if [ "${#mm[@]}" -eq 0 ] && [ -n "$MMPROJ_MATCH" ]; then
+        mapfile -t mm < <(find ./models "$HOME/.lmstudio/models" "$HOME/.cache/lm-studio/models" \
+                               "$HOME/.var/app/ai.lmstudio.lm-studio/.lmstudio/models" \
+                               -maxdepth 5 -iname "${MMPROJ_MATCH}.gguf" -iname "*mmproj*" 2>/dev/null | sort)
+    fi
+    if [ "${#mm[@]}" -gt 1 ]; then
+        echo "More than one mmproj found - set MMPROJ= in llama/server.env:" >&2
+        printf '  %s\n' "${mm[@]}" >&2
+        exit 1
+    fi
+    MMPROJ="${mm[0]:-}"
+elif [ ! -f "$MMPROJ" ]; then
+    echo "MMPROJ in server.env doesn't exist: $MMPROJ" >&2; exit 1
+fi
+
 serving "$PORT" && { echo "Something is already serving on $HOST:$PORT." >&2; exit 1; }
 
 # The 16 GB card holds one copy of a 10 GB model, not two.
@@ -139,6 +162,7 @@ args=(
 )
 
 [ "$KV_UNIFIED" = 1 ] && args+=(--kv-unified)
+[ -n "$MMPROJ" ] && args+=(--mmproj "$MMPROJ")
 
 # shellcheck disable=SC2206
 [ -n "$EXTRA" ] && args+=($EXTRA)
@@ -150,6 +174,11 @@ args=(
 
 echo "chat: $ALIAS"
 echo "  $MODEL"
+if [ -n "$MMPROJ" ]; then
+    echo "  vision: $(basename "$MMPROJ")"
+else
+    echo "  vision: off - no mmproj next to the model (see MMPROJ in server.env)"
+fi
 echo "  http://$HOST:$PORT  (Ctrl+C stops both)"
 echo
 
