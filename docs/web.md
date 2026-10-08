@@ -12,7 +12,7 @@ Without tool calling it falls back to the old keyword trigger.
 
 ## Reading the page, not the blurb
 
-Search returns a title, a couple of hundred characters and a URL —
+Search returns a title, a couple of hundred characters and a URL:
 enough for "what's the weather", nowhere near enough for "what does
 this article say". Two tools go further:
 
@@ -22,7 +22,7 @@ this article say". Two tools go further:
 | `research` | searches, opens the top 3 pages (one per site) at once, and returns the parts that answer the question, with sources | how or why something works, comparisons, what an article or release actually says |
 | `read_page` | opens one link, optionally `looking_for` something | a link you gave her, or one result worth reading in full |
 
-`research` exists because 8–32B models tend to stop at the snippets
+`research` exists because 8-32B models tend to stop at the snippets
 and answer from two lines. It does the follow-up in one call, so
 there's nothing for the model to forget. A page that won't open falls
 back to its search snippet, and she's told when that's all she has.
@@ -38,7 +38,7 @@ Matching is by meaning when the embedding server (`:8081`, see
 isn't. Web passages are embedded fresh and never written to
 `agent/embeddings.db`.
 
-Stdlib only — `HTMLParser`, not BeautifulSoup — so there's nothing new
+Stdlib only (`HTMLParser`, not BeautifulSoup) so there's nothing new
 to install. Non-HTML content types, 404s and pages that need
 JavaScript are refused with a reason rather than returning something
 that looks like text but isn't. The charset comes from the header,

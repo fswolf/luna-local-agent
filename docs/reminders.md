@@ -28,7 +28,7 @@ understands delays, clock times, weekdays, calendar dates and repeats:
 | `december 25` | that date, rolling to next year if it's passed |
 | `every monday at 9` | weekly |
 | `every morning at 8` | daily, and still 08:00 after the clocks change |
-| `every weekday at 7:30` | Mon–Fri, skipping the weekend |
+| `every weekday at 7:30` | Mon-Fri, skipping the weekend |
 | `mon, wed, fri at 6am` | any set of days, with or without "every" |
 
 `/when <phrase>` shows how anything is read without scheduling it:
@@ -39,7 +39,7 @@ understands delays, clock times, weekdays, calendar dates and repeats:
 ```
 
 Each reminder confirms itself the moment it's scheduled, in words rather
-than timestamps — because these get read aloud:
+than timestamps, because these get read aloud:
 
 ```
 sys  │ Scheduled: tomorrow 09:00 - take the bins out (in 18 hours)
@@ -51,7 +51,7 @@ too, rather than failing silently.
 Reminders live in `reminders/reminders.json` and survive restarts.
 Anything that came due while the app was closed is delivered in one
 message on next launch. A reminder is removed only once delivery
-succeeds — if LM Studio is down when it fires, it retries rather than
+succeeds: if LM Studio is down when it fires, it retries rather than
 vanishing. The scanner sleeps until the next one is actually due, so "in
 one minute" means one minute.
 
@@ -60,7 +60,7 @@ delivered, so one that goes out four minutes late doesn't drag the whole
 schedule later every day. Daily times are rebuilt from the wall clock
 rather than by adding 24 hours, which is the difference between "every
 morning at 8" staying at 8 and quietly becoming 7 for the winter. And if
-the app was closed for a week, the daily reminder is due tomorrow — not
+the app was closed for a week, the daily reminder is due tomorrow, not
 seven times at once.
 
 ---
@@ -82,11 +82,11 @@ out" and useless at seven in the morning.
 
 An alarm is the same schedule with a different delivery. It's stored as a
 reminder with `"kind": "alarm"`, so repeats, persistence and the one
-scanner all come for free — the only thing that differs is what happens
+scanner all come for free. The only thing that differs is what happens
 when it fires:
 
 * **She says something first**, written for that alarm by the model, then
-  a tone plays. Speech alone doesn't wake anybody — it's exactly the
+  a tone plays. Speech alone doesn't wake anybody: it's exactly the
   thing your brain has spent years learning to fold into a dream.
 * **It repeats until dismissed**, five times by default, and it stops
   being charming about it around the third:
@@ -108,7 +108,7 @@ snoozing a weekday alarm doesn't disturb tomorrow's.
 Two details worth knowing:
 
 **A bare hour means morning.** "Wake me at 6" is 06:00, where "remind me
-at 6" is still 18:00 — six in the evening has never once been what an
+at 6" is still 18:00; six in the evening has never once been what an
 alarm meant. An explicit `6pm` wins either way, and `/when alarm 6` shows
 you which reading you'll get.
 
@@ -130,7 +130,7 @@ means starting the app at 7:29 still works.
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `enabled` | `true` | Off delivers alarms as ordinary spoken reminders — you still get told, the room doesn't get woken |
+| `enabled` | `true` | Off delivers alarms as ordinary spoken reminders: you still get told, the room doesn't get woken |
 | `volume` | `1.0` | Independent of `tts.volume` |
 | `repeats` | `5` | How many times before it gives up |
 | `gap_seconds` | `25` | Between rounds |
@@ -140,5 +140,5 @@ means starting the app at 7:29 still works.
 The tone is reloaded when you change the path, so `/set alarms.tone
 foghorn.wav` then `/alarm test` works without a restart. If the file is
 missing or unreadable it falls back to a generated tone rather than
-ringing silently — an alarm that fails quietly is worse than no alarm,
+ringing silently: an alarm that fails quietly is worse than no alarm,
 because you were relying on it.

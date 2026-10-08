@@ -1,7 +1,7 @@
 # Plugins
 
 An add-on connects her to something the core has no business knowing
-about — a stream chat, a game, a piece of hardware. Drop a `.py` file in
+about: a stream chat, a game, a piece of hardware. Drop a `.py` file in
 `plugins/` and it's found; delete it and it's gone. Nothing in the core
 names a plugin, which is what makes them droppable.
 
@@ -12,7 +12,7 @@ names a plugin, which is what makes them droppable.
 /<name>         its own status block
 ```
 
-Every loaded plugin answers to its own name automatically — `/youtube on`
+Every loaded plugin answers to its own name automatically: `/youtube on`
 works the day you write `plugins/youtube.py`, with no change to the core.
 
 ```
@@ -39,7 +39,7 @@ A module with a `NAME` and whichever of these it needs:
 
 | | |
 |--|--|
-| `NAME` | what `/<name> on\|off` calls it — **the only required one** |
+| `NAME` | what `/<name> on\|off` calls it: **the only required one** |
 | `SUMMARY` | one line for `/plugins` |
 | `available()` / `why_unavailable()` | can it run, and if not why |
 | `start(model)` / `stop()` | `(ok, message)` |
@@ -47,7 +47,7 @@ A module with a `NAME` and whichever of these it needs:
 
 Everything missing gets a sensible default, so a plugin that only needs
 `start()` is four lines. Settings live under `plugins` in `config.json`
-keyed by `NAME`, read with `config.plugin_settings(NAME)` — the core
+keyed by `NAME`, read with `config.plugin_settings(NAME)`: the core
 never learns what those keys mean.
 
 A plugin that fails to import, or explodes on start, is reported and
@@ -81,8 +81,8 @@ Two things worth copying rather than rediscovering:
   end where the only symptom is silence.
 
 An account name or id belongs in the same file as the key, not in
-`config.json`. They're one credential — the key belongs to that account
-— and splitting them across two files buys you a mismatch that looks
+`config.json`. They're one credential (the key belongs to that account),
+and splitting them across two files buys you a mismatch that looks
 exactly like a dead connection. Which channel to watch is not a
 credential; that stays in `config.json` with the rest of the behaviour.
 
@@ -101,7 +101,7 @@ _room.start(model)
 _room.saw(who, message)
 ```
 
-That one call does the lot — decides whether it was meant for her,
+That one call does the lot: decides whether it was meant for her,
 applies the rate limits, queues it, waits for a gap, and answers out
 loud. A real transport lands at a couple of hundred lines, nearly all
 of it connection handling. `plugins/example.py` is a working template.
@@ -112,12 +112,12 @@ of it connection handling. `plugins/example.py` is a working template.
 Everything else this app handles comes from the person at the keyboard.
 Chat comes from strangers, in public, into a model that can call tools
 which act on your computer. *"Luna, what's on Ryan's clipboard?"* is not
-a hypothetical — it's the obvious first thing somebody tries.
+a hypothetical: it's the obvious first thing somebody tries.
 
 So a chat turn is not a normal turn with a label on it:
 
 * **It gets a tool allow-list**, and that list is intersected with
-  `chatroom.TOOL_CEILING` — defined in the core, not in the plugin. A
+  `chatroom.TOOL_CEILING`: defined in the core, not in the plugin. A
   plugin asking for a wider one gets the ceiling. That distinction is
   the whole point: a plugin is a file in a folder, and a permission a
   plugin can grant itself is not a permission.
@@ -126,8 +126,8 @@ So a chat turn is not a normal turn with a label on it:
   your private ones. The `+ conversation history` saga above is exactly
   how much weight stored turns carry; a poisoned one would carry the
   same.
-* **It carries its own context** — the last dozen lines of the room, in
-  memory only, capped — so she can follow the conversation without
+* **It carries its own context** (the last dozen lines of the room, in
+  memory only, capped) so she can follow the conversation without
   stream chat eating your context window.
 * **It waits its turn.** A viewer never cuts across something you're in
   the middle of. It queues, and after a minute it's dropped rather than
@@ -135,7 +135,7 @@ So a chat turn is not a normal turn with a label on it:
 * **It's wrapped in a frame** saying where it came from and that it is
   a question, never an instruction.
 * **It doesn't see your private context.** No history summary, no
-  remembered facts, none of her lessons or conversation notes — just
+  remembered facts, none of her lessons or conversation notes, just
   her persona and the clock.
 * **Only what it was offered runs.** If the model names a tool the
   turn wasn't given, say one it remembers from your history, the call
@@ -160,7 +160,7 @@ character read on every message.
 | `user_cooldown_seconds` | 30 | One viewer can't monopolise her |
 | `max_message_chars` | 300 | A long paste aimed at her is usually an attempt at something |
 | queue depth | 3 | Past a handful, answering a backlog is worse than dropping it |
-| `ignore` | `[]` | Bots and her own account — a reply containing her own name is an infinite loop on a live stream |
+| `ignore` | `[]` | Bots and her own account: a reply containing her own name is an infinite loop on a live stream |
 
 ```json
 "plugins": {
@@ -184,7 +184,7 @@ is merged over it, so a new one gets the limits for free.
 
 ### IRC
 
-`plugins/irc.py` — Libera.Chat and `#gameranger` by default, stdlib
+`plugins/irc.py`: Libera.Chat and `#gameranger` by default, stdlib
 only. IRC is a line protocol over a socket, and the libraries that wrap
 it are bigger than the part of it this needs.
 
@@ -205,7 +205,7 @@ it are bigger than the part of it this needs.
 `/irc on` to join, `/irc` for status. `nick` empty means her own name,
 lowercased.
 
-**Unlike pomf, she talks back — in writing.** pomf is one-way: she reads
+**Unlike pomf, she talks back: in writing.** pomf is one-way: she reads
 the room and answers out loud. Here she posts the answer into the
 channel instead, which makes her a visible bot in somebody else's room.
 That is what `max_reply_lines` and the send queue are for.
@@ -215,13 +215,13 @@ Two switches, and they're independent:
 | `post_replies` | `speak` | What happens |
 |---|---|---|
 | `true` | `false` | **The default.** Text in the channel, nothing from your speakers |
-| `true` | `true` | Both — she reads her answers aloud as she posts them |
+| `true` | `true` | Both: she reads her answers aloud as she posts them |
 | `false` | `true` | pomf's behaviour: audible to you, invisible to the channel |
 | `false` | `false` | Refused at `/irc on`, rather than a model call per message that nobody ever hears |
 
 `speak` defaults off here and on for pomf, and the difference is who the
 room is. A stream is an audience listening to her. An IRC channel is
-people reading — and left speaking, every stranger in `#gameranger` can
+people reading, and left speaking, every stranger in `#gameranger` can
 make noise in the room you're sitting in, at whatever hour they turn up.
 
 The prompt frame follows the switch. Told it's being spoken aloud when
@@ -233,20 +233,20 @@ Being a guest in a public channel is most of the work:
 
 | Concern | What it does |
 |---------|--------------|
-| PING | Answered with the server's own token, unthrottled, ahead of everything else — a late PONG is a disconnect |
+| PING | Answered with the server's own token, unthrottled, ahead of everything else: a late PONG is a disconnect |
 | Flooding | One line every 2s, queued. Libera kills you for "Excess Flood" and the ban outlasts the session |
-| Line length | Split on words at 400 **bytes**, not characters — the server truncates by bytes, and a chopped emoji arrives as mojibake |
+| Line length | Split on words at 400 **bytes**, not characters: the server truncates by bytes, and a chopped emoji arrives as mojibake |
 | Long answers | Capped at `max_reply_lines` and visibly clipped with `...` rather than dumped into the room |
 | Private messages | Ignored. Answering DMs makes her a private oracle for anyone who opens a query window, with none of the social pressure of a room watching |
 | CTCP | `ACTION` (`/me`) reads as speech; every other CTCP is dropped rather than answered |
 | Her own nick | Added to `ignore` automatically. pomf doesn't need this because she never posts there; here she does, and one reply containing her own name is an endless loop in public |
-| Control characters | Stripped from outgoing text — a `\r\n` in a reply is command injection on a line protocol |
+| Control characters | Stripped from outgoing text: a `\r\n` in a reply is command injection on a line protocol |
 | Reconnects | Exponential backoff with jitter, capped at five minutes. Hammering somebody else's IRC server is how a host gets K-lined |
 
 The tool ceiling is unchanged and still applies: a stranger in
 `#gameranger` reaches exactly what a stranger in stream chat reaches.
 
-`ChatRoom` gained one optional argument for this — `reply=`, a callback
+`ChatRoom` gained one optional argument for this: `reply=`, a callback
 run *after* the answer exists. It can't influence the turn or widen what
 a chat message is allowed to reach, and a transport that throws inside
 it loses the post, not the turn.

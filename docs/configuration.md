@@ -4,11 +4,11 @@ Two files, two jobs.
 
 | File | Holds | You edit it when |
 |------|-------|------------------|
-| `agent/agent.json` | Who she is — name, personality, tone, traits, rules | You want her to behave differently |
-| `config.json` | How the machine runs — voice, models, thresholds, timeouts, theme | You want it to work differently |
+| `agent/agent.json` | Who she is: name, personality, tone, traits, rules | You want her to behave differently |
+| `config.json` | How the machine runs: voice, models, thresholds, timeouts, theme | You want it to work differently |
 
 They used to be one file, which meant tuning a VAD threshold and
-rewriting her personality were the same edit — and you couldn't share
+rewriting her personality were the same edit, and you couldn't share
 either one without handing over the other.
 
 Where both define a key, `config.json` wins. `agent.json` is still read
@@ -46,7 +46,7 @@ you can't turn a dial that isn't there.
 ```
 
 A syntax error in either file is reported and skipped rather than being
-fatal — hand-editing them is the whole point of their being JSON.
+fatal: hand-editing them is the whole point of their being JSON.
 
 ## Changing settings without leaving the terminal
 
@@ -68,8 +68,8 @@ stt.barge_in_margin = 3.5 - saved
 ```
 
 Changes are written to `config.json` immediately, so they survive a
-restart. Most take effect at once; the few that don't — a Whisper model
-size, a wake word file — say so rather than pretending.
+restart. Most take effect at once; the few that don't (a Whisper model
+size, a wake word file) say so rather than pretending.
 
 That split is real, not cosmetic. Settings are read once at import and
 copied into constants, which is why they can't normally change at
@@ -78,7 +78,7 @@ at the point of use instead, because tuning is a loop of *change it,
 say something, listen, change it again* and a restart each time around
 makes it useless.
 
-`/mode` saves too — a mode you picked and then lost on restart is just
+`/mode` saves too: a mode you picked and then lost on restart is just
 an annoyance.
 
 ---
@@ -97,7 +97,7 @@ would write; the one that earns its keep looks like this:
 ```
 
 A baseline sitting exactly on the floor means calibration ran during
-silence — which is a bug that otherwise costs a screenshot and an hour
+silence, which is a bug that otherwise costs a screenshot and an hour
 to find.
 
 ```json

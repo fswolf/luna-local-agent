@@ -25,20 +25,20 @@ Powered by:
 - 🧠 LM Studio or llama.cpp (local LLM) with tool calling, picked automatically
 - 🗣️ [kokoro-reader](https://github.com/fswolf/kokoro-reader) (Kokoro TTS over local HTTP)
 - 🎹 Push-to-talk, three modes including hands free
-- ⚡ Streaming replies — she starts talking a sentence in, not at the end
-- ✋ Barge-in — talk over her and she stops
-- 👀 Optional vision — she can look at your screen
-- ⏰ Reminders and real alarms — she wakes you up, and nags until you're up
-- 📝 Writes and edits your files — every change shown in a permission popup first
-- 🖥️ Runs shell commands — each one shown and approved before it runs
-- 🌙 Moods — she runs warmer or flatter with the clock and the session
-- 📚 Long-term memory — optional permanent SQLite store with its own browser editor
-- 💭 Her reasoning, kept — the model's scratchpad per turn, with a browser viewer for reading it back
-- 🔬 See inside her — token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
-- 🎭 An animated portrait — Live2D or VRM, lip-synced to her voice, blinking, glancing, ears twitching ([details](docs/portrait.md#portrait))
-- 🌱 Learns from herself — daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure, and picking up where you left off ([details](docs/learning.md#learning-from-herself))
-- 🔌 Plugins — stream chat, Discord, scheduled jobs, and she can play Minecraft
-- 🧩 MCP servers — OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
+- ⚡ Streaming replies: she starts talking a sentence in, not at the end
+- ✋ Barge-in: talk over her and she stops
+- 👀 Optional vision: she can look at your screen
+- ⏰ Reminders and real alarms: she wakes you up, and nags until you're up
+- 📝 Writes and edits your files: every change shown in a permission popup first
+- 🖥️ Runs shell commands: each one shown and approved before it runs
+- 🌙 Moods: she runs warmer or flatter with the clock and the session
+- 📚 Long-term memory: optional permanent SQLite store with its own browser editor
+- 💭 Her reasoning, kept: the model's scratchpad per turn, with a browser viewer for reading it back
+- 🔬 See inside her: token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
+- 🎭 An animated portrait: Live2D or VRM, lip-synced to her voice, blinking, glancing, ears twitching ([details](docs/portrait.md#portrait))
+- 🌱 Learns from herself: daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure, and picking up where you left off ([details](docs/learning.md#learning-from-herself))
+- 🔌 Plugins: stream chat, Discord, scheduled jobs, and she can play Minecraft
+- 🧩 MCP servers: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
 - 💬 Full-screen terminal interface
 
 Everything runs locally. No cloud APIs required.
@@ -70,21 +70,21 @@ The installer asks before anything that touches your system, and can be run agai
 
 # Documentation
 
-- [Install](docs/install.md) - the installer, LM Studio or llama.cpp, the voice server, first run
-- [Configuration](docs/configuration.md) - config.json, changing settings live, logging
-- [Controls and voice](docs/controls.md) - keys, voice modes, speech detection, barge-in, wake word
-- [Tool calling](docs/tools.md) - every tool, turning them off, MCP servers
-- [Files and commands](docs/files.md) - reading, writing with approval, allow-all, run_command
-- [Web](docs/web.md) - search, research, reading pages
-- [Vision](docs/vision.md) - looking at your screen
+- [Install](docs/install.md): the installer, LM Studio or llama.cpp, the voice server, first run
+- [Configuration](docs/configuration.md): config.json, changing settings live, logging
+- [Controls and voice](docs/controls.md): keys, voice modes, speech detection, barge-in, wake word
+- [Tool calling](docs/tools.md): every tool, turning them off, MCP servers
+- [Files and commands](docs/files.md): reading, writing with approval, allow-all, run_command
+- [Web](docs/web.md): search, research, reading pages
+- [Vision](docs/vision.md): looking at your screen
 - [Reminders and alarms](docs/reminders.md)
-- [Memory](docs/memory.md) - facts, recall by meaning, the memory manager, conversation history
-- [Her reasoning](docs/reasoning.md) - thought log, token confidence, adaptive thinking, introspection
-- [Learning from herself](docs/learning.md) - lessons, episodes, fact cleanup, calibration
+- [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history
+- [Her reasoning](docs/reasoning.md): thought log, token confidence, adaptive thinking, introspection
+- [Learning from herself](docs/learning.md): lessons, episodes, fact cleanup, calibration
 - [Moods](docs/moods.md)
-- [Portrait](docs/portrait.md) - Live2D and VRM, looking and thinking
-- [Plugins](docs/plugins.md) - stream chat, Minecraft, cron jobs, Discord
-- [Development](docs/development.md) - project structure, extras
+- [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
+- [Plugins](docs/plugins.md): stream chat, Minecraft, cron jobs, Discord
+- [Development](docs/development.md): project structure, extras
 
 The same pages are on the [wiki](https://github.com/fswolf/luna-local-agent/wiki).
 

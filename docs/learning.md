@@ -71,7 +71,7 @@ She can also do this herself:
 Facts are things like "Ryan has a 6950 XT". Episodes are things like
 "we spent the evening fixing his waybar; unfinished: he wants the
 clock on the left". After `self.idle_minutes` (30) of quiet, or at the
-next startup, each finished conversation becomes 2–4 sentences of her
+next startup, each finished conversation becomes 2-4 sentences of her
 own notes, from the transcript. Her notes on the most recent one are
 always in her prompt. Older ones come back when they bear on what's
 being said (by meaning when the embedding server is up), up to

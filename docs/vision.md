@@ -31,14 +31,14 @@ missing.
 
 ## How it works
 
-A tool result is a **string** — there's nowhere in the tool-calling
+A tool result is a **string**: there's nowhere in the tool-calling
 format to hand back an image. So `look_at_screen` captures one, stashes
 it, and returns a sentence saying it did; the image is then attached to
 the next message as an `image_url` block. From the model's point of view
 it asked to look at something and the next thing it saw was a picture.
 
 The image lives for exactly one turn. It isn't written to history, so
-she can't look back at an earlier screenshot — ask "what about now?" and
+she can't look back at an earlier screenshot: ask "what about now?" and
 she takes a new one.
 
 ## Which window
@@ -46,7 +46,7 @@ she takes a new one.
 This is the fiddly part, and the answer depends on how you asked.
 
 **Typed at her**, the focused window is her own terminal, and the one
-behind it is whatever you last touched — on a tiling compositor that's
+behind it is whatever you last touched: on a tiling compositor that's
 close to arbitrary. So typed turns capture the whole screen, which on
 Hyprland is honest anyway: everything is visible at once.
 

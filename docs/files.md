@@ -7,7 +7,7 @@
 ```
 
 She can look around and read anything under your home, and she can
-write — but only through you. Every `write_file` or `edit_file` call
+write, but only through you. Every `write_file` or `edit_file` call
 stops and pops a permission window over the conversation:
 
 ```
@@ -25,7 +25,7 @@ stops and pops a permission window over the conversation:
 
 A new file shows its full content; an overwrite or an edit shows a
 diff. `Y` or Enter allows, `N` or Esc denies, and the keyboard belongs
-to the popup until you answer — nothing you type leaks into the input
+to the popup until you answer: nothing you type leaks into the input
 box. No answer before the countdown runs out is a no. On voice she says
 a one-liner ("Can I write backup.sh? It's on screen.") so you know to
 look; the details stay on screen, because nobody wants a diff read
@@ -48,12 +48,12 @@ the popup, and neither the model nor a reflexive `Y` gets past it:
 anything outside `~`; `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/ai-voice`
 (her own credentials), keyrings and browser profiles; shell startup
 files (`.bashrc`, `.zshrc`, `.profile`...); anything ending in `.key`,
-`.pem`, `.gpg` and the like. That list applies to *reading* too — a
+`.pem`, `.gpg` and the like. That list applies to *reading* too: a
 read puts the file into the prompt, and from there into history and
 the log.
 
 `edit_file` works by exact match: she reads the file, quotes the
-passage to change, and it has to appear exactly once — the same
+passage to change, and it has to appear exactly once, the same
 discipline a careful human uses with search-and-replace, and the one
 that keeps a 9B model from rewriting the wrong block with confidence.
 `write_file` on an existing path is the whole-file alternative, with
@@ -82,7 +82,7 @@ learns from both.
 }
 ```
 
-Stream-chat turns never see these tools — they aren't in the chat
+Stream-chat turns never see these tools: they aren't in the chat
 tool ceiling, so a viewer can't ask her to write anything.
 
 ## Running commands
