@@ -39,6 +39,8 @@ Setup:
         "speak": false          # say each step out loud
     }
 """
+import json
+import os
 import shutil
 import threading
 import time
@@ -57,10 +59,17 @@ PACKAGE = "github:yuniko-software/minecraft-mcp-server"
 # gathering, building, crafting and talking.
 CORE_TOOLS = ["get-position", "move-to-position", "look-at", "find-blocks", "dig-block",
               "place-block", "list-inventory", "equip-item", "craft-item", "can-craft",
-              "find-entity", "send-chat", "read-chat"]
+              "find-entity", "send-chat", "read-chat",
+              # for when something's unclear: what is that block, what does
+              # this recipe need, creative or survival?
+              "get-block-info", "get-recipe", "detect-gamemode"]
 
 DEFAULTS = {"host": "localhost", "port": 25565, "username": "Luna", "step_seconds": 20,
             "max_steps": 60, "speak": False, "mc_tools": CORE_TOOLS, "command": ""}
+
+# Places she pinned with remember_minecraft_spot - kept across restarts,
+# per world, because "the base" is the same place tomorrow.
+SPOTS_FILE = os.path.join(config.BASE_DIR, "agent", "minecraft.json")
 
 _state = {"model": None, "tools": [], "goal": "", "notes": [], "steps": 0,
           "paused": False, "busy": False, "error": "", "last": ""}
@@ -170,6 +179,10 @@ def status():
     else:
         lines.append("  no goal - /minecraft goal <what>, or just ask her")
 
+    for name, spot in _spots().items():
+        lines.append(f"  pinned {name}: {spot['x']}, {spot['y']}, {spot['z']}"
+                     + (f" - {spot['note']}" if spot.get("note") else ""))
+
     for note in _state["notes"][-4:]:
         lines.append(f"    · {note}")
 
@@ -214,10 +227,15 @@ def _set_goal(goal):
 STEP_PROMPT = (
     "(You're playing Minecraft as {username}, in a world the user opened for you. "
     "Your goal: {goal}\n"
+    "Places you pinned: {spots}\n"
     "What you've done so far, oldest first:\n{notes}\n\n"
     "Take the next step. Check your position or inventory if you need to, find what you "
     "need, then do one to three actions towards the goal with your Minecraft tools. If a "
     "player may have said something, read the game chat and answer there. If something "
+    "fails, check before retrying: look at the block's info, or get the recipe. If the "
+    "goal is unclear (which way, what size, what material), ask in the game chat "
+    "instead of guessing, and look for the answer next step. Pin places you'll need "
+    "again (base, chest, the build site) with remember_minecraft_spot. If something "
     "fails twice, try a different way. End with ONE short line: what you just did and "
     "what's next. If the goal is complete, start that line with DONE. If you're truly "
     "stuck, start it with STUCK and say why.)"
@@ -229,8 +247,10 @@ def _step():
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-6:]) or "- nothing yet, you just arrived"
-    prompt = STEP_PROMPT.format(username=s["username"], goal=_state["goal"], notes=notes)
-    allowed = list(_state["tools"]) + ["set_minecraft_goal"]
+    spots = "; ".join(f"{k} at {v['x']}, {v['y']}, {v['z']}" + (f" ({v['note']})" if v.get("note") else "")
+                      for k, v in _spots().items()) or "none yet"
+    prompt = STEP_PROMPT.format(username=s["username"], goal=_state["goal"], notes=notes, spots=spots)
+    allowed = list(_state["tools"]) + ["set_minecraft_goal", "remember_minecraft_spot"]
 
     answer = assistant.respond_to_job(prompt, _state["model"], "minecraft", allowed,
                                       speak=bool(s["speak"])) or ""
@@ -306,4 +326,74 @@ def _register_goal_tool():
     )
 
 
+# ---------------------------------------------------------------------------
+# Pinned spots: a few named coordinates that outlive her six-line notes.
+# ---------------------------------------------------------------------------
+def _world():
+    s = settings()
+    return f"{s['host']}:{s['port']}"
+
+
+def _load():
+    try:
+        with open(SPOTS_FILE) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _spots():
+    return dict(_load().get(_world(), {}))
+
+
+def _save_spots(spots):
+    data = _load()
+    data[_world()] = spots
+    os.makedirs(os.path.dirname(SPOTS_FILE), exist_ok=True)
+    tmp = SPOTS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, SPOTS_FILE)
+
+
+def _register_spot_tool():
+    import tools
+
+    def run(name, x=None, y=None, z=None, note=""):
+        name = " ".join(str(name or "").split())[:40].lower()
+        if not name:
+            return "Needs a name, like 'base' or 'iron cave'."
+        spots = _spots()
+        if x is None and y is None and z is None:
+            if spots.pop(name, None) is None:
+                return f"No spot called {name}."
+            _save_spots(spots)
+            return f"Forgot {name}."
+        try:
+            spot = {"x": round(float(x)), "y": round(float(y)), "z": round(float(z))}
+        except (TypeError, ValueError):
+            return "x, y and z need to be numbers - get-position gives yours."
+        if note:
+            spot["note"] = " ".join(str(note).split())[:80]
+        if name not in spots and len(spots) >= 12:
+            return "You already have 12 spots pinned - forget one first (name only, no coordinates)."
+        spots[name] = spot
+        _save_spots(spots)
+        return f"Pinned {name} at {spot['x']}, {spot['y']}, {spot['z']}."
+
+    tools.register_external(
+        "remember_minecraft_spot",
+        "Pin a place in the Minecraft world by name so you can find it again - your base, "
+        "a chest, the build site, a cave with iron. Pinned spots are shown to you every step "
+        "and kept across sessions. Give just the name with no coordinates to forget one.",
+        {"name": {"type": "string", "description": "Short name, e.g. 'base'."},
+         "x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"},
+         "note": {"type": "string", "description": "Optional: what's there."}},
+        required=("name",), run=run, group="MCP: minecraft",
+        available=running, why=lambda: "the minecraft plugin is off - /minecraft on",
+    )
+
+
 _register_goal_tool()
+_register_spot_tool()
