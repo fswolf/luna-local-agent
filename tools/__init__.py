@@ -126,6 +126,7 @@ _GROUPS = (
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",
                  "focus_window", "system_status")),
     ("Web", ("web_search", "research", "read_page")),
+    ("Shell", ("run_command",)),
     ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
               "reflect_now")),
 )
@@ -284,3 +285,4 @@ from . import files      # noqa: E402,F401
 from . import desktop    # noqa: E402,F401
 from . import web        # noqa: E402,F401
 from . import introspect  # noqa: E402,F401
+from . import shell      # noqa: E402,F401

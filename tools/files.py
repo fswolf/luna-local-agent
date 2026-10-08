@@ -159,6 +159,31 @@ def _job_may_write(full):
     return any(full.startswith(folder + os.sep) for folder in job_write_dirs())
 
 
+_session = {"allow_all": False}
+
+
+def allow_all(on=None):
+    """The A on the approval popup: file changes stop asking until the
+    app restarts. Local turns only - a Discord turn or a job has its own
+    rules - and never for the guarded folders below."""
+    if on is not None:
+        _session["allow_all"] = bool(on)
+        logbook.info("files", "allow all file changes: %s", "on" if on else "off")
+
+    return _session["allow_all"]
+
+
+def _guarded(full):
+    """Her own folder, ~/.config and ~/.local: a write there is code that
+    runs later (her config and source, autostart, systemd units,
+    ~/.local/bin). Always asks, whatever else has been allowed."""
+    real = os.path.realpath(full)
+    guarded = [os.path.realpath(config.BASE_DIR),
+               os.path.join(HOME, ".config"), os.path.join(HOME, ".local")]
+
+    return any(real == g or real.startswith(g + os.sep) for g in guarded)
+
+
 def _remote_may_write(full):
     """auto_approve_sources covers ~, minus the places where a write is
     really code that runs later: her own folder (config.json could add
@@ -171,11 +196,7 @@ def _remote_may_write(full):
     if not remote or remote not in config.FILES_AUTO_APPROVE_SOURCES:
         return False
 
-    real = os.path.realpath(full)
-    guarded = [os.path.realpath(config.BASE_DIR),
-               os.path.join(HOME, ".config"), os.path.join(HOME, ".local")]
-
-    return not any(real == g or real.startswith(g + os.sep) for g in guarded)
+    return not _guarded(full)
 
 
 def _ask(action, full, body_lines, note=""):
@@ -197,6 +218,14 @@ def _ask(action, full, body_lines, note=""):
 
         return True
 
+    local = not remote and not getattr(state.job, "name", None)
+    offer_all = local and not _guarded(full)
+
+    if offer_all and _session["allow_all"]:
+        logbook.info("files", "%s %s - allow all is on, not asked", action, full)
+
+        return True
+
     if state.turn_source != "typed":
         # Voice: a one-liner so you know to look at the screen. The
         # details stay in the popup; reading a diff aloud helps nobody.
@@ -208,12 +237,21 @@ def _ask(action, full, body_lines, note=""):
         except Exception as e:
             logbook.warn("files", "couldn't voice the request: %s", e)
 
-    return ui.ask_approval(
+    answer = ui.ask_approval(
         title=f"{action} {_display(full)}",
         note=note,
         body=body_lines,
         timeout=config.FILES_APPROVAL_TIMEOUT,
+        allow_all="all file changes this session" if offer_all else None,
     )
+
+    if answer == "all":
+        allow_all(True)
+        ui.add_message("system", "File changes won't ask again until you restart - "
+                       "/allow off turns that back off. Her own folder, ~/.config "
+                       "and ~/.local still ask.")
+
+    return bool(answer)
 
 
 def _diff(old, new, name):
