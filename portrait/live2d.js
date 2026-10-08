@@ -9,6 +9,7 @@
 //   ?bg=transparent  ?frame=face  ?debug=1  ?demo=1   (same as the 3D page)
 
 import { PIXI, Live2DModel } from './vendor/luna-pixi.js';
+import { createLook } from './look.js';
 
 const params = new URLSearchParams(location.search);
 const note = document.getElementById('note');
@@ -116,8 +117,10 @@ function handle(ev) {
       const next = stageOf(ev.status);
       if (next === 'listening' && mind.stage !== 'listening') twitch(1);
       mind.stage = next;
+      look.setStage(next);
       break;
     }
+    case 'gaze': look.setTarget(ev); break;
     case 'turn': twitch(0.7); break;
     case 'mood': {
       const w = +ev.warmth || 0;
@@ -126,7 +129,7 @@ function handle(ev) {
       mind.warmth = w;
       break;
     }
-    case 'tool': twitch(0.8); glance(0.6); break;
+    case 'tool': twitch(0.8); look.glance(0.6); break;
     case 'flags':
       if ((ev.flags || []).some(f => /^(tool failed|no answer|cut off)/.test(f))) showExpression('confused');
       else if ((ev.flags || []).length) tilt.target = 6;
@@ -159,26 +162,10 @@ function blinkOpen(now, dt) {
   return 1 - Math.min(1, shut);
 }
 
-// gaze: -1..1 like ParamEyeBallX/Y
-const gaze = { x: 0, y: 0, tx: 0, ty: 0, next: 0 };
-function glance(strength = 1) {
-  gaze.tx = rand(-0.9, 0.9) * strength; gaze.ty = rand(-0.2, 0.5) * strength;
-  gaze.next = performance.now() / 1000 + rand(0.6, 1.4);
-}
-function pickGaze(now) {
-  if (now < gaze.next) return;
-  if (mind.stage === 'thinking') {
-    gaze.tx = (Math.random() < 0.7 ? 1 : -1) * rand(0.5, 0.9); gaze.ty = rand(0.5, 0.85);
-    gaze.next = now + rand(1.2, 2.6);
-  } else if (mind.stage === 'listening' || mind.stage === 'speaking') {
-    gaze.tx = rand(-0.12, 0.12); gaze.ty = rand(-0.06, 0.1); gaze.next = now + rand(0.5, 1.6);
-  } else {
-    const away = Math.random() < 0.3;
-    gaze.tx = away ? rand(-1, 1) : rand(-0.2, 0.2);
-    gaze.ty = away ? rand(-0.35, 0.45) : rand(-0.08, 0.12);
-    gaze.next = now + (away ? rand(0.8, 2.0) : rand(1.0, 3.5));
-  }
-}
+// gaze: -1..1 like ParamEyeBallX/Y. Where it aims comes from look.js;
+// this is just the damped value the eyes actually show.
+const look = createLook();
+const gaze = { x: 0, y: 0 };
 
 // ears: a damped spring per ear parameter, kicked by twitch()
 const ears = earParams.map(id => ({ id, v: 0, vel: 0, span: (r => (r[1] - r[0]) / 2)(range(id)) }));
@@ -224,27 +211,31 @@ model.internalModel.on('beforeModelUpdate', () => {
   last = nowMs;
   const now = nowMs / 1000;
 
-  pickGaze(now);
-  gaze.x = damp(gaze.x, gaze.tx, 20, dt);
-  gaze.y = damp(gaze.y, gaze.ty, 20, dt);
+  const L = look.update(now);
+  if (L2.flip_gaze) { L.x = -L.x; L.wander.x = -L.wander.x; L.tilt = -L.tilt; }   // a rig built mirrored
+  gaze.x = damp(gaze.x, L.x, 20, dt);
+  gaze.y = damp(gaze.y, L.y, 20, dt);
 
   const v = voiceNow();
   const level = v ? Math.min(1, v.level * 1.3) : 0;
   mouth.level = damp(mouth.level, level, level > mouth.level ? 30 : 16, dt);
   const talking = mouth.level > 0.05;
 
-  tilt.v = damp(tilt.v, tilt.target + (mind.stage === 'thinking' ? 8 : 0), 3, dt);
+  tilt.v = damp(tilt.v, tilt.target + L.tilt * 10, 3, dt);
   const sway = Math.sin(now * 0.7) * 3 + Math.sin(now * 0.31 + 1) * 2;
-  head.x = damp(head.x, gaze.x * 18 + sway, 3.5, dt);
-  head.y = damp(head.y, gaze.y * 14 + (mind.stage === 'listening' ? -4 : 0)
-                + mouth.level * 4 * Math.sin(now * 9), 4, dt);
+  // The head follows the eyes part of the way, and slower - more of the
+  // way while she's thinking, with a drift of its own.
+  head.x = damp(head.x, (gaze.x * L.headGain + L.wander.x) * 18 + sway, L.thinking ? 2.5 : 3.5, dt);
+  head.y = damp(head.y, (gaze.y * L.headGain + L.wander.y) * 14 + (mind.stage === 'listening' ? -4 : 0)
+                + mouth.level * 4 * Math.sin(now * 9), L.thinking ? 2.5 : 4, dt);
   head.z = damp(head.z, tilt.v + Math.sin(now * 0.45) * 2, 3, dt);
 
   const w = mind.warmth, e = mind.energy;
   face.smile = damp(face.smile, Math.max(0, Math.min(1, w * 0.6 + e * 0.2 + (talking ? 0.15 : 0))), 2.5, dt);
   face.cheek = damp(face.cheek, Math.max(0, Math.min(1, w * 0.8)), 1.5, dt);
-  face.brow = damp(face.brow, Math.max(-1, Math.min(1, e * 0.5 + w * 0.3)), 2, dt);
-  face.form = damp(face.form, talking ? (v && v.zcr > 0.15 ? 1 : 0.3) : face.smile * 0.8 - (w < -0.4 ? 0.6 : 0), 6, dt);
+  face.brow = damp(face.brow, Math.max(-1, Math.min(1, e * 0.5 + w * 0.3 + L.brow)), 2, dt);
+  face.form = damp(face.form, talking ? (v && v.zcr > 0.15 ? 1 : 0.3)
+                   : face.smile * 0.8 - (w < -0.4 ? 0.6 : 0) + L.purse, 6, dt);
 
   set('ParamAngleX', head.x);
   set('ParamAngleY', head.y);
@@ -294,6 +285,9 @@ if (params.get('debug')) {
     happy: () => handle({ t: 'mood', energy: 0.6, warmth: 1 }),
     sad: () => handle({ t: 'mood', energy: -0.8, warmth: -0.1 }),
     neutral: () => handle({ t: 'mood', energy: 0, warmth: 0 }),
+    'you: left': () => handle({ t: 'gaze', x: -0.8, y: -0.1 }),
+    'you: right': () => handle({ t: 'gaze', x: 0.8, y: -0.1 }),
+    'you: ahead': () => handle({ t: 'gaze', none: true }),
   };
   for (const role of Object.keys(exprFor)) buttons[role] = () => showExpression(role, 3);
   for (const [label, fn] of Object.entries(buttons)) {
@@ -306,7 +300,7 @@ if (params.get('debug')) {
   setInterval(() => { document.getElementById('dstate').textContent =
     `${mind.stage} · energy ${mind.energy.toFixed(2)} warmth ${mind.warmth.toFixed(2)}`; }, 300);
 }
-window.portrait = { handle, twitch, fakeVoice, blink, mind, model, showExpression };
+window.portrait = { handle, twitch, fakeVoice, blink, mind, model, showExpression, look };
 
 if (params.get('demo')) {
   (async () => {
