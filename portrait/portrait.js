@@ -12,6 +12,7 @@
 //   ?demo=1           acts out a fake conversation, no assistant needed
 
 import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils } from './vendor/luna-three.js';
+import { createLook } from './look.js';
 
 const params = new URLSearchParams(location.search);
 const note = document.getElementById('note');
@@ -142,8 +143,12 @@ function handle(ev) {
       const next = stageOf(ev.status);
       if (next === 'listening' && mind.stage !== 'listening') twitch(0, 1.0);  // ears up: he's talking
       mind.stage = next;
+      look.setStage(next);
       break;
     }
+    case 'gaze':
+      look.setTarget(ev);
+      break;
     case 'turn':
       twitch(0, 0.6);
       break;
@@ -153,7 +158,7 @@ function handle(ev) {
       break;
     case 'tool':
       twitch(Math.random() < 0.5 ? 1 : -1, 0.8);
-      glance(0.6);
+      look.glance(0.6);
       break;
     case 'flags':
       if ((ev.flags || []).length) tilt.target = 0.12;   // a "hm" tilt when the review didn't like it
@@ -207,34 +212,14 @@ function blinkValue(now, dt) {
 
 // Where she looks: a target in front of her face that jumps (saccades)
 // and that her head follows, slower and only part of the way.
-const gaze = { x: 0, y: 0, tx: 0, ty: 0, next: 0, hx: 0, hy: 0 };
+const gaze = { x: 0, y: 0 };
 const lookTarget = new THREE.Object3D();
 scene.add(lookTarget);
 
-function glance(strength = 1) {
-  gaze.tx = rand(-0.22, 0.22) * strength;
-  gaze.ty = rand(-0.05, 0.12) * strength;
-  gaze.next = performance.now() / 1000 + rand(0.6, 1.4);
-}
-
-function pickGaze(now) {
-  if (now < gaze.next) return;
-  const st = mind.stage;
-  if (st === 'thinking') {          // up and off to one side, the way people think
-    gaze.tx = (Math.random() < 0.7 ? 1 : -1) * rand(0.10, 0.20);
-    gaze.ty = rand(0.10, 0.18);
-    gaze.next = now + rand(1.2, 2.6);
-  } else if (st === 'listening' || st === 'speaking') {
-    gaze.tx = rand(-0.03, 0.03);    // at you, with the small darts real eyes make
-    gaze.ty = rand(-0.015, 0.025);
-    gaze.next = now + rand(0.5, 1.6);
-  } else {
-    const away = Math.random() < 0.3;
-    gaze.tx = away ? rand(-0.25, 0.25) : rand(-0.05, 0.05);
-    gaze.ty = away ? rand(-0.08, 0.10) : rand(-0.02, 0.03);
-    gaze.next = now + (away ? rand(0.8, 2.0) : rand(1.0, 3.5));
-  }
-}
+// Where it aims comes from look.js (-1..1); these scale that to this
+// scene: how far the look target moves, how far the head tilts.
+const look = createLook();
+const LOOK_X = 0.24, LOOK_Y = 0.2, LOOK_TILT = 0.11;
 
 // Ears: a damped spring per ear per axis. twitch() kicks it.
 function twitch(side = 0, strength = 1) {
@@ -347,9 +332,9 @@ function animate() {
   const now = clock.elapsedTime;
 
   if (vrm) {
-    pickGaze(now);
-    gaze.x = damp(gaze.x, gaze.tx, 22, dt);
-    gaze.y = damp(gaze.y, gaze.ty, 22, dt);
+    const L = look.update(now);
+    gaze.x = damp(gaze.x, L.x * LOOK_X, 22, dt);
+    gaze.y = damp(gaze.y, L.y * LOOK_Y, 22, dt);
     lookTarget.position.set(gaze.x * 1.6, base.lookY + gaze.y * 1.6, base.headZ + 0.9);
     if (vrm.lookAt) vrm.lookAt.target = lookTarget;
 
@@ -358,11 +343,13 @@ function animate() {
     setExpr('blink', mind.stage === 'waking' ? 0 : blinkValue(now, dt));
 
     // Head: follows the gaze part of the way, breathes, nods with her voice.
-    tilt.v = damp(tilt.v, tilt.target + (mind.stage === 'thinking' ? 0.10 : 0), 3, dt);
+    tilt.v = damp(tilt.v, tilt.target + L.tilt * LOOK_TILT, 3, dt);
     const sway = Math.sin(now * 0.7) * 0.025 + Math.sin(now * 0.31 + 1) * 0.02;
-    headRot.y = damp(headRot.y, gaze.x * 0.9 + sway, 3.5, dt);
-    headRot.x = damp(headRot.x, -gaze.y * 0.7 + (mind.stage === 'listening' ? 0.06 : 0)
-                     + talking * 0.05 * Math.sin(now * 9), 4, dt);
+    const rate = L.thinking ? 2.5 : 3.5;
+    headRot.y = damp(headRot.y, (gaze.x * L.headGain + L.wander.x * LOOK_X) * 0.9 + sway, rate, dt);
+    headRot.x = damp(headRot.x, -(gaze.y * L.headGain + L.wander.y * LOOK_Y) * 0.7
+                     + (mind.stage === 'listening' ? 0.06 : 0)
+                     + talking * 0.05 * Math.sin(now * 9), L.thinking ? 2.5 : 4, dt);
     headRot.z = damp(headRot.z, tilt.v + Math.sin(now * 0.45) * 0.02, 3, dt);
     const head = bone('head'), neck = bone('neck');
     if (head) head.rotation.set(headRot.x * 0.6, headRot.y * 0.6, headRot.z * 0.6);
@@ -412,6 +399,9 @@ function debugPanel() {
     sad: () => handle({ t: 'mood', energy: -0.8, warmth: -0.1 }),
     cross: () => handle({ t: 'mood', energy: 0.2, warmth: -0.9 }),
     neutral: () => handle({ t: 'mood', energy: 0, warmth: 0 }),
+    'you: left': () => handle({ t: 'gaze', x: -0.8, y: -0.1 }),
+    'you: right': () => handle({ t: 'gaze', x: 0.8, y: -0.1 }),
+    'you: ahead': () => handle({ t: 'gaze', none: true }),
   };
   const box = document.getElementById('dbuttons');
   for (const [label, fn] of Object.entries(buttons)) {
