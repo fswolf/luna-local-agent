@@ -1,0 +1,40 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "sigewinne.moc3",
+    "Textures": [
+      "textures/texture_00.png"
+    ],
+    "Physics": "sigewinne.physics3.json",
+    "DisplayInfo": "sigewinne.cdi3.json",
+    "Expressions": [
+      {
+        "Name": "tears",
+        "File": "tears.exp3.json"
+      },
+      {
+        "Name": "x_eyes",
+        "File": "x_eyes.exp3.json"
+      },
+      {
+        "Name": "spiral_eyes",
+        "File": "spiral_eyes.exp3.json"
+      }
+    ]
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": []
+    },
+    {
+      "Target": "Parameter",
+      "Name": "EyeBlink",
+      "Ids": [
+        "ParamEyeLOpen",
+        "ParamEyeROpen"
+      ]
+    }
+  ]
+}

@@ -84,8 +84,10 @@ discord.json
 .DS_Store
 
 # Portrait models you add (often large, always someone else's licence),
-# Live2D's core, and Blender's backup files. placeholder.vrm and luna.vrm stay.
+# Live2D's core, and Blender's backup files. placeholder.vrm and luna.vrm stay,
+# and so does the Sigewinne Live2D model, which ships with the repo.
 portrait/models/*/
+!portrait/models/sigewinne/
 portrait/models/luna.glb
 portrait/vendor/live2dcubismcore.min.js
 *.blend1

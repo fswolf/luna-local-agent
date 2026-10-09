@@ -479,9 +479,9 @@ def backend(state):
     choice = ARGS.backend
     if choice is None:
         options = [("lmstudio", "LM Studio - an app with a model browser; easiest"),
-                   ("llama", "llama.cpp's own server - builds it here (Linux), unlocks the research features"),
+                   ("llama", "llama.cpp's own server - builds it here, unlocks the research features"),
                    ("skip", "skip - I'll set one up myself")]
-        if SYSTEM != "Linux":
+        if SYSTEM == "Windows":
             options = [o for o in options if o[0] != "llama"]
         choice = choose("Which model server?", options, "lmstudio")
     state["backend"] = choice
@@ -496,11 +496,18 @@ def backend(state):
             print("  3. Developer tab -> start the server (port 1234)")
         note("model server", up, "LM Studio" if up else "install LM Studio and start its server")
     elif choice == "llama":
-        if SYSTEM != "Linux":
-            warn("the llama.cpp build script is Linux-only so far - use LM Studio on this system")
-            note("model server", False, "llama.cpp: Linux only")
+        if SYSTEM == "Windows":
+            warn("the llama.cpp build script is Linux and macOS only so far - use LM Studio here")
+            note("model server", False, "llama.cpp: not on Windows yet")
             return
-        kind = "rocm" if detect_gpu()[0] == "rocm" else "vulkan"
+        if SYSTEM == "Darwin":
+            kind = "metal"
+            if not shutil.which("cmake"):
+                print("  needs Apple's compiler and cmake first:")
+                print("    xcode-select --install")
+                print("    brew install cmake bash      (Homebrew: https://brew.sh)")
+        else:
+            kind = "rocm" if detect_gpu()[0] == "rocm" else "vulkan"
         print(f"  building llama.cpp ({kind}) - this takes a few minutes")
         good = run(["bash", os.path.join(ROOT, "llama", "install.sh"), kind])
         note("model server", good, "llama.cpp built - put a model in llama/models and run llama/start.sh"

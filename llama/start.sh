@@ -8,7 +8,17 @@
 # Chat on :8080 in this terminal; embeddings on :8081 in the background,
 # logging to llama/embed.log. Ctrl+C stops both. Settings: server.env.
 set -uo pipefail
-cd "$(dirname "$(realpath "$0")")" || exit 1
+
+# macOS still ships bash 3.2, which has no mapfile. Hop to Homebrew's.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        [ -x "$b" ] && exec "$b" "$0" "$@"
+    done
+    echo "This needs bash 4 or newer (macOS ships 3.2): brew install bash" >&2
+    exit 1
+fi
+
+cd "$(dirname "$(realpath "$0" 2>/dev/null || echo "$0")")" || exit 1
 
 # shellcheck disable=SC1091
 source ./server.env
@@ -77,7 +87,7 @@ fi
 
 serving "$PORT" && { echo "Something is already serving on $HOST:$PORT." >&2; exit 1; }
 
-# The 16 GB card holds one copy of a 10 GB model, not two.
+# One copy of the model fits in VRAM (or a Mac's shared memory), not two.
 if curl -fsS --max-time 2 http://localhost:1234/api/v0/models 2>/dev/null |
    grep -q '"state": *"loaded"'; then
     echo "LM Studio has a model loaded - eject it first, or both won't fit in VRAM." >&2

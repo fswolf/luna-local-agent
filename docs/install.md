@@ -98,7 +98,7 @@ vectors, LoRA adapters, saved KV-cache slots. Luna works with either and
 picks by herself at startup, llama-server first if both are up.
 
 ```bash
-llama/install.sh          # build it - Vulkan; "rocm" for ROCm/HIP instead
+llama/install.sh          # build it - Vulkan on Linux ("rocm" for ROCm/HIP), Metal on a Mac
 llama/start.sh            # serve on 127.0.0.1:8080
 ./start.sh                # Luna finds it; the header says "· llama.cpp"
 ```
@@ -110,6 +110,21 @@ run sudo itself. Vulkan and ROCm builds can sit side by side; `bin/`
 points at whichever was built last. Run `llama/bin/llama-bench -m
 <model>` under each to see which is faster on your GPU.
 `install.sh update` pulls the latest llama.cpp and rebuilds.
+
+**On a Mac** it builds for Metal, Apple's GPU, so an Apple-silicon Mac
+runs the model on its GPU with no setup beyond the tools:
+
+```bash
+xcode-select --install         # Apple's compiler
+brew install cmake bash        # Homebrew: https://brew.sh
+llama/install.sh
+```
+
+The newer bash is for `start.sh`: macOS still ships bash 3.2, and
+`start.sh` switches to Homebrew's by itself. The GPU shares the Mac's
+memory, so the model plus macOS has to fit in RAM. Set `MODEL=` in
+`llama/server.env` to your model's full path; the default pattern
+matches one particular model and won't find yours.
 
 `start.sh` reads `llama/server.env`, which holds the same load settings
 as LM Studio's model page: context 16384, every layer on the GPU, 9
