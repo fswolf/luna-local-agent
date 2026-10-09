@@ -1,6 +1,7 @@
 import io
 import queue
 import re
+import sys
 import threading
 import time
 
@@ -695,8 +696,26 @@ def _reset_portaudio():
 _mic_streams = [0]      # open microphone streams (barge-in, recording)
 
 
+_native_rate = [False]   # set once CoreAudio has refused the voice's own rate
+
+
+def _resample(samples, rate, target):
+    if not target or target == rate or len(samples) < 2:
+        return samples, rate
+    n = max(1, int(len(samples) * target / rate))
+    out = np.interp(np.linspace(0, len(samples) - 1, n), np.arange(len(samples)), samples)
+    return out.astype(np.float32), target
+
+
+def _device_rate():
+    try:
+        return int(sd.query_devices(kind="output")["default_samplerate"])
+    except Exception:
+        return 0
+
+
 def _start_playback(samples, rate):
-    """sd.play, with two retries before giving up on a chunk.
+    """sd.play, made to survive macOS and Bluetooth.
 
     macOS's CoreAudio sometimes refuses to open a stream (PortAudio's
     -9986 "Internal PortAudio error", CoreAudio's 'what'). The usual cause
@@ -707,20 +726,35 @@ def _start_playback(samples, rate):
     device's own rate. A voice that can't play is
     reported once and skipped - the reply is on screen either way - rather
     than taking the whole speaker thread down with it."""
+    # On a Mac, play at the output device's own rate. Bluetooth headphones
+    # run at 44.1 kHz (music) or 16/24 kHz (call mode) and CoreAudio can
+    # refuse anything else outright - her Mac took 44100 straight away
+    # after refusing Kokoro's 24000 five times. Elsewhere, only after a
+    # refusal has been seen once.
+    if sys.platform == "darwin" or _native_rate[0]:
+        samples, rate = _resample(samples, rate, _device_rate())
+
     try:
         sd.play(samples, rate)
         return True
     except sd.PortAudioError as e:
         first = e
 
-    try:
-        sd.stop()
-        time.sleep(0.25)
-        _reset_portaudio()
-        sd.play(samples, rate)
-        return True
-    except sd.PortAudioError:
-        pass
+    # Bluetooth takes a second or two to switch back from headset mode to
+    # music mode after the mic closes - longer than a fast model takes to
+    # answer, which is why LM Studio (slower) got away with it and
+    # llama-server didn't. So keep trying for up to ~3 seconds, re-reading
+    # the devices each time, before falling back to the device's own rate.
+    for wait in (0.25, 0.5, 0.75, 1.0):
+        try:
+            sd.stop()
+            time.sleep(wait)
+            _reset_portaudio()
+            sd.play(samples, rate)
+            logbook.info("speech", "speakers opened after a retry (%s)", first)
+            return True
+        except sd.PortAudioError:
+            continue
 
     try:
         device_rate = int(sd.query_devices(kind="output")["default_samplerate"])
@@ -730,6 +764,7 @@ def _start_playback(samples, rate):
                                   np.arange(len(samples)), samples).astype(np.float32)
             sd.play(resampled, device_rate)
             logbook.info("speech", "played at the device's %d Hz after: %s", device_rate, first)
+            _native_rate[0] = True      # from now on, go straight to the device's rate
             return True
     except Exception:
         pass
