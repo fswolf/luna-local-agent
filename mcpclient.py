@@ -21,6 +21,12 @@ Per server:
                     small model picks better from five tools than fifty
   approve           true: every call pops the approval window first.
                     Tools the server itself marks destructive always do.
+  skip_tools        leave these out (the opposite of tools)
+
+A plugin connecting a server itself (connect_server) can also pass
+"check": a function (tool name, arguments) -> "" to let the call run as
+usual, or a short reason to ask first even when nothing else would - the
+home plugin uses it for locks and doors.
   enabled           false keeps it in the file without starting it
 
 Tool names become <server>__<tool>, so two servers can't collide and the
@@ -118,7 +124,8 @@ async def _serve(name, spec, ready):
 def _connect(name, spec, timeout=None):
     ready = threading.Event()
     _servers[name] = {"session": None, "tools": [], "error": "", "approve": bool(spec.get("approve")),
-                      "only": set(spec.get("tools") or []), "stop": None, "spec": spec}
+                      "only": set(spec.get("tools") or []), "skip": set(spec.get("skip_tools") or []),
+                      "check": spec.get("check"), "stop": None, "spec": spec}
 
     async def start():
         _servers[name]["stop"] = asyncio.Event()
@@ -135,9 +142,22 @@ def _connect(name, spec, timeout=None):
 # ---------------------------------------------------------------------------
 # Registering their tools as hers
 # ---------------------------------------------------------------------------
-def _approve(server, tool, arguments):
+def _approve(server, tool, arguments, reason=""):
     import state
     import ui
+
+    body = [f"{k}: {json.dumps(v, ensure_ascii=False)[:300]}" for k, v in (arguments or {}).items()] \
+        or ["(no arguments)"]
+
+    if reason:
+        body += ["", f"asking because: {reason}"]
+
+    # A remote turn (Discord) is answered by that plugin: auto, a message
+    # asking you, or the desk popup. A reason means "ask even in auto".
+    approver = getattr(getattr(state, "remote", None), "approver", None)
+
+    if approver is not None:
+        return bool(approver("mcp", f"{server}: {tool}", body, bool(reason)))
 
     if state.turn_source != "typed":
         try:
@@ -146,9 +166,6 @@ def _approve(server, tool, arguments):
             speak(f"Can I use {tool.replace('_', ' ')} in {server}? It's on screen.")
         except Exception:
             pass
-
-    body = [f"{k}: {json.dumps(v, ensure_ascii=False)[:300]}" for k, v in (arguments or {}).items()] \
-        or ["(no arguments)"]
 
     return ui.ask_approval(title=f"{server}: {tool}", note="an MCP server's tool - Y to let it run",
                            body=body, timeout=getattr(config, "FILES_APPROVAL_TIMEOUT", 120))
@@ -183,8 +200,17 @@ def _make_runner(server, tool):
         if session is None:
             return f"Error: the {server} MCP server isn't connected ({entry.get('error') or 'stopped'})."
 
-        if entry.get("approve") or destructive:
-            if not _approve(server, tool.name, arguments):
+        reason = ""
+        check = entry.get("check")
+
+        if callable(check):
+            try:
+                reason = str(check(tool.name, arguments or {}) or "")
+            except Exception as e:
+                reason = f"couldn't check this one ({e})"   # unsure = ask
+
+        if entry.get("approve") or destructive or reason:
+            if not _approve(server, tool.name, arguments, reason):
                 return "Denied by the user - it did not run. Do not retry."
 
         async def call():
@@ -214,7 +240,7 @@ def _register(server):
     entry["registered"] = []
     count = 0
     for t in entry["tools"]:
-        if entry["only"] and t.name not in entry["only"]:
+        if (entry["only"] and t.name not in entry["only"]) or t.name in entry["skip"]:
             continue
         name = f"{_slug(server, 20)}__{_slug(t.name, 40)}"[:64]
         schema = dict(t.inputSchema or {"type": "object", "properties": {}})
@@ -327,7 +353,8 @@ def status():
         elif entry["session"] is None:
             lines.append(f"  {name}: not connected - {entry['error']}")
         else:
-            shown = [t.name for t in entry["tools"] if not entry["only"] or t.name in entry["only"]]
+            shown = [t.name for t in entry["tools"]
+                     if (not entry["only"] or t.name in entry["only"]) and t.name not in entry["skip"]]
             lines.append(f"  {name}: {len(shown)} tool(s){' (asks first)' if entry['approve'] else ''}"
                          f" - {', '.join(shown[:12])}{' ...' if len(shown) > 12 else ''}")
     return "MCP servers:\n" + "\n".join(lines) + "\nSwitch single tools on and off in the tools pane."

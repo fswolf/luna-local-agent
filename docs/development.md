@@ -48,6 +48,7 @@ ai-voice/
 │   ├── youtube.py    # YouTube live chat (read-only, API key)
 │   ├── cron.py       # scheduled jobs - /cron, agent/cron.json
 │   ├── minecraft.py  # she joins your world and plays towards a goal
+│   ├── home.py       # your smart home, through a local Home Assistant
 │   └── discord.py    # remote access for the owner over Discord
 ├── ptt.py
 ├── reminders.py

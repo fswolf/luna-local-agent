@@ -65,6 +65,7 @@ Slash commands:
 | `/plugins` | What's installed, then `/<name> on`, `off`, or status |
 | `/allow` | Whether file changes are asking; `/allow off` ends a session allow-all |
 | `/minecraft ...` | `on`, `off`, `goal <what>`, `pause`, `resume`: see [Plugins](plugins.md) |
+| `/home ...` | `on`, `off`, `refresh`: your smart home through Home Assistant, see [Home automation](home.md) |
 | `/discord approval ...` | `auto`, `discord` or `desk`: who approves Discord's commands and file changes |
 | `/cron` | Scheduled jobs, and when each last ran |
 | `/mcp` | MCP servers: connected or not, and their tools |

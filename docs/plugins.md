@@ -430,6 +430,18 @@ recipe browsing) stay off.
 The tools only exist while the plugin is on, so they cost nothing the
 rest of the time. `speak: true` reads each step aloud.
 
+## Your home: Home Assistant
+
+```
+/home on        /home off        /home        /home refresh
+```
+
+Connects her to a [Home Assistant](https://www.home-assistant.io/) on
+your own network, so she can run your lights, plugs, sensors and
+thermostat. Local only, and locks and garage doors always ask first.
+Setup, safety and which devices to buy are on their own page:
+[Home automation](home.md).
+
 ## Sysadmin: cron and Discord
 
 Every other plugin connects her to a *conversation*. These two give

@@ -197,9 +197,11 @@ def _ask_in_discord(kind, title, body, guarded):
     if len(shown) > 1500:
         shown = shown[:1500] + "\n..."
 
-    what = {"command": "run a command", "write": "change a file", "read": "read a file"}.get(kind, kind)
-    warn = "\n**This is her own code or a config folder.**" if guarded else ""
-    head = f"**Luna wants to {what}**" + ("" if kind == "command" else f": {title}")
+    what = {"command": "run a command", "write": "change a file", "read": "read a file",
+            "mcp": "use"}.get(kind, kind)
+    warn = ("\n**This is her own code or a config folder.**" if kind in ("write", "read")
+            else "\n**Flagged: it always asks.**") if guarded else ""
+    head = f"**Luna wants to {what}**" + ("" if kind == "command" else f"{'' if kind == 'mcp' else ':'} {title}")
     wait = f"{timeout // 60} min" if timeout >= 60 else f"{timeout}s"
     text = (f"{head}{warn}\n{FENCE}\n{shown}\n{FENCE}\n"
             f"Reply **y** or **n** (or tap a reaction) - {wait}, then it's a no.")

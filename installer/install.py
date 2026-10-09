@@ -147,12 +147,27 @@ def http_ok(url, timeout=2):
         return False
 
 
+# Some CDNs (Live2D's among them) answer Python's default user agent
+# with 403 Forbidden, so say what we are in words a CDN accepts.
+USER_AGENT = "Mozilla/5.0 (compatible; luna-installer; +https://github.com/fswolf/luna-local-agent)"
+
+
+def _curl(url, tmp):
+    """Second try with the system curl, which every Mac and most Linux
+    boxes have - different TLS stack, different fingerprint."""
+    curl = shutil.which("curl")
+    if not curl:
+        return False
+    return subprocess.run([curl, "-fsSL", "--retry", "2", "-A", USER_AGENT, "-o", tmp, url]).returncode == 0
+
+
 def download(url, dest):
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     tmp = dest + ".part"
     print(f"  {D}downloading {url}{X}")
     try:
-        with urllib.request.urlopen(url, timeout=60) as r, open(tmp, "wb") as f:
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=60) as r, open(tmp, "wb") as f:
             total = int(r.headers.get("Content-Length") or 0)
             got = 0
             while True:
@@ -168,6 +183,10 @@ def download(url, dest):
         os.replace(tmp, dest)
         return True
     except Exception as e:
+        print(f"  {D}{e} - trying curl{X}")
+        if _curl(url, tmp):
+            os.replace(tmp, dest)
+            return True
         fail(f"download failed: {e}")
         try:
             os.remove(tmp)
@@ -501,7 +520,10 @@ def extras_files(extras):
             ok("already here")
         else:
             print("  Live2D's own code, under their licence: https://www.live2d.com/eula/")
-            note("live2d runtime", download(CUBISM_URL, dest))
+            got = download(CUBISM_URL, dest)
+            note("live2d runtime", got, "" if got else
+                 "not fatal: the portrait loads it from Live2D's site instead. "
+                 "To keep a copy: bash portrait/vendor/get_cubism_core.sh")
     if "embeddings" in extras:
         step("Embedding model")
         dest = os.path.join(ROOT, "llama", "models", os.path.basename(EMBED_URL))
