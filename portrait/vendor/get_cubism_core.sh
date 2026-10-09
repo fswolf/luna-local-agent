@@ -5,5 +5,6 @@
 # it's fetched rather than shipped in this repo.
 set -euo pipefail
 cd "$(dirname "$0")"
-curl -fsSLo live2dcubismcore.min.js https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js
+# A browser-ish user agent: the CDN can answer bare scripts with 403.
+curl -fsSL -A "Mozilla/5.0 (compatible; luna-installer)" -o live2dcubismcore.min.js https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js
 echo "saved $(pwd)/live2dcubismcore.min.js"
