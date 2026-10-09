@@ -28,6 +28,9 @@ agent/notebook.db-shm
 agent/cron.json
 # Places she pinned in your Minecraft worlds (plugins/minecraft.py).
 agent/minecraft.json
+# Zork saves (plugins/zork.py), and any made running the server by hand.
+agent/zork/
+games/zork/saves/
 
 # llama.cpp is built in place by llama/install.sh; only the scripts and
 # the settings file are ours.

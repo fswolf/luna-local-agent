@@ -647,13 +647,21 @@ SELF_GREET = bool(_self_cfg.get("greet", True))
 #   "portrait": { "model": "models/luna.vrm", "ear_bones": [],
 #                 "browser": "", "size": "420x560" }
 _portrait_cfg = setting("portrait", {})
-PORTRAIT_MODEL = str(_portrait_cfg.get("model", "models/luna.vrm"))
+# The Sigewinne Live2D model ships with the repo and is the default; the
+# generated luna.vrm is the fallback if that folder is missing.
+_SIGEWINNE = "models/sigewinne/sigewinne.model3.json"
+_DEFAULT_PORTRAIT = (_SIGEWINNE if os.path.exists(os.path.join(BASE_DIR, "portrait", _SIGEWINNE))
+                     else "models/luna.vrm")
+PORTRAIT_MODEL = str(_portrait_cfg.get("model") or _DEFAULT_PORTRAIT)
 PORTRAIT_EAR_BONES = list(_portrait_cfg.get("ear_bones", []) or [])
 PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))
 PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 # Live2D only: which expression is which (portrait/add_live2d.py fills it
 # in), and which parameters are the ears if their names don't say so.
 PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
+if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
+    # Its three expressions, so moods show on her face out of the box.
+    PORTRAIT_LIVE2D = {"expressions": {"sad": "tears", "flustered": "x_eyes", "confused": "spiral_eyes"}}
 
 # MCP servers whose tools she can use (mcpclient.py). Read at startup.
 #   "mcp": { "enabled": true, "servers": { "obs": {"command": "...", "args": [...]} } }
