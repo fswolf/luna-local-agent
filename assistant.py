@@ -181,7 +181,7 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True):
 
 
 def respond_remote(text, model, source, who, tools_allowed=None,
-                   speak=False, remember=True):
+                   speak=False, remember=True, approver=None):
     """The owner talking to her from somewhere else - Discord.
 
     A normal private turn (his history, his tools) that waits for the
@@ -201,6 +201,9 @@ def respond_remote(text, model, source, who, tools_allowed=None,
         ui.set_status(f"{source.title()}...")
         ui.begin_message(AGENT_NAME.lower())
         state.remote.source = source
+        # Who answers permission questions for this turn, if not the
+        # desk popup: approver(kind, title, body, guarded) -> bool.
+        state.remote.approver = approver
 
         def on_sentence(sentence):
             if not state.stop_speaking:
@@ -224,6 +227,7 @@ def respond_remote(text, model, source, who, tools_allowed=None,
             raise
         finally:
             state.remote.source = None
+            state.remote.approver = None
             ui.set_status("Idle")
 
 

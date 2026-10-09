@@ -59,10 +59,17 @@ Slash commands:
 | `/mouse` | Wheel scrolling vs. being able to select text |
 | `/scroll` | Why the wheel isn't scrolling: pane sizes and what the terminal sent |
 | `/set` | List every setting, or change one: saved to `config.json` |
-| `/tools` | Which tools the model can call, what each costs: Tab twice to change |
+| `/tools` | Which tools the model can call, what each costs: Tab twice to change, and to set read/write/execute permissions |
 | `/tooltest` | Whether this model *actually* calls them |
 | `/repair` | Record past reminders as the tool calls they really were |
 | `/plugins` | What's installed, then `/<name> on`, `off`, or status |
+| `/allow` | Whether file changes are asking; `/allow off` ends a session allow-all |
+| `/minecraft ...` | `on`, `off`, `goal <what>`, `pause`, `resume`: see [Plugins](plugins.md) |
+| `/discord approval ...` | `auto`, `discord` or `desk`: who approves Discord's commands and file changes |
+| `/cron` | Scheduled jobs, and when each last ran |
+| `/mcp` | MCP servers: connected or not, and their tools |
+| `/portrait` | Her animated portrait; `/portrait obs` for an OBS source |
+| `/thoughts`, `/memory`, `/monitor` | The browser pages: her reasoning, her memory, the live view |
 | `/help` | Points at Tab, and says which mode you're in |
 | `/keys` | Hotkey + socket diagnostics |
 | `/clear` | Wipe the conversation and saved history |

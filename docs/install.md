@@ -137,6 +137,20 @@ Which server she uses:
 `auto` checks once at startup. `lmstudio` or `llama` forces one. To
 switch servers mid-session, restart her.
 
+**The model on another machine.** Put that machine's address in the
+URLs above (`http://192.168.1.50:8080/...`), then on the model machine:
+
+* llama.cpp: set `HOST="0.0.0.0"` in `llama/server.env` (the default
+  only answers that machine itself), and copy its `llama/.api_key` into
+  `llama/.api_key` on Luna's machine. Without the key, `auto` quietly
+  falls back to LM Studio.
+* LM Studio: turn on **Serve on Local Network** in the Developer tab.
+* Open the port in its firewall (1234, 8080, and 8081 for embeddings),
+  e.g. `sudo firewall-cmd --add-port=8080/tcp --permanent && sudo firewall-cmd --reload`.
+
+`embed_url` in the same block points at the embedding server, if that
+runs elsewhere too.
+
 **Vision.** llama-server only takes images when it's started with the
 model's vision adapter, a separate `mmproj-*.gguf`. `start.sh` looks
 for one in the model's own folder, which is where LM Studio puts it,

@@ -205,6 +205,12 @@ def _ask(action, full, body_lines, note=""):
     import ui
 
     remote = getattr(state.remote, "source", None)
+    approver = getattr(state.remote, "approver", None)
+
+    if approver is not None:
+        # A remote plugin (Discord) answers for its own turns: straight
+        # through, a message asking you, or the desk popup - its setting.
+        return bool(approver("write", f"{action} {_display(full)}", body_lines, _guarded(full)))
 
     if _remote_may_write(full):
         logbook.info("files", "%s: %s %s - auto_approve_sources, not asked",
@@ -394,6 +400,12 @@ def _ask_read(action, full):
 
     if _mode("read") != "ask":
         return True
+
+    approver = getattr(state.remote, "approver", None)
+
+    if approver is not None:
+        return bool(approver("read", f"{action} {_display(full)}",
+                             ["nothing changes on disk"], False))
 
     return bool(ui.ask_approval(
         title=f"{action} {_display(full)}",

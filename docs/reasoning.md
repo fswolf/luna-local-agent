@@ -195,6 +195,18 @@ to look at.
 
 `/set thoughts.token_probs false` stops collecting it.
 
+## Background calls don't think
+
+After every reply a few small model calls run behind the scenes: is
+there a fact worth remembering, a reminder in that, how warm was it for
+her mood, and now and then a summary of older history. They go through
+one helper (`lmstudio.chore`) that switches thinking off on llama-server
+and caps the reply length, because a thinking model with an unlimited
+budget would otherwise spend a minute of GPU deciding to answer
+"NONE". On LM Studio they get room to think plus the same reasoning
+setting a turn uses. The idle jobs (lessons, notes, fact cleanup) set
+their own small budgets.
+
 ## Adaptive thinking (llama-server)
 
 An idea borrowed from [mini-AGI](https://github.com/volotat/mini-AGI):

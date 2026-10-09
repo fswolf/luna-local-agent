@@ -151,20 +151,44 @@ def _run_command(command, folder="~", why="", background=False):
     if why:
         body += [f"why:     {str(why).strip()[:200]}"]
 
-    if state.turn_source != "typed":
+    remote = getattr(getattr(state, "remote", None), "source", None)
+    approver = getattr(getattr(state, "remote", None), "approver", None)
+
+    if approver is not None:
+        allowed = bool(approver("command", "run a command", body, False))
+
+        if allowed:
+            try:
+                ui.add_message("system", f"{remote} ran: {command[:200]}"
+                               + (" (background)" if background else ""))
+            except Exception:
+                pass
+    elif remote and remote in getattr(config, "SHELL_AUTO_APPROVE_SOURCES", []):
+        # Automation from a trusted remote (Discord, owner ids only): no
+        # popup, but never silent - it's logged and shown at the desk.
+        allowed = True
+        logbook.info("shell", "%s: auto-approved (shell.auto_approve_sources)", remote)
+
         try:
-            from speech import speak
+            ui.add_message("system", f"{remote} ran: {command[:200]}"
+                           + (" (background)" if background else ""))
+        except Exception:
+            pass
+    else:
+        if state.turn_source != "typed":
+            try:
+                from speech import speak
 
-            speak("Can I run a command? It's on screen.")
-        except Exception as e:
-            logbook.warn("shell", "couldn't voice the request: %s", e)
+                speak("Can I run a command? It's on screen.")
+            except Exception as e:
+                logbook.warn("shell", "couldn't voice the request: %s", e)
 
-    allowed = ui.ask_approval(
-        title="run a command",
-        note="runs as you - read it before you say yes",
-        body=body,
-        timeout=config.FILES_APPROVAL_TIMEOUT,
-    )
+        allowed = ui.ask_approval(
+            title="run a command",
+            note="runs as you - read it before you say yes",
+            body=body,
+            timeout=config.FILES_APPROVAL_TIMEOUT,
+        )
 
     if not allowed:
         logbook.info("shell", "denied: %s", command[:300])
