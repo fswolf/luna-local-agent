@@ -1,7 +1,11 @@
 import io
+import os
 import queue
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -769,7 +773,7 @@ def _start_playback(samples, rate):
     except Exception:
         pass
 
-    logbook.warn("speech", "couldn't open the speakers: %s", first)
+    logbook.warn("speech", "couldn't open the speakers: %s | %s", first, _audio_devices())
 
     if time.monotonic() - _audio_warned[0] > 60:
         _audio_warned[0] = time.monotonic()
@@ -779,11 +783,76 @@ def _start_playback(samples, rate):
     return False
 
 
+def _audio_devices():
+    """One line about the devices PortAudio sees, for the log."""
+    try:
+        out = sd.query_devices(kind="output")
+        inp = sd.query_devices(kind="input")
+        return (f"out={out['name']!r} {int(out['default_samplerate'])}Hz "
+                f"in={inp['name']!r} {int(inp['default_samplerate'])}Hz "
+                f"default={sd.default.device}")
+    except Exception as e:
+        return f"devices unknown ({e})"
+
+
+# macOS fallback: afplay, the system's own player. It talks to CoreAudio
+# directly, takes any rate, and doesn't care what mode Bluetooth headphones
+# are in - which is exactly where PortAudio gives up. Once it's needed it's
+# used for the rest of the session, so no sentence waits out the retries.
+_afplay = [None, False]      # [running process, switched over]
+AFPLAY = shutil.which("afplay") if sys.platform == "darwin" else None
+
+
+def _play_afplay(samples, rate):
+    """Play one chunk with afplay; False if interrupted."""
+    fd, path = tempfile.mkstemp(prefix="luna-", suffix=".wav")
+    os.close(fd)
+
+    try:
+        write(path, rate, (np.clip(samples, -1, 1) * 32767).astype(np.int16))
+        proc = subprocess.Popen([AFPLAY, path], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        logbook.warn("speech", "afplay couldn't start: %s", e)
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        return True
+
+    _afplay[0] = proc
+
+    try:
+        while proc.poll() is None:
+            if state.stop_speaking:
+                proc.kill()
+                _lip_stop()
+                return False
+            time.sleep(0.05)
+        return True
+    finally:
+        _afplay[0] = None
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
 def _play(samples, rate):
     """Play one chunk; return False if HOME interrupted it."""
     _lip_sync(samples, rate)
 
+    if AFPLAY and _afplay[1]:
+        return _play_afplay(samples, rate)
+
     if not _start_playback(samples, rate):
+        if AFPLAY:
+            if not _afplay[1]:
+                _afplay[1] = True
+                logbook.info("speech", "PortAudio won't open the speakers - playing with afplay from now on")
+                ui.add_message("system", "Playing her voice through macOS's own player (afplay) - "
+                                         "PortAudio wouldn't open the speakers.")
+            return _play_afplay(samples, rate)
         return True     # skipped, not interrupted: carry on with the rest
 
     while True:
@@ -913,6 +982,9 @@ def _playing():
     silence sets the baseline to the noise floor, after which her own
     first word clears the bar and she interrupts herself. Every time.
     """
+    if _afplay[0] is not None and _afplay[0].poll() is None:
+        return True
+
     try:
         stream = sd.get_stream()
     except Exception:
