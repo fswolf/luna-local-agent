@@ -679,13 +679,32 @@ def _lip_stop():
 _audio_warned = [0.0]
 
 
+def _reset_portaudio():
+    """Make PortAudio forget and re-read the audio devices. Only when no
+    microphone stream is open: restarting it under one breaks that stream."""
+    try:
+        if _mic_streams[0] > 0:
+            return
+        sd._terminate()
+        sd._initialize()
+        logbook.info("speech", "restarted PortAudio to re-read the audio devices")
+    except Exception as e:
+        logbook.warn("speech", "couldn't restart PortAudio: %s", e)
+
+
+_mic_streams = [0]      # open microphone streams (barge-in, recording)
+
+
 def _start_playback(samples, rate):
     """sd.play, with two retries before giving up on a chunk.
 
     macOS's CoreAudio sometimes refuses to open a stream (PortAudio's
-    -9986 "Internal PortAudio error"): right after another stream closed,
-    or at a rate the output device won't take. So: wait a moment and try
-    again, then try at the device's own rate. A voice that can't play is
+    -9986 "Internal PortAudio error", CoreAudio's 'what'). The usual cause
+    is Bluetooth headphones: opening their microphone switches them to
+    headset mode, the output device changes rate under PortAudio's feet,
+    and PortAudio's cached idea of the device is stale. So: wait, restart
+    PortAudio so it re-reads the devices, try again, then try at the
+    device's own rate. A voice that can't play is
     reported once and skipped - the reply is on screen either way - rather
     than taking the whole speaker thread down with it."""
     try:
@@ -697,6 +716,7 @@ def _start_playback(samples, rate):
     try:
         sd.stop()
         time.sleep(0.25)
+        _reset_portaudio()
         sd.play(samples, rate)
         return True
     except sd.PortAudioError:
@@ -909,6 +929,7 @@ def _watch_for_barge_in(stop):
     except Exception:
         return
 
+    _mic_streams[0] += 1
     waited = 0.0
 
     try:
@@ -994,6 +1015,7 @@ def _watch_for_barge_in(stop):
     except Exception:
         return
     finally:
+        _mic_streams[0] -= 1
         try:
             stream.stop()
             stream.close()
