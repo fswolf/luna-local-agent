@@ -803,6 +803,15 @@ _afplay = [None, False]      # [running process, switched over]
 AFPLAY = shutil.which("afplay") if sys.platform == "darwin" else None
 
 
+def _use_afplay():
+    """afplay from the start on a Mac (tts.player "auto"), or once PortAudio
+    has refused; never when tts.player is "portaudio"."""
+    player = str(getattr(config, "TTS_PLAYER", "auto")).lower()
+    if not AFPLAY or player == "portaudio":
+        return False
+    return player == "afplay" or sys.platform == "darwin" or _afplay[1]
+
+
 def _play_afplay(samples, rate):
     """Play one chunk with afplay; False if interrupted."""
     fd, path = tempfile.mkstemp(prefix="luna-", suffix=".wav")
@@ -842,7 +851,7 @@ def _play(samples, rate):
     """Play one chunk; return False if HOME interrupted it."""
     _lip_sync(samples, rate)
 
-    if AFPLAY and _afplay[1]:
+    if _use_afplay():
         return _play_afplay(samples, rate)
 
     if not _start_playback(samples, rate):

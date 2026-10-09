@@ -222,6 +222,10 @@ TTS_VOLUME = float(_tts_env("VOLUME", _tts_cfg.get("volume", 1.0)))
 # sounding like themselves an octave up; moving them together is what
 # reads as a different age of person, which is the point here.
 TTS_PITCH = float(_tts_env("PITCH", _tts_cfg.get("pitch", 0.0)))
+# How her voice reaches the speakers: "auto" is PortAudio everywhere except
+# macOS, where it's afplay (PortAudio loses Bluetooth headphones there);
+# "afplay" or "portaudio" forces one.
+TTS_PLAYER = str(_tts_cfg.get("player", "auto")).lower()
 VOICE = _tts_env("VOICE", setting("voice", "af_bella"))
 
 # Shown on the UI's TTS line.
@@ -779,6 +783,7 @@ SETTINGS = {
 
     "tts.speed":                  ("TTS_SPEED",                    True),
     "tts.volume":                 ("TTS_VOLUME",                   True),
+    "tts.player":                 ("TTS_PLAYER",                   True),
     "tts.pitch":                  ("TTS_PITCH",                    True),
     # Live now, where it used to need a restart: speech.py reads
     # config.VOICE per request rather than importing the value, so
