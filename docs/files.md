@@ -134,9 +134,10 @@ so read it.
 "shell": { "enabled": true, "timeout": 60, "max_output_chars": 6000 }
 ```
 
-Stream chat never gets it (not in the chat tool ceiling). A Discord
-turn gets it when `plugins.discord.tools` allows it, but the popup
-still appears on your screen, so from your phone it times out as a no.
+Stream chat never gets it (not in the chat tool ceiling). For Discord
+turns the plugin's `approval` setting decides: ask in the chat (the
+default), run straight through (`auto`), or the desk popup. See the
+Discord section in [Plugins](plugins.md).
 Scheduled jobs only get it if you add `run_command` to `job_tools`.
 `/set shell.enabled false`, or the **Shell** group in the tools pane,
 takes it away.

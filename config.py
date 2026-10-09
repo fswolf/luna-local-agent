@@ -710,6 +710,10 @@ _shell_cfg = setting("shell", {})
 SHELL_ENABLED = bool(_shell_cfg.get("enabled", True))
 SHELL_TIMEOUT = float(_shell_cfg.get("timeout", 60))
 SHELL_MAX_OUTPUT = int(_shell_cfg.get("max_output_chars", 6000))
+# Remote sources whose commands run without the popup - for automation
+# from Discord. Empty by default: opting in is yours, in core config.
+SHELL_AUTO_APPROVE_SOURCES = [str(s).strip().lower() for s in
+                              _shell_cfg.get("auto_approve_sources", []) if str(s).strip()]
 
 _web_search_cfg = setting("web_search", {})
 WEB_SEARCH_ENABLED = _web_search_cfg.get("enabled", True)

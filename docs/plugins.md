@@ -44,6 +44,13 @@ A module with a `NAME` and whichever of these it needs:
 | `available()` / `why_unavailable()` | can it run, and if not why |
 | `start(model)` / `stop()` | `(ok, message)` |
 | `running()` / `status()` | state, and the block `/<name>` prints |
+| `command(text)` | anything else after `/<name>`: `/minecraft goal build a hut` calls `command("goal build a hut")` |
+
+A plugin can also bring an MCP server with it and drop it again:
+`mcpclient.connect_server(name, spec)` starts the server and registers
+its tools while the plugin is on, and `mcpclient.disconnect_server(name)`
+takes them back out of her prompt. That's how the Minecraft tools only
+exist while `/minecraft` is on.
 
 Everything missing gets a sensible default, so a plugin that only needs
 `start()` is four lines. Settings live under `plugins` in `config.json`
@@ -608,35 +615,47 @@ under Discord's 2000-character limit. `/discord` also tells you why
 it's quiet: a rejected token, Message Content Intent switched off, or
 a non-owner it's been ignoring.
 
-#### Writes from Discord
+#### Writes and commands from Discord: approval
 
-**Out of the box, a write from Discord pops the window on screen,**
-the same as one you asked for at the desk, and times out as a no when
-nobody's home. If you want remote writes to go through, opt in, in
-core config rather than in the plugin:
+When a Discord turn wants to write a file or run a command, the
+plugin's `approval` setting decides who says yes:
 
-```json
-"files": { ..., "auto_approve_sources": ["discord"] }
+| Mode | What happens |
+|------|--------------|
+| `discord` (default) | She asks in the same chat: the command or the file change, then **y** / **n** (or tap ✅ / ❌). Only owner replies count. No answer in `approval_timeout` seconds (300) is a no |
+| `auto` | Nobody is asked: it goes straight through. For automation |
+| `desk` | The popup on the desk screen, as if you'd asked at the keyboard. From your phone that times out as a no |
+
+```
+/discord approval auto|discord|desk     switch it (saved)
+/discord                                shows the current mode
 ```
 
-With `discord` in that list, a write or edit from a Discord owner turn
-goes straight through and is logged as `auto_approve_sources, not
-asked`. Security is then the owner's to assume: **whoever holds the
-bot token, or an owner's Discord account, can write any file under ~
-outside the guarded places below.** These guards stay on either way:
+```json
+"discord": { ..., "approval": "discord", "approval_timeout": 300 }
+```
+
+Every command a Discord turn runs is also shown at the desk as
+`discord ran: ...`, and every approval, denial and timeout goes in the
+log.
+
+On `auto`, security is the owner's to assume: **whoever holds the bot
+token, or an owner's Discord account, has a shell on this machine,** and
+so does a web page she reads during a Discord turn if it talks her into
+running something. These guards stay on in every mode:
 
 | Guard | Why |
 |-------|-----|
 | Only `owner_ids` are obeyed; everyone else is ignored and logged | Without it, anyone who can type in the channel has remote access |
-| The deny list (`.ssh`, `.gnupg`, `.env`, `~/.config/ai-voice`, keys, shell startup files) | Refused before approval is even considered, so no remote turn reads or writes them, including the bot token |
-| Luna's own folder, `~/.config`, `~/.local` still pop the window | A write there is code that runs later (her config and source, autostart, systemd units, `~/.local/bin`), and a web page she reads mid-turn can steer a write as well as you can |
+| The Permissions switches in the tools pane | Execute *off* takes commands away from Discord too; read and write *off* the same |
+| The file deny list (`.ssh`, `.gnupg`, `.env`, `~/.config/ai-voice`, keys, shell startup files) | `read_file` and `write_file` refuse them, including the bot token. A *command* isn't bound by it |
+| File writes to Luna's own folder, `~/.config`, `~/.local` always ask, even on `auto` | A write there is code that runs later |
 
-The flag is thread-local and set only by `assistant.respond_remote`,
-so a reminder or a job firing while a Discord turn is running still
-follows its own rules. Her one shell tool, `run_command`, asks on
-this screen for every command, so from Discord it times out as a no
-unless someone's at the desk; "remote access" means her other tools
-(files, web, desktop, memory, reminders, jobs).
+The approver is attached to the Discord turn's own thread by
+`assistant.respond_remote`, so a reminder or a job firing at the same
+time still follows its own rules. `files.auto_approve_sources` and
+`shell.auto_approve_sources` still exist for other remote sources, but
+Discord doesn't need them any more.
 
 ### What came across from CR0N, and what didn't
 
@@ -648,8 +667,8 @@ unless someone's at the desk; "remote access" means her other tools
 | Turn budget and stuck-loop detection | not yet. Jobs run under the normal tool-round limit |
 | `!kill` mid-run | `!stop` in Discord |
 | Helper delegation to other PCs | not planned |
-| Remote access over Discord, no approval | `plugins/discord.py`; skipping the popup is opt-in via `files.auto_approve_sources` |
-| `bash` with regex auto-approve | **no.** `run_command` asks for every command, with no auto-approve |
+| Remote access over Discord, no approval | `plugins/discord.py`: `approval` auto, or ask in the chat, or ask at the desk |
+| `bash` with regex auto-approve | `run_command`: asks at the desk or in Discord, or runs straight through on `approval: auto` (no regex) |
 | `pass` password store | **no** |
 | Write-guard on its own code by path string | **no.** Paths are resolved, and the app folder is excluded outright |
 

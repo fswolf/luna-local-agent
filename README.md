@@ -30,14 +30,14 @@ Powered by:
 - 👀 Optional vision: she can look at your screen
 - ⏰ Reminders and real alarms: she wakes you up, and nags until you're up
 - 📝 Writes and edits your files: every change shown in a permission popup first
-- 🖥️ Runs shell commands: each one shown and approved before it runs
+- 🖥️ Runs shell commands and opens apps: each one shown and approved first, with read/write/execute permissions you set in the tools pane
 - 🌙 Moods: she runs warmer or flatter with the clock and the session
 - 📚 Long-term memory: optional permanent SQLite store with its own browser editor
 - 💭 Her reasoning, kept: the model's scratchpad per turn, with a browser viewer for reading it back
 - 🔬 See inside her: token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
-- 🎭 An animated portrait: Live2D or VRM, lip-synced to her voice, blinking, glancing, ears twitching ([details](docs/portrait.md#portrait))
+- 🎭 An animated portrait: Live2D or VRM, lip-synced to her voice, blinking, looking at your terminal, visibly thinking ([details](docs/portrait.md#portrait))
 - 🌱 Learns from herself: daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure, and picking up where you left off ([details](docs/learning.md#learning-from-herself))
-- 🔌 Plugins: stream chat, Discord, scheduled jobs, and she can play Minecraft
+- 🔌 Plugins: stream chat, Discord (approvals answered right in the chat), scheduled jobs, and she can play Minecraft
 - 🧩 MCP servers: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
 - 💬 Full-screen terminal interface
 

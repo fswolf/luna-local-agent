@@ -314,7 +314,7 @@ def status():
     """For /mcp."""
     if not getattr(config, "MCP_SERVERS", None):
         return ('No MCP servers configured. Add them to config.json under "mcp": {"servers": {...}} '
-                "- see the README's MCP section.")
+                "- see docs/tools.md, MCP servers.")
     if not available():
         return "MCP servers are configured but the SDK isn't installed: pip install mcp"
     lines = []

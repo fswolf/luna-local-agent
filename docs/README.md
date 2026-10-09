@@ -36,10 +36,13 @@ Everything the README only touches on, one subject per page.
 - Reminders in plain language, with repeats, retry and DST-safe schedules
 - Alarms that ring, nag and snooze until you're actually up
 - Writes and edits your files, with every change approved on screen first
+- Runs shell commands and opens apps, each one approved first
+- Read, write and execute permissions you set from the tools pane: allow, ask or off
 - A tools pane showing what each schema costs, and switches to turn them off
 - Web search the model reaches for on its own
 - Scheduled jobs she runs on her own, approved once, with writes fenced to folders you pick
-- Remote access from Discord for the owner only, off until you switch it on
+- Remote access from Discord for the owner only, off until you switch it on, with approvals answered right in the chat
+- Plays Minecraft: joins your world, works towards a goal, asks when something's unclear
 - Searchable archive of every conversation, which pruning never deletes
 - Her reasoning kept per turn, with token confidence, review flags and a browser viewer
 - Adaptive thinking: a deeper second look only when an answer comes out shaky
@@ -49,6 +52,8 @@ Everything the README only touches on, one subject per page.
 - Says when she's unsure, measured from her own token probabilities
 - Checks every script she writes for syntax errors, without running it
 - Researches properly: reads the top pages in one go and keeps the parts that answer the question
+- Follow-through: when she says she'll check something and stops, she's made to actually do it
+- An animated portrait that looks at your terminal and visibly thinks
 - Rotating debug log that records decisions, not just errors
 - Every setting changeable from the terminal and saved, most without a restart
 - Diagnostics for the things that fail quietly: tool selection, prompt size, scrolling
