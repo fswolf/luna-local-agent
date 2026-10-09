@@ -234,6 +234,24 @@ the thought log already measures:
    as a normal tool turn with the usual approvals, then gives the
    corrected answer.
 
+**Voting instead (the default, `mode: "vote"`).** Step 2 can be a vote
+in place of one deeper look. On a shaky reply the same question is asked
+`votes` (2) more times, silently, at the normal budget, and the answers
+are compared. Two answers count as the same when their specifics match
+(numbers, names) or, without specifics, when they say the same thing.
+"The capital is Sydney" and "The capital is Canberra" share nearly every
+word and still disagree.
+
+| What the vote finds | What happens |
+|---|---|
+| Her first reply is in the majority | it stands: *held, 2 of 3 answers agree* |
+| Two or more of the new answers agree with each other, not with her | she corrects herself with the majority answer |
+| Nobody agrees with anybody | the first stands, and calibration says she wasn't sure |
+| Most of the new answers reach for a tool | she says *"Hang on, let me check."* and does it |
+
+It costs two quick extra answers, only on shaky turns. `/set
+adaptive.mode rethink` goes back to the single deeper second look.
+
 **Follow-through.** Separate from the second look, and on any server:
 when a reply ends with a step she announced ("let me read the file and
 fix it~") but she called no tool, the turn doesn't end there. She's
@@ -263,7 +281,9 @@ directly: when she was unsure, did more thinking actually help?
     "rethink_below": 0.75,
     "min_gain": 0.05,
     "speak_corrections": true,
-    "follow_through": true
+    "follow_through": true,
+    "mode": "vote",
+    "votes": 2
 }
 ```
 
@@ -271,6 +291,50 @@ All of it can be changed live with `/set adaptive.<name>`, and
 **adaptive thinking** is a toggle under *Thoughts* in the settings pane.
 `speak_corrections: false` still takes the second look and records it,
 but never says anything, which suits measuring before trusting it.
+
+## The grounding check
+
+Calibration catches guesses she was unsure of token by token. This one
+catches the guesses she was sure of. After each of your turns, every
+checkable specific in her reply is looked for in what she actually had
+in front of her:
+
+- **The specifics:** numbers with units, prices, percentages, versions,
+  years, times, links, domains and file paths. Plain words and names
+  aren't checked; they're too loose to match. Code she wrote in a
+  ```` ``` ```` block isn't either, because an invented path in a script
+  isn't a claim.
+- **What counts as a source:** the system prompt (memory, the situation
+  block, projects), what you said in this conversation, and every tool
+  result of the turn. Her own earlier replies don't count: a guess
+  repeated isn't a source.
+- **A reply that already hedges** ("I think", "probably", "about 3 GB")
+  is left alone. That's the behaviour this is trying to get.
+
+A specific that appears in none of them is **ungrounded**:
+
+| `grounding.mode` | What happens |
+|---|---|
+| `flag` | the thought log gets an **ungrounded** flag naming the details, and her next prompt tells her they weren't sourced, so a "you sure?" gets an honest answer |
+| `hedge` (default) | all that, plus a short line after the reply (*"I haven't checked those details, though, so take them with a grain of salt."*) when a strong specific was unsourced: a path, link, version, price, percentage or measurement. Bare numbers are only flagged, never said |
+| `check` | all that, and on a turn with tools she's sent straight back to verify them with a tool or say she isn't sure |
+
+Her tool instructions also gained a rule: a specific she didn't get from
+a tool, memory or you gets checked, or said with "I think". The check is
+there for when she forgets.
+
+```json
+"grounding": {
+    "enabled": true,
+    "mode": "hedge",
+    "hedge_line": "I haven't checked those details, though, so take them with a grain of salt."
+}
+```
+
+**grounding check** is a toggle under *Thoughts* in the settings pane;
+`/set grounding.mode check` (or `flag`) changes how strict it is. It
+runs on any server, not just llama-server, and only on your own turns.
+The **flagged** filter in the thought viewer shows the turns it caught.
 
 ## Testing her introspection: injected thoughts
 

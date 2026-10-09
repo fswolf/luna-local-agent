@@ -166,7 +166,8 @@ def set_enabled(on):
 # ---------------------------------------------------------------------------
 def record(user_text, rounds, answer, source="typed", tools=(),
            seconds=0.0, mood=("", ""), results=(), known_tools=(),
-           agent="", model="", prompt_hash="", checks=None, tokens=()):
+           agent="", model="", prompt_hash="", checks=None, tokens=(),
+           extra_flags=()):
     """One turn. `rounds` is a list of {"text": ..., "called": [...]} in
     the order the model ran, from llm._record_thoughts. Nothing is
     stored for a turn with no reasoning in it.
@@ -210,6 +211,10 @@ def record(user_text, rounds, answer, source="typed", tools=(),
             and (checks is None or "overconfident" in checks)):
         flags.append(f"overconfident: sounded sure at {shape['conf']:.0%} "
                      "measured confidence, and didn't say so")
+
+    # Found by the caller rather than here, because they need what she had
+    # in front of her (grounding.py): "ungrounded: stated 2.5 GB ...".
+    flags.extend(str(f) for f in extra_flags or ())
 
     def write(conn):
         cursor = conn.execute(
@@ -646,7 +651,7 @@ _WROTE = re.compile(r"^(?:Wrote|Replaced|Edited) (.+?) \(\d+ lines?")
 # own account of itself and not always a faithful one.
 CHECKS = ("promised a tool", "guessed", "date math", "leaked", "tool failed",
           "no answer", "cut off", "broke character", "low confidence",
-          "overconfident", "broken code", "denied")
+          "overconfident", "broken code", "denied", "ungrounded")
 
 
 def review(reasoning, answer, called, results=(), known_tools=(),

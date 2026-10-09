@@ -54,6 +54,9 @@ Slash commands:
 | `/log` | Tail the debug log without leaving the app |
 | `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |
+| `/skills` | Recipes she's saved: `/skills show`, `forget`, `restore <n>` |
+| `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>` |
+| `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder) |
 | `/voice` | List voices, or switch: blends too |
 | `/context` | What every turn sends, in tokens, against the model's context length |
 | `/mouse` | Wheel scrolling vs. being able to select text |

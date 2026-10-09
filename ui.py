@@ -727,6 +727,7 @@ _FEATURES = (
 _THOUGHT_FEATURES = (
     ("reasoning log", "THOUGHTS_ENABLED", "thoughts.enabled", "/thoughts to read"),
     ("adaptive thinking", "ADAPTIVE_ENABLED", "adaptive.enabled", "llama-server only"),
+    ("grounding check", "GROUNDING_ENABLED", "grounding.enabled", "flags unsourced specifics"),
 )
 
 
@@ -738,6 +739,9 @@ _SELF_FEATURES = (
     ("fact cleanup", "SELF_TIDY_FACTS", "self.tidy_facts", "sqlite memory"),
     ("calibration", "SELF_CALIBRATION", "self.calibration", "says when unsure"),
     ("startup greeting", "SELF_GREET", "self.greet", "after a break"),
+    ("skill recipes", "SELF_SKILLS", "self.skills", "/skills"),
+    ("ongoing projects", "SELF_PROJECTS", "self.projects", "/projects"),
+    ("situation block", "SITUATION_ENABLED", "situation.enabled", "/situation"),
 )
 
 
@@ -1481,6 +1485,9 @@ _HELP_SECTIONS = [
         ("/reflect", "dream pass now: lessons, session notes, fact cleanup"),
         ("/lessons", "what she's learned - /lessons forget|restore <n>"),
         ("/episodes", "her notes on past conversations - /episodes forget <n>"),
+        ("/skills", "recipes she's saved - /skills show|forget|restore <n>"),
+        ("/projects", "ongoing work - /projects show|done|pause|resume|drop <n>"),
+        ("/situation", "the live lines she sees each turn (window, music, load...)"),
         "the Learning group in the tools pane switches each part.",
     ]),
     ("Tools", [

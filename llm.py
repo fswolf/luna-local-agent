@@ -70,7 +70,7 @@ _calibration_note = {"text": ""}
 # Whether the turn in flight is Ryan's own (True) or came from stream
 # chat. The self tools refuse on a chat turn even if a model names them
 # without being offered them, and they read this to know.
-turn = {"private": True, "lessons": []}
+turn = {"private": True, "lessons": [], "skills": []}
 
 
 def build_self_prompt(query=""):
@@ -113,6 +113,27 @@ def build_self_prompt(query=""):
     except Exception:
         logbook.exception("llm", "self prompt failed")
 
+    try:
+        import projects
+
+        ongoing = projects.prompt_block(query)
+
+        if ongoing:
+            blocks.append(ongoing)
+    except Exception:
+        logbook.exception("llm", "projects prompt failed")
+
+    try:
+        import skills
+
+        recipes, ids = skills.prompt_block(query)
+        turn["skills"] = ids
+
+        if recipes:
+            blocks.append(recipes)
+    except Exception:
+        logbook.exception("llm", "skills prompt failed")
+
     if _calibration_note["text"]:
         blocks.append(_calibration_note["text"])
 
@@ -127,6 +148,12 @@ _SELF_NUDGE = """- Asked how you're doing, how today has gone, what you've learn
   you need the exact words.
 - Corrected on how you did something (not on a fact about them) ->
   note_lesson, one line you'll follow from now on.
+- Just finished a job that took several steps and it worked, or told to
+  remember how you did something -> save_skill, the steps as a recipe.
+- Starting work that will outlast this conversation ("we're fixing X")
+  -> start_project. Working on one -> update_project after each step
+  (tried / found / next); project_notes before suggesting something, so
+  you don't repeat what failed.
 """
 
 
@@ -154,6 +181,10 @@ and the user finds out later that it didn't.
   for a quick fact; research when it needs real reading (how, why,
   comparisons, what an article says). Never invent an answer
   you would have needed to look up.
+- A specific you didn't get from a tool, your memory or the user - a
+  number, size, price, version, date, path or link: check it with a
+  tool, or say "I think" / "if I remember right". Stated flatly, it
+  reads as checked.
 - Checking or doing something on the machine - a service, logs, a
   port, running a script you wrote -> run_command. The user approves
   each command, so say what it's for and keep it to one job.
@@ -183,12 +214,22 @@ def build_system_prompt(query="", timing="", private=True):
     # has to derive a date. It used to get a bare ISO timestamp and the
     # instruction to work out elapsed time from other ISO timestamps -
     # arithmetic a 9B model fails quietly and confidently.
+    situation_block = ""
+
+    if private:
+        try:
+            import situation
+
+            situation_block = situation.block()
+        except Exception:
+            logbook.exception("llm", "situation block failed")
+
     return f"""
 You are {AGENT_NAME}.
 
 Right now:
 {timeutil.describe_now()}
-
+{situation_block}
 Never calculate a date or a duration yourself - call get_datetime or
 time_until instead.
 {timing}
@@ -1477,6 +1518,243 @@ def _calibrate(answer, second, remember, on_text, on_sentence):
     return f"{answer} {line}"
 
 
+# ---------------------------------------------------------------------------
+# Self-consistency: on a shaky reply, ask again and go with the majority
+# ---------------------------------------------------------------------------
+_KEY_TERM = re.compile(r"\d+(?:[.,:]\d+)*|(?<![.!?]\s)(?<!^)\b[A-Z][a-zA-Z]{2,}\b")
+
+
+def _key_terms(text):
+    """The parts of an answer that make it *this* answer: numbers, and
+    capitalised names that don't just start a sentence."""
+    return {m.group(0).lower().replace(",", "") for m in _KEY_TERM.finditer(str(text or "").strip())}
+
+
+def _agrees(a, b):
+    """Same answer, for voting. The specifics decide when both have some:
+    "The capital is Sydney" and "The capital is Canberra" share almost
+    every word and still disagree, while "Canberra." and "It's Canberra,
+    the capital of Australia" agree. Without specifics, overall likeness."""
+    ka, kb = _key_terms(a), _key_terms(b)
+
+    if ka and kb:
+        return bool(ka & kb) and (ka <= kb or kb <= ka)
+
+    return _same_answer(a, b)
+
+def _vote(payload, base_messages, answer, on_text, on_sentence):
+    """Like _rethink, but instead of one deeper look it asks the same
+    question `adaptive.votes` more times at the normal thinking budget and
+    compares the answers. Whatever most of them agree on wins:
+
+      * the first reply is in the majority -> it stands ("held, 3 of 3")
+      * two or more later answers agree with each other and not with the
+        first -> she corrects herself with the majority answer
+      * nobody agrees with anybody -> the first stands, and calibration
+        says she wasn't sure
+      * most of the new answers reach for a tool -> she goes and checks
+
+    Returns the same shape _rethink does, so ask() treats them alike."""
+    import thoughtlog
+
+    first = {"thinking": _last_raw.get("thinking") or [],
+             "tokens": _last_raw.get("tokens") or [],
+             "exchanges": [], "called": set()}
+    shape = thoughtlog.confidence(first["tokens"])
+    conf = shape["conf"]
+
+    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shape["shaky"]):
+        return None
+
+    reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shape["shaky"]
+              else f"only {conf:.0%} sure")
+    n = max(1, min(4, int(getattr(config, "ADAPTIVE_VOTES", 2))))
+
+    try:
+        import ui
+
+        ui.set_status("Double-checking...")
+    except Exception:
+        pass
+
+    livefeed.emit("rethink", step="start", reason=f"{reason} - asking {n} more times", conf=conf)
+    logbook.info("llm", "voting - %s, %d more answers", reason, n)
+
+    sample = {k: v for k, v in payload.items() if k != "tool_choice"}
+    sample["messages"] = list(base_messages)
+
+    if getattr(config, "LLM_BACKEND", "") == "llama":
+        sample["reasoning_budget_tokens"] = int(getattr(config, "ADAPTIVE_FIRST_BUDGET", 1024))
+
+    votes = []
+
+    for _ in range(n):
+        _last_raw.update(thinking=[], tokens=[], exchanges=[], called=set())
+        quiet = _Narrator()
+
+        try:
+            reply = _chat_completion(sample, quiet)
+        except Exception as e:
+            logbook.warn("llm", "vote sample failed: %s", e)
+            continue
+
+        text = _strip_leading_timestamps(quiet.finish())
+        shape_n = thoughtlog.confidence(_last_raw.get("tokens") or [])
+        votes.append({
+            "text": text,
+            "tool": bool((reply or {}).get("tool_calls") or _TOOL_MARKUP.search(text or "")),
+            "conf": shape_n["conf"],
+            "run": {"thinking": _last_raw.get("thinking") or [],
+                    "tokens": _last_raw.get("tokens") or [], "exchanges": [], "called": set()},
+        })
+
+    _last_raw.update(first)
+
+    if not votes:
+        livefeed.emit("rethink", step="done", outcome="the extra answers failed - kept the first")
+        return None
+
+    tool_votes = sum(v["tool"] for v in votes)
+
+    if tool_votes * 2 > len(votes) and payload.get("tools"):
+        outcome = f"{tool_votes} of {len(votes)} new answers wanted to check with a tool - doing that"
+        _log_tool_call("vote", f"{reason} → {outcome}")
+        livefeed.emit("rethink", step="done", outcome=outcome)
+        return {"wants_tools": True, "corrected": False, "answer": "", "said": "",
+                "conf": conf, "conf2": None, "outcome": outcome}
+
+    pool = [{"text": answer, "conf": conf, "run": first, "first": True}]
+    pool += [dict(v, first=False) for v in votes if v["text"].strip() and not v["tool"]]
+
+    if len(pool) == 1:
+        outcome = ("the extra answers reached for a tool she wasn't offered - kept the first"
+                   if tool_votes else "the extra answers came back empty - kept the first")
+        _log_tool_call("vote", f"{reason} → {outcome}")
+        livefeed.emit("rethink", step="done", outcome=outcome)
+        return None
+
+    # How many of the others each answer agrees with.
+    for a in pool:
+        a["agree"] = sum(1 for b in pool if b is not a and _agrees(a["text"], b["text"]))
+
+    total = len(pool)
+    best = max(pool, key=lambda a: (a["agree"], a["first"], a["conf"] or 0))
+    first_agree = pool[0]["agree"]
+    corrected = False
+    said = ""
+
+    if best["first"] or first_agree >= best["agree"]:
+        backing = next((a for a in pool[1:] if _agrees(answer, a["text"])), None)
+        outcome = (f"held - {first_agree + 1} of {total} answers agree" if first_agree
+                   else f"no agreement across {total} answers - kept the first")
+        shown = backing or (pool[1] if total > 1 else pool[0])
+        second_run, second_text = shown["run"], shown["text"]
+        conf2 = (backing or {}).get("conf")
+    elif best["agree"] >= 1:
+        conf2 = best["conf"]
+        second_run, second_text = best["run"], best["text"]
+
+        if config.ADAPTIVE_SPEAK_CORRECTIONS:
+            corrected = True
+            said = f"{config.ADAPTIVE_PREFIX} {best['text']}".strip()
+            speaker = _Narrator(on_text, on_sentence)
+            speaker.feed("\n\n" + said + " ")
+            speaker.finish()
+            outcome = f"corrected herself - {best['agree'] + 1} of {total} answers agree on another reply"
+        else:
+            outcome = (f"would have corrected ({best['agree'] + 1} of {total} agree) - "
+                       "speak_corrections is off")
+    else:
+        conf2 = None
+        shown = pool[1] if total > 1 else pool[0]
+        second_run, second_text = shown["run"], shown["text"]
+        outcome = f"no agreement across {total} answers - kept the first"
+
+    _log_tool_call("vote", f"{reason} → {outcome}")
+    livefeed.emit("rethink", step="done", outcome=outcome, conf=conf2)
+
+    return {"first": first, "second": second_run, "answer": second_text, "said": said,
+            "corrected": corrected, "conf": conf, "conf2": conf2, "outcome": outcome}
+
+
+# ---------------------------------------------------------------------------
+# Grounding: specifics she stated with nothing behind them (grounding.py)
+# ---------------------------------------------------------------------------
+def _evidence(payload):
+    """What she had in front of her this turn: the system prompt, every
+    user message, every tool result. Her own earlier replies don't count -
+    a guess repeated isn't a source."""
+    out = []
+
+    for m in payload.get("messages") or ():
+        if m.get("role") not in ("system", "user", "tool"):
+            continue
+
+        content = m.get("content")
+
+        if isinstance(content, list):
+            content = " ".join(str(p.get("text", "")) for p in content if isinstance(p, dict))
+
+        out.append(str(content or ""))
+
+    out += [str(x.get("result", "")) for x in _last_raw.get("exchanges") or []]
+    return out
+
+
+def _ground(answer, first_answer, second, payload, base_messages, model, on_text, on_sentence,
+            already_hedged=False):
+    """(answer, first_answer, extra_flags, checked) after the grounding
+    check - `checked` when it sent her back to verify with a tool."""
+    try:
+        import grounding
+
+        loose, strong = grounding.check(answer, _evidence(payload))
+    except Exception:
+        logbook.exception("llm", "grounding check failed")
+        return answer, first_answer, [], False
+
+    if not loose:
+        return answer, first_answer, [], False
+
+    flags = [grounding.flag(loose)]
+    note = grounding.note(loose)
+    _calibration_note["text"] = (_calibration_note["text"] + "\n" + note).strip()
+    mode = grounding.mode()
+    corrected = bool(second and second.get("corrected"))
+    logbook.info("llm", "ungrounded: %s", ", ".join(v for _k, v in loose[:6]))
+
+    if mode == "check" and payload.get("tools") and not _last_raw.get("exchanges"):
+        shown = ", ".join(v for _k, v in loose[:4])
+        _log_tool_call("grounding", f"unsourced {shown} - checking")
+        livefeed.emit("rethink", step="done", outcome=f"grounding: checking {shown}")
+        answer = _follow_through(
+            payload, base_messages, answer, model, on_text, on_sentence,
+            "Actually, let me double-check that.",
+            f"(Not from Ryan - your own grounding check: you stated {shown} but nothing "
+            "you were given says so. Check them with your tools now, or say plainly that "
+            "you're not sure. Don't repeat them as fact.)")
+
+        if not corrected:
+            first_answer = answer
+
+        return answer, first_answer, flags, True
+
+    if mode in ("hedge", "check") and strong and not already_hedged and not corrected:
+        line = grounding.hedge_line()
+
+        if line:
+            speaker = _Narrator(on_text, on_sentence)
+            speaker.feed(" " + line + " ")
+            speaker.finish()
+            _log_tool_call("grounding", f"unsourced {', '.join(v for _k, v in loose[:4])} - "
+                                        f"added \"{line}\"")
+            livefeed.emit("rethink", step="done", outcome="grounding: hedged unsourced details")
+            answer = f"{answer} {line}"
+            first_answer = answer
+
+    return answer, first_answer, flags, False
+
+
 _window_cache = {"at": 0.0, "n": 0}
 
 
@@ -1490,7 +1768,7 @@ def _window():
 
 
 def _record_thoughts(user_text, answer, started, source=None, model="",
-                     prompt_hash=""):
+                     prompt_hash="", extra_flags=()):
     """This turn's scratchpad, to the thought log.
 
     Only called for turns that will be remembered, so stream chat and
@@ -1528,6 +1806,7 @@ def _record_thoughts(user_text, answer, started, source=None, model="",
             agent=AGENT_NAME,
             model=model,
             prompt_hash=prompt_hash,
+            extra_flags=extra_flags,
         )
         livefeed.emit("flags", flags=flags or [])
     except Exception:
@@ -1564,10 +1843,18 @@ def prompt_budget(text="hello"):
     tools_block = build_tools_prompt()
     self_block = build_self_prompt(text)
 
+    try:
+        import situation
+
+        situation_block = situation.block()
+    except Exception:
+        situation_block = ""
+
     parts = {
-        "persona + rules": lmstudio.estimate_tokens(system) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block) - lmstudio.estimate_tokens(self_block),
+        "persona + rules": lmstudio.estimate_tokens(system) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block) - lmstudio.estimate_tokens(self_block) - lmstudio.estimate_tokens(situation_block),
+        "situation (live)": lmstudio.estimate_tokens(situation_block),
         "memory (facts + preferences)": lmstudio.estimate_tokens(memory_block),
-        "lessons + past sessions": lmstudio.estimate_tokens(self_block),
+        "lessons, recipes, projects + past sessions": lmstudio.estimate_tokens(self_block),
         "tools nudge": lmstudio.estimate_tokens(tools_block),
         "tool schemas": lmstudio.estimate_tokens(specs),
         "tool example": lmstudio.estimate_tokens(demo),
@@ -1617,6 +1904,7 @@ def ask(text, model, on_text=None, on_sentence=None,
     past = [] if context is not None else history.get_messages_full()
     turn["private"] = context is None
     turn["lessons"] = []
+    turn["skills"] = []
     messages = [{
         "role": "system",
         # A turn from stream chat never sees her notes on Ryan's
@@ -1779,7 +2067,8 @@ def ask(text, model, on_text=None, on_sentence=None,
     if (adaptive and not kept_promise and not _last_raw.get("exchanges")
             and _last_raw.get("tokens")
             and answer != "...sorry, I got tangled up there. Say that again?"):
-        second = _rethink(payload, base_messages, answer, on_text, on_sentence)
+        how = _vote if str(getattr(config, "ADAPTIVE_MODE", "vote")).lower() == "vote" else _rethink
+        second = how(payload, base_messages, answer, on_text, on_sentence)
 
     if second and second.get("wants_tools"):
         # She answered without looking, and the second look says she
@@ -1800,12 +2089,24 @@ def ask(text, model, on_text=None, on_sentence=None,
         # transcript keep the correction, not a tidier version of events.
         answer = f"{first_answer}\n\n{second['said']}"
 
+    pre_calibration = answer
     spoken = _calibrate(answer, second, remember and source is None, on_text, on_sentence)
 
     if spoken != answer and not (second and second["corrected"]):
         first_answer = spoken  # the log records what she said, hedge included
 
     answer = spoken
+    extra_flags = []
+
+    if remember and source is None and turn["private"]:
+        answer, first_answer, extra_flags, checked = _ground(
+            answer, first_answer, second, payload, base_messages, model, on_text, on_sentence,
+            already_hedged=spoken != pre_calibration)
+
+        if checked:
+            # The grounding check ran a tool turn: its calls are what the
+            # thought log should show, not the vote's empty exchanges.
+            second = None
 
     if remember:
         # The hash is of the system prompt as sent, so a changed persona,
@@ -1819,7 +2120,8 @@ def ask(text, model, on_text=None, on_sentence=None,
             _last_raw.update(second["first"])
 
         _record_thoughts(text, first_answer, started, source,
-                         model=payload.get("model", ""), prompt_hash=prompt_hash)
+                         model=payload.get("model", ""), prompt_hash=prompt_hash,
+                         extra_flags=extra_flags)
 
         # The second look as a row of its own, beside the first, so the
         # two can be compared - same question, more thinking.
@@ -1851,6 +2153,11 @@ def ask(text, model, on_text=None, on_sentence=None,
             import notebook
 
             notebook.credit(turn["lessons"])
+
+        if remember and turn["skills"]:
+            import skills
+
+            skills.credit(turn["skills"])
     except Exception:
         pass
 

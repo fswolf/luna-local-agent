@@ -1173,6 +1173,106 @@ def handle_input(text):
             + ["/lessons forget <n> hides one; /lessons retired lists hidden ones."]))
         return
 
+    if text == "/skills" or text.startswith("/skills "):
+        import skills
+
+        words = text.split()
+
+        if len(words) == 3 and words[1] in ("forget", "restore", "show") and words[2].isdigit():
+            n = int(words[2])
+
+            if words[1] == "show":
+                found = skills.get(n)
+                ui.add_message("system", skills.render(found) + (
+                    f"\n  tools: {', '.join(found['tools'])}" if found and found["tools"] else "")
+                    + (f"\n  used {found['uses']}x" if found and found["uses"] else "")
+                    if found else f"No recipe {n}.")
+                return
+
+            ok = (skills.retire if words[1] == "forget" else skills.restore)(n)
+            done = "restored" if words[1] == "restore" else "hidden from her"
+            ui.add_message("system", f"Recipe {n} {done}." if ok else f"No recipe {n} to {words[1]}.")
+            return
+
+        retired = len(words) > 1 and words[1] == "retired"
+        rows = skills.skills(retired=retired)
+
+        if not rows:
+            ui.add_message("system", "No retired recipes." if retired else
+                           "No recipes yet - she saves one with save_skill after a multi-step "
+                           "job goes right, or when you tell her to remember how she did it.")
+            return
+
+        ui.add_message("system", "\n".join(
+            [f"{'Retired recipes' if retired else 'Recipes'} ({len(rows)}):"]
+            + [f"{s['id']:>3}. {s['name']}  - when: {s['when']}  ({len(s['steps'])} steps"
+               + (f", used {s['uses']}x" if s["uses"] else "") + ")" for s in rows]
+            + ["/skills show <n> prints one; /skills forget <n> hides it; /skills retired lists hidden ones."]))
+        return
+
+    if text == "/projects" or text.startswith("/projects "):
+        import projects
+
+        words = text.split()
+        verbs = ("show", "done", "pause", "resume", "drop", "restore")
+
+        if len(words) == 3 and words[1] in verbs and words[2].lstrip("#").isdigit():
+            n = int(words[2].lstrip("#"))
+            p = projects.get(n)
+
+            if not p:
+                ui.add_message("system", f"No project {n}.")
+                return
+
+            if words[1] == "show":
+                log = projects.entries(n)
+                ui.add_message("system", "\n".join(
+                    [projects.render(p, recent=0)]
+                    + [f"  {e['at'][:16].replace('T', ' ')}  {e['kind']}: {e['text']}" for e in log[-30:]]
+                    + ([] if log else ["  (nothing recorded yet)"])))
+                return
+
+            if words[1] == "drop":
+                ok, done = projects.retire(n), "dropped (/projects restore brings it back)"
+            elif words[1] == "restore":
+                ok, done = projects.restore(n), "restored"
+            else:
+                status = {"done": "done", "pause": "paused", "resume": "active"}[words[1]]
+                ok, done = projects.set_status(n, status), f"marked {status}"
+
+            ui.add_message("system", f"Project {n} {done}." if ok else f"Project {n} unchanged.")
+            return
+
+        if len(words) > 1 and words[1] == "dropped":
+            rows = projects.projects(retired=True)
+        else:
+            rows = projects.projects()
+
+        if not rows:
+            ui.add_message("system", "No projects yet - she starts one with start_project when "
+                           "you begin something that spans sessions, or ask her to track one.")
+            return
+
+        order = {"active": 0, "paused": 1, "done": 2}
+        rows.sort(key=lambda p: p["updated"], reverse=True)       # newest first...
+        rows.sort(key=lambda p: order.get(p["status"], 3))         # ...within active, paused, done
+        ui.add_message("system", "\n".join(
+            [f"Projects ({len(rows)}):"]
+            + [f"{p['id']:>3}. [{p['status']}] {p['title']}"
+               + (f"  - next: {p['next']}" if p["next"] and p["status"] != "done" else "") for p in rows]
+            + ["/projects show <n> for the log; done|pause|resume|drop <n> to steer."]))
+        return
+
+    if text == "/situation":
+        import situation
+
+        found = situation.lines(fresh=True)
+        state_word = "on" if situation.enabled() else "off (/set situation.enabled true)"
+        ui.add_message("system", "\n".join(
+            [f"Situation block: {state_word}. What she'd see this turn:"]
+            + ([f"  - {line}" for line in found] or ["  (nothing to report)"])))
+        return
+
     if text == "/episodes" or text.startswith("/episodes "):
         import notebook
 
