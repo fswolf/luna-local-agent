@@ -439,7 +439,11 @@ def voice(state, gpu_choice):
     run([kpy, "-m", "pip", "install", "--disable-pip-version-check", "-q", "--upgrade", "pip"], quiet=True)
 
     gpu = gpu_choice
-    device = {"cuda": "cuda", "rocm": "cuda", "mps": "mps"}.get(gpu, "cpu")
+    # Kokoro on Apple's GPU (mps) is unreliable: PyTorch's istft on MPS
+    # fails on some sentences ("window overlap add min: 0"), so the server
+    # answers 500 and she goes quiet. The voice is small; an Apple-silicon
+    # CPU runs it faster than real time. GPUs elsewhere are fine.
+    device = {"cuda": "cuda", "rocm": "cuda", "mps": "cpu"}.get(gpu, "cpu")
     have_torch = subprocess.run([kpy, "-c", "import torch"], stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL).returncode == 0
     if not have_torch:
