@@ -1554,6 +1554,11 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
         says she wasn't sure
       * most of the new answers reach for a tool -> she goes and checks
 
+    A correction needs a fact to correct: only when her answer and the
+    majority's both carry specifics (numbers, names) that differ does she
+    speak again. Playful replies that merely differ in wording are left
+    alone, so the vote changes what she knows, never how she sounds.
+
     Returns the same shape _rethink does, so ask() treats them alike."""
     import thoughtlog
 
@@ -1650,6 +1655,13 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
         shown = backing or (pool[1] if total > 1 else pool[0])
         second_run, second_text = shown["run"], shown["text"]
         conf2 = (backing or {}).get("conf")
+    elif best["agree"] >= 1 and not (_key_terms(answer) and _key_terms(best["text"])):
+        # The others agree with each other, but nobody said anything
+        # checkable - a number, a name. That's three wordings of the same
+        # mood, not a corrected fact, and her first wording stands.
+        conf2 = best["conf"]
+        second_run, second_text = best["run"], best["text"]
+        outcome = f"held - the other {total - 1} answers only differ in wording"
     elif best["agree"] >= 1:
         conf2 = best["conf"]
         second_run, second_text = best["run"], best["text"]
