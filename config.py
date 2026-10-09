@@ -473,6 +473,12 @@ MOOD_AFFECTION = bool(_mood_cfg.get("affection", True))
 _files_cfg = setting("files", {})
 FILES_ENABLED = bool(_files_cfg.get("enabled", True))
 FILES_APPROVAL_TIMEOUT = float(_files_cfg.get("approval_timeout", 120))
+# The Permissions group in the tools pane. read: allow | ask | off,
+# write: ask | allow | off. "allow" for write is the saved form of the
+# popup's A: her own folder, ~/.config and ~/.local still ask, and the
+# deny list still refuses. Execute is shell.enabled (commands always ask).
+FILES_READ = str(_files_cfg.get("read", "allow")).lower()
+FILES_WRITE = str(_files_cfg.get("write", "ask")).lower()
 # Folders a scheduled job (plugins/cron.py) may write in without the
 # popup. Yours to set - a plugin can't widen it. The deny list still
 # wins, ~ itself and this app's own folder are ignored, and every other
@@ -788,6 +794,8 @@ SETTINGS = {
     "mood.affection":             ("MOOD_AFFECTION",               True),
 
     "files.enabled":              ("FILES_ENABLED",                True),
+    "files.read":                 ("FILES_READ",                   True),
+    "files.write":                ("FILES_WRITE",                  True),
     "files.approval_timeout":     ("FILES_APPROVAL_TIMEOUT",       True),
 
     # Shared by every chat plugin. A plugin's own keys - channels,

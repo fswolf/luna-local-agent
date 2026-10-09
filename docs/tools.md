@@ -43,7 +43,8 @@ day a request stops fitting the context window, which is a bad day to
 find out.
 
 **Tab twice** opens the tools pane: every tool, what it costs, and
-space to switch it on or off. The total at the top moves as you go, so
+space to switch it on or off. At the top, **Permissions** sets read,
+write and execute (allow, ask or off; see [Files](files.md)). The total at the top moves as you go, so
 you can see what you're buying back.
 
 <img width="1210" alt="The tools pane: every tool grouped, its token cost, and on/off switches" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-tools.png" />

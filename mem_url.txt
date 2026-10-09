@@ -1,0 +1,1 @@
+It’s http://127.0.0.1:8792/memory/, and it works while Luna is running. You can also type /memory in Luna to open it in your browser.

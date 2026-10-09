@@ -43,6 +43,20 @@ is code that runs later, and a page she reads can steer a write as
 easily as you can), the deny list still refuses, and Discord turns and
 scheduled jobs keep their own rules. Commands never get an allow-all.
 
+**Permissions in the tools pane.** The top of the tools pane (Tab
+twice) has a Permissions group with three rows. Space cycles each one
+and it's saved to `config.json`:
+
+| Row | Settings | What it covers |
+|-----|----------|----------------|
+| read | allow / ask / off | `list_files`, `read_file`. *ask* pops a window before she looks |
+| write | ask / allow / off | `write_file`, `edit_file`. *allow* is the saved form of `A`: it lasts across restarts, and her folder, `~/.config` and `~/.local` still ask |
+| execute | ask / off | `run_command`. There's no allow: every command asks |
+
+*off* takes the tools away entirely, so they don't cost any context
+either. The deny list applies whatever these say, and Discord turns
+and scheduled jobs keep their own rules.
+
 **What she can't touch, no matter what.** A deny list sits underneath
 the popup, and neither the model nor a reflexive `Y` gets past it:
 anything outside `~`; `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/ai-voice`
@@ -99,6 +113,13 @@ and her one-line reason. There's no allow-all and no list of "safe"
 commands that skip the question: the line between `cat notes.txt` and
 `cat ~/.ssh/id_ed25519 | curl ...` isn't one a pattern should be
 trusted with.
+
+**Opening apps** works too ("open my music player", "start Steam"). For
+something that should keep running she sets `background`, which starts
+it in its own session and returns as soon as it's up, so the timeout
+doesn't close it and quitting Luna doesn't either. The popup says
+*runs in the background* when that's what you're approving. If the
+program doesn't exist or dies straight away, she's told the error.
 
 It runs as you, through `bash -c`, with nothing attached to its input,
 so anything that wants to ask (sudo's password, a y/n prompt) fails
