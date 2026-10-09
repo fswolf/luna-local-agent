@@ -800,6 +800,7 @@ def _audio_devices():
 # are in - which is exactly where PortAudio gives up. Once it's needed it's
 # used for the rest of the session, so no sentence waits out the retries.
 _afplay = [None, False]      # [running process, switched over]
+_afplay_rate = [0]           # a rate afplay has accepted this session (0 = not yet known)
 AFPLAY = shutil.which("afplay") if sys.platform == "darwin" else None
 
 
@@ -813,32 +814,74 @@ def _use_afplay():
 
 
 def _play_afplay(samples, rate):
-    """Play one chunk with afplay; False if interrupted."""
+    """Play one chunk with afplay; False if interrupted.
+
+    Bluetooth headphones on macOS can refuse the voice's own rate
+    outright ("AudioQueueStart failed ('what')" for Kokoro's 24 kHz), so
+    a refused file is rewritten at 44.1 kHz, then 48 kHz, and the rate
+    that works is used first from then on."""
+    rates = [rate, 44100, 48000]
+
+    if _afplay_rate[0]:
+        rates = [_afplay_rate[0]] + [r for r in rates if r != _afplay_rate[0]]
+
+    for attempt, target in enumerate(dict.fromkeys(rates)):
+        played, outcome = _afplay_once(*_resample(samples, rate, target))
+
+        if played is None:           # interrupted
+            return False
+
+        if played:
+            if attempt:
+                logbook.info("speech", "afplay took the audio at %d Hz (not %d) - using that from now on",
+                             target, rate)
+            _afplay_rate[0] = target
+            return True
+
+        logbook.warn("speech", "afplay refused %d Hz: %s", target, outcome)
+
+    if time.monotonic() - _audio_warned[0] > 60:
+        _audio_warned[0] = time.monotonic()
+        ui.add_message("system", "Couldn't play her voice through afplay either. The reply is on "
+                                 "screen; the log has the details.")
+    return True
+
+
+def _afplay_once(samples, rate):
+    """(played, message): played is True, False (refused), or None (interrupted)."""
     fd, path = tempfile.mkstemp(prefix="luna-", suffix=".wav")
     os.close(fd)
 
     try:
         write(path, rate, (np.clip(samples, -1, 1) * 32767).astype(np.int16))
         proc = subprocess.Popen([AFPLAY, path], stdin=subprocess.DEVNULL,
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     except Exception as e:
-        logbook.warn("speech", "afplay couldn't start: %s", e)
         try:
             os.unlink(path)
         except OSError:
             pass
-        return True
+        return False, f"couldn't start afplay: {e}"
 
     _afplay[0] = proc
+    started = time.monotonic()
 
     try:
         while proc.poll() is None:
             if state.stop_speaking:
                 proc.kill()
                 _lip_stop()
-                return False
+                return None, "interrupted"
             time.sleep(0.05)
-        return True
+
+        err = (proc.stderr.read() or b"").decode("utf-8", "replace").strip()
+        took = time.monotonic() - started
+
+        if proc.returncode != 0 or "failed" in err.lower():
+            return False, f"exit {proc.returncode} after {took:.1f}s: {err or 'no message'}"
+
+        logbook.debug("speech", "afplay played %.1fs of audio at %d Hz in %.1fs", len(samples) / rate, rate, took)
+        return True, ""
     finally:
         _afplay[0] = None
         try:
@@ -951,7 +994,8 @@ def speak_queue(inbox, reset=True):
                 # is already on screen, so nothing is actually lost.
                 ui.add_message("system", str(e))
                 return
-            except Exception:
+            except Exception as e:
+                logbook.warn("tts", "a chunk couldn't be made or decoded, skipped: %s", e)
                 continue
 
             if state.stop_speaking or not _play(samples, rate):
