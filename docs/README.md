@@ -16,7 +16,7 @@ Everything the README only touches on, one subject per page.
 - [Moods](moods.md)
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
-- [Plugins](plugins.md): stream chat, Minecraft, Zork, Home Assistant, cron jobs, Discord
+- [Plugins](plugins.md): stream chat, Minecraft, Zork, Vibe City, Home Assistant, cron jobs, Discord
 - [Development](development.md): project structure, extras
 
 ---
@@ -61,6 +61,7 @@ Everything the README only touches on, one subject per page.
 - Remote access from Discord for the owner only, off until you switch it on, with approvals answered right in the chat
 - Plays Minecraft: joins your world, works towards a goal, asks when something's unclear
 - Plays Zork I, the classic text adventure, on her own or with you calling the moves
+- Plays mayor in Vibe City, building the town in your open game window while you watch
 - Runs your [smart home](home.md) through a Home Assistant on your own network, locks and garage doors always asking first
 - Searchable archive of every conversation, which pruning never deletes
 - Her reasoning kept per turn, with token confidence, review flags and a browser viewer

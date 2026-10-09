@@ -50,6 +50,7 @@ ai-voice/
 │   ├── minecraft.py  # she joins your world and plays towards a goal
 │   ├── home.py       # your smart home, through a local Home Assistant
 │   ├── zork.py       # she plays Zork I - /zork, saves in agent/zork/
+│   ├── vibecity.py   # she plays mayor in an open Vibe City window (its AI Player server)
 │   └── discord.py    # remote access for the owner over Discord
 ├── ptt.py
 ├── reminders.py

@@ -435,6 +435,7 @@ rest of the time. `speak: true` reads each step aloud.
 ```
 /zork on        load the game          /zork play      she plays on her own
 /zork pause     stop playing           /zork off       put it away (saved)
+/zork watch     a terminal window showing the game as she plays
 /zork           score and what she's been up to
 ```
 
@@ -474,7 +475,7 @@ tools only exist while it's on.
 ### Playing on her own
 
 `/zork play` hands her the controls. Whenever nobody has spoken for
-`step_seconds` she takes a turn of two to five commands and says in one
+`step_seconds` (30) she takes a turn of two to five commands and says in one
 line where she is and what's next. Like Minecraft, a turn is a job:
 fresh context, nothing in your history, only her Zork tools, and the
 last dozen of her one-liners as her memory of the game. Talking to her
@@ -486,19 +487,88 @@ and picks the autosave back up next time, so a playthrough survives
 restarts. Saves live in `agent/zork/` (gitignored), and dfrotz can't
 read or write anywhere else.
 
+### Watching her play
+
+`/zork watch` opens a terminal window that shows the game the way a
+player sees it: her commands in purple after a `>`, the game's replies
+underneath, live. It follows `agent/zork/transcript.txt`, which the
+server writes as she plays, so closing the window doesn't touch the
+game. It finds kitty, foot, alacritty, wezterm, konsole, gnome-terminal
+or xterm (Terminal.app or kitty on a Mac); `"terminal"` picks one, and
+`"watch": true` opens it every time you `/zork play`. Without Luna:
+
+```bash
+python games/zork/watch.py agent/zork
+```
+
 ```json
 "zork": {
     "enabled": false,
-    "step_seconds": 15,
+    "step_seconds": 30,
     "max_steps": 80,
     "speak": false,
-    "interpreter": ""
+    "interpreter": "",
+    "watch": false,
+    "terminal": ""
 }
 ```
 
 Zork is hard for a small model: it has to map the place in its head,
 remember what it's carrying, and survive the dark. The live view and
 the thought viewer show every command she types, which is half the fun.
+
+## Vibe City
+
+```
+/vibecity on            connect to the open game     /vibecity play     she builds on her own
+/vibecity goal <what>   what to aim for              /vibecity pause    stop taking turns
+/vibecity off           disconnect                   /vibecity          goal and recent moves
+```
+
+She plays mayor in **Vibe City**, the isometric city builder, inside
+the game window you already have open. The game has its own MCP server
+built in: switch on **Settings > AI Player** and it listens on
+`http://127.0.0.1:47823/mcp`. This plugin connects to that (it doesn't
+start the game), so everything she does happens on your screen the way
+a player would do it: the tool is picked from the menu, the cursor
+moves, the road is dragged out, the camera pans to where she's working,
+and her `say` lines show up as the mayor's thoughts.
+
+Her tools come from the game: `how_to_play`, `get_city`, `list_tools`,
+`get_map`, `get_tile`, `build`, `set_tax`, `set_speed`, `look_at`,
+`open_window`, `close_windows` and `say`, plus `play_vibe_city` so she
+can start herself ("go build me a town"). `screenshot` hands her a
+picture of the game window, attached to the next message the same way
+`look_at_screen` is, so a vision model sees the town (a text-only model
+is told it can't; add `screenshot` to `skip_tools` for one). While the
+plugin is on they work in conversation too: "how's the city doing?", "put the tax at 9".
+
+`/vibecity play` hands her the mayor's office. Whenever nobody has
+spoken for `step_seconds` she takes a turn: checks the city, makes two
+to six moves towards the goal, narrates with `say`, and reports in one
+line. Her first turn each session reads `how_to_play` and `list_tools`.
+Turns are jobs like Minecraft's: fresh context, nothing in your
+history, only her city tools, her last dozen one-liners as memory.
+
+**You can take over any time** by clicking or pressing a key in the
+game. A build that answers "the player took over" pauses her until you
+`/vibecity play` again. Builds only cost in-game money, so nothing asks
+for approval, and the game's server only accepts connections from this
+machine.
+
+```json
+"vibecity": {
+    "enabled": false,
+    "url": "http://127.0.0.1:47823/mcp",
+    "step_seconds": 30,
+    "max_steps": 60,
+    "speak": false,
+    "goal": "",
+    "skip_tools": []
+}
+```
+
+`goal` empty means "grow the town without running out of money".
 
 ## Your home: Home Assistant
 
