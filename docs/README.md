@@ -20,6 +20,22 @@ Everything the README only touches on, one subject per page.
 
 ---
 
+## See inside her
+
+<img width="1210" alt="The live view: her reply streaming in, each word shaded by how sure she was" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/live-view.png" />
+
+[Live](reasoning.md#watching-live-monitor) at 127.0.0.1:8792: the turn as it happens, newest on top, coloured by confidence.
+
+<img width="1210" alt="The thought viewer: every turn down the left, the selected one in full on the right" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/thought-viewer.png" />
+
+[Thoughts](reasoning.md) at 127.0.0.1:8792/thoughts/: every turn kept, searchable, filterable by flags.
+
+<img width="1210" alt="The memory editor: the facts she keeps about you" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
+
+[Memory](memory.md) at 127.0.0.1:8792/memory/: the facts she keeps about you, to edit, retire or delete.
+
+---
+
 ## Everything she does
 
 - Local speech recognition with Silero voice detection
