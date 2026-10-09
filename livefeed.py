@@ -450,6 +450,7 @@ PAGE = r"""<!DOCTYPE html>
   .bar i.warn { background: var(--amber); } .bar i.full { background: var(--danger); }
   main { max-width: 980px; margin: 0 auto; padding: 18px 18px 80px; }
   .turn { margin: 0 0 26px; }
+  .turn.old { border-top: 1px solid var(--line); padding-top: 14px; }
   .turn.old { opacity: .55; }
   .lab { color: var(--dim); font-size: 11px; text-transform: uppercase;
          letter-spacing: .08em; margin: 12px 0 4px; display: flex; gap: 8px; align-items: center; }
@@ -501,19 +502,29 @@ function el(tag, cls, text) {
   if (text != null) e.textContent = text;
   return e;
 }
-function nearBottom() { return innerHeight + scrollY >= document.body.scrollHeight - 120; }
-function follow(was) { if (was) scrollTo(0, document.body.scrollHeight); }
+// Newest turn on top. While it streams, keep its end in view - unless
+// you've scrolled off it to read something else.
+function nearBottom() {
+  if (!turn) return true;
+  const r = turn.getBoundingClientRect();
+  return r.top < innerHeight && r.bottom <= innerHeight + 120;
+}
+function follow(was) {
+  if (!was || !turn) return;
+  const r = turn.getBoundingClientRect();
+  if (r.bottom > innerHeight) scrollBy(0, r.bottom - innerHeight + 24);
+}
 
 function newTurn(ev) {
   $("empty")?.remove();
   document.querySelectorAll(".turn").forEach(t => t.classList.add("old"));
   const old = document.querySelectorAll(".turn");
-  for (let i = 0; i < old.length - 4; i++) old[i].remove();   // keep the page light
+  for (let i = 4; i < old.length; i++) old[i].remove();   // keep the page light
   turn = el("div", "turn");
   const l = el("div", "lab", "you said");
   if (ev.source && ev.source !== "typed") l.appendChild(el("span", "src", ev.source));
   turn.append(l, el("div", "you", ev.text || ""));
-  $("feed").appendChild(turn);
+  $("feed").prepend(turn);
   box = null; boxKind = "";
 }
 function stream(kind) {
@@ -548,7 +559,7 @@ const handlers = {
     bar.className = f > 0.9 ? "full" : f > 0.7 ? "warn" : "";
     $("ctxtext").textContent = ev.window ? `~${(ev.used / 1000).toFixed(1)}k / ${(ev.window / 1000).toFixed(0)}k` : `~${(ev.used / 1000).toFixed(1)}k`;
   },
-  turn(ev) { const w = nearBottom(); newTurn(ev); follow(w); },
+  turn(ev) { newTurn(ev); scrollTo(0, 0); },
   round(ev) { if (ev.n > 0) box = null; },
   tok(ev) { const w = nearBottom(); stream(ev.p).appendChild(tokSpan(ev.s, ev.c)); follow(w); },
   tool(ev) {

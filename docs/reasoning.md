@@ -390,7 +390,11 @@ llama-server. It sits in its own *Self* group in the tools pane.
 ```
 
 opens `http://127.0.0.1:8792`, served by Luna herself while she runs.
-It shows the turn as it happens: the stage (listening, transcribing,
+
+<img width="1380" alt="The live view: her reply streaming in, coloured by confidence, with the second look and the review flags underneath" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/live-view.png" />
+
+It shows the turn as it happens, newest turn on top with the last few
+dimmed underneath: the stage (listening, transcribing,
 thinking, speaking), what you said, her thinking streaming in, each tool
 call with its arguments and the start of its result, then her reply.
 On llama-server every piece is coloured by confidence as it arrives.
