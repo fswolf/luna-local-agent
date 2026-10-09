@@ -22,6 +22,8 @@ agent/embeddings.db-wal
 agent/embeddings.db-shm
 # Lessons and session notes (notebook.py) - about your conversations.
 agent/notebook.db
+agent/skills.db
+agent/projects.db
 agent/notebook.db-wal
 agent/notebook.db-shm
 # Scheduled jobs (plugins/cron.py) - yours, like reminders.

@@ -1,6 +1,6 @@
 # Learning from herself
 
-Five things that make her a little better each day. None of them
+Eight things that make her a little better each day, and more aware of what's around her. None of them
 changes the model's weights. They change what she gets told about
 herself, and all of it is written down where you can read it, edit it,
 or switch it off.
@@ -12,9 +12,13 @@ or switch it off.
 | Fact cleanup | merges facts that say the same thing twice, retires the losing side of a contradiction | `/facts retired` |
 | Calibration | says so out loud when her token probabilities say she didn't know | the thought log's **overconfident** flag |
 | Startup greeting | after a break, opens by picking up where you left off | the first thing she says |
+| Recipes (skill library) | saves the steps of a multi-step job that went right, and brings them back for similar jobs | `/skills` |
+| Ongoing projects | work that spans sessions: the goal, what was tried and found, the next step | `/projects` |
+| Situation block | a few live lines each turn: your focused window, music, machine load, running plugins, next reminder | `/situation` |
 
 Each one switches on and off in the tools pane's **Learning** group, or
-with `/set self.<name> false`.
+with `/set self.<name> false` (`/set situation.enabled false` for the
+situation block).
 
 ## Lessons: the dream pass
 
@@ -97,6 +101,116 @@ said. For anything else she has **`recall_episodes`**: she searches her
 own notes when you ask "what did we decide about the waybar last
 month?", and uses `search_history` when she needs the exact words.
 
+## Recipes: the skill library
+
+A small model is bad at planning a multi-step job from nothing and good
+at following a worked example. So when she finishes something that took
+several steps and it went right, the steps get saved as a named recipe,
+and the next time something similar comes up the recipe rides along in
+her prompt:
+
+```
+Recipes you've saved for jobs like this:
+#3 check whether the voice server is up (use when: is kokoro running)
+  1. run_command: curl -s http://127.0.0.1:8899/health
+  2. if nothing answers, run_command: tail -20 ~/.cache/ai-voice/kokoro.log
+  3. tell him which it is, and the last error line if there is one
+```
+
+- **How one gets saved:** she calls `save_skill` after a job works, or
+  when you say "remember how you did that". **You approve it on screen**,
+  like a lesson, because it goes into her prompt. If the turn read a web
+  page, a file or the screen, the popup says so, so you can check the
+  steps say what you'd want.
+- **What it remembers:** a name, when to use it, 2 to 12 steps, and
+  which tools that turn used. Saving the same job again updates the
+  recipe instead of adding a second one.
+- **When it comes back:** only when it clearly fits what you just said
+  (by meaning when the embedding server is up, otherwise at least two
+  shared words), at most `skills_in_prompt` (2) at a time. A recipe is a
+  paragraph, so an unrelated one isn't worth its tokens.
+- **Your controls:** `/skills` lists them, `/skills show <n>` prints one,
+  `/skills forget <n>` hides it, `/skills retired` and
+  `/skills restore <n>` bring one back. Nothing is deleted, and over
+  `max_skills` (60) the least-used is retired.
+
+Stored in `agent/skills.db` (gitignored). Following a recipe still goes
+through every normal approval: a step that runs a command still asks.
+
+## Ongoing projects
+
+Her conversation notes say what happened; a project says where a piece
+of work stands. "We're fixing the Mac audio" becomes a project with a
+goal, a running log of what was tried and found, and the next step, and
+it rides in her prompt every session until it's done:
+
+```
+Ongoing projects with the user:
+#1 fix the Mac audio (goal: Luna's voice plays on NZ_Kitty's Mac) - last touched 2 hours ago
+   tried: afplay with resampling
+   found: the headphones refuse 24 kHz; 44.1 kHz plays
+   next: ask if she heard Luna after pulling
+Paused projects: #2 build a Zork primer
+```
+
+| Tool | |
+|---|---|
+| `start_project` | starts tracking work that will outlast this conversation |
+| `update_project` | records what was **tried**, what was **found**, a **decision**, the **next** step, or a new status (`paused`, `done`) |
+| `project_notes` | the whole log, so she doesn't suggest what already failed |
+
+- **Which ones she sees:** every active project while there are up to
+  `projects_in_prompt` (3); past that, the ones matching what you said
+  plus the most recently touched. Paused ones get a single line, so she
+  knows they exist. Done ones drop out.
+- **No popup.** A project is a work log built from your own conversation,
+  not an instruction to her, so it doesn't ask first. You can see and
+  steer every one of them.
+- **Your controls:** `/projects` lists them, `/projects show <n>` prints
+  the log, `/projects done|pause|resume <n>` changes the status,
+  `/projects drop <n>` hides one and `/projects restore <n>` brings it
+  back. `/projects dropped` lists the hidden ones.
+
+Stored in `agent/projects.db` (gitignored). At most six active at once.
+
+## The situation block
+
+A few live lines at the top of every one of your turns, so she isn't
+starting blind:
+
+```
+Around you right now:
+- Focused window: firefox - Hyprland Wiki
+- Playing: Daft Punk - Veridis Quo (playing)
+- Machine: CPU 18%, RAM 21.4 of 31.2 GB free, GPU 34% busy (VRAM 11.2/16 GB)
+- Running: minecraft, zork
+- Next reminder: tomorrow 09:00 - take the bins out (in 18 hours)
+```
+
+| Line | Comes from |
+|---|---|
+| Focused window | the focused window on Hyprland, skipping her own terminal (the front app on a Mac) |
+| Playing | `playerctl`, when something is playing |
+| Machine | CPU load, free RAM, and the GPU's load and VRAM |
+| Running | plugins that are on |
+| Next reminder | the soonest one, and how many more |
+
+Anything that can't be read is left out, never guessed. It's cached for
+a few seconds and costs roughly 60 to 100 tokens. Stream chat never gets
+it: your window title and your music are your business.
+
+**Toggle:** the **situation block** switch in the tools pane's Learning
+group, or `/set situation.enabled false`. Each line can be switched off
+in `config.json`. `/situation` shows exactly what she'd see right now.
+
+```json
+"situation": {
+    "enabled": true,
+    "window": true, "music": true, "machine": true,
+    "plugins": true, "reminders": true
+}
+```
+
 ## Fact cleanup
 
 The same pass compares remembered facts that look alike (by meaning
@@ -172,10 +286,13 @@ wasn't given is refused before it runs.
     "tidy_facts": true,
     "calibration": true, "hedge_below": 0.6,
     "hedge_line": "I'm not totally sure about that one, though.",
-    "greet": true
+    "greet": true,
+    "skills": true, "skills_in_prompt": 2, "max_skills": 60,
+    "projects": true, "projects_in_prompt": 3
 }
 ```
 
 Everything is stored in `agent/notebook.db` (gitignored). `/context`
-shows what lessons and past sessions cost, under **lessons + past
-sessions**. Usually it's a hundred or two tokens.
+shows what lessons, recipes and past sessions cost, under **lessons,
+recipes, projects + past sessions**, and the situation block under **situation
+(live)**. Usually it's a hundred or two tokens.

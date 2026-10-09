@@ -198,7 +198,7 @@ def _ask_in_discord(kind, title, body, guarded):
         shown = shown[:1500] + "\n..."
 
     what = {"command": "run a command", "write": "change a file", "read": "read a file",
-            "mcp": "use"}.get(kind, kind)
+            "mcp": "use", "skill": "save a recipe"}.get(kind, kind)
     warn = ("\n**This is her own code or a config folder.**" if kind in ("write", "read")
             else "\n**Flagged: it always asks.**") if guarded else ""
     head = f"**Luna wants to {what}**" + ("" if kind == "command" else f"{'' if kind == 'mcp' else ':'} {title}")

@@ -432,3 +432,238 @@ def _reflect_now():
     import reflect
 
     return reflect.reflect_soon(lmstudio.model, show=_show)
+
+
+# ---------------------------------------------------------------------------
+# Skills: recipes for multi-step jobs that went right (skills.py)
+# ---------------------------------------------------------------------------
+_saved_skills = {"n": 0}
+MAX_SKILLS_PER_SESSION = 5
+
+
+def _skills_on():
+    import skills
+
+    return skills.enabled()
+
+
+def _approve_skill(name, when, steps, warn=""):
+    import config
+    import state
+    import ui
+
+    body = [f"name: {name}", f"use when: {when}", ""] + [f"{i}. {s}" for i, s in enumerate(steps, 1)]
+
+    if warn:
+        body += ["", warn]
+
+    approver = getattr(getattr(state, "remote", None), "approver", None)
+
+    if approver is not None:
+        return bool(approver("skill", name, body, bool(warn)))
+
+    if state.turn_source != "typed":
+        try:
+            from speech import speak
+
+            speak("Can I save how I did that? It's on screen.")
+        except Exception:
+            pass
+
+    return ui.ask_approval(
+        title=f"{config.AGENT_NAME} wants to save a recipe",
+        note="it comes back in her prompt when a similar job does - /skills forget <n> undoes it",
+        body=body,
+        timeout=getattr(config, "FILES_APPROVAL_TIMEOUT", 120),
+    )
+
+
+@tool(
+    "save_skill",
+    "Save how you just did a multi-step job as a recipe, so next time you can follow "
+    "it instead of working it out again. Use it when a job took several steps or "
+    "tool calls and it worked, or when the user says to remember how you did "
+    "something. The user approves it on screen. Write the steps as instructions to "
+    "yourself, naming the tools and the exact commands or arguments that worked.",
+    {
+        "name": {"type": "string",
+                 "description": "Short name for the job: 'check if the voice server is up'."},
+        "when": {"type": "string",
+                 "description": "When to use it - what the user would say or need."},
+        "steps": {"type": "array", "items": {"type": "string"},
+                  "description": "The steps in order, one instruction each (2-12)."},
+    },
+    required=("name", "when", "steps"),
+    available=_skills_on,
+    why=lambda: "skills are off (self.skills)",
+)
+def _save_skill(name, when, steps):
+    if not _private():
+        return _NOT_HERE
+
+    import skills
+
+    if _saved_skills["n"] >= MAX_SKILLS_PER_SESSION:
+        return "You've saved enough recipes for one session - the rest can wait."
+
+    problem = skills.check(name, when, steps)
+
+    if problem:
+        return f"Not saved: {problem}."
+
+    clean = skills.clean_steps(steps)
+    name = " ".join(str(name).split())[:skills.MAX_NAME_CHARS]
+    when = " ".join(str(when).split())[:skills.MAX_WHEN_CHARS]
+
+    try:
+        import llm
+
+        called = set(llm._last_raw.get("called") or ())
+    except Exception:
+        called = set()
+
+    outside = called & _OUTSIDE
+    warn = (f"(this turn read outside content: {', '.join(sorted(outside))} - "
+            "check the steps say what you'd want)" if outside else "")
+    same = skills.find_same(name, when)
+
+    if not _approve_skill(name, when, clean, warn):
+        return "He didn't approve it, so it wasn't saved. Don't ask again this turn."
+
+    new = skills.add(name, when, clean, tools=called - {"save_skill"})
+    _saved_skills["n"] += 1
+    verb = "updated" if same else "saved"
+    _show(f"Recipe #{new} {verb}: {name}\n  (/skills show {new} prints it, /skills forget {new} drops it)")
+
+    return f"Recipe #{new} {verb}. It comes back in your prompt when a similar job does."
+
+
+# ---------------------------------------------------------------------------
+# Ongoing projects (projects.py)
+# ---------------------------------------------------------------------------
+MAX_ACTIVE_PROJECTS = 6
+
+
+def _projects_on():
+    import projects
+
+    return projects.enabled()
+
+
+@tool(
+    "start_project",
+    "Start tracking a piece of work you and the user are doing together that will "
+    "outlast this conversation - fixing something, building something, a plan. It "
+    "stays in your prompt every session until it's done. Not for one-off questions.",
+    {
+        "title": {"type": "string", "description": "Short name: 'fix the Mac audio'."},
+        "goal": {"type": "string", "description": "What done looks like, one line."},
+    },
+    required=("title",),
+    available=_projects_on,
+    why=lambda: "projects are off (self.projects)",
+)
+def _start_project(title, goal=""):
+    if not _private():
+        return _NOT_HERE
+
+    import projects
+
+    if len(" ".join(str(title or "").split())) < 4:
+        return "Not started: give it a name, a few words."
+
+    if len(projects.projects("active")) >= MAX_ACTIVE_PROJECTS:
+        return ("There are already enough active projects - finish or pause one with "
+                "update_project first, or ask the user which to drop.")
+
+    pid, new = projects.start(title, goal)
+    _show(f"Project #{pid} {'started' if new else 'picked back up'}: {' '.join(str(title).split())}"
+          f"\n  (/projects show {pid}, /projects drop {pid})")
+
+    return (f"Project #{pid} {'started' if new else 'is active again'}. Record each step with "
+            "update_project as you go.")
+
+
+@tool(
+    "update_project",
+    "Record progress on an ongoing project: what you tried, what you found out, a "
+    "decision, and the next step. Call it after each real step, not just at the end, "
+    "so the next session knows where things stand. status 'done' when it's finished, "
+    "'paused' when it's on hold.",
+    {
+        "project": {"type": "string", "description": "Its number or name."},
+        "tried": {"type": "string", "description": "What was just tried, and the result."},
+        "found": {"type": "string", "description": "Something learned - a cause, a fact."},
+        "decided": {"type": "string", "description": "A decision made."},
+        "next": {"type": "string", "description": "The next step, replacing the old one."},
+        "status": {"type": "string", "enum": ["active", "paused", "done"]},
+    },
+    required=("project",),
+    available=_projects_on,
+    why=lambda: "projects are off (self.projects)",
+)
+def _update_project(project, tried="", found="", decided="", next="", status=""):
+    if not _private():
+        return _NOT_HERE
+
+    import projects
+
+    p = projects.find(project)
+
+    if not p:
+        names = ", ".join(f"#{x['id']} {x['title']}" for x in projects.projects()[:8]) or "none"
+        return f"No project matches '{project}'. Projects: {names}."
+
+    wrote = []
+
+    for kind, text in (("tried", tried), ("found", found), ("decided", decided)):
+        if str(text or "").strip():
+            projects.log(p["id"], kind, text)
+            wrote.append(kind)
+
+    if str(next or "").strip():
+        projects.log(p["id"], "next", next)
+        projects.set_next(p["id"], next)
+        wrote.append("next")
+
+    if status and status != p["status"]:
+        projects.set_status(p["id"], status)
+        wrote.append(status)
+
+        if status == "done":
+            _show(f"Project #{p['id']} done: {p['title']}")
+
+    if not wrote:
+        return "Nothing recorded - give at least one of tried, found, decided, next or status."
+
+    return f"Project #{p['id']} updated ({', '.join(wrote)})."
+
+
+@tool(
+    "project_notes",
+    "The full log of an ongoing project - everything tried and found so far. Use it "
+    "before suggesting something, so you don't repeat what already failed.",
+    {"project": {"type": "string", "description": "Its number or name."}},
+    required=("project",),
+    available=_projects_on,
+    why=lambda: "projects are off (self.projects)",
+)
+def _project_notes(project):
+    if not _private():
+        return _NOT_HERE
+
+    import projects
+
+    p = projects.find(project)
+
+    if not p:
+        return f"No project matches '{project}'."
+
+    log = projects.entries(p["id"])
+    lines = [f"#{p['id']} {p['title']} [{p['status']}]" + (f" - goal: {p['goal']}" if p["goal"] else "")]
+    lines += [f"{e['at'][:16].replace('T', ' ')}  {e['kind']}: {e['text']}" for e in log[-40:]]
+
+    if p["next"] and not (log and log[-1]["kind"] == "next" and log[-1]["text"] == p["next"]):
+        lines.append(f"next: {p['next']}")
+
+    return "\n".join(lines) if log or p["next"] else lines[0] + "\n(nothing recorded yet)"

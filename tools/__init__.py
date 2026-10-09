@@ -128,7 +128,8 @@ _GROUPS = (
     ("Web", ("web_search", "research", "read_page")),
     ("Shell", ("run_command",)),
     ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
-              "reflect_now")),
+              "reflect_now", "save_skill")),
+    ("Projects", ("start_project", "update_project", "project_notes")),
 )
 
 

@@ -27,6 +27,10 @@ ai-voice/
 ├── mood.py
 ├── notebook.py       # her lessons and conversation notes (agent/notebook.db)
 ├── reflect.py        # what she does while idle - session notes, the dream pass, fact cleanup, the greeting
+├── skills.py         # her recipes for multi-step jobs (agent/skills.db)
+├── projects.py       # ongoing projects: goal, log of tried/found, next step (agent/projects.db)
+├── grounding.py      # the grounding check: specifics in a reply that nothing she was given backs up
+├── situation.py      # the live lines at the top of each turn: window, music, load, plugins, next reminder
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── embedmem.py       # recalling facts by meaning, when the embedding server is up
 ├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792 (and /portrait)

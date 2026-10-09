@@ -65,9 +65,13 @@ Everything the README only touches on, one subject per page.
 - Runs your [smart home](home.md) through a Home Assistant on your own network, locks and garage doors always asking first
 - Searchable archive of every conversation, which pruning never deletes
 - Her reasoning kept per turn, with token confidence, review flags and a browser viewer
-- Adaptive thinking: a deeper second look only when an answer comes out shaky
+- Adaptive thinking: when an answer comes out shaky, she asks herself again and goes with what most answers agree on
+- A grounding check: specifics she states with no tool, memory or message behind them get flagged, and said with a hedge
 - Lessons from her own mistakes, written while she's idle and followed from then on
 - Notes on every conversation, and a greeting that picks up where you left off
+- Recipes: the steps of jobs that went right, saved and brought back when a similar job comes up
+- Ongoing projects that carry across sessions: what was tried, what was found, what's next
+- A live situation block each turn: your focused window, music, machine load, what's running
 - Duplicate and contradicting facts merged or retired, never deleted
 - Says when she's unsure, measured from her own token probabilities
 - Checks every script she writes for syntax errors, without running it

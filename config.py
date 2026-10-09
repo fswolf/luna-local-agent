@@ -619,6 +619,18 @@ ADAPTIVE_DEEP_BUDGET = int(_adaptive_cfg.get("deep_budget", -1))
 ADAPTIVE_RETHINK_BELOW = float(_adaptive_cfg.get("rethink_below", 0.75))
 ADAPTIVE_MIN_GAIN = float(_adaptive_cfg.get("min_gain", 0.05))
 ADAPTIVE_SPEAK_CORRECTIONS = bool(_adaptive_cfg.get("speak_corrections", True))
+# "vote": on a shaky reply, ask again `votes` more times and go with what
+# most of the answers agree on. "rethink": one deeper second look.
+ADAPTIVE_MODE = str(_adaptive_cfg.get("mode", "vote")).lower()
+ADAPTIVE_VOTES = int(_adaptive_cfg.get("votes", 2))
+
+# The grounding check (grounding.py): specifics she stated with nothing
+# behind them. mode: "flag", "hedge" (default) or "check".
+_grounding_cfg = setting("grounding", {})
+GROUNDING_ENABLED = bool(_grounding_cfg.get("enabled", True))
+GROUNDING_MODE = str(_grounding_cfg.get("mode", "hedge")).lower()
+GROUNDING_HEDGE_LINE = str(_grounding_cfg.get(
+    "hedge_line", "I haven't checked those details, though, so take them with a grain of salt."))
 # "Let me read the file~" and then nothing: run the step she announced.
 # Any backend, any of your turns that had tools - not just shaky ones.
 FOLLOW_THROUGH = bool(_adaptive_cfg.get("follow_through", True))
@@ -644,6 +656,20 @@ SELF_HEDGE_BELOW = float(_self_cfg.get("hedge_below", 0.6))
 SELF_HEDGE_LINE = str(_self_cfg.get("hedge_line",
                                     "I'm not totally sure about that one, though."))
 SELF_GREET = bool(_self_cfg.get("greet", True))
+# Recipes for multi-step jobs she's done well (skills.py).
+SELF_SKILLS = bool(_self_cfg.get("skills", True))
+SELF_SKILLS_IN_PROMPT = int(_self_cfg.get("skills_in_prompt", 2))
+SELF_MAX_SKILLS = int(_self_cfg.get("max_skills", 60))
+# Ongoing projects (projects.py): work that spans sessions.
+SELF_PROJECTS = bool(_self_cfg.get("projects", True))
+SELF_PROJECTS_IN_PROMPT = int(_self_cfg.get("projects_in_prompt", 3))
+
+# The situation block (situation.py): focused window, music, machine load,
+# running plugins, next reminder - a few live lines in every private turn.
+_situation_cfg = setting("situation", {})
+SITUATION_ENABLED = bool(_situation_cfg.get("enabled", True))
+SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
+                   for k in ("window", "music", "machine", "plugins", "reminders")}
 
 # The portrait window (portrait/, served by the live monitor at
 # /portrait/): a VRM model that blinks, looks around, twitches its ears
@@ -877,6 +903,11 @@ SETTINGS = {
     "adaptive.rethink_below":     ("ADAPTIVE_RETHINK_BELOW",       True),
     "adaptive.min_gain":          ("ADAPTIVE_MIN_GAIN",            True),
     "adaptive.speak_corrections": ("ADAPTIVE_SPEAK_CORRECTIONS",   True),
+    "adaptive.mode":              ("ADAPTIVE_MODE",                True),
+    "adaptive.votes":             ("ADAPTIVE_VOTES",               True),
+    "grounding.enabled":          ("GROUNDING_ENABLED",            True),
+    "grounding.mode":             ("GROUNDING_MODE",               True),
+    "grounding.hedge_line":       ("GROUNDING_HEDGE_LINE",         True),
     "adaptive.follow_through":    ("FOLLOW_THROUGH",               True),
 
     "self.lessons":               ("SELF_LESSONS",                 True),
@@ -891,6 +922,12 @@ SETTINGS = {
     "self.hedge_below":           ("SELF_HEDGE_BELOW",             True),
     "self.hedge_line":            ("SELF_HEDGE_LINE",              True),
     "self.greet":                 ("SELF_GREET",                   True),
+    "self.skills":                ("SELF_SKILLS",                  True),
+    "self.skills_in_prompt":      ("SELF_SKILLS_IN_PROMPT",        True),
+    "self.max_skills":            ("SELF_MAX_SKILLS",              True),
+    "self.projects":              ("SELF_PROJECTS",                True),
+    "self.projects_in_prompt":    ("SELF_PROJECTS_IN_PROMPT",      True),
+    "situation.enabled":          ("SITUATION_ENABLED",            True),
 
     "portrait.model":             ("PORTRAIT_MODEL",               True),
     "portrait.browser":           ("PORTRAIT_BROWSER",             True),
