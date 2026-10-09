@@ -21,6 +21,11 @@ Tools:
     zork_save(slot) / zork_restore(slot)
     zork_restart()
 
+Everything typed and every reply is also appended to transcript.txt in
+the saves folder, so you can watch a game as it's played:
+    python games/zork/watch.py [saves folder]
+(Luna's /zork watch opens that in a terminal window for you.)
+
 The game autosaves every few commands and when the server stops, and
 picks the autosave back up on the next start, so a game survives Luna
 restarting. Saves live in --saves, and dfrotz is restricted to that
@@ -50,6 +55,22 @@ ap.add_argument("--story", default=os.path.join(HERE, "zork1.z3"))
 ap.add_argument("--saves", default=os.path.join(HERE, "saves"))
 ap.add_argument("--interpreter", default="")
 ARGS, _ = ap.parse_known_args()
+
+
+def transcript(text):
+    """Append to the watchable transcript. Never fails the game."""
+    try:
+        path = os.path.join(ARGS.saves, "transcript.txt")
+        if os.path.exists(path) and os.path.getsize(path) > 2_000_000:
+            with open(path, "rb") as f:
+                f.seek(-500_000, 2)
+                tail = f.read()
+            with open(path, "wb") as f:
+                f.write(tail)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(text.rstrip() + "\n\n")
+    except OSError:
+        pass
 
 
 def find_dfrotz():
@@ -94,6 +115,7 @@ class Game:
                 intro = "(Picked up the saved game.)\n" + self._send("look")
 
         self.last = intro
+        transcript("=" * 60 + "\n" + clean(intro))
         return intro
 
     def _pump(self):
@@ -215,6 +237,7 @@ def zork_command(command: str) -> str:
             game._save(AUTOSAVE)
         game.last = reply
 
+    transcript(f"> {command}\n{clean(reply)}")
     hint = ("\n[The game is over or you died. RESTORE goes back to the last save "
             "(zork_restore), RESTART starts again.]" if game.over else "")
     return clean(reply) + hint
@@ -229,7 +252,9 @@ def zork_status() -> str:
         look = clean(game._send("look"))
         inv = clean(game._send("inventory"))
         score = clean(game._send("score"))
-    return f"{look}\n\n{inv}\n\n{score}"
+    text = f"{look}\n\n{inv}\n\n{score}"
+    transcript(f"> look / inventory / score\n{text}")
+    return text
 
 
 @mcp.tool()
@@ -237,6 +262,7 @@ def zork_save(slot: str = "slot1") -> str:
     """Save the game to a named slot before something risky."""
     with game.lock:
         game.ensure()
+        transcript(f"[saved to {_slot(slot)}]")
         return clean(game._save(_slot(slot)))
 
 
@@ -251,7 +277,9 @@ def zork_restore(slot: str = AUTOSAVE) -> str:
             return f"No save called {slot}. Saves: {', '.join(have) or 'none'}"
         reply = game._restore(slot)
         game.over = False
-        return clean(reply + "\n" + game._send("look"))
+        text = clean(reply + "\n" + game._send("look"))
+        transcript(f"[restored {slot}]\n{text}")
+        return text
 
 
 @mcp.tool()

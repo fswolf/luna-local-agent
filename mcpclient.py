@@ -171,6 +171,25 @@ def _approve(server, tool, arguments, reason=""):
                            body=body, timeout=getattr(config, "FILES_APPROVAL_TIMEOUT", 120))
 
 
+def _attach_image(content):
+    """A tool result is text, so a picture can't ride in it. Hand it to
+    the same slot look_at_screen uses: llm.py attaches it to the next
+    message, where a vision model sees it."""
+    try:
+        import vision
+
+        if vision._model_is_blind():
+            return "[a picture came back, but this model can't see images]"
+
+        mime = getattr(content, "mimeType", None) or "image/png"
+        vision._pending = f"data:{mime};base64,{content.data}"
+
+        return ("[a picture came back - it's attached to the next message. Describe only what "
+                "you actually see in it.]")
+    except Exception as e:
+        return f"[a picture came back but couldn't be passed on: {e}]"
+
+
 def _text_of(result):
     parts = []
     for c in getattr(result, "content", None) or []:
@@ -180,6 +199,8 @@ def _text_of(result):
         elif kind == "resource":
             res = getattr(c, "resource", None)
             parts.append(getattr(res, "text", None) or f"[resource {getattr(res, 'uri', '')}]")
+        elif kind == "image" and getattr(c, "data", None):
+            parts.append(_attach_image(c))
         elif kind:
             parts.append(f"[{kind} returned - not shown]")
     structured = getattr(result, "structuredContent", None)

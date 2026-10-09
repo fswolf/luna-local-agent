@@ -2,6 +2,7 @@ import io
 import queue
 import re
 import threading
+import time
 
 import requests
 import sounddevice as sd
@@ -675,10 +676,60 @@ def _lip_stop():
         pass
 
 
+_audio_warned = [0.0]
+
+
+def _start_playback(samples, rate):
+    """sd.play, with two retries before giving up on a chunk.
+
+    macOS's CoreAudio sometimes refuses to open a stream (PortAudio's
+    -9986 "Internal PortAudio error"): right after another stream closed,
+    or at a rate the output device won't take. So: wait a moment and try
+    again, then try at the device's own rate. A voice that can't play is
+    reported once and skipped - the reply is on screen either way - rather
+    than taking the whole speaker thread down with it."""
+    try:
+        sd.play(samples, rate)
+        return True
+    except sd.PortAudioError as e:
+        first = e
+
+    try:
+        sd.stop()
+        time.sleep(0.25)
+        sd.play(samples, rate)
+        return True
+    except sd.PortAudioError:
+        pass
+
+    try:
+        device_rate = int(sd.query_devices(kind="output")["default_samplerate"])
+        if device_rate and device_rate != rate and len(samples) > 1:
+            n = max(1, int(len(samples) * device_rate / rate))
+            resampled = np.interp(np.linspace(0, len(samples) - 1, n),
+                                  np.arange(len(samples)), samples).astype(np.float32)
+            sd.play(resampled, device_rate)
+            logbook.info("speech", "played at the device's %d Hz after: %s", device_rate, first)
+            return True
+    except Exception:
+        pass
+
+    logbook.warn("speech", "couldn't open the speakers: %s", first)
+
+    if time.monotonic() - _audio_warned[0] > 60:
+        _audio_warned[0] = time.monotonic()
+        ui.add_message("system", f"Couldn't play her voice ({first}). The reply is on screen; "
+                                 "check the sound output device.")
+
+    return False
+
+
 def _play(samples, rate):
     """Play one chunk; return False if HOME interrupted it."""
     _lip_sync(samples, rate)
-    sd.play(samples, rate)
+
+    if not _start_playback(samples, rate):
+        return True     # skipped, not interrupted: carry on with the rest
 
     while True:
         stream = sd.get_stream()

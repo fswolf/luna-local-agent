@@ -3,6 +3,7 @@
     /zork on          load the game (her Zork tools appear)
     /zork play        she plays on her own while you're quiet
     /zork pause       stop taking turns (the game stays where it is)
+    /zork watch       open a terminal window showing the game as she plays
     /zork off         put it away (saved, picked up next time)
     /zork             status: score, moves, what she's been up to
 
@@ -30,14 +31,24 @@ games/zork/. dfrotz has to be installed:
 
     "zork": {
         "enabled": false,
-        "step_seconds": 15,     # quiet needed before her next turn
+        "step_seconds": 30,     # quiet needed before her next turn
         "max_steps": 80,        # turns per /zork play, then she pauses
         "speak": false,         # read each turn's line aloud
-        "interpreter": ""       # path to dfrotz if it's somewhere odd
+        "interpreter": "",      # path to dfrotz if it's somewhere odd
+        "watch": false,         # open the watch window with /zork play
+        "terminal": ""          # e.g. "kitty" or "gnome-terminal --"; "" = find one
     }
+
+/zork watch opens a terminal running games/zork/watch.py, which follows
+the game's transcript: her commands and the game's replies, the way a
+player would see the screen. It looks for kitty, foot, alacritty,
+wezterm, konsole, gnome-terminal or xterm (Terminal.app on a Mac);
+"terminal" picks one. Closing it doesn't stop the game.
 """
 import os
+import shlex
 import shutil
+import subprocess
 import sys
 import threading
 
@@ -50,9 +61,11 @@ SUMMARY = "she plays Zork I, the classic text adventure"
 SERVER = "zork"
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_SCRIPT = os.path.join(HERE, "games", "zork", "zork_server.py")
+WATCH_SCRIPT = os.path.join(HERE, "games", "zork", "watch.py")
 SAVES = os.path.join(HERE, "agent", "zork")      # gitignored, like her other state
 
-DEFAULTS = {"step_seconds": 15, "max_steps": 80, "speak": False, "interpreter": ""}
+DEFAULTS = {"step_seconds": 30, "max_steps": 80, "speak": False, "interpreter": "",
+            "watch": False, "terminal": ""}
 
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "playing": False,
           "busy": False, "error": ""}
@@ -172,7 +185,63 @@ def command(text):
     if word in ("pause", "stop playing"):
         return _set_playing(False)
 
-    return "zork: on | off | play | pause"
+    if word == "watch":
+        return _open_watch()
+
+    return "zork: on | off | play | pause | watch"
+
+
+# ---------------------------------------------------------------------------
+# A window to watch her play in
+# ---------------------------------------------------------------------------
+TITLE = "Luna plays Zork"
+
+
+def _terminal_command(inner):
+    """argv that opens a terminal window running `inner`, or None."""
+    chosen = str(settings()["terminal"] or "").strip()
+
+    if chosen:
+        return shlex.split(chosen) + inner
+
+    if sys.platform == "darwin":
+        kitty = shutil.which("kitty") or "/Applications/kitty.app/Contents/MacOS/kitty"
+        if os.path.exists(kitty):
+            return [kitty, "--title", TITLE] + inner
+        script = " ".join(shlex.quote(a) for a in inner)
+        return ["osascript", "-e", f'tell application "Terminal" to do script "{script}"',
+                "-e", 'tell application "Terminal" to activate']
+
+    styles = [("kitty", ["--title", TITLE]), ("foot", ["--title", TITLE]),
+              ("alacritty", ["--title", TITLE, "-e"]), ("wezterm", ["start", "--"]),
+              ("konsole", ["-e"]), ("gnome-terminal", ["--title", TITLE, "--"]),
+              ("xterm", ["-T", TITLE, "-e"])]
+
+    for name, flags in styles:
+        path = shutil.which(name)
+        if path:
+            return [path] + flags + inner
+
+    return None
+
+
+def _open_watch():
+    inner = [sys.executable, WATCH_SCRIPT, SAVES]
+    argv = _terminal_command(inner)
+
+    if argv is None:
+        return ("zork: no terminal found to open - run it yourself:\n  "
+                + " ".join(shlex.quote(a) for a in inner)
+                + '\n  (or set "terminal" under plugins.zork in config.json)')
+
+    try:
+        os.makedirs(SAVES, exist_ok=True)
+        subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError as e:
+        return f"zork: couldn't open a terminal ({e})"
+
+    return f"zork: opened a window to watch in ({os.path.basename(argv[0])})"
 
 
 def _set_playing(on):
@@ -183,7 +252,11 @@ def _set_playing(on):
 
     if on:
         _state["steps"] = 0
-        return "zork: she's playing - she takes a turn whenever you're quiet. /zork pause stops."
+        extra = ""
+        if settings()["watch"]:
+            extra = "\n" + _open_watch()
+        return ("zork: she's playing - she takes a turn whenever you're quiet. "
+                "/zork pause stops, /zork watch shows the game." + extra)
 
     return "zork: paused."
 
