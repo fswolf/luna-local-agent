@@ -43,6 +43,22 @@ Powered by:
 
 Everything runs locally. No cloud APIs required.
 
+## See inside her
+
+Three local pages, served by Luna while she runs:
+
+<img width="1210" alt="The live view: her reply streaming in, each word shaded by how sure she was, with the second look and review flags underneath" src="assets/live-view.png" />
+
+**Live** (127.0.0.1:8792): the turn as it happens, newest on top, every word coloured by confidence, with the second look and the review flags as they land.
+
+<img width="1210" alt="The thought viewer: every turn down the left, the selected one in full on the right with its flags" src="assets/thought-viewer.png" />
+
+**Thoughts** (127.0.0.1:8792/thoughts/): every turn kept, searchable and filterable by flags, tools, rethinks and model.
+
+<img width="1210" alt="The memory editor: add, edit, retire or delete the facts she keeps about you" src="assets/memory-manager.png" />
+
+**Memory** (127.0.0.1:8792/memory/): the facts she keeps about you, to add, edit, retire or delete.
+
 ---
 
 # Quick start

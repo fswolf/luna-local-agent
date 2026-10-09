@@ -85,6 +85,7 @@ ai-voice/
 │
 ├── assets/
 │   ├── alarm.wav
+│   ├── live-view.png
 │   ├── luna-desktop.png
 │   ├── memory-manager.png
 │   ├── thought-viewer.png
