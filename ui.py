@@ -741,6 +741,53 @@ _SELF_FEATURES = (
 )
 
 
+# What she may do to your machine, cycled with space and saved to
+# config.json. Read and write cover the file tools; execute is the shell
+# tool, which always asks when it's on - there's deliberately no
+# "allow" for commands.
+_PERMS = (
+    ("read", "files.read", "FILES_READ", ("allow", "ask", "off"), "list and read files"),
+    ("write", "files.write", "FILES_WRITE", ("ask", "allow", "off"), "create and edit files"),
+    ("execute", "shell.enabled", "SHELL_ENABLED", ("ask", "off"), "run commands - each one asks"),
+)
+
+
+def _perm_value(label):
+    import config
+
+    for name, _path, key, values, _note in _PERMS:
+        if name == label:
+            raw = getattr(config, key, None)
+
+            if isinstance(raw, bool):
+                return "ask" if raw else "off"
+
+            raw = str(raw or "").lower()
+
+            return raw if raw in values else values[0]
+
+    return ""
+
+
+def _perm_group():
+    try:
+        import config  # noqa: F401
+    except Exception:
+        return None
+
+    members = []
+
+    for name, _path, _key, _values, note in _PERMS:
+        value = _perm_value(name)
+
+        if name == "write" and value == "allow":
+            note += " - her folder, ~/.config, ~/.local still ask"
+
+        members.append((name, value != "off", True, note, 0, "perm:" + name))
+
+    return ("Permissions", members, 0, 0)
+
+
 def _self_group():
     try:
         import config
@@ -806,8 +853,9 @@ def _tool_groups():
         groups = []
 
     extra = [g for g in (_feature_group(), _thoughts_group(), _self_group()) if g]
+    perms = _perm_group()
 
-    return groups + extra
+    return ([perms] if perms else []) + groups + extra
 
 
 def _tool_rows():
@@ -903,12 +951,27 @@ def _tool_fragments():
         # these 22 do I not need" into "do I need the desktop ones".
         spent = f"{group_live} tok" if group_live == group_total \
             else f"{group_live} of {group_total} tok"
+
+        if label == "Permissions":
+            spent = "space cycles, saved"
+
         fragments.append(("class:label bold", f" {label}"))
         fragments.append(("class:dim", f"   {spent}\n"))
 
         for name, on, ready, why, cost, setting in members:
             selected = index == _tool_cursor
             pointer = " >" if selected else "  "
+
+            if setting and setting.startswith("perm:"):
+                mark = _perm_value(name)
+                mark_style = {"allow": "class:warn", "ask": "class:ok"}.get(mark, "class:dim")
+                name_style = "class:agent bold" if selected else "class:agent"
+                fragments.append(("class:key" if selected else "class:dim", pointer))
+                fragments.append((mark_style, f" {mark:<5} "))
+                fragments.append((name_style, f"{name:<14}"))
+                fragments.append(("class:dim", f"  {why}\n"))
+                index += 1
+                continue
 
             if not ready:
                 mark, mark_style = "--", "class:dim"
@@ -1004,7 +1067,21 @@ def _tool_toggle():
         return
 
     try:
-        if setting:
+        if setting and setting.startswith("perm:"):
+            import config
+
+            for label, path, _key, values, _note in _PERMS:
+                if label == name:
+                    now = _perm_value(label)
+                    nxt = values[(values.index(now) + 1) % len(values)]
+                    stored = ("true" if nxt != "off" else "false") if path == "shell.enabled" else nxt
+                    config.save_setting(path, stored)
+                    if label == "write" and nxt == "allow":
+                        add_message("system", "Write: allow - file changes won't ask, now or after a "
+                                    "restart. Her own folder, ~/.config and ~/.local still ask; the "
+                                    "deny list still refuses. Space again to go back to off/ask.")
+                    break
+        elif setting:
             import config
 
             config.save_setting(setting, "false" if on else "true")
@@ -1427,6 +1504,8 @@ _HELP_SECTIONS = [
         "diff. Y or Enter allows, N or Esc denies, PgUp/PgDn scrolls.",
         "A allows all file changes until you restart (her own folder,",
         "~/.config and ~/.local still ask) - /allow off ends it early.",
+        "Permissions, at the top of the tools pane, sets read / write /",
+        "execute for good: allow, ask or off, saved to config.json.",
         "No answer in files.approval_timeout seconds is a no.",
         "/set files.enabled false turns the whole thing off.",
     ]),

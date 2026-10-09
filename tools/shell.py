@@ -61,6 +61,36 @@ def _cap(text, limit):
     return f"{text[:head]}\n[... {skipped} characters left out ...]\n{text[-tail:]}"
 
 
+def _start_detached(command, cwd):
+    """An app or a server: its own session, so neither a timeout nor
+    Luna quitting takes it down, and no pipe to wait on. Only a quick
+    failure (bad name, missing binary) is reported back."""
+    try:
+        proc = subprocess.Popen(
+            ["/bin/bash", "-c", command], cwd=cwd, start_new_session=True,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            env=dict(os.environ, HOME=HOME),
+        )
+    except OSError as e:
+        return f"Couldn't start it: {e}"
+
+    try:
+        code = proc.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        proc.stderr.close()
+        return f"$ {command}\n(started in the background - still running after 2s, so it's up)"
+
+    err = (proc.stderr.read() or b"").decode("utf-8", "replace").strip()[-600:]
+
+    if code == 0:
+        # A launcher that hands off and exits (xdg-open, a single-instance
+        # app passing the request to its running copy) - that's success.
+        return f"$ {command}\n(started - the launcher handed it off and exited cleanly)"
+
+    return (f"$ {command}\n(exited straight away with code {code})\n--- output ---\n"
+            f"{err or '(no output)'}\n--- end ---\nIt did not start. Report this; don't guess why.")
+
+
 @tool(
     "run_command",
     "Run a shell command on the user's computer and see its output - "
@@ -68,7 +98,9 @@ def _cap(text, limit):
     "at what's installed. The user approves every command first, so one "
     "clear job per command, and say why you want it. If it's denied, "
     "don't retry it. Nothing interactive: no sudo, no editors, nothing "
-    "that waits for input.",
+    "that waits for input. To open an app (a music player, a browser, a "
+    "game) set background to true, or it gets closed when the command "
+    "times out.",
     {
         "command": {
             "type": "string",
@@ -82,12 +114,17 @@ def _cap(text, limit):
             "type": "string",
             "description": "One short line for the approval popup: what this is for.",
         },
+        "background": {
+            "type": "boolean",
+            "description": "true to start something that keeps running (an app, "
+                           "a server) and not wait for it. Default false.",
+        },
     },
     required=("command",),
     available=available,
     why=why_unavailable,
 )
-def _run_command(command, folder="~", why=""):
+def _run_command(command, folder="~", why="", background=False):
     import ui
 
     command = str(command or "").strip()
@@ -106,7 +143,10 @@ def _run_command(command, folder="~", why=""):
     timeout = max(1.0, float(getattr(config, "SHELL_TIMEOUT", 60)))
     body = [f"$ {line}" if i == 0 else f"  {line}"
             for i, line in enumerate(command.splitlines())]
-    body += ["", f"in:      {_display(cwd)}", f"timeout: {timeout:g}s"]
+    background = str(background).lower() in ("true", "1", "yes")
+    body += ["", f"in:      {_display(cwd)}",
+             "runs:    in the background, keeps running after this" if background
+             else f"timeout: {timeout:g}s"]
 
     if why:
         body += [f"why:     {str(why).strip()[:200]}"]
@@ -133,6 +173,9 @@ def _run_command(command, folder="~", why=""):
 
     logbook.info("shell", "running in %s: %s", cwd, command[:300])
     started = time.monotonic()
+
+    if background:
+        return _start_detached(command, cwd)
 
     try:
         proc = subprocess.Popen(

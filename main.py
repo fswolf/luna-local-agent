@@ -1081,7 +1081,10 @@ def handle_input(text):
             file_tools.allow_all(False)
             ui.add_message("system", "File changes ask again.")
         else:
+            saved = str(getattr(config, "FILES_WRITE", "ask")).lower()
             ui.add_message("system", "File changes: " + (
+                "allowed (Write is set to allow in the tools pane - space it back to ask)"
+                if saved == "allow" else
                 "allowed without asking until restart (her own folder, ~/.config and "
                 "~/.local still ask) - /allow off" if file_tools.allow_all()
                 else "every one asks. Press A on a file popup to stop asking this session.")

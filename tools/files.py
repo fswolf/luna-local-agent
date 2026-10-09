@@ -221,7 +221,7 @@ def _ask(action, full, body_lines, note=""):
     local = not remote and not getattr(state.job, "name", None)
     offer_all = local and not _guarded(full)
 
-    if offer_all and _session["allow_all"]:
+    if offer_all and (_session["allow_all"] or _mode("write") == "allow"):
         logbook.info("files", "%s %s - allow all is on, not asked", action, full)
 
         return True
@@ -364,6 +364,45 @@ def _why():
     return "files.enabled is false"
 
 
+def _mode(kind):
+    """files.read / files.write as set in the tools pane."""
+    value = str(getattr(config, f"FILES_{kind.upper()}", "")).lower()
+    default = "allow" if kind == "read" else "ask"
+    return value if value in ("allow", "ask", "off") else default
+
+
+def _can_read():
+    return config.FILES_ENABLED and _mode("read") != "off"
+
+
+def _can_write():
+    return config.FILES_ENABLED and _mode("write") != "off"
+
+
+def _why_read():
+    return _why() if not config.FILES_ENABLED else "Read is off in the tools pane (Permissions)"
+
+
+def _why_write():
+    return _why() if not config.FILES_ENABLED else "Write is off in the tools pane (Permissions)"
+
+
+def _ask_read(action, full):
+    """Read set to ask: a popup before she looks. No diff to show, just
+    what and where; allow-all doesn't cover reads."""
+    import ui
+
+    if _mode("read") != "ask":
+        return True
+
+    return bool(ui.ask_approval(
+        title=f"{action} {_display(full)}",
+        note="Read is set to ask (tools pane, Permissions)",
+        body=[f"she wants to {action} this - nothing changes on disk"],
+        timeout=config.FILES_APPROVAL_TIMEOUT,
+    ))
+
+
 @tool(
     "list_files",
     "List what's in a folder under the user's home - names, with a / "
@@ -376,8 +415,8 @@ def _why():
         },
     },
     required=("path",),
-    available=_enabled,
-    why=_why,
+    available=_can_read,
+    why=_why_read,
 )
 def _list_files(path):
     try:
@@ -388,6 +427,9 @@ def _list_files(path):
     if not os.path.isdir(full):
         return f"{_display(full)} isn't a folder" + (
             "" if os.path.exists(full) else " - it doesn't exist")
+
+    if not _ask_read("list", full):
+        return "The user didn't allow that - not listed. Don't retry."
 
     try:
         names = sorted(os.listdir(full), key=str.lower)
@@ -421,8 +463,8 @@ def _list_files(path):
         },
     },
     required=("path",),
-    available=_enabled,
-    why=_why,
+    available=_can_read,
+    why=_why_read,
 )
 def _read_file(path):
     try:
@@ -445,6 +487,9 @@ def _read_file(path):
 
     if not _is_text(data):
         return f"{_display(full)} is binary, not text"
+
+    if not _ask_read("read", full):
+        return "The user didn't allow that - not read. Don't retry."
 
     text = data.decode("utf-8", errors="replace")
 
@@ -478,8 +523,8 @@ def _read_file(path):
         },
     },
     required=("path", "content"),
-    available=_enabled,
-    why=_why,
+    available=_can_write,
+    why=_why_write,
 )
 def _write_file(path, content, executable=False):
     try:
@@ -577,8 +622,8 @@ def _write_file(path, content, executable=False):
         },
     },
     required=("path", "find", "replace"),
-    available=_enabled,
-    why=_why,
+    available=_can_write,
+    why=_why_write,
 )
 def _edit_file(path, find, replace):
     try:
