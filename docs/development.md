@@ -49,6 +49,7 @@ ai-voice/
 │   ├── cron.py       # scheduled jobs - /cron, agent/cron.json
 │   ├── minecraft.py  # she joins your world and plays towards a goal
 │   ├── home.py       # your smart home, through a local Home Assistant
+│   ├── zork.py       # she plays Zork I - /zork, saves in agent/zork/
 │   └── discord.py    # remote access for the owner over Discord
 ├── ptt.py
 ├── reminders.py
@@ -107,6 +108,7 @@ ai-voice/
 ├── reminders/
 │   └── reminders.json
 │
+├── games/zork/       # Zork I (MIT): zork1.z3 and zork_server.py, an MCP server around dfrotz
 ├── tts/              # experimental speech servers, each self-contained
 │   ├── chatterbox/
 │   └── qwen3/

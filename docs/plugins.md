@@ -430,6 +430,76 @@ recipe browsing) stay off.
 The tools only exist while the plugin is on, so they cost nothing the
 rest of the time. `speak: true` reads each step aloud.
 
+## Zork
+
+```
+/zork on        load the game          /zork play      she plays on her own
+/zork pause     stop playing           /zork off       put it away (saved)
+/zork           score and what she's been up to
+```
+
+She plays [Zork I](https://en.wikipedia.org/wiki/Zork_I), the 1980
+Infocom text adventure. Microsoft released Zork I, II and III under the
+MIT licence in 2025, so the game ships with Luna in `games/zork/`
+(`zork1.z3`, with its licence beside it).
+
+The game runs in `games/zork/zork_server.py`, a small MCP server around
+**dfrotz**, the plain-text build of the Frotz interpreter. It's a normal
+MCP server, so Claude Desktop or any other MCP client can play it too.
+
+```bash
+brew install frotz          # macOS
+sudo apt install frotz      # Debian / Ubuntu (dfrotz lands in /usr/games)
+sudo dnf install frotz      # Fedora
+```
+
+If your system's frotz package has no `dfrotz`, build it from
+[the Frotz source](https://gitlab.com/DavidGriffith/frotz) with
+`make dumb` and set `"interpreter"` to the binary's path.
+
+### Her tools
+
+| Tool | |
+|------|--|
+| `zork_command` | type one command: `north`, `open mailbox`, `take lamp` |
+| `zork_status` | LOOK, INVENTORY and SCORE in one call |
+| `zork_save` / `zork_restore` | named saves; `autosave` is kept for her |
+| `zork_restart` | a new game from the start |
+| `play_zork` | start or stop playing on her own ("go play some Zork") |
+
+While the plugin is on these are hers in conversation too: "what's in
+the mailbox?", "try going north", "how many points have you got?". The
+tools only exist while it's on.
+
+### Playing on her own
+
+`/zork play` hands her the controls. Whenever nobody has spoken for
+`step_seconds` she takes a turn of two to five commands and says in one
+line where she is and what's next. Like Minecraft, a turn is a job:
+fresh context, nothing in your history, only her Zork tools, and the
+last dozen of her one-liners as her memory of the game. Talking to her
+pauses play until you stop. After `max_steps` turns she pauses and says
+so.
+
+The game **autosaves** every five commands and when the plugin stops,
+and picks the autosave back up next time, so a playthrough survives
+restarts. Saves live in `agent/zork/` (gitignored), and dfrotz can't
+read or write anywhere else.
+
+```json
+"zork": {
+    "enabled": false,
+    "step_seconds": 15,
+    "max_steps": 80,
+    "speak": false,
+    "interpreter": ""
+}
+```
+
+Zork is hard for a small model: it has to map the place in its head,
+remember what it's carrying, and survive the dark. The live view and
+the thought viewer show every command she types, which is half the fun.
+
 ## Your home: Home Assistant
 
 ```

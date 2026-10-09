@@ -37,7 +37,7 @@ Powered by:
 - 🔬 See inside her: token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
 - 🎭 An animated portrait: Live2D or VRM, lip-synced to her voice, blinking, looking at your terminal, visibly thinking ([details](docs/portrait.md#portrait))
 - 🌱 Learns from herself: daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure, and picking up where you left off ([details](docs/learning.md#learning-from-herself))
-- 🔌 Plugins: stream chat, Discord (approvals answered right in the chat), scheduled jobs, your smart home through a local Home Assistant, and she can play Minecraft
+- 🔌 Plugins: stream chat, Discord (approvals answered right in the chat), scheduled jobs, your smart home through a local Home Assistant, and she can play Minecraft and Zork
 - 🧩 MCP servers: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
 - 💬 Full-screen terminal interface
 
@@ -100,7 +100,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Moods](docs/moods.md)
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
 - [Home automation](docs/home.md): Home Assistant on your own network, setup, what always asks, local devices
-- [Plugins](docs/plugins.md): stream chat, Minecraft, Home Assistant, cron jobs, Discord
+- [Plugins](docs/plugins.md): stream chat, Minecraft, Zork, Home Assistant, cron jobs, Discord
 - [Development](docs/development.md): project structure, extras
 
 The same pages are on the [wiki](https://github.com/fswolf/luna-local-agent/wiki).
