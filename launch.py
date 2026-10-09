@@ -48,10 +48,11 @@ def start_voice(v):
     if not (os.path.exists(v.get("python", "")) and os.path.exists(v.get("server", ""))):
         print("Her voice server isn't where the installer left it - run the installer again.", file=sys.stderr)
         return None
+    # Always passed, "cpu" included: the server's own default is "auto",
+    # which picks the GPU - and on Apple silicon that's the device the
+    # installer deliberately steered away from.
     env = dict(os.environ, KOKORO_HOST="127.0.0.1", KOKORO_PORT=str(port),
                KOKORO_DEVICE=v.get("device", "cpu"))
-    if env["KOKORO_DEVICE"] == "cpu":
-        env.pop("KOKORO_DEVICE")
     log = open(os.path.join(log_dir(), "kokoro.log"), "a", encoding="utf-8")
     flags = subprocess.CREATE_NO_WINDOW if WIN else 0
     proc = subprocess.Popen([v["python"], v["server"]], cwd=os.path.dirname(v["server"]), env=env,
