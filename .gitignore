@@ -7,6 +7,8 @@ __pycache__/
 history/conversation.json
 history/transcript.jsonl
 reminders/reminders.json
+# Her memory of you. Yours, never shipped: a fresh install starts empty.
+agent/memory.json
 agent/facts.db
 agent/mood.json
 agent/facts.db-wal

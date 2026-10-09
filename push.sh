@@ -42,8 +42,8 @@ fi
 # it. That is skip-worktree: the file stays in the repo at its committed
 # contents while git stops watching your copy. It has eaten local edits
 # to config.json and agent.json more than once.
-PRIVATE_PATTERN='history/conversation\.json|history/transcript\.jsonl|reminders/reminders\.json|Claude outputs/'
-PERSONAL_PATTERN='^config\.json$|^agent/agent\.json$|^agent/memory\.json$'
+PRIVATE_PATTERN='agent/memory\.json|history/conversation\.json|history/transcript\.jsonl|reminders/reminders\.json|Claude outputs/'
+PERSONAL_PATTERN='^config\.json$|^agent/agent\.json$'
 
 SKIPPED=$(git ls-files -v | grep '^S ' | cut -c3- || true)
 
