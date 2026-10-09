@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Build llama.cpp's server into llama/bin, from source, for this GPU.
 #
-#   llama/install.sh            Vulkan - the default, and the easy one on AMD
+#   llama/install.sh            Vulkan on Linux (the easy one on AMD),
+#                               Metal on a Mac
 #   llama/install.sh rocm       ROCm/HIP for the RX 6950 XT (gfx1030)
+#   llama/install.sh metal      Apple GPU (any Apple-silicon Mac)
 #   llama/install.sh update     pull the latest llama.cpp and rebuild
 #
 # Both can be built side by side; bin/ points at whichever ran last, so
@@ -10,15 +12,17 @@
 # llama-bench is built too - run it under each to see which is faster
 # on this card before settling.
 set -euo pipefail
-cd "$(dirname "$(realpath "$0")")"
+cd "$(dirname "$(realpath "$0" 2>/dev/null || echo "$0")")"
 
-KIND="${1:-vulkan}"
+MAC=""
+[ "$(uname -s)" = Darwin ] && MAC=1
+KIND="${1:-$([ -n "$MAC" ] && echo metal || echo vulkan)}"
 SRC=llama.cpp
 
 if [ "$KIND" = update ]; then
     git -C "$SRC" pull --ff-only
     KIND="$(readlink bin 2>/dev/null | sed -n 's|.*/build-\(.*\)/bin|\1|p')"
-    KIND="${KIND:-vulkan}"
+    KIND="${KIND:-$([ -n "$MAC" ] && echo metal || echo vulkan)}"
 fi
 
 need() {
@@ -51,8 +55,15 @@ case "$KIND" in
         # the build to minutes rather than an hour.
         FLAGS=(-DGGML_HIP=ON -DGPU_TARGETS=gfx1030)
         ;;
+    metal)
+        # Apple's compiler comes with the Command Line Tools; cmake and a
+        # newer bash (start.sh needs it - macOS ships bash 3.2) from Homebrew.
+        PKGS="xcode-select --install   # then:  brew install cmake bash   (Homebrew: https://brew.sh)"
+        need cmake c++ git
+        FLAGS=(-DGGML_METAL=ON)
+        ;;
     *)
-        echo "usage: llama/install.sh [vulkan|rocm|update]" >&2
+        echo "usage: llama/install.sh [vulkan|rocm|metal|update]" >&2
         exit 1
         ;;
 esac
@@ -65,11 +76,16 @@ BUILD="$SRC/build-$KIND"
 
 cmake -S "$SRC" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release \
       -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF "${FLAGS[@]}"
-cmake --build "$BUILD" --config Release -j"$(nproc)" \
+JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+cmake --build "$BUILD" --config Release -j"$JOBS" \
       --target llama-server llama-bench llama-cvector-generator
 
 ln -sfn "$BUILD/bin" bin
 
 echo
 echo "Built for $KIND: llama/bin/llama-server"
-echo "Next: llama/start.sh"
+echo "Next: put a model in llama/models (or point MODEL= in llama/server.env at"
+echo "one LM Studio downloaded), then llama/start.sh"
+if [ -n "$MAC" ] && [ "${BASH_VERSINFO[0]}" -lt 4 ] && ! command -v brew >/dev/null; then
+    echo "start.sh needs a newer bash than the Mac's own: brew install bash"
+fi
