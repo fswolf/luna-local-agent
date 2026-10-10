@@ -699,6 +699,12 @@ PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))
 PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 # Live2D only: which expression is which (portrait/add_live2d.py fills it
 # in), and which parameters are the ears if their names don't say so.
+# The hologram look (portrait/hologram.js): off unless "enabled": true, or
+# ?holo=1 on the portrait URL. tint, mix (0 = her own colours, 1 = all
+# tint), intensity, glitch (how often it tears), base (the projector glow).
+#   "hologram": { "enabled": true, "tint": "#c37bff", "mix": 0.8 }
+PORTRAIT_HOLOGRAM = dict(_portrait_cfg.get("hologram", {}) or {})
+PORTRAIT_HOLOGRAM_ENABLED = bool(PORTRAIT_HOLOGRAM.get("enabled", False))
 PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
 if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
     # Its three expressions, so moods show on her face out of the box.
@@ -946,6 +952,7 @@ SETTINGS = {
     "portrait.model":             ("PORTRAIT_MODEL",               True),
     "portrait.browser":           ("PORTRAIT_BROWSER",             True),
     "portrait.size":              ("PORTRAIT_SIZE",                True),
+    "portrait.hologram.enabled":  ("PORTRAIT_HOLOGRAM_ENABLED",    True),
 }
 
 _TRUE = ("1", "true", "yes", "on", "y")

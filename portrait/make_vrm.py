@@ -42,7 +42,9 @@ EXPRESSIONS = {
     "aa": ([("aa", 1)], {}), "ih": ([("ih", 1)], {}), "ou": ([("ou", 1)], {}),
     "ee": ([("ee", 1)], {}), "oh": ([("oh", 1)], {}),
     "happy": ([("happyEyes", 1), ("happyLower", 1), ("smile", 1)], {"overrideBlink": "block"}),
-    "relaxed": ([("happyEyes", 0.3), ("smile", 0.6)], {"overrideBlink": "blend"}),
+    # relaxed doubles as her smug look: lids half down, a lopsided grin
+    "relaxed": ([("blinkLeft", 0.32), ("blinkRight", 0.32), ("happyEyes", 0.15), ("smile", 0.85)],
+                {"overrideBlink": "blend"}),
     "sad": ([("frown", 1), ("blinkLeft", 0.15), ("blinkRight", 0.15)], {}),
     "angry": ([("frown", 0.7), ("blinkLeft", 0.3), ("blinkRight", 0.3)], {}),
     "surprised": ([("gasp", 1)], {"overrideBlink": "block"}),
@@ -58,7 +60,7 @@ SHADE = {
     "Luna_Hair": ([0.55, 0.45, 0.78], 0.90, 0.0),
     "Luna_Ears": ([0.62, 0.52, 0.80], 0.90, 0.0),
     "Luna_Eye": ([0.92, 0.88, 0.94], 0.95, -0.6),
-    "Luna_FaceParts": ([0.90, 0.80, 0.86], 0.95, -0.4),
+    "Luna_FaceParts": ([0.93, 0.70, 0.78], 0.85, -0.05),   # lids are skin: shade them like skin
     "Luna_Blush": ([1.0, 1.0, 1.0], 0.95, -1.0),
     "Luna_Top": ([0.75, 0.68, 0.85], 0.9, -0.05),
 }
@@ -136,7 +138,15 @@ def prune(g, binary):
     imap = {o: i for i, o in enumerate(imgs)}
     smps = sorted({g["textures"][t]["sampler"] for t in texs if "sampler" in g["textures"][t]})
     smap = {o: i for i, o in enumerate(smps)}
-    views = sorted({g["accessors"][a]["bufferView"] for a in accs if "bufferView" in g["accessors"][a]}
+    def acc_views(a):
+        acc = g["accessors"][a]
+        out_ = [acc["bufferView"]] if "bufferView" in acc else []
+        sp = acc.get("sparse")
+        if sp:   # newer Blender writes morph targets as sparse accessors
+            out_ += [sp["indices"]["bufferView"], sp["values"]["bufferView"]]
+        return out_
+
+    views = sorted({v for a in accs for v in acc_views(a)}
                    | {g["images"][i]["bufferView"] for i in imgs if "bufferView" in g["images"][i]})
     accs = sorted(accs)
     amap = {o: i for i, o in enumerate(accs)}
@@ -197,9 +207,12 @@ def prune(g, binary):
         new_meshes.append(mesh)
     new_accs = []
     for a in accs:
-        acc = dict(g["accessors"][a])
+        acc = json.loads(json.dumps(g["accessors"][a]))
         if "bufferView" in acc:
             acc["bufferView"] = vmap[acc["bufferView"]]
+        if "sparse" in acc:
+            acc["sparse"]["indices"]["bufferView"] = vmap[acc["sparse"]["indices"]["bufferView"]]
+            acc["sparse"]["values"]["bufferView"] = vmap[acc["sparse"]["values"]["bufferView"]]
         new_accs.append(acc)
     new_imgs = []
     for i in imgs:
@@ -292,7 +305,10 @@ def main(src=SRC, dst=DST):
                 g["samplers"][t["sampler"]].update(wrapS=33071, wrapT=33071)
 
     for m in g["materials"]:
-        shade, toony, shift = SHADE.get(m.get("name"), ([0.8, 0.72, 0.85], 0.9, -0.05))
+        # per-part materials are named like Luna_Hair_HairBack: match the family
+        mname = m.get("name", "")
+        fam = next((k for k in SHADE if mname == k or mname.startswith(k + "_")), None)
+        shade, toony, shift = SHADE.get(fam, ([0.8, 0.72, 0.85], 0.9, -0.05))
         base = m.get("pbrMetallicRoughness", {}).get("baseColorFactor", [1, 1, 1, 1])
         tex = m.get("pbrMetallicRoughness", {}).get("baseColorTexture")
         mtoon = {

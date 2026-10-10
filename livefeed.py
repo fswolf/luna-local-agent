@@ -37,7 +37,7 @@ _lock = threading.Lock()
 # The last of each of these, replayed to a page that opens mid-session,
 # so it shows where things stand instead of a blank screen until the
 # next turn.
-_SNAPSHOT_KINDS = ("stage", "mood", "context", "server", "turn", "gaze")
+_SNAPSHOT_KINDS = ("stage", "mood", "context", "server", "turn", "gaze", "holo")
 _snapshot = {}
 
 
@@ -283,7 +283,9 @@ def portrait_config():
         model = "models/placeholder.vrm"
 
     return {"model": model, "ear_bones": list(getattr(config, "PORTRAIT_EAR_BONES", []) or []),
-            "live2d": dict(getattr(config, "PORTRAIT_LIVE2D", {}) or {})}
+            "live2d": dict(getattr(config, "PORTRAIT_LIVE2D", {}) or {}),
+            "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},
+                             enabled=bool(getattr(config, "PORTRAIT_HOLOGRAM_ENABLED", False)))}
 
 
 def portrait_url(transparent=False):

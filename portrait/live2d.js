@@ -10,6 +10,7 @@
 
 import { PIXI, Live2DModel } from './vendor/luna-pixi.js';
 import { createLook } from './look.js';
+import { createHologram } from './hologram.js';
 
 const params = new URLSearchParams(location.search);
 const note = document.getElementById('note');
@@ -28,6 +29,11 @@ document.body.appendChild(app.view);
 say('loading…', true);
 const model = await Live2DModel.from(cfg.model, { autoInteract: false, autoUpdate: true });
 app.stage.addChild(model);
+
+// The hologram look: config.json "hologram": {"enabled": true}, or ?holo=1.
+const holoCfg = cfg.hologram || {};
+const holoOn = params.has('holo') ? params.get('holo') !== '0' : !!holoCfg.enabled;
+let holo = holoOn ? createHologram(PIXI, app, model, holoCfg) : null;
 const core = model.internalModel.coreModel;
 
 // We do the blinking and the looking, so the model's own versions are off.
@@ -120,13 +126,19 @@ function handle(ev) {
       if (next === 'listening' && mind.stage !== 'listening') {
         twitch(1);
         // Talked over mid-sentence: a startled look before she listens.
-        if (mind.stage === 'speaking') react('surprised', 0.9);
+        if (mind.stage === 'speaking') { react('surprised', 0.9); holo?.glitch(0.5); }
         else kick(nod, -0.35);
       }
       mind.stage = next;
       look.setStage(next);
+      holo?.bright(next === 'speaking' ? 1.12 : next === 'thinking' ? 0.9 : 1);
       break;
     }
+    case 'holo':        // /holo or the tools pane, while the page is open
+      if (params.has('holo')) break;            // the URL said, the URL wins
+      if (ev.on) { holo ? holo.on() : (holo = createHologram(PIXI, app, model, holoCfg)); }
+      else holo?.off();
+      break;
     case 'gaze': look.setTarget(ev); break;
     case 'turn': twitch(0.7); break;
     case 'mood': {
@@ -141,7 +153,7 @@ function handle(ev) {
     case 'flags': {
       const flags = ev.flags || [];
       const hit = re => flags.some(f => re.test(f));
-      if (hit(/^(tool failed|no answer|cut off)/)) { showExpression('confused'); react('furrow', 2.5); }
+      if (hit(/^(tool failed|no answer|cut off)/)) { showExpression('confused'); react('furrow', 2.5); holo?.glitch(1); }
       else if (hit(/^(ungrounded|guessed|overconfident)/)) react('skeptical', 3);
       else if (hit(/^low confidence/)) react('worried', 3);
       else if (flags.length) tilt.target = 6;
@@ -459,6 +471,9 @@ if (params.get('debug')) {
     nod: () => kick(nod, -0.45), hop: () => kick(bounce, 1), 'breath in': () => { breath.inhale = true; },
     stretch: () => { act.stretch = 0; },
   });
+  Object.assign(buttons, { glitch: () => holo?.glitch(1),
+    'holo on/off': () => { if (holo && holo.isOn()) holo.off(); else if (holo) holo.on();
+                           else holo = createHologram(PIXI, app, model, holoCfg); } });
   for (const name of Object.keys(REACT)) buttons[name] = () => react(name, 2.5);
   for (const role of Object.keys(exprFor)) buttons[role] = () => showExpression(role, 3);
   for (const [label, fn] of Object.entries(buttons)) {
@@ -516,7 +531,7 @@ if (params.get('debug')) {
   setInterval(() => { document.getElementById('dstate').textContent =
     `${mind.stage} · energy ${mind.energy.toFixed(2)} warmth ${mind.warmth.toFixed(2)}`; }, 300);
 }
-window.portrait = { handle, twitch, fakeVoice, blink, mind, model, showExpression, look };
+window.portrait = { handle, twitch, fakeVoice, blink, mind, model, showExpression, look, get holo() { return holo; } };
 
 if (params.get('demo')) {
   (async () => {
