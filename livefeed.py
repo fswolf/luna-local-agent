@@ -275,15 +275,24 @@ def with_switcher(html, here):
 
 def portrait_config():
     """What the portrait page needs from config.json: which model, and
-    which nodes are her ears if their names don't say so."""
-    model = str(getattr(config, "PORTRAIT_MODEL", "") or "models/placeholder.vrm")
+    which nodes are her ears if their names don't say so. A model that
+    isn't there falls back to Sigewinne; with neither, the page says so."""
     root = os.path.join(config.BASE_DIR, "portrait")
+    model = str(getattr(config, "PORTRAIT_MODEL", "") or "")
+    missing = ""
 
-    if not os.path.isfile(os.path.join(root, model)):
-        model = "models/placeholder.vrm"
+    if not model or not os.path.isfile(os.path.join(root, model)):
+        missing = model
+        fallback = getattr(config, "_SIGEWINNE", "models/sigewinne/sigewinne.model3.json")
+        model = fallback if os.path.isfile(os.path.join(root, fallback)) else ""
 
-    return {"model": model, "ear_bones": list(getattr(config, "PORTRAIT_EAR_BONES", []) or []),
-            "live2d": dict(getattr(config, "PORTRAIT_LIVE2D", {}) or {}),
+    live2d = dict(getattr(config, "PORTRAIT_LIVE2D", {}) or {})
+    if missing and model and not live2d:     # Sigewinne's expressions, as config.py sets them
+        live2d = {"expressions": {"sad": "tears", "flustered": "x_eyes", "confused": "spiral_eyes"}}
+
+    return {"model": model, "missing": missing,
+            "ear_bones": list(getattr(config, "PORTRAIT_EAR_BONES", []) or []),
+            "live2d": live2d,
             "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},
                              enabled=bool(getattr(config, "PORTRAIT_HOLOGRAM_ENABLED", False)))}
 
