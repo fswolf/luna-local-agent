@@ -536,7 +536,7 @@ and her `say` lines show up as the mayor's thoughts.
 
 Her tools come from the game: `how_to_play`, `get_city`, `list_tools`,
 `get_map`, `get_tile`, `build`, `set_tax`, `set_speed`, `look_at`,
-`open_window`, `close_windows` and `say`, plus `play_vibe_city` so she
+`open_window`, `close_windows`, `answer`, `name_city` and `say`, plus `play_vibe_city` so she
 can start herself ("go build me a town"). `screenshot` hands her a
 picture of the game window, attached to the next message the same way
 `look_at_screen` is, so a vision model sees the town (a text-only model
@@ -546,9 +546,35 @@ plugin is on they work in conversation too: "how's the city doing?", "put the ta
 `/vibecity play` hands her the mayor's office. Whenever nobody has
 spoken for `step_seconds` she takes a turn: checks the city, makes two
 to six moves towards the goal, narrates with `say`, and reports in one
-line. Her first turn each session reads `how_to_play` and `list_tools`.
-Turns are jobs like Minecraft's: fresh context, nothing in your
-history, only her city tools, her last dozen one-liners as memory.
+line. Her first turn each session reads `how_to_play` and `list_tools`,
+unpauses the game if it's paused, and names the city if it still has
+the default name. Turns are jobs like Minecraft's: fresh context,
+nothing in your history, only her city tools, her last dozen
+one-liners as memory.
+
+Each turn follows the same checklist, written from watching a game
+played through these tools:
+
+1. **Answer what's waiting.** Milestone and neighbour windows sit on screen
+   until someone answers, so she answers them first.
+2. **Build what's asked for.** The highest demand, and power first when
+   the city uses more than 85% of what it makes.
+3. **Connect what she zones.** A zone without power or water never
+   grows, and that's easy to miss, so after zoning she checks the power
+   and water layers and closes the gaps in the same turn.
+4. **Mind the money.** High ground costs more; she keeps about $2,000
+   back.
+5. **Close what she opened**, like the budget window `set_tax` leaves
+   up.
+
+Her one-line report includes coordinates and anything left
+unconnected, so the next turn, which starts fresh, can finish it.
+
+When she stops (`/vibecity pause`, `/vibecity off`, or after
+`max_steps` turns) the game pauses too, so the city doesn't run on and
+spend its money with nobody in charge. Pausing mid-turn lets her finish
+the turn first. Set `pause_game` to `false` to leave the clock running.
+When you take over, the game is left alone: you're playing.
 
 **You can take over any time** by clicking or pressing a key in the
 game. A build that answers "the player took over" pauses her until you
@@ -564,7 +590,8 @@ machine.
     "max_steps": 60,
     "speak": false,
     "goal": "",
-    "skip_tools": []
+    "skip_tools": [],
+    "pause_game": true
 }
 ```
 
