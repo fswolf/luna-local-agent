@@ -100,6 +100,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Moods](docs/moods.md)
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
 - [Home automation](docs/home.md): Home Assistant on your own network, setup, what always asks, local devices
+- [Sysadmin](docs/sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](docs/plugins.md): stream chat, Minecraft, Zork, Vibe City, Home Assistant, cron jobs, Discord
 - [Development](docs/development.md): project structure, extras
 
