@@ -51,6 +51,7 @@ Slash commands:
 | `/snooze [n]` | Ring again in n minutes |
 | `/alarm off` | Stop one that's ringing; `/alarm test` hears the tone |
 | `/look` | List windows, or test a screenshot |
+| `/camera` | Webcam: `/camera on`, `off`, `list`, `test` |
 | `/log` | Tail the debug log without leaving the app |
 | `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |

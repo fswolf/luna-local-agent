@@ -1263,6 +1263,40 @@ def handle_input(text):
             + ["/projects show <n> for the log; done|pause|resume|drop <n> to steer."]))
         return
 
+    if text == "/camera" or text.startswith("/camera "):
+        import camera
+        import config
+        import tools
+
+        word = text[len("/camera"):].strip().lower()
+
+        if word in ("on", "off"):
+            tools.set_enabled("look_at_camera", word == "on")
+            ui.add_message("system", f"Camera {word}." + (
+                "" if word == "off" or camera.available() else f" (not usable yet: {camera.why_unavailable()})"))
+        elif word == "list":
+            ui.set_status("Looking for cameras...")
+            found = camera.cameras()
+            ui.set_status("")
+            ui.add_message("system", "\n".join(
+                ["Cameras that open:"] + [f"  {i}: {size}" + ("  <- in use" if i == config.CAMERA_DEVICE else "")
+                                          for i, size in found]
+                + ["  /set camera.device <n> picks one"] if found else
+                ["No camera opened." + (f" ({camera.why_unavailable()})" if camera._cv2() is None else "")]))
+        elif word == "test":
+            data, what = camera.grab()
+            ui.add_message("system", f"Camera works: {what}. Nothing was sent or saved." if data
+                           else f"Camera test failed: {what}")
+        else:
+            on = tools.enabled("look_at_camera")
+            usable = camera.available()
+            ui.add_message("system", "\n".join([
+                f"Camera: {'on' if on else 'off'} (tools pane, Camera group, or /camera on|off)",
+                f"  device {config.CAMERA_DEVICE}, width {config.CAMERA_WIDTH}",
+                "  ready" if usable else f"  not usable: {camera.why_unavailable()}",
+                "  /camera list | /camera test"]))
+        return
+
     if text == "/situation":
         import situation
 

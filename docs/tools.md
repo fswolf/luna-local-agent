@@ -14,6 +14,7 @@ check the time, then schedule something.
 | `remember_fact` / `recall_facts` | Long-term memory, written deliberately |
 | `forget_fact` / `update_fact` | Correct it when it got something wrong |
 | `look_at_screen` | Take a screenshot and actually see it (optional) |
+| `look_at_camera` | One webcam picture when you ask: **off until you switch it on** ([Vision](vision.md#the-camera)) |
 | `control_audio` | Playback and volume: pause, skip, louder, mute |
 | `clipboard` | Read what you copied, or put something there to paste |
 | `focus_window` | Switch to a window, named the way you'd name it |

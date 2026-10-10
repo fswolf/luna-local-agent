@@ -5,6 +5,7 @@ Every one of these is gated on the thing it needs actually being
 installed. A tool that cannot work is never offered, because a
 model told it can see will describe a screen it never looked at.
 """
+import camera
 import config
 import desktop
 import machine
@@ -63,6 +64,30 @@ def _look_at_screen(window=None, whole_screen=False, region=None):
         "message. Describe what you actually see in it; do not guess, "
         "and say so if it isn't what they meant."
     )
+
+
+@tool(
+    "look_at_camera",
+    "Take one picture with the user's webcam and see it. Use this when "
+    "they hold something up or ask about something in the room - 'what am "
+    "I holding', 'read this label', 'look at this'. Not for their screen; "
+    "that's look_at_screen. The picture arrives in the next message.",
+    {},
+    available=camera.available,
+    why=camera.why_unavailable,
+)
+def _look_at_camera():
+    if camera._remote_or_job():
+        return "The camera only works for the user at the desk. Say so."
+
+    image, detail = camera.capture()
+
+    if image is None:
+        return (f"Couldn't take a picture: {detail} Tell the user this - do not "
+                "describe anything you have not seen.")
+
+    return (f"Picture taken ({detail}) - it is attached to the next message. "
+            "Describe what you actually see; if it's dark or blurry, say so.")
 
 
 # ---------------------------------------------------------------------------
