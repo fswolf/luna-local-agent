@@ -167,6 +167,7 @@ function handle(ev) {
       if (mind.voice.length > 3) mind.voice.shift();
       break;
     case 'done': tilt.target = 0; break;
+    case 'reload': location.reload(); break;     // /portrait use switched the model
   }
 }
 

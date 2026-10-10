@@ -32,7 +32,7 @@ ai-voice/
 ├── grounding.py      # the grounding check: specifics in a reply that nothing she was given backs up
 ├── situation.py      # the live lines at the top of each turn: window, music, load, plugins, next reminder
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
-├── embedmem.py       # recalling facts by meaning, when the embedding server is up
+├── embedmem.py       # recalling facts by meaning (and reranking), when those servers are up
 ├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792 (and /portrait)
 ├── portrait/         # her animated portrait: boot.js, live2d.js, portrait.js (VRM), look.js (where she looks), add_live2d.py, hologram.js, models/, vendor/
 ├── introspection/    # injected-thought experiments - make_vectors, trial, report, blind

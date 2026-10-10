@@ -821,14 +821,32 @@ def _thoughts_group():
     return ("Thoughts", members, 0, 0)
 
 
+def _model_name(path):
+    """models/sigewinne/sigewinne.model3.json -> sigewinne; models/foo.vrm -> foo"""
+    parts = str(path or "").split("/")
+    return parts[1] if len(parts) > 2 else parts[-1].rsplit(".", 1)[0]
+
+
 def _portrait_group():
     try:
         import config
     except Exception:
         return None
 
-    members = [(label, bool(getattr(config, key, False)), True, note, 0, path)
-               for label, key, path, note in _PORTRAIT_FEATURES]
+    # the model: space steps through whatever is in portrait/models
+    try:
+        import livefeed
+
+        found = livefeed.portrait_models()
+    except Exception:
+        found = []
+
+    current = getattr(config, "PORTRAIT_MODEL", "")
+    where = f"{found.index(current) + 1} of {len(found)}" if current in found else f"{len(found)} found"
+    members = [("model", True, bool(found), f"{where} in portrait/models - space: next" if found
+                else "drop a model into portrait/models", 0, "pick:portrait.model")]
+    members += [(label, bool(getattr(config, key, False)), True, note, 0, path)
+                for label, key, path, note in _PORTRAIT_FEATURES]
 
     return ("Portrait", members, 0, 0)
 
@@ -975,6 +993,8 @@ def _tool_fragments():
 
         if label == "Permissions":
             spent = "space cycles, saved"
+        elif label == "Portrait":
+            spent = "space switches, saved, live"
 
         fragments.append(("class:label bold", f" {label}"))
         fragments.append(("class:dim", f"   {spent}\n"))
@@ -982,6 +1002,17 @@ def _tool_fragments():
         for name, on, ready, why, cost, setting in members:
             selected = index == _tool_cursor
             pointer = " >" if selected else "  "
+
+            if setting and setting.startswith("pick:"):
+                import config
+
+                mark = _model_name(getattr(config, "PORTRAIT_MODEL", ""))[:12]
+                fragments.append(("class:key" if selected else "class:dim", pointer))
+                fragments.append(("class:ok", f" {mark:<12} "))
+                fragments.append(("class:agent bold" if selected else "class:agent", f"{name:<7}"))
+                fragments.append(("class:dim", f"  {why}\n"))
+                index += 1
+                continue
 
             if setting and setting.startswith("perm:"):
                 mark = _perm_value(name)
@@ -1088,7 +1119,17 @@ def _tool_toggle():
         return
 
     try:
-        if setting and setting.startswith("perm:"):
+        if setting == "pick:portrait.model":
+            import config
+            import livefeed
+
+            found = livefeed.portrait_models()
+            current = getattr(config, "PORTRAIT_MODEL", "")
+            nxt = found[(found.index(current) + 1) % len(found)] if current in found else found[0]
+            config.save_setting("portrait.model", nxt)
+            livefeed.emit("reload")
+            add_message("system", f"Portrait model: {_model_name(nxt)} ({nxt}) - an open portrait reloads now.")
+        elif setting and setting.startswith("perm:"):
             import config
 
             for label, path, _key, values, _note in _PERMS:
@@ -1502,6 +1543,7 @@ _HELP_SECTIONS = [
         ("/thoughts", "her reasoning, turn by turn, in the browser"),
         ("/monitor", "watch her think live - stages, tokens, tools, mood"),
         ("/portrait", "her animated portrait in its own window (again closes it)"),
+        ("/portrait models", "list the models in portrait/models; /portrait use <n> switches"),
         ("/portrait obs", "the see-through URL for an OBS browser source"),
         "/set thoughts.enabled false stops recording it.",
         "",

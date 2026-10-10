@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Serve the model with llama.cpp's own server - and, when its model is
-# there, the small embedding server beside it. Luna finds both by herself.
+# Serve the model with llama.cpp's own server - and, when their models
+# are there, the small embedding and reranker servers beside it. Luna
+# finds all of them by herself.
 #
-#   llama/start.sh                 both (embeddings only if the model is found)
+#   llama/start.sh                 all of them (each side server only if its model is found)
 #   llama/start.sh --verbose       anything extra goes to the chat server
 #
-# Chat on :8080 in this terminal; embeddings on :8081 in the background,
-# logging to llama/embed.log. Ctrl+C stops both. Settings: server.env.
+# Chat on :8080 in this terminal; embeddings on :8081 and the reranker
+# on :8082 in the background, logging to llama/embed.log and
+# llama/rerank.log. Ctrl+C stops them all. Settings: server.env.
 set -uo pipefail
 
 # macOS still ships bash 3.2, which has no mapfile. Hop to Homebrew's.
@@ -105,54 +107,74 @@ fi
 chmod 600 .api_key
 mkdir -p slots
 
-# --- the embedding model, if it's there -----------------------------------
-# EMBED=auto starts it when the model is found and says so when it isn't;
-# off never starts it; on refuses to start without it.
-embed_pid=""
-EMBED="${EMBED:-auto}"
+# --- the side servers: embeddings, and the reranker -----------------------
+# Each is a small model on its own port, in the background. Its switch
+# in server.env: auto starts it when the model is found and says so
+# when it isn't; off never starts it; on refuses to start without it.
+side_pids=()
 
-if [ "$EMBED" != off ]; then
-    why=""
+# A background job in a script ignores Ctrl+C, so they have to be
+# stopped by hand - on Ctrl+C, on kill, and when the chat server exits
+# by itself. Bash won't reliably run an EXIT trap after an interrupt,
+# hence the separate INT/TERM one.
+stop_sides() {
+    [ "${#side_pids[@]}" -gt 0 ] && kill "${side_pids[@]}" 2>/dev/null
+    side_pids=()
+}
+trap stop_sides EXIT
+trap 'stop_sides; exit 130' INT TERM
 
-    if [ -z "$EMBED_MODEL" ]; then
-        EMBED_MODEL="$(find_model "$EMBED_MATCH" 2>/tmp/.embed_why.$$)" || EMBED_MODEL=""
-        why="$(cat /tmp/.embed_why.$$ 2>/dev/null)"; rm -f /tmp/.embed_why.$$
-    elif [ ! -f "$EMBED_MODEL" ]; then
-        why="EMBED_MODEL in server.env doesn't exist: $EMBED_MODEL"
-        EMBED_MODEL=""
+# side_server LABEL SWITCH MODEL MATCH PORT LOG FALLBACK -- server args...
+# MODEL may be empty (found by MATCH). FALLBACK is what Luna does
+# without it, for the "off" line.
+side_server() {
+    local label="$1" switch="${2:-auto}" model="$3" match="$4" port="$5" log="$6" fallback="$7" why=""
+    shift 8
+
+    [ "$switch" = off ] && return 0
+
+    if [ -z "$model" ]; then
+        model="$(find_model "$match" 2>/tmp/.side_why.$$)" || model=""
+        why="$(cat /tmp/.side_why.$$ 2>/dev/null)"; rm -f /tmp/.side_why.$$
+    elif [ ! -f "$model" ]; then
+        why="the model path set in server.env doesn't exist: $model"
+        model=""
     fi
 
-    if [ -z "$EMBED_MODEL" ]; then
-        [ "$EMBED" = on ] && { echo "$why" >&2; exit 1; }
-        echo "embeddings: off - $why"
-        echo "  (fact recall falls back to matching words; EMBED=off in server.env hides this)"
-    elif serving "$EMBED_PORT"; then
-        echo "embeddings: something is already on :$EMBED_PORT - leaving it be."
-    else
-        # One fact is a sentence; the whole input must fit one batch, so
-        # the batch is the context.
-        eargs=(
-            -m "$EMBED_MODEL" --alias "$(basename "$EMBED_MODEL" .gguf)"
-            --host "$HOST" --port "$EMBED_PORT"
-            --embeddings -c "$EMBED_CTX" -b "$EMBED_CTX" -ub "$EMBED_CTX"
-            -ngl "$NGL" -t "$THREADS"
-            --api-key-file .api_key --cors-origins localhost
-        )
-        [ -n "$EMBED_POOLING" ] && eargs+=(--pooling "$EMBED_POOLING")
-
-        "$BIN" "${eargs[@]}" > embed.log 2>&1 &
-        embed_pid=$!
-
-        # A background job in a script ignores Ctrl+C, so it has to be
-        # stopped by hand - on Ctrl+C, on kill, and when the chat server
-        # exits by itself. Bash won't reliably run an EXIT trap after an
-        # interrupt, hence the separate INT/TERM one.
-        stop_embed() { [ -n "$embed_pid" ] && kill "$embed_pid" 2>/dev/null; embed_pid=""; }
-        trap stop_embed EXIT
-        trap 'stop_embed; exit 130' INT TERM
-        echo "embeddings: $(basename "$EMBED_MODEL" .gguf) on http://$HOST:$EMBED_PORT (log: llama/embed.log)"
+    if [ -z "$model" ]; then
+        [ "$switch" = on ] && { echo "$label: $why" >&2; exit 1; }
+        echo "$label: off - $why"
+        echo "  ($fallback)"
+        return 0
     fi
-fi
+
+    if serving "$port"; then
+        echo "$label: something is already on :$port - leaving it be."
+        return 0
+    fi
+
+    "$BIN" -m "$model" --alias "$(basename "$model" .gguf)" \
+        --host "$HOST" --port "$port" -ngl "$NGL" -t "$THREADS" \
+        --api-key-file .api_key --cors-origins localhost \
+        "$@" > "$log" 2>&1 &
+    side_pids+=($!)
+    echo "$label: $(basename "$model" .gguf) on http://$HOST:$port (log: llama/$log)"
+}
+
+# One fact is a sentence; the whole input must fit one batch, so the
+# batch is the context.
+eargs=(--embeddings -c "$EMBED_CTX" -b "$EMBED_CTX" -ub "$EMBED_CTX")
+[ -n "$EMBED_POOLING" ] && eargs+=(--pooling "$EMBED_POOLING")
+side_server embeddings "${EMBED:-auto}" "$EMBED_MODEL" "$EMBED_MATCH" "$EMBED_PORT" embed.log \
+    "fact recall falls back to matching words; EMBED=off in server.env hides this" -- "${eargs[@]}"
+
+# The reranker scores what you said and one fact together, so each pair
+# has to fit a batch. RERANK=off hides the line when it isn't wanted.
+RERANK_CTX="${RERANK_CTX:-2048}"
+side_server reranker "${RERANK:-auto}" "${RERANK_MODEL:-}" "${RERANK_MATCH:-*qwen3-reranker*}" \
+    "${RERANK_PORT:-8082}" rerank.log \
+    "recall uses the embedding order as it is; RERANK=off in server.env hides this" -- \
+    --reranking --pooling rank -c "$RERANK_CTX" -b "$RERANK_CTX" -ub "$RERANK_CTX"
 
 # --- the chat server, in the foreground -----------------------------------
 args=(
@@ -189,11 +211,11 @@ if [ -n "$MMPROJ" ]; then
 else
     echo "  vision: off - no mmproj next to the model (see MMPROJ in server.env)"
 fi
-echo "  http://$HOST:$PORT  (Ctrl+C stops both)"
+echo "  http://$HOST:$PORT  (Ctrl+C stops them all)"
 echo
 
-# Not exec: this shell has to outlive the server, to stop the embedding
-# one when it goes.
+# Not exec: this shell has to outlive the server, to stop the side
+# servers when it goes.
 #
 # QUIET_LOG sends the server's own output to a file instead of this
 # terminal. A blind session needs it: llama-server announces the control

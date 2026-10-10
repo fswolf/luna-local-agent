@@ -175,6 +175,9 @@ function handle(ev) {
       mind.voice.push({ env: ev.env || [], zcr: ev.zcr || [], fps: ev.fps || 30, start: performance.now() });
       if (mind.voice.length > 3) mind.voice.shift();
       break;
+    case 'reload':      // /portrait use switched the model
+      location.reload();
+      break;
     case 'done':
       tilt.target = 0;
       break;

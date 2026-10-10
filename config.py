@@ -182,6 +182,13 @@ EMBED_QUERY_PREFIX = str(_llm_cfg.get(
 # How alike a fact must be to travel on meaning alone. Cosine, 0-1.
 EMBED_MIN_SCORE = float(_llm_cfg.get("embed_min_score", 0.35))
 
+# The reranker (also from llama/start.sh, :8082) re-orders the
+# embedding's best matches by reading each one beside what was said.
+# Optional too: when it isn't answering the embedding order stands.
+# rerank_candidates is how many of the embedding's matches it reads.
+RERANK_URL = str(_llm_cfg.get("rerank_url", "http://127.0.0.1:8082/v1/rerank"))
+RERANK_CANDIDATES = int(_llm_cfg.get("rerank_candidates", 24))
+
 
 def llm_backend_label():
     return "llama.cpp" if LLM_BACKEND == "llama" else "LM Studio"
