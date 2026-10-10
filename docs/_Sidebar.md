@@ -14,6 +14,7 @@
 - [Moods](moods.md)
 - [Portrait](portrait.md)
 - [Home automation](home.md)
+- [Sysadmin](sysadmin.md)
 - [Plugins](plugins.md)
 - [Development](development.md)
 

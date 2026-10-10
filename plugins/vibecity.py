@@ -224,7 +224,8 @@ STEP_PROMPT = (
     "to six moves towards the goal. Before building somewhere, look_at it with zoom about 1.2 so "
     "the player can see it. Keep funds above zero. If a build fails, read why and fix that, not "
     "the same build again. Now and then, take a screenshot to see how the town actually looks. If a "
-    "call says the player took over, stop and end with PAUSED.\n"
+    "call says the player took over, stop and end with PAUSED. Close any window you opened "
+    "(set_tax, open_window...) with close_windows before ending your turn.\n"
     "End with ONE short line: what you built or changed and what you'll do next.)"
 )
 
