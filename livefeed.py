@@ -290,6 +290,22 @@ def portrait_models():
     return found
 
 
+def _model_sidecar(path):
+    """The luna.json beside a model, or {} - a broken one is a log line,
+    not a portrait that won't load."""
+    side = os.path.join(os.path.dirname(path), "luna.json")
+
+    try:
+        with open(side, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        logbook.warn("monitor", "ignoring %s: %s", side, e)
+        return {}
+
+
 def portrait_config():
     """What the portrait page needs from config.json: which model, and
     which nodes are her ears if their names don't say so. A model that
@@ -303,16 +319,18 @@ def portrait_config():
         fallback = getattr(config, "_SIGEWINNE", "models/sigewinne/sigewinne.model3.json")
         model = fallback if os.path.isfile(os.path.join(root, fallback)) else ""
 
-    # The live2d block belongs to one model: what config.json says if you
-    # set one, else Sigewinne's expressions for Sigewinne and nothing for
-    # a model you've just switched to (its expressions are found by name).
-    live2d = config._stored("portrait.live2d") or {}
+    # The live2d block belongs to one model, so it travels with it: a
+    # luna.json in the model's folder (framing, expressions, credit).
+    # Without one, what config.json says, else Sigewinne's expressions
+    # for Sigewinne and nothing for anything else.
+    sidecar = _model_sidecar(os.path.join(root, model)) if model else {}
+    live2d = sidecar.get("live2d") or config._stored("portrait.live2d") or {}
     if not live2d and model == getattr(config, "_SIGEWINNE", ""):
         live2d = {"expressions": {"sad": "tears", "flustered": "x_eyes", "confused": "spiral_eyes"}}
 
     return {"model": model, "missing": missing,
             "ear_bones": list(getattr(config, "PORTRAIT_EAR_BONES", []) or []),
-            "live2d": live2d,
+            "live2d": live2d, "credit": str(sidecar.get("credit") or ""),
             "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},
                              enabled=bool(getattr(config, "PORTRAIT_HOLOGRAM_ENABLED", False)))}
 

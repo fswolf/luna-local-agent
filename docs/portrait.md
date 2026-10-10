@@ -83,20 +83,39 @@ The standard Cubism parameters drive it: head angle, eyeballs, eye
 open/smile, mouth open and form, cheek, brows and breath. Ears are the
 model's own ear-physics parameters, nudged after physics runs, and
 they're found by name. Expressions are matched to roles by what they
-show (spiral eyes → confused, >< → flustered, tears → sad). All of that
-lives in `config.json` under `portrait.live2d` if a model needs it
-spelled out:
+show (spiral eyes → confused, >< → flustered, tears → sad).
+
+When a model needs any of that spelled out, put a `luna.json` in its
+folder. It travels with the model, so switching models switches the
+settings too:
 
 ```json
-"portrait": {
-    "model": "models/sigewinne/sigewinne.model3.json",
+{
+    "credit": "Art: Koahri, Live2D: Medwok - https://booth.pm/en/items/4711410",
     "live2d": {
-        "expressions": {"confused": "spiral_eyes", "flustered": "x_eyes", "sad": "tears"},
-        "ear_params": ["Param29", "Param31", "Param30", "Param35", "Param37", "Param39"],
-        "crop": {"top": 0.02, "height": 0.42}
+        "expressions": {"confused": "squeezed eyes", "flustered": "blush", "sad": "cry"},
+        "ear_params": ["Param29", "Param31"],
+        "crop": {"top": 0.04, "height": 0.78, "width": 0.8},
+        "crop_face": {"top": 0.12, "height": 0.45, "width": 0.55}
     }
 }
 ```
+
+`crop` is the window's view of the model's canvas, as fractions: where
+it starts (`top`), how much of the height shows, and how much of the
+width has to fit across. The default suits a full-body model, cropped
+to the bust. A half-body model, whose canvas is already the bust, wants
+a bigger `height` and `width`. `crop_face` is the same for
+`?frame=face`. `credit` is for you: free models usually ask to be
+credited, and this keeps the line with the model.
+
+A model without a `luna.json` uses `portrait.live2d` from `config.json`,
+which is how older setups did it.
+
+A model made in Cubism 5 (its `.moc3` starts `MOC3` then version 5)
+needs a recent Cubism Core. The CDN copy is always recent; a local
+copy from `get_cubism_core.sh` older than 2023 shows a blank page with
+"Unknown error" in the console. Run the script again to update it.
 
 ### Using more of the rig
 
