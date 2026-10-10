@@ -160,11 +160,12 @@ URLs above (`http://192.168.1.50:8080/...`), then on the model machine:
   `llama/.api_key` on Luna's machine. Without the key, `auto` quietly
   falls back to LM Studio.
 * LM Studio: turn on **Serve on Local Network** in the Developer tab.
-* Open the port in its firewall (1234, 8080, and 8081 for embeddings),
+* Open the port in its firewall (1234, 8080, 8081 for embeddings and
+  8082 for the reranker),
   e.g. `sudo firewall-cmd --add-port=8080/tcp --permanent && sudo firewall-cmd --reload`.
 
-`embed_url` in the same block points at the embedding server, if that
-runs elsewhere too.
+`embed_url` and `rerank_url` in the same block point at the embedding
+and reranker servers, if those run elsewhere too.
 
 **Vision.** llama-server only takes images when it's started with the
 model's vision adapter, a separate `mmproj-*.gguf`. `start.sh` looks
@@ -223,6 +224,45 @@ start without it).
 Each fact is embedded once and cached in `agent/embeddings.db`; per
 turn only what you said is embedded. If the server isn't answering she
 goes back to matching words, with nothing to switch.
+
+### The reranker (optional)
+
+A second small model, Qwen3-Reranker-0.6B, can sharpen the pick. The
+embedding model compares what you said and each fact as two separate
+summaries; the reranker reads them side by side, so it's better at
+telling a fact that answers you from one that's only on the same
+topic. It's slower per fact, so it only reads the embedding's best
+matches (`llm.rerank_candidates`, 24), and only on turns where more
+facts match than there's room for. The similarity floor still decides
+what counts as a match.
+
+```bash
+curl -L -o ~/ai-voice/llama/models/qwen3-reranker-0.6b-q8_0.gguf \
+  https://huggingface.co/ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/resolve/main/qwen3-reranker-0.6b-q8_0.gguf
+```
+
+or `installer/install.py --extras reranker`. `start.sh` then runs it on
+127.0.0.1:8082, logging to `llama/rerank.log`. It costs about 0.6 GB on
+disk and under 1 GB of VRAM. `RERANK` in `server.env` works like
+`EMBED`: `auto` (start it if the model is found), `off` (never, even if
+it is) or `on` (refuse to start without it). Without it, recall works
+exactly as before.
+
+### Short on memory?
+
+On a 16 GB machine, especially a Mac where the model shares memory with
+everything else, these lines in `llama/server.env` free the most:
+
+| Setting | Saves | What you give up |
+|---------|-------|------------------|
+| `RERANK=off` | under 1 GB | the reranker's sharper pick |
+| `EMBED=off` | about 0.7 GB | recall by meaning (back to matching words) |
+| `MMPROJ=off` | about 0.6 to 1 GB | screenshots, the webcam and Vibe City pictures |
+| `CTX=8192` | half the context memory | shorter conversations before old turns drop |
+| `PARALLEL=1` | slot overhead | jobs and chat wait for each other |
+
+A smaller quant of the chat model (Q4 instead of Q6 or Q8) saves the
+most of all.
 
 ---
 

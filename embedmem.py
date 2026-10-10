@@ -11,6 +11,13 @@ on :8081; when that isn't answering, available() says so and longterm
 quietly uses the word matching it always did. Nothing here ever makes
 a turn fail.
 
+A reranker (:8082, also optional) can sharpen the pick. The embedding
+model compares two vectors made separately; the reranker reads what
+was said and each candidate together, so it's better at telling a fact
+that answers the turn from one that's merely on the same topic. It's
+slower per fact, so it only re-orders the embedding's best matches, and
+only when there are more of them than slots to fill.
+
 Vectors are cached in agent/embeddings.db, keyed by the text and the
 model that made them, so each fact is embedded once - editing a fact
 or switching models simply misses the cache and makes a new one. The
@@ -35,6 +42,7 @@ RECHECK = 30.0     # seconds between "is it up?" checks
 
 _lock = threading.Lock()
 _state = {"up": None, "checked": 0.0, "model": ""}
+_rerank = {"up": None, "checked": 0.0, "model": ""}
 
 
 def _db():
@@ -207,6 +215,60 @@ def rank(query, facts):
     return scored
 
 
+# ---------------------------------------------------------------------------
+# The reranker
+# ---------------------------------------------------------------------------
+def reranker_available():
+    """Is the reranker answering? Same cadence as available()."""
+    now = time.monotonic()
+
+    if _rerank["up"] is not None and now - _rerank["checked"] < RECHECK:
+        return _rerank["up"]
+
+    try:
+        response = requests.get(config.RERANK_URL.split("/v1/")[0] + "/v1/models",
+                                headers=config.EMBED_HEADERS, timeout=0.5)
+        up = response.status_code == 200
+        _rerank["model"] = ((response.json().get("data") or [{}])[0].get("id", "")
+                            if up else "")
+    except Exception:
+        up = False
+
+    if up != _rerank["up"]:
+        logbook.info("embed", "reranker %s",
+                     f"up ({_rerank['model']})" if up else "not answering")
+
+    _rerank.update(up=up, checked=now)
+
+    return up
+
+
+def rerank(query, texts):
+    """texts re-ordered best first by the reranker, or None if it isn't
+    there or the request failed - the caller keeps its own order then."""
+    if not texts or not reranker_available():
+        return None
+
+    try:
+        response = requests.post(
+            config.RERANK_URL, headers=config.EMBED_HEADERS,
+            json={"model": _rerank["model"] or "rerank", "query": str(query),
+                  "documents": list(texts)},
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        results = response.json()["results"]
+    except Exception as e:
+        logbook.warn("embed", "rerank failed, keeping the embedding order: %s", e)
+        _rerank.update(up=False, checked=time.monotonic())
+
+        return None
+
+    order = sorted(results, key=lambda r: r["relevance_score"], reverse=True)
+
+    return [texts[r["index"]] for r in order if 0 <= r["index"] < len(texts)]
+
+
 def select(query, facts, limit):
     """The facts for this turn, oldest first, or None to fall back.
 
@@ -214,7 +276,8 @@ def select(query, facts, limit):
     because a fact learned two minutes ago is usually still in play.
     The rest are the closest in meaning above EMBED_MIN_SCORE - a
     floor, so a turn about nothing in particular doesn't drag in the
-    least-unrelated trivia just because there was room.
+    least-unrelated trivia just because there was room. When more pass
+    the floor than fit, the reranker (if it's running) picks which.
     """
     keep = max(1, limit // 3)
     recent = facts[-keep:]
@@ -225,9 +288,23 @@ def select(query, facts, limit):
         return None
 
     floor = float(getattr(config, "EMBED_MIN_SCORE", 0.35))
-    chosen = {f for score, f in scored[:limit - keep] if score >= floor}
+    slots = limit - keep
+    passing = [f for score, f in scored if score >= floor]
+    how = "by meaning"
 
-    logbook.info("embed", "recall by meaning: %d of %d facts (best %.2f)",
-                 len(chosen), len(candidates), scored[0][0] if scored else 0)
+    # More good matches than room: let the reranker choose which travel.
+    # The floor still decides what's a match at all, so the reranker
+    # never brings in more than the embedding alone would have.
+    if len(passing) > slots:
+        better = rerank(query, passing[:max(slots, int(getattr(config, "RERANK_CANDIDATES", 24)))])
+
+        if better is not None:
+            passing = better
+            how = "by meaning, reranked"
+
+    chosen = set(passing[:slots])
+
+    logbook.info("embed", "recall %s: %d of %d facts (best %.2f)",
+                 how, len(chosen), len(candidates), scored[0][0] if scored else 0)
 
     return [f for f in candidates if f in chosen] + recent

@@ -46,6 +46,22 @@ Page options: `?bg=transparent` (OBS), `?frame=face` (closer crop),
 right / ahead* to try the looking), `?demo=1` (acts out a conversation
 on its own).
 
+## Switching models
+
+Drop a model into `portrait/models/` (a Live2D model's folder, or a
+`.vrm` file) and switch to it from Luna:
+
+```
+/portrait models          list what's there, with the one in use marked
+/portrait use 2           switch by number
+/portrait use sigewinne   or by any part of its name
+```
+
+The choice is saved to `config.json`, and an open portrait reloads with
+the new model straight away. A Live2D model straight out of its zip
+usually works as it is; `add_live2d.py` (below) tidies one up first if
+its file names are messy or its expressions aren't listed.
+
 ## Live2D models
 
 ```bash

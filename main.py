@@ -1079,6 +1079,33 @@ def handle_input(text):
         ui.add_message("system", f"Portrait hologram {word} (saved; an open portrait switches now).")
         return
 
+    if text == "/portrait models" or text.startswith("/portrait use"):
+        import livefeed
+
+        found = livefeed.portrait_models()
+        want = text[len("/portrait use"):].strip().lower() if text.startswith("/portrait use") else ""
+
+        if not want:
+            ui.add_message("system", "\n".join(
+                ["Portrait models (in portrait/models):"]
+                + [f"  {i}. {m}" + ("  <- in use" if m == config.PORTRAIT_MODEL else "")
+                   for i, m in enumerate(found, 1)]
+                + ["  /portrait use <number or name> switches"] if found else
+                ["No models in portrait/models - drop a Live2D folder or a .vrm in there."]))
+            return
+
+        pick = (found[int(want) - 1] if want.isdigit() and 0 < int(want) <= len(found)
+                else next((m for m in found if want in m.lower()), None))
+
+        if not pick:
+            ui.add_message("system", f"No model matching {want!r} - /portrait models lists them.")
+            return
+
+        config.save_setting("portrait.model", pick)
+        livefeed.emit("reload")
+        ui.add_message("system", f"Portrait model: {pick} (saved; an open portrait reloads now).")
+        return
+
     if text in ("/portrait", "/portrait obs"):
         _toggle_portrait(obs=text.endswith("obs"))
         return

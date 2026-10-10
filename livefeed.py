@@ -273,6 +273,23 @@ def with_switcher(html, here):
     return html[:j + 1] + nav + html[j + 1:]
 
 
+def portrait_models():
+    """Every model in portrait/models, as paths portrait.model takes:
+    a folder's .model3.json (Live2D), and any .vrm / .glb (3D)."""
+    root = os.path.join(config.BASE_DIR, "portrait", "models")
+    found = []
+
+    for dirpath, _dirs, files in sorted(os.walk(root)):
+        if dirpath[len(root):].count(os.sep) > 2:      # not deep inside a model's own folders
+            continue
+
+        for f in sorted(files):
+            if f.endswith((".model3.json", ".vrm", ".glb")):
+                found.append(os.path.relpath(os.path.join(dirpath, f), os.path.dirname(root)).replace(os.sep, "/"))
+
+    return found
+
+
 def portrait_config():
     """What the portrait page needs from config.json: which model, and
     which nodes are her ears if their names don't say so. A model that
@@ -286,8 +303,11 @@ def portrait_config():
         fallback = getattr(config, "_SIGEWINNE", "models/sigewinne/sigewinne.model3.json")
         model = fallback if os.path.isfile(os.path.join(root, fallback)) else ""
 
-    live2d = dict(getattr(config, "PORTRAIT_LIVE2D", {}) or {})
-    if missing and model and not live2d:     # Sigewinne's expressions, as config.py sets them
+    # The live2d block belongs to one model: what config.json says if you
+    # set one, else Sigewinne's expressions for Sigewinne and nothing for
+    # a model you've just switched to (its expressions are found by name).
+    live2d = config._stored("portrait.live2d") or {}
+    if not live2d and model == getattr(config, "_SIGEWINNE", ""):
         live2d = {"expressions": {"sad": "tears", "flustered": "x_eyes", "confused": "spiral_eyes"}}
 
     return {"model": model, "missing": missing,

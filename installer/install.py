@@ -12,7 +12,7 @@ without asking first - system packages show the exact command and wait.
     --backend X          lmstudio (default), llama, or skip
     --voice X            install (default), url:http://host:port, or skip
     --gpu X              auto (default), cpu, cuda, rocm - for the voice server
-    --extras a,b         wakeword, mcp, portrait, live2d, embeddings, chat, camera  (or "all")
+    --extras a,b         wakeword, mcp, portrait, live2d, embeddings, reranker, chat, camera  (or "all")
     --no-system          don't install system packages, just say which are missing
     --check              only run the health check
 """
@@ -37,6 +37,8 @@ TORCH_ROCM = os.environ.get("LUNA_TORCH_ROCM", "https://download.pytorch.org/whl
 TORCH_CUDA_WIN = os.environ.get("LUNA_TORCH_CUDA", "https://download.pytorch.org/whl/cu128")
 EMBED_URL = ("https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/"
              "Qwen3-Embedding-0.6B-Q8_0.gguf")
+RERANK_URL = ("https://huggingface.co/ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/resolve/main/"
+              "qwen3-reranker-0.6b-q8_0.gguf")
 CUBISM_URL = "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"
 
 EXTRAS = {
@@ -45,6 +47,7 @@ EXTRAS = {
     "portrait": (["pillow"], "portrait tools: Live2D import, textures"),
     "live2d": ([], "Live2D's runtime saved locally, so the portrait works offline"),
     "embeddings": ([], "recall by meaning: a 600 MB embedding model (llama.cpp backend)"),
+    "reranker": ([], "sharper recall: a 640 MB reranker beside the embedding model (skip on 16 GB machines)"),
     "chat": (["websocket-client"], "the pomf.tv stream-chat plugin"),
     "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
 }
@@ -543,6 +546,13 @@ def extras_files(extras):
             ok("already here")
         elif ask("Download the 600 MB embedding model?"):
             note("embedding model", download(EMBED_URL, dest), "used by llama/start.sh")
+    if "reranker" in extras:
+        step("Reranker model")
+        dest = os.path.join(ROOT, "llama", "models", os.path.basename(RERANK_URL))
+        if os.path.exists(dest):
+            ok("already here")
+        elif ask("Download the 640 MB reranker model?"):
+            note("reranker model", download(RERANK_URL, dest), "used by llama/start.sh (RERANK in server.env)")
 
 
 # ---------------------------------------------------------------------------
@@ -701,7 +711,7 @@ def main():
             step("Extras")
             extras = []
             for key, (_pkgs, what) in EXTRAS.items():
-                if key == "embeddings" and ARGS.backend not in (None, "llama"):
+                if key in ("embeddings", "reranker") and ARGS.backend not in (None, "llama"):
                     continue
                 if ask(f"{key}: {what}?", default=key in ("mcp", "portrait")):
                     extras.append(key)
