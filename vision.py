@@ -26,8 +26,9 @@ import config
 # stale copy, so the setting silently does nothing.
 from config import VISION_SCALE, VISION_MAX_BYTES
 
-# Set by capture(), consumed once by llm._tool_rounds.
+# Set by capture() (or camera.capture), consumed once by llm._tool_rounds.
 _pending = None
+_label = "the screenshot"
 last_error = ""
 
 
@@ -465,10 +466,22 @@ def capture(region="auto", window=None):
         except OSError:
             pass
 
-    _pending = f"data:image/png;base64,{encoded}"
+    stash(f"data:image/png;base64,{encoded}", "the screenshot")
     last_error = ""
 
     return _pending, what
+
+
+def stash(data_url, label):
+    """Hold an image for the next message. label is how it's introduced:
+    "(Here is the screenshot you asked for.)"."""
+    global _pending, _label
+
+    _pending, _label = data_url, label
+
+
+def label():
+    return _label
 
 
 def take():

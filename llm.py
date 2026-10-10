@@ -177,6 +177,8 @@ and the user finds out later that it didn't.
 - What day or time it is now -> get_datetime. How far away something is
   -> time_until. Never count days or convert units yourself.
 - Anything about what's on their screen -> look_at_screen.
+- Something they're holding up or showing you in the room -> look_at_camera,
+  when you have it.
 - Anything you cannot know - news, prices, live facts -> web_search
   for a quick fact; research when it needs real reading (how, why,
   comparisons, what an article says). Never invent an answer
@@ -1175,6 +1177,7 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
         # it over here as a user turn instead. A text-only model will
         # reject this payload, and the error says so plainly rather than
         # us pretending she looked.
+        label = vision.label()
         image = vision.take()
 
         if image:
@@ -1182,7 +1185,7 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
                 "role": "user",
                 "content": [
                     {"type": "text",
-                     "text": "(Here is the screenshot you asked for.)"},
+                     "text": f"(Here is {label} you asked for.)"},
                     {"type": "image_url", "image_url": {"url": image}},
                 ],
             })

@@ -77,3 +77,68 @@ use:
 
 That separates "is grim working" from "can this model see", which are
 the two ways this fails and they look identical from the outside.
+
+## The camera
+
+She can also look through your webcam, one picture at a time, when
+you ask.
+
+```
+> "What am I holding?"
+> "Read this label for me."
+> "Luna, look at this." (on stream, holding something up)
+```
+
+**It's off until you switch it on.** Open the tools pane (Tab twice),
+find the **Camera** group and press Space on `look_at_camera`, or type
+`/camera on`. On a fresh install, and in any config written before the
+camera existed, it stays off.
+
+Once it's on:
+
+- **One picture per request.** No live feed, nothing in the background.
+- **Nothing is saved.** The picture lives for one turn, like a
+  screenshot, and goes only to your local model.
+- **Only for you at the desk.** It's never offered to stream chat,
+  Discord turns or scheduled jobs, so nobody can ask her to look but
+  you.
+- **You see it happen.** Each picture shows `Camera: took one picture`
+  in the conversation, and your camera's own light comes on.
+
+It needs OpenCV, which works on Linux, macOS and Windows:
+
+```bash
+pip install opencv-python-headless      # or: python3 installer/install.py --extras camera
+```
+
+and, like the screen, a model that can see.
+
+```
+/camera            on or off, which camera, whether it's ready
+/camera list       every camera that opens, with its size
+/camera test       take a picture without sending it anywhere
+```
+
+```json
+"camera": { "device": 0, "width": 1280, "warmup": 5 }
+```
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `device` | `0` | Which camera. `/camera list` shows them; a virtual camera from OBS can take number 0 |
+| `width` | `1280` | Pictures are scaled down to this, plenty for reading a label |
+| `warmup` | `5` | Frames thrown away first, because a webcam's first frame is nearly black |
+
+**First time on each system:**
+
+- **macOS** asks whether the terminal Luna runs in (Terminal, iTerm,
+  kitty) may use the camera. If you said no, pictures fail or come
+  back black: allow it in System Settings > Privacy & Security >
+  Camera, then restart Luna.
+- **Windows** needs Settings > Privacy > Camera > *Let desktop apps
+  access your camera*.
+- **Linux** usually just works. If it can't open the camera, check
+  that you're in the `video` group.
+
+On every system, a camera that OBS or Discord is already using may
+refuse to open. She'll say so rather than guess.

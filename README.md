@@ -27,7 +27,7 @@ Powered by:
 - 🎹 Push-to-talk, three modes including hands free
 - ⚡ Streaming replies: she starts talking a sentence in, not at the end
 - ✋ Barge-in: talk over her and she stops
-- 👀 Optional vision: she can look at your screen
+- 👀 Optional vision: she can look at your screen, and through your webcam when you switch it on
 - ⏰ Reminders and real alarms: she wakes you up, and nags until you're up
 - 📝 Writes and edits your files: every change shown in a permission popup first
 - 🖥️ Runs shell commands and opens apps: each one shown and approved first, with read/write/execute permissions you set in the tools pane
@@ -92,7 +92,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Tool calling](docs/tools.md): every tool, turning them off, MCP servers
 - [Files and commands](docs/files.md): reading, writing with approval, allow-all, run_command
 - [Web](docs/web.md): search, research, reading pages
-- [Vision](docs/vision.md): looking at your screen
+- [Vision](docs/vision.md): looking at your screen, the webcam
 - [Reminders and alarms](docs/reminders.md)
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](docs/reasoning.md): thought log, token confidence, adaptive thinking, introspection

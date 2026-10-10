@@ -12,7 +12,7 @@ without asking first - system packages show the exact command and wait.
     --backend X          lmstudio (default), llama, or skip
     --voice X            install (default), url:http://host:port, or skip
     --gpu X              auto (default), cpu, cuda, rocm - for the voice server
-    --extras a,b         wakeword, mcp, portrait, live2d, embeddings, chat  (or "all")
+    --extras a,b         wakeword, mcp, portrait, live2d, embeddings, chat, camera  (or "all")
     --no-system          don't install system packages, just say which are missing
     --check              only run the health check
 """
@@ -46,6 +46,7 @@ EXTRAS = {
     "live2d": ([], "Live2D's runtime saved locally, so the portrait works offline"),
     "embeddings": ([], "recall by meaning: a 600 MB embedding model (llama.cpp backend)"),
     "chat": (["websocket-client"], "the pomf.tv stream-chat plugin"),
+    "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
 }
 
 # ---------------------------------------------------------------------------

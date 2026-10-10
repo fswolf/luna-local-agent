@@ -8,7 +8,7 @@ Everything the README only touches on, one subject per page.
 - [Tool calling](tools.md): every tool, turning them off, MCP servers
 - [Files and commands](files.md): reading, writing with approval, allow-all, run_command
 - [Web](web.md): search, research, reading pages
-- [Vision](vision.md): looking at your screen
+- [Vision](vision.md): looking at your screen, the webcam
 - [Reminders and alarms](reminders.md)
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
@@ -46,7 +46,7 @@ Everything the README only touches on, one subject per page.
 - Streaming replies: she talks while she's still thinking
 - Barge-in: interrupt her mid-sentence
 - Optional wake word, so open mode needs no keypress
-- Optional vision: she can read what's on your screen
+- Optional vision: she can read what's on your screen, and see through your webcam when you switch it on
 - Three push-to-talk modes, including hands free
 - Configurable AI personality, and moods that shift with the clock and the session
 - Long-term memory the model writes, corrects and forgets

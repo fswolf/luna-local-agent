@@ -125,6 +125,7 @@ _GROUPS = (
     ("Files", ("list_files", "read_file", "write_file", "edit_file")),
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",
                  "focus_window", "system_status")),
+    ("Camera", ("look_at_camera",)),
     ("Web", ("web_search", "research", "read_page")),
     ("Shell", ("run_command",)),
     ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
@@ -174,7 +175,17 @@ def grouped():
     return out
 
 
+# The exceptions to on-by-default: tools that reach into the room rather
+# than the computer. Off until switched on, and the switch is stored as
+# an on-list (tools.enabled), so an old config.json with an off-list
+# that predates the tool doesn't turn it on by saying nothing.
+OPT_IN = {"look_at_camera"}
+
+
 def enabled(name):
+    if name in OPT_IN:
+        return name in config.TOOLS_ENABLED
+
     return name not in config.TOOLS_DISABLED
 
 
@@ -184,14 +195,21 @@ def set_enabled(name, on):
     if name not in _REGISTRY:
         return None
 
-    off = set(config.TOOLS_DISABLED)
-    off.discard(name) if on else off.add(name)
-    config.TOOLS_DISABLED = sorted(off)
+    # _store, not save_setting: a list isn't a /set-able scalar, so it
+    # stays out of SETTINGS - same escape hatch plugin switches use.
+    if name in OPT_IN:
+        chosen = set(config.TOOLS_ENABLED)
+        chosen.add(name) if on else chosen.discard(name)
+        config.TOOLS_ENABLED = sorted(chosen)
+        key, value = "tools.enabled", config.TOOLS_ENABLED
+    else:
+        off = set(config.TOOLS_DISABLED)
+        off.discard(name) if on else off.add(name)
+        config.TOOLS_DISABLED = sorted(off)
+        key, value = "tools.disabled", config.TOOLS_DISABLED
 
     try:
-        # _store, not save_setting: a list isn't a /set-able scalar, so
-        # it stays out of SETTINGS - same escape hatch plugin switches use.
-        config._store("tools.disabled", config.TOOLS_DISABLED)
+        config._store(key, value)
     except Exception:
         pass  # a failed save costs the preference, not the session
 

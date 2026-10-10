@@ -1533,6 +1533,7 @@ _HELP_SECTIONS = [
     ]),
     ("Session", [
         ("/look", "list windows, or test a screenshot"),
+        ("/camera", "webcam on/off, list cameras, take a test picture"),
         ("/allow", "is allow-all on for file changes? /allow off ends it"),
         ("/log", "tail the debug log without leaving the app"),
         ("/context", "how big every prompt is vs the model's context"),

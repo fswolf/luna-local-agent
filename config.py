@@ -451,6 +451,17 @@ DESKTOP_ENABLED = bool(_desktop_cfg.get("enabled", True))
 # list rather than a scalar - the tools pane (Tab, twice) edits it, and
 # tools.set_enabled writes it back.
 TOOLS_DISABLED = list(setting("tools", {}).get("disabled", []))
+# The opt-in tools (tools.OPT_IN, the camera) switched on - an on-list,
+# so they stay off until you choose them.
+TOOLS_ENABLED = list(setting("tools", {}).get("enabled", []))
+
+# The webcam, for look_at_camera. The switch is the tool's row in the
+# tools pane; these only say which camera and how big.
+#   "camera": { "device": 0, "width": 1280, "warmup": 5 }
+_camera_cfg = setting("camera", {})
+CAMERA_DEVICE = int(_camera_cfg.get("device", 0))
+CAMERA_WIDTH = int(_camera_cfg.get("width", 1280))
+CAMERA_WARMUP = int(_camera_cfg.get("warmup", 5))
 
 # How she happens to be feeling - see mood.py. Colours tone only, from
 # free signals (clock, session length, errors, barge-ins), never a
@@ -826,6 +837,9 @@ SETTINGS = {
 
     "vision.enabled":             ("VISION_ENABLED",               True),
     "vision.scale":               ("VISION_SCALE",                 True),
+    "camera.device":              ("CAMERA_DEVICE",                True),
+    "camera.width":               ("CAMERA_WIDTH",                 True),
+    "camera.warmup":              ("CAMERA_WARMUP",                True),
 
     "desktop.enabled":            ("DESKTOP_ENABLED",              True),
     "desktop.clipboard":          ("DESKTOP_CLIPBOARD",            True),
