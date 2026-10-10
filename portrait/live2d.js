@@ -46,11 +46,14 @@ model.internalModel.focusController && (model.internalModel.focusController.focu
 function frame() {
   const face = params.get('frame') === 'face';
   // fractions of the model's canvas: where the crop starts, how tall it is
-  const crop = Object.assign({ top: face ? 0.035 : 0.02, height: face ? 0.25 : 0.42, centerX: 0.5 },
+  // (width: how much of the canvas must fit across). The defaults suit a
+  // full-body canvas; a half-body model sets its own in its luna.json.
+  const crop = Object.assign({ top: face ? 0.035 : 0.02, height: face ? 0.25 : 0.42, centerX: 0.5,
+                               width: face ? 0.28 : 0.45 },
                              (face ? L2.crop_face : L2.crop) || {});
   const w0 = model.width / model.scale.x, h0 = model.height / model.scale.y;
   // by height; the sides may run off a narrow window - it's a portrait
-  const s = Math.min(innerHeight / (h0 * crop.height), innerWidth / (w0 * (face ? 0.28 : 0.45)));
+  const s = Math.min(innerHeight / (h0 * crop.height), innerWidth / (w0 * crop.width));
   model.scale.set(s);
   model.x = innerWidth / 2 - w0 * s * crop.centerX;
   model.y = -h0 * s * crop.top;
