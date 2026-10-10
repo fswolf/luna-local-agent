@@ -2,8 +2,8 @@
 
     python portrait/make_placeholder.py
 
-Not the real model: that one comes from VRoid Studio (see
-portrait/design/README.md). This exists so the portrait window has
+Not a real model: make one in VRoid Studio, or use a Live2D model
+(Sigewinne ships with the repo). This exists so the portrait window has
 someone in it from day one, and as a test of everything the window
 drives - it has every part the animation code looks for:
 

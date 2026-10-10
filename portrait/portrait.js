@@ -78,7 +78,7 @@ async function load(url) {
 
   model.scene.traverse(o => {
     o.frustumCulled = false;
-    // Painted with vertex colours (build_luna.py's hair, ears, face parts):
+    // Painted with vertex colours (some generated and hand-made models are):
     // MToon ignores them unless asked to use them.
     if (o.isMesh && o.geometry?.attributes?.color) {
       for (const m of [].concat(o.material)) { m.vertexColors = true; m.needsUpdate = true; }

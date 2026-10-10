@@ -276,7 +276,7 @@ def with_switcher(html, here):
 def portrait_config():
     """What the portrait page needs from config.json: which model, and
     which nodes are her ears if their names don't say so."""
-    model = str(getattr(config, "PORTRAIT_MODEL", "") or "models/luna.vrm")
+    model = str(getattr(config, "PORTRAIT_MODEL", "") or "models/placeholder.vrm")
     root = os.path.join(config.BASE_DIR, "portrait")
 
     if not os.path.isfile(os.path.join(root, model)):
