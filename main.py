@@ -1070,6 +1070,15 @@ def handle_input(text):
         ui.add_message("system", f"Live monitor: {livefeed.url()}")
         return
 
+    if text in ("/holo", "/holo on", "/holo off"):
+        import livefeed
+
+        word = text.split()[1] if " " in text else ("off" if config.PORTRAIT_HOLOGRAM_ENABLED else "on")
+        config.save_setting("portrait.hologram.enabled", "true" if word == "on" else "false")
+        livefeed.emit("holo", on=word == "on")
+        ui.add_message("system", f"Portrait hologram {word} (saved; an open portrait switches now).")
+        return
+
     if text in ("/portrait", "/portrait obs"):
         _toggle_portrait(obs=text.endswith("obs"))
         return

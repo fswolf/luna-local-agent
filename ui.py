@@ -722,6 +722,11 @@ _FEATURES = (
     ("warmth sensing", "MOOD_AFFECTION", "mood.affection", "1 call/turn"),
 )
 
+# How the portrait looks - nothing to do with the prompt, so no cost.
+_PORTRAIT_FEATURES = (
+    ("hologram look", "PORTRAIT_HOLOGRAM_ENABLED", "portrait.hologram.enabled", "/holo, live"),
+)
+
 # Costs nothing in context - it records what the model already produced
 # - so it carries no token figure, just what it does.
 _THOUGHT_FEATURES = (
@@ -816,6 +821,18 @@ def _thoughts_group():
     return ("Thoughts", members, 0, 0)
 
 
+def _portrait_group():
+    try:
+        import config
+    except Exception:
+        return None
+
+    members = [(label, bool(getattr(config, key, False)), True, note, 0, path)
+               for label, key, path, note in _PORTRAIT_FEATURES]
+
+    return ("Portrait", members, 0, 0)
+
+
 def _feature_group():
     """The Mood group: same shape as a tool group, so the cursor, the
     scrolling and the line map don't need to know the difference."""
@@ -856,7 +873,7 @@ def _tool_groups():
     except Exception:
         groups = []
 
-    extra = [g for g in (_feature_group(), _thoughts_group(), _self_group()) if g]
+    extra = [g for g in (_feature_group(), _thoughts_group(), _self_group(), _portrait_group()) if g]
     perms = _perm_group()
 
     return ([perms] if perms else []) + groups + extra
@@ -1096,6 +1113,12 @@ def _tool_toggle():
                 import mood
 
                 mood._announce()
+
+            # an open portrait switches straight away
+            if setting == "portrait.hologram.enabled":
+                import livefeed
+
+                livefeed.emit("holo", on=not on)
         else:
             import tools
 
@@ -1533,6 +1556,7 @@ _HELP_SECTIONS = [
     ]),
     ("Session", [
         ("/look", "list windows, or test a screenshot"),
+        ("/holo", "portrait hologram look on/off (live, saved)"),
         ("/camera", "webcam on/off, list cameras, take a test picture"),
         ("/allow", "is allow-all on for file changes? /allow off ends it"),
         ("/log", "tail the debug log without leaving the app"),

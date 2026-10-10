@@ -76,7 +76,14 @@ async function load(url) {
 
   if (model.meta?.metaVersion === '0') VRMUtils.rotateVRM0(model);
 
-  model.scene.traverse(o => { o.frustumCulled = false; });
+  model.scene.traverse(o => {
+    o.frustumCulled = false;
+    // Painted with vertex colours (build_luna.py's hair, ears, face parts):
+    // MToon ignores them unless asked to use them.
+    if (o.isMesh && o.geometry?.attributes?.color) {
+      for (const m of [].concat(o.material)) { m.vertexColors = true; m.needsUpdate = true; }
+    }
+  });
   scene.add(model.scene);
 
   for (const e of model.expressionManager?.expressions || []) has.add(e.expressionName);
@@ -325,6 +332,17 @@ const clock = new THREE.Clock();
 const headRot = { x: 0, y: 0, z: 0 };
 
 function bone(name) { return vrm.humanoid.getNormalizedBoneNode(name); }
+const breathing = { phase: Math.random() * 6, jitter: 1 };
+const posture = { z: 0, y: 0, cz: 0, cy: 0, next: 10 };
+let armsDown = null;
+function inTPose() {
+  // rest pose: does the upper arm run out sideways (T-pose) or down?
+  const up = vrm.humanoid.getRawBoneNode('leftUpperArm'), lo = vrm.humanoid.getRawBoneNode('leftLowerArm');
+  if (!up || !lo) return true;
+  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  up.getWorldPosition(a); lo.getWorldPosition(b);
+  return Math.abs(b.x - a.x) > Math.abs(b.y - a.y);
+}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -355,16 +373,31 @@ function animate() {
     if (head) head.rotation.set(headRot.x * 0.6, headRot.y * 0.6, headRot.z * 0.6);
     if (neck) neck.rotation.set(headRot.x * 0.4, headRot.y * 0.4, headRot.z * 0.4);
 
-    const breath = Math.sin(now * 1.7) * 0.012;
+    // Breathing: in quicker than out, each breath a little different, the
+    // shoulders lifting with it so it reads on a skinned model.
+    breathing.phase += Math.PI * 2 * (talking > 0.05 ? 0.3 : mind.stage === 'thinking' ? 0.28 : 0.22) * breathing.jitter * dt;
+    if (breathing.phase > Math.PI * 2) { breathing.phase -= Math.PI * 2; breathing.jitter = 0.85 + Math.random() * 0.3; }
+    const k = breathing.phase / (Math.PI * 2);
+    const breath = k < 0.4 ? (1 - Math.cos(Math.PI * k / 0.4)) / 2 : (1 + Math.cos(Math.PI * (k - 0.4) / 0.6)) / 2;
     const chest = bone('upperChest') || bone('chest');
-    if (chest) chest.rotation.x = breath;
-    const spine = bone('spine');
-    if (spine) spine.rotation.z = Math.sin(now * 0.4) * 0.01;
+    if (chest) chest.rotation.x = -breath * 0.035;
+    const ls = bone('leftShoulder'), rs = bone('rightShoulder');
+    if (ls) ls.rotation.z = breath * 0.05;
+    if (rs) rs.rotation.z = -breath * 0.05;
 
-    // Arms down from the T-pose models ship in.
+    // The body sways on its own and shifts its weight now and then, so the
+    // hair (spring bones) has something to swing from besides the head.
+    if (now > posture.next) { posture.z = (Math.random() - 0.5) * 0.08; posture.y = (Math.random() - 0.5) * 0.1; posture.next = now + 18 + Math.random() * 22; }
+    posture.cz = damp(posture.cz, posture.z + Math.sin(now * 0.23) * 0.015, 1, dt);
+    posture.cy = damp(posture.cy, posture.y + Math.sin(now * 0.11 + 2) * 0.02, 1, dt);
+    const spine = bone('spine');
+    if (spine) spine.rotation.set(mind.stage === 'listening' ? 0.04 : 0, posture.cy, posture.cz);
+
+    // Arms down - but only on a model that ships in a T-pose.
     const la = bone('leftUpperArm'), ra = bone('rightUpperArm');
-    if (la) la.rotation.z = -1.2;
-    if (ra) ra.rotation.z = 1.2;
+    if (armsDown === null) armsDown = inTPose();
+    if (la) la.rotation.z = armsDown ? -1.2 : 0;
+    if (ra) ra.rotation.z = armsDown ? 1.2 : 0;
 
     vrm.update(dt);
     updateEars(now, dt);   // after update: spring bones won't overwrite a twitch
@@ -448,7 +481,7 @@ try {
   }
   frame();
   say('');
-  window.portrait = { handle, twitch, fakeVoice, blink, mind };
+  window.portrait = { handle, twitch, fakeVoice, blink, mind, get vrm() { return vrm; } };
   if (params.get('debug')) debugPanel();
   if (params.get('demo')) demo(); else connect();
 } catch (e) {
