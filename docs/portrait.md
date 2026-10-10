@@ -82,6 +82,44 @@ spelled out:
 }
 ```
 
+### Using more of the rig
+
+Most Live2D models hang their hair and ears off the head angles, and
+their clothes off the body angles, with breathing feeding both. So the
+portrait moves the body on its own instead of copying the head:
+
+- **Body:** a slow sway of its own, a change of posture every half
+  minute or so, leaning in while you talk, a little hop when she's
+  pleased. The clothes physics swings with it.
+- **Breathing:** a breath in that's quicker than the breath out, a
+  little different each time, slower when it's late and quiet, and a
+  top-up breath before she starts talking. Each breath also lifts the
+  head and body slightly, so you can see it even on a model whose own
+  breath parameter is subtle.
+- **Brows and eyes:** worried when a reply came out unsure, one brow up
+  when the grounding check flags a guess, furrowed when a tool fails,
+  wide-eyed when you talk over her, softer when she's warm. One brow sits
+  higher on the side she looks to while thinking. On Sigewinne the bangs
+  hide much of the brows, so this mostly shows through the eyes.
+- **Talking and listening:** small nods and brow lifts on her louder
+  syllables, and an "mm-hm" nod every few seconds while you talk.
+- **Idle:** after a quiet minute she looks around more, and now and then
+  she stretches. Late at night her eyelids get heavier.
+
+Two settings tune it, under `portrait.live2d`:
+
+| Key | Default | What it does |
+|-----|---------|--------------|
+| `breath` | `1` | How visible her breathing is. `0` turns it off, `2` is deep |
+| `motion` | `1` | How much the body sways and gestures move overall |
+| `flip_lean` | `false` | For a rig where leaning in looks like leaning back |
+
+The `?debug=1` page has a button for every gesture and reaction, sliders
+for `breath` and `motion` (try values there, then put them in
+`config.json`), and a picker that holds any one of the model's
+parameters on a slider, named from its display file. That's the way to
+find out what an unlabelled parameter like Sigewinne's `Param27` does.
+
 Live2D's Cubism Core comes from Live2D's CDN. For offline use, run
 `bash portrait/vendor/get_cubism_core.sh` once. It's Live2D's code under
 their licence, so it's downloaded rather than shipped here. Models you

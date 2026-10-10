@@ -38,6 +38,8 @@ REPO = os.environ.get("LUNA_REPO") or os.path.expanduser("~/ai-voice")
 TEXTURES = os.path.join(REPO, "portrait", "textures")
 SCENE = "Luna VRM"
 COLL = "Luna"
+# "bob" (short, like most of her pictures) or "long" (the first wallpaper)
+HAIR_STYLE = os.environ.get("LUNA_HAIR", "bob")
 
 
 def hexc(h, a=1.0):
@@ -59,11 +61,11 @@ PAL = {
 }
 
 HC = Vector((0.0, 0.0, 1.47))         # head centre
-HR = Vector((0.084, 0.089, 0.099))    # half sizes: x, depth (y), height
+HR = Vector((0.087, 0.090, 0.097))    # half sizes: x, depth (y), height
 
 EYE_X, EYE_Z = 0.0335, 1.452
 EYE_W, EYE_H = 0.0205, 0.0245
-MOUTH_Z, MOUTH_W = 1.391, 0.0118
+MOUTH_Z, MOUTH_W = 1.394, 0.0118
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +151,15 @@ def make_obj(coll, name, verts, faces, colors=None, mat=None, uvs=None, smooth=T
     return ob
 
 
+def outward(ob):
+    """Point every face outwards (the generators don't promise a winding)."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data)
+    bm.free()
+
+
 def add_keys(ob, keys):
     """keys: {name: [Vector per vertex]} absolute positions."""
     ob.shape_key_add(name="Basis", from_mix=False)
@@ -173,9 +184,9 @@ def head_point(u, v, grow=0.0):
     front = max(0.0, math.cos(u))
     if z < 0:
         t = min(1.0, -z)
-        p.x *= 1 - 0.36 * t ** 1.3
+        p.x *= 1 - 0.34 * t ** 1.4
         p.y *= 1 - 0.18 * t
-        p.z *= 1 + 0.10 * t ** 1.5
+        p.z *= 1 - 0.02 * t ** 1.5
         p.y -= 0.010 * t ** 2.2 * front ** 2
     if y < 0:   # the face: flatter, cheeks a touch fuller under the eyes
         p.y *= 1 - 0.13 * front * (1 - abs(z) ** 1.5)
@@ -512,9 +523,11 @@ def bez(p0, p1, p2, p3, t):
     return p0 * (1 - t) ** 3 + p1 * 3 * (1 - t) ** 2 * t + p2 * 3 * (1 - t) * t * t + p3 * t ** 3
 
 
-def strand(acc, ctrl, width, thick, segs=14, sides=6, color=None, centre=None, flat_tip=False):
-    """A clump of hair along a Bezier: a flattened tube, pointed at the end."""
-    verts, colors, faces = acc
+def strand(acc, ctrl, width, thick, segs=14, sides=6, color=None, centre=None, flat_tip=False, chain=None):
+    """A clump of hair along a Bezier: a flattened tube, pointed at the end.
+    chain: which spring-bone chain it hangs from; each vertex is recorded
+    in HAIR_WEIGHTS with how far down the strand it is, for skinning."""
+    verts, colors, faces = acc[:3]
     ctrl = [Vector(c) for c in ctrl]
     centre = centre or HC
     pts = [bez(*ctrl, s / segs) for s in range(segs + 1)]
@@ -535,12 +548,15 @@ def strand(acc, ctrl, width, thick, segs=14, sides=6, color=None, centre=None, f
             verts.append(p + side * (math.cos(a) * w) + out * (math.sin(a) * th))
             colors.append(c)
             ring.append(len(verts) - 1)
+            if len(acc) > 3:
+                acc[3].append((chain, t))
         rings.append(ring)
     for s in range(segs):
         for k in range(sides):
             faces.append((rings[s][k], rings[s][(k + 1) % sides], rings[s + 1][(k + 1) % sides], rings[s + 1][k]))
     # cap the root
     faces.append(tuple(rings[0][::-1]))
+    return pts
 
 
 def build_hair(coll, mats, S):
@@ -620,16 +636,144 @@ def build_hair(coll, mats, S):
 
 
 # ---------------------------------------------------------------------------
+# Hair: the bob, with spring-bone chains
+# ---------------------------------------------------------------------------
+# chain name -> the points its bones run through (root first). Filled in by
+# the hair builder from a representative strand, used by build_armature.
+CHAINS = {}
+CHAIN_T0 = 0.18          # the part of each strand above this stays with the head
+CHAIN_BONES = 3
+
+
+def chain_from(name, pts):
+    """Bone points for a chain, from one strand's sampled curve."""
+    n = len(pts) - 1
+    CHAINS[name] = [pts[min(n, round(n * (CHAIN_T0 + (1 - CHAIN_T0) * k / CHAIN_BONES)))].copy()
+                    for k in range(CHAIN_BONES + 1)]
+
+
+def bob_col(t, shine=0.0):
+    """Down the strand: near-black indigo, violet, lilac, then magenta ends."""
+    if t < 0.45:
+        c = lerp(PAL["hair_top"], PAL["hair_mid"], t / 0.45)
+    elif t < 0.75:
+        c = lerp(PAL["hair_mid"], PAL["hair_violet"], (t - 0.45) / 0.3)
+    else:
+        c = lerp(PAL["hair_violet"], PAL["hair_tip"], ((t - 0.75) / 0.25) ** 0.8)
+        if t > 0.93:
+            c = lerp(c, PAL["hair_tip2"], (t - 0.93) / 0.07)
+    return lerp(c, PAL["hair_violet"], shine) if shine else c
+
+
+def build_hair_bob(coll, mats, S):
+    obs = []
+    CHAINS.clear()
+
+    # The cap, as before: a shell over the skull, open at the face.
+    U, V = 64, 34
+    verts, colors, faces = [], [], []
+    keep = {}
+    for j in range(V + 1):
+        v = -0.95 + (math.pi / 2 + 0.95) * j / V
+        for i in range(U):
+            u = 2 * math.pi * i / U
+            p = head_point(u, v, grow=0.0085)
+            p.z += 0.003
+            rel = (p.z - HC.z)
+            shine = max(0.0, 1 - abs(rel - 0.055) / 0.012) * 0.55 * max(0.0, -math.cos(u) * 0.3 + 0.7)
+            verts.append(p)
+            colors.append(bob_col(0.12 - 0.1 * max(0, rel) / 0.1, shine))
+            front = math.cos(u)
+            line = 0.012 * max(0, front) ** 0.7 - 0.055 * (1 - max(0, front)) - 0.03 * max(0, -front)
+            keep[j * U + i] = rel > line
+    for j in range(V):
+        for i in range(U):
+            a, b = j * U + i, j * U + (i + 1) % U
+            quad = (a, b, b + U, a + U)
+            if all(keep[q] for q in quad):
+                faces.append(quad)
+    obs.append(make_obj(coll, "Luna_HairCap", verts, faces, colors, mats["hair"], subsurf=1))
+
+    # Bangs: messy and pointed, longer locks between the eyes and one that
+    # falls across her right eye the way it does in most of her pictures.
+    acc = ([], [], [], [])
+    xs = [-0.078 + 0.0098 * k for k in range(17)]
+    for k, x in enumerate(xs):
+        edge = abs(x) / 0.08
+        jag = (0.0, 0.011, 0.004, 0.015, 0.007)[k % 5]       # uneven, pointed ends
+        tip_z = EYE_Z + 0.027 - jag + 0.012 * edge ** 3
+        tip_x = x * 0.98 + 0.006 * math.sin(k * 2.3) + 0.004 * math.copysign(edge, x)
+        if abs(x + 0.006) < 0.011:
+            tip_z = EYE_Z - 0.004                       # down between the eyes
+        if -0.048 < x < -0.022 and k % 2 == 0:
+            tip_z = EYE_Z - 0.006; tip_x = x + 0.006    # across her right eye
+        tip = S.at(tip_x, tip_z, 0.0068 + 0.004 * edge)
+        root = HC + Vector((x * 0.4 + 0.012, -0.03, 0.097))
+        c1 = HC + Vector((x * 0.8, -0.072, 0.080))
+        c2 = S.at(x * 1.0, tip_z + 0.036, 0.011 + 0.004 * edge)
+        w = 0.0115 + 0.004 * ((k * 7) % 3) / 2
+        pts = strand(acc, [root, c1, c2, tip], w, 0.0042, segs=16, chain="bangs",
+                     color=lambda t: bob_col(t * 0.55, shine=max(0.0, 1 - abs(t - 0.28) / 0.09) * 0.55))
+        if k == 8:
+            chain_from("bangs", pts)
+    obs.append((make_obj(coll, "Luna_HairBangs", acc[0], acc[2], acc[1], mats["hair"], subsurf=1), acc[3]))
+
+    # Side locks in front of the ears, to the jaw, the ends curling in.
+    acc = ([], [], [], [])
+    for side in (1, -1):
+        name = "side_L" if side > 0 else "side_R"
+        for k, (dx, dy, end_z, w) in enumerate(((0.000, -0.034, 1.352, 0.017), (0.010, -0.014, 1.338, 0.019),
+                                                  (0.004, 0.006, 1.345, 0.017))):
+            top = HC + Vector((side * (0.072 + dx), dy - 0.018, 0.058))
+            mid1 = HC + Vector((side * (0.097 + dx), dy - 0.026, 0.0))
+            mid2 = Vector((side * (0.096 + dx), HC.y + dy - 0.03, end_z + 0.05))
+            tip = Vector((side * (0.080 + dx * 0.5), HC.y + dy - 0.040, end_z))
+            pts = strand(acc, [top, mid1, mid2, tip], w, 0.0040, segs=18, chain=name,
+                         color=lambda t: bob_col(0.1 + 0.9 * t), centre=HC + Vector((0, 0.01, -0.06)))
+            if k == 1:
+                chain_from(name, pts)
+    obs.append((make_obj(coll, "Luna_HairSides", acc[0], acc[2], acc[1], mats["hair"], subsurf=1), acc[3]))
+
+    # The bob: full over the back of the skull, ending at the nape and jaw,
+    # the ends turned in, a few flicking out. Three chains across the back
+    # so it sways in pieces rather than as a helmet.
+    acc = ([], [], [], [])
+    n = 23
+    names = ("back_R", "back_C", "back_L")       # her right is -x
+    for k in range(n):
+        a = -1.62 + 3.24 * k / (n - 1)          # 0 = straight back, +-1.6 = beside the ears
+        side_amt = abs(a) / 1.62
+        r0, r1 = 0.060, 0.122 - 0.012 * side_amt
+        top = HC + Vector((r0 * math.sin(a), r0 * math.cos(a) * 0.95 + 0.01, 0.094 - 0.02 * side_amt))
+        c1 = HC + Vector((r1 * math.sin(a) * 1.02, r1 * math.cos(a) * 0.98 + 0.004, 0.012))
+        end_z = 1.338 + 0.012 * side_amt + 0.006 * math.sin(k * 2.1)
+        flick = 1.0 if k % 5 == 2 else 0.0
+        rin = 0.104 - 0.012 * (1 - flick) + 0.018 * flick
+        c2 = Vector((r1 * 0.98 * math.sin(a), HC.y + r1 * 0.95 * math.cos(a) + 0.006, end_z + 0.055))
+        tip = Vector((rin * math.sin(a), HC.y + rin * math.cos(a) * 0.92 + 0.004, end_z))
+        # weight between the two nearest chains, by angle
+        f = (a + 1.62) / 3.24 * 2                # 0..2 across the three chains
+        i0 = min(1, int(f)); blend = f - i0
+        ch = {names[i0]: 1 - blend, names[i0 + 1]: blend}
+        pts = strand(acc, [top, c1, c2, tip], 0.024, 0.0085, segs=20, chain=ch,
+                     color=lambda t: bob_col(0.05 + 0.95 * t), centre=Vector((0, 0.0, top.z - 0.09)))
+        if k in (2, n // 2, n - 3):
+            chain_from(names[(0, 1, 2)[[2, n // 2, n - 3].index(k)]], pts)
+    obs.append((make_obj(coll, "Luna_HairBack", acc[0], acc[2], acc[1], mats["hair"], subsurf=1), acc[3]))
+    return obs
+
+
+# ---------------------------------------------------------------------------
 # Ears
 # ---------------------------------------------------------------------------
-EAR_BASE = Vector((0.061, 0.006, 1.552))
+EAR_BASE = Vector((0.063, 0.010, 1.549))
 
 
 def build_ear(coll, mats, side):
     """A cat ear standing on the head, built at the origin then placed.
     Dark outside, pink inside, white fur along the inner edge."""
     verts, colors, faces = [], [], []
-    h, w, d = 0.074, 0.030, 0.013
+    h, w, d = 0.086, 0.035, 0.014
     rings, n = 10, 16
     for r in range(rings + 1):
         t = r / rings
@@ -650,12 +794,12 @@ def build_ear(coll, mats, side):
             faces.append((a, b, b + n, a + n))
     # fur: little tufts from the inner rim
     acc = (verts, colors, faces)
-    for k in range(9):
-        fx = -0.019 + 0.0047 * k
+    for k in range(13):
+        fx = -0.024 + 0.004 * k
         base = Vector((fx, -0.003, 0.002 + 0.003 * (k % 3)))
-        tip = Vector((fx * 0.55 + 0.002 * math.sin(k * 1.7), -0.011 - 0.002 * (k % 2), 0.020 + 0.007 * ((k * 5) % 3)))
-        strand(acc, [base, base + Vector((0, -0.005, 0.006)), tip + Vector((0, 0.001, -0.006)), tip],
-               0.0042, 0.0016, segs=6, sides=5, color=lambda t: lerp(PAL["fur"], PAL["ear_in"], t * 0.25),
+        tip = Vector((fx * 0.5 + 0.002 * math.sin(k * 1.7), -0.013 - 0.002 * (k % 2), 0.026 + 0.009 * ((k * 5) % 3)))
+        strand(acc, [base, base + Vector((0, -0.006, 0.008)), tip + Vector((0, 0.001, -0.008)), tip],
+               0.0050, 0.0018, segs=6, sides=5, color=lambda t: lerp(PAL["fur"], PAL["ear_in"], t * 0.15),
                centre=Vector((fx, 0.02, 0.0)))
     ob = make_obj(coll, f"Luna_Ear_{'L' if side > 0 else 'R'}", verts, faces, colors, mats["ear"], subsurf=1)
     # stand it on the head: tilted out and a little back
@@ -668,52 +812,140 @@ def build_ear(coll, mats, side):
 # ---------------------------------------------------------------------------
 # Body
 # ---------------------------------------------------------------------------
+BODY_PROFILE = [  # z, half-width, half-depth, squareness
+    (1.405, 0.025, 0.023, 0.0), (1.37, 0.025, 0.023, 0.0), (1.335, 0.026, 0.024, 0.0),
+    (1.318, 0.038, 0.031, 0.1), (1.304, 0.070, 0.044, 0.3), (1.287, 0.108, 0.053, 0.42),
+    (1.266, 0.133, 0.060, 0.5), (1.240, 0.142, 0.066, 0.5), (1.205, 0.138, 0.072, 0.45),
+    (1.165, 0.128, 0.076, 0.4), (1.125, 0.122, 0.075, 0.38), (1.090, 0.120, 0.073, 0.36),
+]
+
+
+def body_ring(z):
+    """(half-width, half-depth, squareness) at a height, smoothly between rows."""
+    P = BODY_PROFILE
+    if z >= P[0][0]:
+        return P[0][1:]
+    for i in range(len(P) - 1):
+        z0, z1 = P[i][0], P[i + 1][0]
+        if z1 <= z <= z0:
+            t = (z0 - z) / (z0 - z1)
+            t = t * t * (3 - 2 * t)
+            return tuple(P[i][c] * (1 - t) + P[i + 1][c] * t for c in (1, 2, 3))
+    return P[-1][1:]
+
+
+def body_point(z, a, grow=0.0):
+    """A point on the torso: a=0 is her left side (+x), a=pi/2 the front."""
+    hw, hd, sq = body_ring(z)
+    c, s_ = math.cos(a), math.sin(a)
+    e = 2 / (2 + sq * 4)
+    x = (hw + grow) * math.copysign(abs(c) ** e, c)
+    y = -(hd + grow) * math.copysign(abs(s_) ** e, s_)
+    p = Vector((x, y + 0.006, z))
+    if z < 1.31:
+        p.y += 0.004 * (1.31 - z) / 0.3
+    if y < 0:   # a modest bust
+        bump = math.exp(-((z - 1.178) / 0.034) ** 2) * math.exp(-((abs(x) - 0.052) / 0.04) ** 2)
+        p.y -= 0.016 * bump
+    return p
+
+
+def neckline(a):
+    """Where the camisole's top edge sits at angle a."""
+    front = max(0.0, math.sin(a))
+    back = max(0.0, -math.sin(a))
+    return 1.212 - 0.012 * front ** 6 + 0.022 * back
+
+
 def build_body(coll, mats):
-    verts, colors, faces = [], [], []
-    n = 48
-    profile = [  # z, half-width, half-depth, squareness
-        (1.405, 0.024, 0.022, 0.0), (1.37, 0.025, 0.023, 0.0), (1.335, 0.027, 0.025, 0.0),
-        (1.312, 0.036, 0.031, 0.1), (1.295, 0.068, 0.045, 0.3), (1.275, 0.108, 0.056, 0.45),
-        (1.250, 0.140, 0.064, 0.55), (1.222, 0.153, 0.070, 0.55), (1.185, 0.150, 0.077, 0.5),
-        (1.14, 0.140, 0.080, 0.45), (1.10, 0.132, 0.078, 0.4),
-    ]
-    # Catmull-Rom between the profile rings, so colour edges (the
-    # neckline, the straps) land on real vertices instead of smearing.
-    fine = []
-    for i in range(len(profile) - 1):
-        p0, p1 = profile[max(0, i - 1)], profile[i]
-        p2, p3 = profile[i + 1], profile[min(len(profile) - 1, i + 2)]
-        for s_ in range(4):
-            t = s_ / 4
-            fine.append(tuple(0.5 * ((2 * p1[c]) + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t * t
-                                     + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t ** 3) for c in range(4)))
-    fine.append(profile[-1])
-    profile = fine
-    n = 96
-    for z, hw, hd, sq in profile:
+    n, rows = 96, 44
+    z_top, z_bot = 1.405, 1.090
+    verts, faces = [], []
+    for j in range(rows + 1):
+        z = z_top - (z_top - z_bot) * j / rows
         for k in range(n):
-            a = 2 * math.pi * k / n
-            c, s = math.cos(a), math.sin(a)
-            e = 2 / (2 + sq * 4)
-            x = hw * math.copysign(abs(c) ** e, c)
-            y = -hd * math.copysign(abs(s) ** e, s)
-            p = Vector((x, y + 0.006, z))
-            if z < 1.31:
-                p.y += 0.004 * (1.31 - z) / 0.3
-            verts.append(p)
-            # a black camisole: neckline under the collarbones, thin straps
-            strap = abs(abs(x) - 0.085) < 0.006 and z > 1.18 and z < 1.285
-            neckline = 1.20 - 0.03 * max(0.0, 1 - abs(x) / 0.10) ** 2 + 0.01 * (y > 0.03)
-            colors.append(PAL["top"] if (z < neckline or strap) else PAL["skin"])
-    for j in range(len(profile) - 1):
+            verts.append(body_point(z, 2 * math.pi * k / n))
+    for j in range(rows):
         for k in range(n):
             a, b = j * n + k, j * n + (k + 1) % n
             faces.append((a, a + n, b + n, b))
-    ob = make_obj(coll, "Luna_Body", verts, faces, colors, mats["body"], subsurf=1)
+    # arms hanging at her sides, from the shoulder to the bottom of the bust
+    for side in (1, -1):
+        path = [Vector((side * 0.112, 0.006, 1.262)), Vector((side * 0.146, 0.010, 1.222)),
+                Vector((side * 0.156, 0.014, 1.150)), Vector((side * 0.160, 0.017, 1.085))]
+        radii = [0.028, 0.031, 0.029, 0.027]
+        ring_n, steps = 24, 16
+        start = len(verts)
+        for i in range(steps + 1):
+            t = i / steps
+            seg = min(2, int(t * 3)); tt = t * 3 - seg
+            p = path[seg].lerp(path[seg + 1], tt)
+            r = radii[seg] * (1 - tt) + radii[seg + 1] * tt
+            if t < 0.12:   # a rounded shoulder top
+                r *= 0.55 + 0.45 * math.sin(math.pi / 2 * t / 0.12)
+            tan = (path[min(3, seg + 1)] - path[seg]).normalized()
+            ax = Vector((0, 1, 0)).cross(tan).normalized()
+            ay = tan.cross(ax).normalized()
+            for k in range(ring_n):
+                a = 2 * math.pi * k / ring_n
+                verts.append(p + ax * math.cos(a) * r + ay * math.sin(a) * r * 0.92)
+        for i in range(steps):
+            for k in range(ring_n):
+                a = start + i * ring_n + k
+                b = start + i * ring_n + (k + 1) % ring_n
+                f = (a, b, b + ring_n, a + ring_n)
+                faces.append(f if side > 0 else f[::-1])
+        faces.append(tuple(range(start, start + ring_n))[::-1] if side > 0 else tuple(range(start, start + ring_n)))
+    ob = make_obj(coll, "Luna_Body", verts, faces, None, mats["skin"], subsurf=1)
+    outward(ob)
 
-    # choker: a band with a small ring at the front
+    # the camisole: a shell just off the skin, with a clean top edge, and straps
     verts, faces = [], []
-    for z in (1.338, 1.351):
+    cols, trows = 96, 26
+    for k in range(cols):
+        a = 2 * math.pi * k / cols
+        zt = neckline(a)
+        for j in range(trows + 1):
+            z = z_bot - 0.004 + (zt - z_bot + 0.004) * j / trows
+            verts.append(body_point(z, a, grow=0.0035))
+    for k in range(cols):
+        for j in range(trows):
+            a = k * (trows + 1) + j
+            b = ((k + 1) % cols) * (trows + 1) + j
+            faces.append((a, b, b + 1, a + 1))
+    top = make_obj(coll, "Luna_Top", verts, faces, None, mats["top"], subsurf=1)
+    outward(top)
+
+    # straps: their own mesh, no subdivision (it would shrink a thin ribbon to nothing)
+    verts, faces = [], []
+    bpy.context.view_layer.update()
+    bvh = BVHTree.FromObject(ob, bpy.context.evaluated_depsgraph_get())
+    for side in (1, -1):
+        pts = []
+        x = side * 0.078
+        c = Vector((x, 0.006, 1.19))
+        for i in range(25):
+            th = 0.25 + (math.pi - 0.5) * i / 24          # front, over the shoulder, to the back
+            d = Vector((0, -math.cos(th), math.sin(th)))
+            hit, nrm, _f, _d = bvh.ray_cast(c + d * 0.4, -d)
+            if hit is None:
+                continue
+            front = hit.y < 0.006
+            if hit.z < neckline(math.pi / 2 if front else -math.pi / 2) - 0.006:
+                continue
+            pts.append(hit + d * 0.0042)          # out along the ray: the side we came from
+        start = len(verts)
+        for pnt in pts:
+            for dx in (-0.0035, 0.0035):
+                verts.append(pnt + Vector((dx, 0, 0)))
+        for i in range(len(pts) - 1):
+            a_ = start + 2 * i
+            faces.append((a_, a_ + 2, a_ + 3, a_ + 1) if side > 0 else (a_ + 1, a_ + 3, a_ + 2, a_))
+    straps = make_obj(coll, "Luna_Straps", verts, faces, None, mats["top"])
+
+    # choker: a band, a ring and a little bell
+    verts, faces = [], []
+    for z in (1.336, 1.350):
         for k in range(n):
             a = 2 * math.pi * k / n
             verts.append(Vector((0.0285 * math.cos(a), -0.0265 * math.sin(a) + 0.006, z)))
@@ -722,14 +954,16 @@ def build_body(coll, mats):
     choker = make_obj(coll, "Luna_Choker", verts, faces, None, mats["choker"], subsurf=1)
     ring = bpy.data.objects.new("Luna_ChokerRing", bpy.data.meshes.new("Luna_ChokerRing"))
     bm = bmesh.new()
-    bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.0042, radius2=0.0042, depth=0.0012)
-    bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "X"))
+    bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=10, radius=0.0058)
+    bmesh.ops.translate(bm, verts=bm.verts, vec=(0, 0, -0.0065))
+    ring_v = bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.0028, radius2=0.0028, depth=0.0012)
+    bmesh.ops.rotate(bm, verts=ring_v["verts"], cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "X"))
     bm.to_mesh(ring.data)
     bm.free()
     ring.data.materials.append(mats["metal"])
-    ring.location = (0, -0.0225, 1.334)
+    ring.location = (0, -0.0235, 1.336)
     coll.objects.link(ring)
-    return [ob, choker, ring]
+    return [ob, top, straps, choker, ring]
 
 
 # ---------------------------------------------------------------------------
@@ -746,14 +980,15 @@ BONES = [  # name (VRM humanoid name where there is one), parent, head, tail
     ("rightEye", "head", (-EYE_X, -0.05, EYE_Z), (-EYE_X, -0.07, EYE_Z)),
     ("Ear_L", "head", (EAR_BASE.x, EAR_BASE.y, EAR_BASE.z), (EAR_BASE.x + 0.025, EAR_BASE.y, EAR_BASE.z + 0.06)),
     ("Ear_R", "head", (-EAR_BASE.x, EAR_BASE.y, EAR_BASE.z), (-EAR_BASE.x - 0.025, EAR_BASE.y, EAR_BASE.z + 0.06)),
-    ("leftShoulder", "upperChest", (0.02, 0, 1.29), (0.10, 0, 1.28)),
-    ("leftUpperArm", "leftShoulder", (0.15, 0, 1.27), (0.40, 0, 1.27)),
-    ("leftLowerArm", "leftUpperArm", (0.40, 0, 1.27), (0.62, 0, 1.27)),
-    ("leftHand", "leftLowerArm", (0.62, 0, 1.27), (0.70, 0, 1.27)),
-    ("rightShoulder", "upperChest", (-0.02, 0, 1.29), (-0.10, 0, 1.28)),
-    ("rightUpperArm", "rightShoulder", (-0.15, 0, 1.27), (-0.40, 0, 1.27)),
-    ("rightLowerArm", "rightUpperArm", (-0.40, 0, 1.27), (-0.62, 0, 1.27)),
-    ("rightHand", "rightLowerArm", (-0.62, 0, 1.27), (-0.70, 0, 1.27)),
+    # arms hang at her sides (she's a bust: only the upper arm has a mesh)
+    ("leftShoulder", "upperChest", (0.02, 0.004, 1.29), (0.115, 0.006, 1.264)),
+    ("leftUpperArm", "leftShoulder", (0.118, 0.006, 1.262), (0.162, 0.016, 1.115)),
+    ("leftLowerArm", "leftUpperArm", (0.162, 0.016, 1.115), (0.168, 0.02, 0.92)),
+    ("leftHand", "leftLowerArm", (0.168, 0.02, 0.92), (0.170, 0.02, 0.84)),
+    ("rightShoulder", "upperChest", (-0.02, 0.004, 1.29), (-0.115, 0.006, 1.264)),
+    ("rightUpperArm", "rightShoulder", (-0.118, 0.006, 1.262), (-0.162, 0.016, 1.115)),
+    ("rightLowerArm", "rightUpperArm", (-0.162, 0.016, 1.115), (-0.168, 0.02, 0.92)),
+    ("rightHand", "rightLowerArm", (-0.168, 0.02, 0.92), (-0.170, 0.02, 0.84)),
     ("leftUpperLeg", "hips", (0.08, 0, 0.90), (0.08, 0, 0.50)),
     ("leftLowerLeg", "leftUpperLeg", (0.08, 0, 0.50), (0.08, 0, 0.10)),
     ("leftFoot", "leftLowerLeg", (0.08, 0, 0.10), (0.08, -0.10, 0.03)),
@@ -761,6 +996,10 @@ BONES = [  # name (VRM humanoid name where there is one), parent, head, tail
     ("rightLowerLeg", "rightUpperLeg", (-0.08, 0, 0.50), (-0.08, 0, 0.10)),
     ("rightFoot", "rightLowerLeg", (-0.08, 0, 0.10), (-0.08, -0.10, 0.03)),
 ]
+
+
+def chain_bone(name, i):
+    return f"hair_{name}_{i + 1}"
 
 
 def build_armature(coll):
@@ -777,17 +1016,103 @@ def build_armature(coll):
         b.head, b.tail = head, tail
         if parent:
             b.parent = arm.edit_bones[parent]
+    # hair chains: head -> 1 -> 2 -> 3, through the points the builder chose
+    for cname, pts in CHAINS.items():
+        parent = arm.edit_bones["head"]
+        for i in range(len(pts) - 1):
+            b = arm.edit_bones.new(chain_bone(cname, i))
+            b.head, b.tail = pts[i], pts[i + 1]
+            b.parent = parent
+            b.use_connect = i > 0
+            parent = b
+        # a short end bone: spring chains need a tail joint to swing the last bone
+        end = arm.edit_bones.new(f"hair_{cname}_end")
+        d = (pts[-1] - pts[-2]).normalized() * 0.012
+        end.head, end.tail = pts[-1], pts[-1] + d
+        end.parent = parent
+        end.use_connect = True
+        end.use_deform = False
     bpy.ops.object.mode_set(mode="OBJECT")
+    ob.show_in_front = True
     return ob
 
 
-def parent_to_bone(ob, arm, bone):
+def skin(ob, arm, weights):
+    """Deform ob with the armature: weights(i, co) -> {bone: weight}."""
+    groups = {}
+    for i, v in enumerate(ob.data.vertices):
+        for bone, w in weights(i, v.co).items():
+            if w <= 1e-4:
+                continue
+            if bone not in groups:
+                groups[bone] = ob.vertex_groups.new(name=bone)
+            groups[bone].add([i], w, "ADD")
+    # deform first, then subdivide: take the subdivision off and put it back after
+    levels = [(m.levels, m.render_levels) for m in ob.modifiers if m.type == "SUBSURF"]
+    for m in [m for m in ob.modifiers if m.type == "SUBSURF"]:
+        ob.modifiers.remove(m)
+    mod = ob.modifiers.new("Armature", "ARMATURE")
+    mod.object = arm
+    for lv, rl in levels:
+        sub = ob.modifiers.new("Subdivision", "SUBSURF")
+        sub.levels, sub.render_levels = lv, rl
     world = ob.matrix_world.copy()
     ob.parent = arm
-    ob.parent_type = "BONE"
-    ob.parent_bone = bone
-    bpy.context.view_layer.update()
     ob.matrix_world = world
+
+
+def only(bone):
+    return lambda i, co: {bone: 1.0}
+
+
+def hair_weights(info):
+    def w(i, co):
+        chain, t = info[i] if i < len(info) else (None, 0.0)
+        if chain is None:
+            return {"head": 1.0}
+        chains = chain if isinstance(chain, dict) else {chain: 1.0}
+        out = {}
+        if t < CHAIN_T0 + 0.06:            # the root eases off the head
+            h = 1.0 if t <= CHAIN_T0 else 1 - (t - CHAIN_T0) / 0.06
+            out["head"] = h
+        else:
+            h = 0.0
+        f = max(0.0, (t - CHAIN_T0) / (1 - CHAIN_T0)) * CHAIN_BONES
+        i0 = min(CHAIN_BONES - 1, int(f))
+        frac = min(1.0, f - i0) if i0 < CHAIN_BONES - 1 else 0.0
+        for name, cw in chains.items():
+            if name not in CHAINS:
+                continue
+            out[chain_bone(name, i0)] = out.get(chain_bone(name, i0), 0) + (1 - h) * cw * (1 - frac)
+            if frac:
+                out[chain_bone(name, i0 + 1)] = out.get(chain_bone(name, i0 + 1), 0) + (1 - h) * cw * frac
+        return out
+    return w
+
+
+def smooth(a, b, x):
+    t = max(0.0, min(1.0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+
+
+def torso_weights(i, co):
+    """Neck into head, chest up into the neck, shoulders out to the arms."""
+    z, ax = co.z, abs(co.x)
+    side = "left" if co.x > 0 else "right"
+    hw = body_ring(z)[0]
+    if ax > hw + 0.004 and z < 1.275:           # the arm
+        top = smooth(1.235, 1.262, z)
+        return {f"{side}UpperArm": 1 - top * 0.6, f"{side}Shoulder": top * 0.6}
+    out = {}
+    head = smooth(1.385, 1.405, z)
+    neck = smooth(1.29, 1.325, z) * (1 - head)
+    rest = 1 - head - neck
+    shoulder = smooth(0.07, 0.125, ax) * smooth(1.2, 1.25, z) * rest * 0.7
+    rest -= shoulder
+    upper = smooth(1.13, 1.2, z)
+    out.update({"head": head, "neck": neck, f"{side}Shoulder": shoulder,
+                "upperChest": rest * upper, "chest": rest * (1 - upper)})
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -801,6 +1126,7 @@ def main():
         "hair": material("Luna_Hair", vc=True, rough=0.55),
         "ear": material("Luna_Ears", vc=True),
         "body": material("Luna_Body", vc=True),
+        "top": material("Luna_Top", PAL["top"], rough=0.6),
         "choker": material("Luna_Choker", PAL["choker"], rough=0.35),
         "metal": material("Luna_Metal", PAL["metal"], rough=0.25),
     }
@@ -809,18 +1135,39 @@ def main():
     S = Surface(face)
     head_parts = [face, build_eyes(coll, mats, S), build_lids(coll, mats, S), build_lower_lids(coll, mats, S),
                   build_mouth(coll, mats, S), build_details(coll, mats, S), build_blush(coll, mats, S)]
-    head_parts += build_hair(coll, mats, S)
+    hair = build_hair_bob(coll, mats, S) if HAIR_STYLE == "bob" else build_hair(coll, mats, S)
     ears = [build_ear(coll, mats, 1), build_ear(coll, mats, -1)]
     body = build_body(coll, mats)
     arm = build_armature(coll)
     bpy.context.view_layer.update()
     for o in head_parts:
-        parent_to_bone(o, arm, "head")
-    parent_to_bone(ears[0], arm, "Ear_L")
-    parent_to_bone(ears[1], arm, "Ear_R")
+        skin(o, arm, only("head"))
+    for h in hair:
+        if isinstance(h, tuple):
+            skin(h[0], arm, hair_weights(h[1]))
+        else:
+            skin(h, arm, only("head"))
+    skin(ears[0], arm, only("Ear_L"))
+    skin(ears[1], arm, only("Ear_R"))
     for o in body:
-        parent_to_bone(o, arm, "upperChest" if o.name == "Luna_Body" else "neck")
-    print("built:", sorted(o.name for o in coll.objects))
+        skin(o, arm, torso_weights if o.name in ("Luna_Body", "Luna_Top", "Luna_Straps") else only("neck"))
+    unwrap(coll)
+    print("built:", sorted(o.name for o in coll.objects), "chains:", sorted(CHAINS))
+
+
+def unwrap(coll):
+    """UVs on everything that doesn't have its own (the eyes do), laid out
+    per part, so textures can be painted for each piece later."""
+    for o in coll.objects:
+        if o.type != "MESH" or o.data.uv_layers:
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004)
+        bpy.ops.object.mode_set(mode="OBJECT")
 
 
 main()

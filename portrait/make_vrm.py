@@ -15,6 +15,8 @@ This adds it, from names:
               single surface that can never poke through the lids
   shading     every material becomes MToon - flat anime light with soft
               violet shadows and a magenta rim, like the wallpaper
+  hair        bone chains named hair_<chain>_1.. become spring bones, so
+              the hair swings when she moves; skinned meshes keep their skins
 
 It also drops anything the export dragged along from other scenes.
 """
@@ -58,6 +60,7 @@ SHADE = {
     "Luna_Eye": ([0.92, 0.88, 0.94], 0.95, -0.6),
     "Luna_FaceParts": ([0.90, 0.80, 0.86], 0.95, -0.4),
     "Luna_Blush": ([1.0, 1.0, 1.0], 0.95, -1.0),
+    "Luna_Top": ([0.75, 0.68, 0.85], 0.9, -0.05),
 }
 
 
@@ -106,6 +109,11 @@ def prune(g, binary):
                 accs.add(p["indices"])
             for t in p.get("targets", []):
                 accs.update(t.values())
+    skins = sorted({g["nodes"][n]["skin"] for n in keep_nodes if "skin" in g["nodes"][n]})
+    skmap = {o: i for i, o in enumerate(skins)}
+    for sk in skins:
+        if "inverseBindMatrices" in g["skins"][sk]:
+            accs.add(g["skins"][sk]["inverseBindMatrices"])
     mats = sorted(mats)
     matmap = {o: i for i, o in enumerate(mats)}
     texs = set()
@@ -162,7 +170,18 @@ def prune(g, binary):
             n["children"] = [nmap[c] for c in n["children"] if c in nmap]
         if "mesh" in n:
             n["mesh"] = mmap[n["mesh"]]
+        if "skin" in n:
+            n["skin"] = skmap[n["skin"]]
         nodes.append(n)
+    new_skins = []
+    for sk in skins:
+        skin = dict(g["skins"][sk])
+        skin["joints"] = [nmap[j] for j in skin["joints"]]
+        if "skeleton" in skin:
+            skin["skeleton"] = nmap.get(skin["skeleton"], skin["joints"][0])
+        if "inverseBindMatrices" in skin:
+            skin["inverseBindMatrices"] = amap[skin["inverseBindMatrices"]]
+        new_skins.append(skin)
     new_meshes = []
     for m in meshes:
         mesh = json.loads(json.dumps(g["meshes"][m]))
@@ -202,10 +221,40 @@ def prune(g, binary):
           "accessors": new_accs, "bufferViews": new_views, "buffers": [{"byteLength": len(out)}]}
     if new_texs:
         g2.update(textures=new_texs, images=new_imgs, samplers=[g["samplers"][s] for s in smps] or [{}])
+    if new_skins:
+        g2["skins"] = new_skins
     for k in ("extensionsUsed", "extensionsRequired"):
         if k in g:
             g2[k] = list(g[k])
     return g2, bytes(out)
+
+
+# Hair that swings: build_luna.py makes bone chains named hair_<chain>_1..3
+# with a hair_<chain>_end tail. (stiffness, gravity, drag) per chain.
+SPRING = {"bangs": (2.2, 0.08, 0.6), "side": (1.1, 0.15, 0.5), "back": (0.9, 0.18, 0.45)}
+
+
+def spring_bones(g, names):
+    """VRMC_springBone: one spring per hair chain, kept off the head, neck
+    and shoulders by sphere colliders."""
+    chains = sorted({n[5:].rsplit("_", 1)[0] for n in names if n.startswith("hair_") and n.endswith("_end")})
+    if not chains:
+        return None
+    colliders = []
+    for bone, offset, radius in (("head", [0, 0.085, 0], 0.094), ("neck", [0, 0.04, 0], 0.036),
+                                 ("upperChest", [0, 0.02, 0], 0.095),
+                                 ("leftShoulder", [0, 0.06, 0], 0.045), ("rightShoulder", [0, 0.06, 0], 0.045)):
+        if bone in names:
+            colliders.append({"node": names[bone], "shape": {"sphere": {"offset": offset, "radius": radius}}})
+    springs = []
+    for chain in chains:
+        joints = [n for n in (f"hair_{chain}_{i}" for i in range(1, 10)) if n in names] + [f"hair_{chain}_end"]
+        stiff, grav, drag = SPRING.get(chain.split("_")[0], (1.0, 0.15, 0.5))
+        springs.append({"name": f"hair {chain}", "colliderGroups": [0],
+                        "joints": [{"node": names[j], "hitRadius": 0.012, "stiffness": stiff, "gravityPower": grav,
+                                    "gravityDir": [0, -1, 0], "dragForce": drag} for j in joints]})
+    return {"specVersion": "1.0", "colliders": colliders,
+            "colliderGroups": [{"name": "body", "colliders": list(range(len(colliders)))}], "springs": springs}
 
 
 def main(src=SRC, dst=DST):
@@ -277,7 +326,11 @@ def main(src=SRC, dst=DST):
                    "rangeMapVerticalDown": rng, "rangeMapVerticalUp": rng},
         "expressions": {"preset": expressions},
     }
-    used = set(g.get("extensionsUsed", [])) | {"VRMC_vrm", "VRMC_materials_mtoon"}
+    springs = spring_bones(g, names)
+    if springs:
+        g["extensions"]["VRMC_springBone"] = springs
+    used = set(g.get("extensionsUsed", [])) | {"VRMC_vrm", "VRMC_materials_mtoon"} | (
+        {"VRMC_springBone"} if springs else set())
     g["extensionsUsed"] = sorted(used)
     write_glb(dst, g, binary)
     print(f"wrote {dst}: {len(g['nodes'])} nodes, {len(g['meshes'])} meshes, "
