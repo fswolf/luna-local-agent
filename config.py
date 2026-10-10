@@ -685,14 +685,14 @@ SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
 # The portrait window (portrait/, served by the live monitor at
 # /portrait/): a VRM model that blinks, looks around, twitches its ears
 # and moves its mouth with her voice. /portrait opens it.
-#   "portrait": { "model": "models/luna.vrm", "ear_bones": [],
+#   "portrait": { "model": "models/sigewinne/sigewinne.model3.json", "ear_bones": [],
 #                 "browser": "", "size": "420x560" }
 _portrait_cfg = setting("portrait", {})
 # The Sigewinne Live2D model ships with the repo and is the default; the
-# generated luna.vrm is the fallback if that folder is missing.
+# generated placeholder.vrm is the fallback if that folder is missing.
 _SIGEWINNE = "models/sigewinne/sigewinne.model3.json"
 _DEFAULT_PORTRAIT = (_SIGEWINNE if os.path.exists(os.path.join(BASE_DIR, "portrait", _SIGEWINNE))
-                     else "models/luna.vrm")
+                     else "models/placeholder.vrm")
 PORTRAIT_MODEL = str(_portrait_cfg.get("model") or _DEFAULT_PORTRAIT)
 PORTRAIT_EAR_BONES = list(_portrait_cfg.get("ear_bones", []) or [])
 PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))
