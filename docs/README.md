@@ -16,6 +16,7 @@ Everything the README only touches on, one subject per page.
 - [Moods](moods.md)
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
+- [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](plugins.md): stream chat, Minecraft, Zork, Vibe City, Home Assistant, cron jobs, Discord
 - [Development](development.md): project structure, extras
 

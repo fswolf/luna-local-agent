@@ -587,6 +587,7 @@ Setup, safety and which devices to buy are on their own page:
 Every other plugin connects her to a *conversation*. These two give
 her a sysadmin side: she looks after the machine on a schedule, and
 she can be reached from anywhere, the way a homelab bot would be.
+For putting them to work, with ready-made jobs, see [Sysadmin](sysadmin.md).
 They're adapted from CR0N, a friend's Discord sysadmin bot. Its
 scheduler and remote control came over; its regex-gated shell didn't
 (see *What came across*).
