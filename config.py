@@ -688,11 +688,10 @@ SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
 #   "portrait": { "model": "models/sigewinne/sigewinne.model3.json", "ear_bones": [],
 #                 "browser": "", "size": "420x560" }
 _portrait_cfg = setting("portrait", {})
-# The Sigewinne Live2D model ships with the repo and is the default; the
-# generated placeholder.vrm is the fallback if that folder is missing.
+# The Sigewinne Live2D model ships with the repo and is the default, and
+# the fallback when portrait.model points at something that isn't there.
 _SIGEWINNE = "models/sigewinne/sigewinne.model3.json"
-_DEFAULT_PORTRAIT = (_SIGEWINNE if os.path.exists(os.path.join(BASE_DIR, "portrait", _SIGEWINNE))
-                     else "models/placeholder.vrm")
+_DEFAULT_PORTRAIT = _SIGEWINNE
 PORTRAIT_MODEL = str(_portrait_cfg.get("model") or _DEFAULT_PORTRAIT)
 PORTRAIT_EAR_BONES = list(_portrait_cfg.get("ear_bones", []) or [])
 PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))

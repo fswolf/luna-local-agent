@@ -470,15 +470,7 @@ async function demo() {
 
 // ---------------------------------------------------------------------------
 try {
-  try {
-    vrm = await load(cfg.model || 'models/placeholder.vrm');
-  } catch (e) {
-    if (!cfg.model || cfg.model.endsWith('placeholder.vrm')) throw e;
-    console.warn(e);
-    vrm = await load('models/placeholder.vrm');
-    say(`couldn't load ${cfg.model} - showing the placeholder`, true);
-    setTimeout(() => say(''), 6000);
-  }
+  vrm = await load(cfg.model);
   frame();
   say('');
   window.portrait = { handle, twitch, fakeVoice, blink, mind, get vrm() { return vrm; } };
