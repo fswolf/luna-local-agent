@@ -35,7 +35,8 @@ Builds cost in-game money only, so nothing here asks for approval.
         "max_steps": 60,
         "speak": false,
         "goal": "",
-        "skip_tools": []               # e.g. ["screenshot"] for a model that can't see
+        "skip_tools": [],              # e.g. ["screenshot"] for a model that can't see
+        "pause_game": true             # pause the game when she stops playing
     }
 
 screenshot returns a picture of the game window. It reaches her the
@@ -57,7 +58,7 @@ DEFAULT_GOAL = ("grow the town: roads, homes, shops and industry, with power and
                 "without running out of money")
 
 DEFAULTS = {"url": "http://127.0.0.1:47823/mcp", "step_seconds": 30, "max_steps": 60,
-            "speak": False, "goal": "", "skip_tools": []}
+            "speak": False, "goal": "", "skip_tools": [], "pause_game": True}
 
 _state = {"model": None, "tools": [], "goal": "", "notes": [], "steps": 0, "playing": False,
           "busy": False, "error": "", "briefed": False}
@@ -136,6 +137,10 @@ def stop():
     import mcpclient
 
     _stop.set()
+
+    if _state["playing"]:
+        _pause_game()
+
     _state["playing"] = False
     mcpclient.disconnect_server(SERVER)
     _connected = False
@@ -189,13 +194,43 @@ def _set_playing(on, goal=""):
     if goal:
         _set_goal(goal)
 
+    was = _state["playing"]
     _state["playing"] = bool(on)
 
     if on:
         _state["steps"] = 0
         return f"vibecity: she's the mayor now - goal: {_goal()}. /vibecity pause stops."
 
+    if was and _state["busy"] and settings()["pause_game"]:
+        _state["pause_after_turn"] = True
+        return "vibecity: pausing - she finishes this turn, then the game pauses too."
+
+    if was and _pause_game():
+        return "vibecity: paused, and so is the game."
+
     return "vibecity: paused."
+
+
+def _pause_game():
+    """Stop the clock when she stops playing, so the city doesn't run on
+    (and run out of money) while nobody is mayor. Not when you took over:
+    then you're the one playing. True if the game said yes."""
+    if not settings()["pause_game"]:
+        return False
+
+    name = next((t for t in _state["tools"] if t.endswith("__set_speed")), None)
+
+    if not name or _state["busy"]:
+        return False
+
+    try:
+        import tools
+
+        result = tools.call(name, {"speed": 0})
+        return not str(result).startswith("Error")
+    except Exception as e:
+        logbook.warn(NAME, "couldn't pause the game: %s", e)
+        return False
 
 
 def _set_goal(goal):
@@ -220,17 +255,28 @@ STEP_PROMPT = (
     "Your goal: {goal}\n"
     "{brief}"
     "What you've done so far, oldest first:\n{notes}\n\n"
-    "Take your next turn: check get_city (and get_map around where you'll build), then make two "
-    "to six moves towards the goal. Before building somewhere, look_at it with zoom about 1.2 so "
-    "the player can see it. Keep funds above zero. If a build fails, read why and fix that, not "
-    "the same build again. Now and then, take a screenshot to see how the town actually looks. If a "
-    "call says the player took over, stop and end with PAUSED. Close any window you opened "
-    "(set_tax, open_window...) with close_windows before ending your turn.\n"
-    "End with ONE short line: what you built or changed and what you'll do next.)"
+    "Take your next turn, two to six moves:\n"
+    "1. get_city first. If a window is waiting for an answer (a milestone, a neighbour link, the "
+    "city name), answer it - continue a milestone, not_now a neighbour unless you can easily "
+    "afford it.\n"
+    "2. Build what the city asks for: the demand above 0 that's highest, and what 'needs most' "
+    "says. If power used is over 85% of made, add power before anything else.\n"
+    "3. Every new zone needs a road, power AND water. After zoning, check get_map with layer "
+    "power and layer water around it, and close any gap (x = not connected) with a powerline or "
+    "pipe in the same turn. An unconnected zone never grows.\n"
+    "4. Before building, look_at the spot with zoom about 1.2. High ground costs more; keep "
+    "about $2,000 in reserve. If a build fails, read why and fix that, not the same build again.\n"
+    "5. Now and then take a screenshot to see how the town looks.\n"
+    "6. Close any window you opened (set_tax, open_window...) with close_windows.\n"
+    "If a call says the player took over, stop and end with PAUSED.\n"
+    "End with ONE short line: what you built, with its coordinates, anything left unconnected "
+    "or unfinished, and what you'll do next.)"
 )
 
 BRIEF = ("This is your first turn this session: call how_to_play first, then list_tools, so you "
-         "know the coordinates, the prices and the house rules.\n")
+         "know the coordinates, the prices and the house rules. If the game is paused (speed 0), "
+         "set_speed 1. If the city still has the game's default name, give it one with "
+         "name_city.\n")
 
 
 def _step():
@@ -254,7 +300,10 @@ def _step():
         _say("Vibe City: you took over, so she's paused. /vibecity play hands it back.")
     elif _state["steps"] >= int(s["max_steps"]):
         _state["playing"] = False
-        _say(f"Vibe City: {_state['steps']} turns - paused. /vibecity play to keep going.")
+        _state["busy"] = False
+        paused = _pause_game()
+        _say(f"Vibe City: {_state['steps']} turns - she's stopped{' and the game is paused' if paused else ''}. "
+             "/vibecity play to keep going.")
 
 
 def _say(text):
@@ -287,6 +336,9 @@ def _play():
             _stop.wait(30)
         finally:
             _state["busy"] = False
+
+            if _state.pop("pause_after_turn", False) and not _state["playing"]:
+                _pause_game()
 
 
 # ---------------------------------------------------------------------------
