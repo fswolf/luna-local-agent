@@ -758,11 +758,17 @@ _PERMS = (
     ("read", "files.read", "FILES_READ", ("allow", "ask", "off"), "list and read files"),
     ("write", "files.write", "FILES_WRITE", ("ask", "allow", "off"), "create and edit files"),
     ("execute", "shell.enabled", "SHELL_ENABLED", ("ask", "off"), "run commands - each one asks"),
+    # Smart-home changes: the home plugin's ask_all. "allow" still asks
+    # for locks, doors, alarms and valves (its ask_domains).
+    ("home", "plugins.home.ask_all", None, ("ask", "allow"), "smart-home changes - locks and doors always ask"),
 )
 
 
 def _perm_value(label):
     import config
+
+    if label == "home":
+        return "ask" if config.plugin_settings("home").get("ask_all", False) else "allow"
 
     for name, _path, key, values, _note in _PERMS:
         if name == label:
@@ -966,7 +972,7 @@ def _tool_header():
 
     return [
         ("class:label bold", line + "\n"),
-        ("class:footer", " (space) toggle  (up/down or wheel) choose"),
+        ("class:footer", " (space) toggle  (a) whole group  (up/down or wheel) choose"),
     ]
 
 
@@ -1136,6 +1142,12 @@ def _tool_toggle():
                 if label == name:
                     now = _perm_value(label)
                     nxt = values[(values.index(now) + 1) % len(values)]
+                    if label == "home":
+                        # a plugin setting, so _store rather than save_setting, and
+                        # the plugin reads the refreshed block on its next call
+                        config._store(path, nxt == "ask")
+                        config._plugins_cfg = config.settings.get("plugins", {})
+                        break
                     stored = ("true" if nxt != "off" else "false") if path == "shell.enabled" else nxt
                     config.save_setting(path, stored)
                     if label == "write" and nxt == "allow":
@@ -1167,6 +1179,53 @@ def _tool_toggle():
     except Exception as e:
         add_message("system", f"Couldn't change {name}: {e}")
 
+    _refresh()
+
+
+def _tool_group_toggle():
+    """Switch every row in the selected row's group at once: all off if
+    they're all on, otherwise all on. Rows that cycle (Permissions) or
+    pick (the portrait model) are left alone."""
+    position = 0
+
+    for label, members, _live, _total in _tool_groups():
+        if position <= _tool_cursor < position + len(members):
+            break
+        position += len(members)
+    else:
+        return
+
+    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "pick:"))]
+
+    if not rows:
+        add_message("system", f"{label}: nothing here switches as a group")
+        return
+
+    turn_on = not all(m[1] for m in rows)
+
+    try:
+        import config
+        import tools
+
+        for name, on, _ready, _why, _cost, setting in rows:
+            if on == turn_on:
+                continue
+            if setting:
+                config.save_setting(setting, "true" if turn_on else "false")
+                if setting == "portrait.hologram.enabled":
+                    import livefeed
+
+                    livefeed.emit("holo", on=turn_on)
+                elif setting.startswith("mood."):
+                    import mood
+
+                    mood._announce()
+            else:
+                tools.set_enabled(name, turn_on)
+    except Exception as e:
+        add_message("system", f"Couldn't switch {label}: {e}")
+
+    add_message("system", f"{label}: all {'on' if turn_on else 'off'}")
     _refresh()
 
 
@@ -1811,6 +1870,10 @@ def _build_keys():
     @keys.add(" ", filter=Condition(lambda: _pane == "tools" and not approving()))
     def _(event):
         _tool_toggle()
+
+    @keys.add("a", filter=Condition(lambda: _pane == "tools" and not approving()))
+    def _(event):
+        _tool_group_toggle()
 
     @keys.add("tab")
     def _(event):
