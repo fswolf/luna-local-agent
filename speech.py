@@ -825,26 +825,39 @@ def _play_afplay(samples, rate):
     if _afplay_rate[0]:
         rates = [_afplay_rate[0]] + [r for r in rates if r != _afplay_rate[0]]
 
-    for attempt, target in enumerate(dict.fromkeys(rates)):
-        played, outcome = _afplay_once(*_resample(samples, rate, target))
+    # 'what' is usually transient: Bluetooth still in headset mode right
+    # after the mic closed. llama-server answers before it switches back,
+    # so back off and retry for ~3s instead of giving up in 0.3s.
+    for n, wait in enumerate((0, 0.5)):
+        if wait:
+            time.sleep(wait)
+            if state.stop_speaking:
+                return False
+        for attempt, target in enumerate(dict.fromkeys(rates)):
+            played, outcome = _afplay_once(*_resample(samples, rate, target))
 
-        if played is None:           # interrupted
-            return False
+            if played is None:           # interrupted
+                return False
 
-        if played:
-            if attempt:
-                logbook.info("speech", "afplay took the audio at %d Hz (not %d) - using that from now on",
-                             target, rate)
-            _afplay_rate[0] = target
-            return True
+            if played:
+                if attempt or n:
+                    logbook.info("speech", "afplay took the audio at %d Hz (not %d) on pass %d",
+                                 target, rate, n + 1)
+                _afplay_rate[0] = target
+                return True
 
-        logbook.warn("speech", "afplay refused %d Hz: %s", target, outcome)
+            logbook.warn("speech", "afplay refused %d Hz (pass %d): %s", target, n + 1, outcome)
 
-    if time.monotonic() - _audio_warned[0] > 60:
-        _audio_warned[0] = time.monotonic()
-        ui.add_message("system", "Couldn't play her voice through afplay either. The reply is on "
-                                 "screen; the log has the details.")
-    return True
+    # Keep the refused audio so it can be inspected (empty? NaN? odd rate?).
+    try:
+        dump = os.path.join(os.path.expanduser("~/.cache/ai-voice"), "last-refused.wav")
+        write(dump, rate, (np.nan_to_num(np.clip(samples, -1, 1)) * 32767).astype(np.int16))
+        logbook.warn("speech", "afplay refused every try: %d samples @ %d Hz, finite=%s, peak=%.3f -> %s",
+                     len(samples), rate, bool(np.isfinite(samples).all()),
+                     float(np.nanmax(np.abs(samples))) if len(samples) else 0.0, dump)
+    except Exception as e:
+        logbook.warn("speech", "couldn't save refused audio: %s", e)
+    return "refused"
 
 
 def _afplay_once(samples, rate):
@@ -895,7 +908,20 @@ def _play(samples, rate):
     _lip_sync(samples, rate)
 
     if _use_afplay():
-        return _play_afplay(samples, rate)
+        result = _play_afplay(samples, rate)
+        if result != "refused":
+            return result
+        # afplay can't get the speakers; try PortAudio in-process instead,
+        # and stick with it from now on if it works.
+        logbook.info("speech", "afplay refused - trying PortAudio")
+        if not _start_playback(samples, rate):
+            if time.monotonic() - _audio_warned[0] > 60:
+                _audio_warned[0] = time.monotonic()
+                ui.add_message("system", "Couldn't play her voice (afplay and PortAudio both refused). "
+                                         "The reply is on screen; the log has the details.")
+            return True
+        config.TTS_PLAYER = "portaudio"
+        logbook.info("speech", "PortAudio played it - using PortAudio from now on")
 
     if not _start_playback(samples, rate):
         if AFPLAY:
@@ -904,7 +930,7 @@ def _play(samples, rate):
                 logbook.info("speech", "PortAudio won't open the speakers - playing with afplay from now on")
                 ui.add_message("system", "Playing her voice through macOS's own player (afplay) - "
                                          "PortAudio wouldn't open the speakers.")
-            return _play_afplay(samples, rate)
+            return _play_afplay(samples, rate) is not False
         return True     # skipped, not interrupted: carry on with the rest
 
     while True:
