@@ -459,8 +459,10 @@ DESKTOP_ENABLED = bool(_desktop_cfg.get("enabled", True))
 # tools.set_enabled writes it back.
 TOOLS_DISABLED = list(setting("tools", {}).get("disabled", []))
 # The opt-in tools (tools.OPT_IN, the camera) switched on - an on-list,
-# so they stay off until you choose them.
-TOOLS_ENABLED = list(setting("tools", {}).get("enabled", []))
+# so they stay off until you choose them. Its own key: tools.enabled is
+# the master switch further down.
+_opt_in = setting("tools", {}).get("opt_in", [])
+TOOLS_OPT_IN = list(_opt_in) if isinstance(_opt_in, (list, tuple)) else []
 
 # The webcam, for look_at_camera. The switch is the tool's row in the
 # tools pane; these only say which camera and how big.
