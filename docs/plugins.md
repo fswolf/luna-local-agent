@@ -547,9 +547,11 @@ is told it can't; add `screenshot` to `skip_tools` for one). While the
 plugin is on they work in conversation too: "how's the city doing?", "put the tax at 9".
 
 `/vibecity play` hands her the mayor's office. Whenever nobody has
-spoken for `step_seconds` she takes a turn: checks the city, makes two
-to six moves towards the goal, narrates with `say`, and reports in one
-line. Her first turn each session reads `how_to_play` and `list_tools`,
+spoken for `step_seconds` (10) she takes a turn: checks the city, makes
+two to six moves towards the goal, narrates with `say`, and reports in
+one line. A turn may use up to `max_rounds` (12) tool calls - the
+checklist below needs several - instead of chat's usual
+`tools.max_rounds`. Her first turn each session reads `how_to_play` and `list_tools`,
 unpauses the game if it's paused, and names the city if it still has
 the default name. Turns are jobs like Minecraft's: fresh context,
 nothing in your history, only her city tools, her last dozen
@@ -589,7 +591,8 @@ machine.
 "vibecity": {
     "enabled": false,
     "url": "http://127.0.0.1:47823/mcp",
-    "step_seconds": 30,
+    "step_seconds": 10,
+    "max_rounds": 12,
     "max_steps": 60,
     "speak": true,
     "goal": "",

@@ -561,6 +561,14 @@ _last_raw = {"deltas": 0, "content": 0, "reasoning": 0, "tool_rounds": 0,
              "tokens": []}
 
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+
+# A tool call the model wrote out as text instead of sending properly -
+# Qwen's XML form (<function=name><parameter=x>...</parameter></function>,
+# usually inside <tool_call>) or the JSON one inside <tool_call> tags.
+# Never shown or spoken; _calls_from_text turns it into a real call.
+_CALL_BLOCK = re.compile(r"<tool_call>.*?</tool_call>|<function=[^>]*>.*?</function>",
+                         re.IGNORECASE | re.DOTALL)
+_CALL_OPEN = re.compile(r"<tool_call>|<function=", re.IGNORECASE)
 _THINK_INNER = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
 _THINK_OPEN = re.compile(r"<think>", re.IGNORECASE)
 
@@ -713,7 +721,54 @@ def _visible(raw):
     if "<think>" in text.lower():
         text = re.split(r"<think>", text, maxsplit=1, flags=re.IGNORECASE)[0]
 
-    return re.sub(r"<[a-z/]{0,7}$", "", text, flags=re.IGNORECASE)
+    # Same for a tool call written out as text: cut whole ones, and hold
+    # everything after one that hasn't closed yet.
+    text = _CALL_BLOCK.sub("", text)
+    opened = _CALL_OPEN.search(text)
+    if opened:
+        text = text[:opened.start()]
+
+    return re.sub(r"<[a-z_/=]{0,12}$", "", text, flags=re.IGNORECASE)
+
+
+def _calls_from_text(raw, payload):
+    """Tool calls the model wrote into its reply as text, as proper
+    tool_calls entries - so they run instead of being printed. Values
+    are converted to the type the tool's schema asks for (numbers,
+    true/false); everything else stays a string. [] if there are none."""
+    raw = _THINK_BLOCK.sub("", raw or "")
+    schemas = {(t.get("function") or {}).get("name"): (t.get("function") or {}).get("parameters") or {}
+               for t in payload.get("tools") or ()}
+    calls = []
+
+    def typed(name, key, value):
+        kind = ((schemas.get(name) or {}).get("properties") or {}).get(key, {}).get("type")
+        if kind in ("integer", "number", "boolean", "array", "object"):
+            try:
+                return json.loads(value)
+            except ValueError:
+                pass
+        return value
+
+    for match in re.finditer(r"<function=([^>\s]+)\s*>(.*?)</function>", raw, re.IGNORECASE | re.DOTALL):
+        name, body = match.group(1).strip(), match.group(2)
+        args = {k.strip(): typed(name, k.strip(), v.strip())
+                for k, v in re.findall(r"<parameter=([^>]+)>(.*?)</parameter>", body, re.IGNORECASE | re.DOTALL)}
+        calls.append((name, args))
+
+    if not calls:
+        for block in re.findall(r"<tool_call>(.*?)</tool_call>", raw, re.IGNORECASE | re.DOTALL):
+            try:
+                data = json.loads(block.strip())
+            except ValueError:
+                continue
+            if isinstance(data, dict) and data.get("name"):
+                args = data.get("arguments") or data.get("parameters") or {}
+                calls.append((str(data["name"]), args if isinstance(args, dict) else {}))
+
+    return [{"id": f"text_call_{i}", "type": "function",
+             "function": {"name": name, "arguments": json.dumps(args)}}
+            for i, (name, args) in enumerate(calls)]
 
 
 class _Narrator:
@@ -1101,13 +1156,29 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
     # too, or replace_message would wipe it off the screen.
     said = []
 
-    for _round in range(MAX_TOOL_ROUNDS):
+    # A game turn can ask for more rounds than chat gets (Vibe City's
+    # checklist is a dozen calls); assistant.respond_to_job sets it.
+    rounds = int(getattr(state.job, "max_rounds", None) or MAX_TOOL_ROUNDS)
+
+    for _round in range(rounds):
         _last_raw["tool_rounds"] = _round + 1
         livefeed.emit("round", n=_round)
         narrator = _Narrator(on_text, on_sentence)
         message = _chat_completion(payload, narrator)
         calls = message.get("tool_calls") or []
         text = narrator.finish() if streaming else _content(message)
+
+        # Some turns the model writes the call out as text instead of
+        # sending it (Qwen's <function=...> form slipping past the
+        # server's parser). It's already kept off the screen and out of
+        # the voice; here it's run like any other call.
+        if not calls:
+            raw = narrator.raw if streaming else (message.get("content") or "")
+            calls = _calls_from_text(raw, payload)
+            if calls:
+                logbook.info("tools", "ran %d tool call(s) the model wrote as text", len(calls))
+                text = _visible(raw).strip() if not streaming else text
+                message = dict(message, content=text)
 
         if text:
             said.append(text)

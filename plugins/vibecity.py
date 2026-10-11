@@ -31,8 +31,9 @@ Builds cost in-game money only, so nothing here asks for approval.
     "vibecity": {
         "enabled": false,
         "url": "http://127.0.0.1:47823/mcp",
-        "step_seconds": 30,
+        "step_seconds": 10,        # quiet before her next turn
         "max_steps": 60,
+        "max_rounds": 12,          # tool calls she may make in one turn
         "speak": true,             # narrate each turn out loud
         "goal": "",
         "skip_tools": [],              # e.g. ["screenshot"] for a model that can't see
@@ -57,7 +58,7 @@ SERVER = "vibecity"
 DEFAULT_GOAL = ("grow the town: roads, homes, shops and industry, with power and water, "
                 "without running out of money")
 
-DEFAULTS = {"url": "http://127.0.0.1:47823/mcp", "step_seconds": 30, "max_steps": 60,
+DEFAULTS = {"url": "http://127.0.0.1:47823/mcp", "step_seconds": 10, "max_steps": 60, "max_rounds": 12,
             "speak": True, "goal": "", "skip_tools": [], "pause_game": True}
 
 _state = {"model": None, "tools": [], "goal": "", "notes": [], "steps": 0, "playing": False,
@@ -288,7 +289,8 @@ def _step():
     allowed = list(_state["tools"]) + ["play_vibe_city"]
 
     answer = assistant.respond_to_job(prompt, _state["model"], "vibecity", allowed,
-                                      speak=bool(s["speak"])) or ""
+                                      speak=bool(s["speak"]),
+                                      max_rounds=int(s["max_rounds"] or 12)) or ""
     _state["briefed"] = True
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
     line = lines[-1][:200] if lines else "(no report)"
