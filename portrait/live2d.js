@@ -138,7 +138,8 @@ function handle(ev) {
       break;
     }
     case 'holo':        // /holo or the tools pane, while the page is open
-      if (params.has('holo')) break;            // the URL said, the URL wins
+      // ?holo= on the URL only sets how the page starts; /holo and the
+      // tools pane always win after that, OBS browser sources included.
       if (ev.on) { holo ? holo.on() : (holo = createHologram(PIXI, app, model, holoCfg)); }
       else holo?.off();
       break;

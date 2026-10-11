@@ -196,8 +196,9 @@ glitch and on/off buttons). The rest of the look is set in config.json:
 | `glitch` | `1.0` | How hard the random tears hit. `0` turns them off |
 | `base` | `true` | The projector glow and beam under her |
 
-It works in OBS too: with `?bg=transparent&holo=1` she floats over the
-stream as a projection.
+It works in OBS too: with `?bg=transparent` she floats over the stream
+as a projection. `/holo` and the tools pane switch it live there as
+well; `&holo=1` or `&holo=0` on the URL only sets how the page starts.
 
 ### When something's off
 
