@@ -8,7 +8,8 @@
 #
 # Chat on :8080 in this terminal; embeddings on :8081 and the reranker
 # on :8082 in the background, logging to llama/embed.log and
-# llama/rerank.log. Ctrl+C stops them all. Settings: server.env.
+# llama/rerank.log. Ctrl+C stops them all. Settings: server.env
+# (server.mac.env on macOS), then server.local.env if present.
 set -uo pipefail
 
 # macOS still ships bash 3.2, which has no mapfile. Hop to Homebrew's.
@@ -22,8 +23,18 @@ fi
 
 cd "$(dirname "$(realpath "$0" 2>/dev/null || echo "$0")")" || exit 1
 
+# Settings: server.env (Linux/desktop) or server.mac.env on macOS, or
+# LLAMA_ENV=<file> to pick one. Then server.local.env, if there is one,
+# for this machine's own overrides (a MODEL path) - it isn't committed.
+SERVER_ENV="${LLAMA_ENV:-server.env}"
+if [ -z "${LLAMA_ENV:-}" ] && [ "$(uname)" = Darwin ] && [ -f server.mac.env ]; then
+    SERVER_ENV=server.mac.env
+fi
+# shellcheck disable=SC1090
+source "./$SERVER_ENV"
 # shellcheck disable=SC1091
-source ./server.env
+[ -f server.local.env ] && source ./server.local.env
+echo "settings: llama/$SERVER_ENV$([ -f server.local.env ] && echo ' + server.local.env')"
 
 BIN=./bin/llama-server
 [ -x "$BIN" ] || { echo "llama-server isn't built yet - run llama/install.sh first." >&2; exit 1; }
