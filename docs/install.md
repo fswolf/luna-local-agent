@@ -99,9 +99,16 @@ picks by herself at startup, llama-server first if both are up.
 
 ```bash
 llama/install.sh          # build it - Vulkan on Linux ("rocm" for ROCm/HIP), Metal on a Mac
-llama/start.sh            # serve on 127.0.0.1:8080
-./start.sh                # Luna finds it; the header says "· llama.cpp"
+./start.sh                # starts llama.cpp too, then Luna; the header says "· llama.cpp"
 ```
+
+Once llama.cpp is built, `./start.sh` starts it for you when no model
+server is answering, waits for the model to load, and stops it again
+when Luna exits. Its output goes to `llama/server.log`. A server you
+started yourself (`llama/start.sh` in its own terminal, or LM Studio)
+is used as it is and left running. To never auto-start it, set
+`"autostart": false` (or `"backend": "lmstudio"`) in the `llm` block of
+`config.json`.
 
 `install.sh` clones llama.cpp into `llama/llama.cpp/` and builds only
 `llama-server` and `llama-bench`, for this card. If a build tool is
@@ -122,9 +129,15 @@ llama/install.sh
 
 The newer bash is for `start.sh`: macOS still ships bash 3.2, and
 `start.sh` switches to Homebrew's by itself. The GPU shares the Mac's
-memory, so the model plus macOS has to fit in RAM. Set `MODEL=` in
-`llama/server.env` to your model's full path; the default pattern
-matches one particular model and won't find yours.
+memory, so the model plus macOS has to fit in RAM.
+
+On a Mac, `llama/start.sh` reads `llama/server.mac.env` instead of
+`server.env`: lighter settings (one slot, smaller batches, the reranker
+off) so the model leaves room for macOS and its audio. On any machine,
+put your own overrides in `llama/server.local.env`, which is read last
+and never committed. That's the place for `MODEL=` with your model's
+full path; the default pattern matches one particular model and won't
+find yours. `LLAMA_ENV=<file>` picks a settings file by hand.
 
 `start.sh` reads `llama/server.env`, which holds the same load settings
 as LM Studio's model page: context 16384, every layer on the GPU, 9

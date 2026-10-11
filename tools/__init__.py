@@ -177,14 +177,14 @@ def grouped():
 
 # The exceptions to on-by-default: tools that reach into the room rather
 # than the computer. Off until switched on, and the switch is stored as
-# an on-list (tools.enabled), so an old config.json with an off-list
+# an on-list (tools.opt_in), so an old config.json with an off-list
 # that predates the tool doesn't turn it on by saying nothing.
 OPT_IN = {"look_at_camera"}
 
 
 def enabled(name):
     if name in OPT_IN:
-        return name in config.TOOLS_ENABLED
+        return name in config.TOOLS_OPT_IN
 
     return name not in config.TOOLS_DISABLED
 
@@ -198,10 +198,10 @@ def set_enabled(name, on):
     # _store, not save_setting: a list isn't a /set-able scalar, so it
     # stays out of SETTINGS - same escape hatch plugin switches use.
     if name in OPT_IN:
-        chosen = set(config.TOOLS_ENABLED)
+        chosen = set(config.TOOLS_OPT_IN)
         chosen.add(name) if on else chosen.discard(name)
-        config.TOOLS_ENABLED = sorted(chosen)
-        key, value = "tools.enabled", config.TOOLS_ENABLED
+        config.TOOLS_OPT_IN = sorted(chosen)
+        key, value = "tools.opt_in", config.TOOLS_OPT_IN
     else:
         off = set(config.TOOLS_DISABLED)
         off.discard(name) if on else off.add(name)
