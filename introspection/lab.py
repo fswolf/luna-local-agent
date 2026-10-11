@@ -27,16 +27,25 @@ HOST = "127.0.0.1"
 
 
 def env():
-    """llama/server.env as a dict - the same file start.sh sources."""
+    """llama-server's settings as a dict - the same files start.sh
+    sources: server.env (server.mac.env on macOS, or $LLAMA_ENV), then
+    server.local.env on top."""
     out = {}
+    name = os.environ.get("LLAMA_ENV") or (
+        "server.mac.env" if sys.platform == "darwin"
+        and os.path.exists(os.path.join(LLAMA, "server.mac.env")) else "server.env")
 
-    with open(os.path.join(LLAMA, "server.env")) as f:
-        for line in f:
-            m = re.match(r"\s*([A-Z_]+)=(.*)", line)
+    for path in (os.path.join(LLAMA, name), os.path.join(LLAMA, "server.local.env")):
+        if not os.path.exists(path):
+            continue
 
-            if m:
-                words = shlex.split(m.group(2), comments=True)
-                out[m.group(1)] = words[0] if words else ""
+        with open(path) as f:
+            for line in f:
+                m = re.match(r"\s*([A-Z_]+)=(.*)", line)
+
+                if m:
+                    words = shlex.split(m.group(2), comments=True)
+                    out[m.group(1)] = words[0] if words else ""
 
     return out
 
