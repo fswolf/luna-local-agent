@@ -37,9 +37,13 @@ setup() {
     if [ -z "$(git config user.name || true)" ]; then
         printf 'Your name for commits: '; read -r n; git config --global user.name "$n"
     fi
-    if [ -z "$(git config user.email || true)" ]; then
-        e=$(gh api user/emails -q '[.[]|select(.primary)][0].email' 2>/dev/null || true)
-        [ -n "$e" ] || { printf 'Your GitHub email: '; read -r e; }
+    # GitHub's private no-reply address: links commits to the account
+    # without publishing a real email. Also repairs a bad earlier value.
+    e=$(git config user.email || true)
+    case "$e" in *@*.*) case "$e" in *'{'*) e="" ;; esac ;; *) e="" ;; esac
+    if [ -z "$e" ]; then
+        e=$(gh api user -q '"\(.id)+\(.login)@users.noreply.github.com"' 2>/dev/null || true)
+        case "$e" in *+*@users.noreply.github.com) ;; *) printf 'Your GitHub email: '; read -r e ;; esac
         git config --global user.email "$e"
     fi
     echo "Ready as $(git config user.name) <$(git config user.email)> / GitHub: $(gh api user -q .login)"
