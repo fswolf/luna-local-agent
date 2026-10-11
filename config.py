@@ -233,6 +233,10 @@ TTS_PITCH = float(_tts_env("PITCH", _tts_cfg.get("pitch", 0.0)))
 # macOS, where it's afplay (PortAudio loses Bluetooth headphones there);
 # "afplay" or "portaudio" forces one.
 TTS_PLAYER = str(_tts_cfg.get("player", "auto")).lower()
+# Drop the ~ of "Mrrp~" before speaking. Kokoro reads it out as "tilde";
+# some other voices stretch the word instead, which is what she means -
+# switch this off for one of those. Emoji are always left unspoken.
+TTS_STRIP_TILDE = bool(_tts_cfg.get("strip_tilde", True))
 VOICE = _tts_env("VOICE", setting("voice", "af_bella"))
 
 # Shown on the UI's TTS line.
@@ -836,6 +840,7 @@ SETTINGS = {
     "tts.volume":                 ("TTS_VOLUME",                   True),
     "tts.player":                 ("TTS_PLAYER",                   True),
     "tts.pitch":                  ("TTS_PITCH",                    True),
+    "tts.strip_tilde":            ("TTS_STRIP_TILDE",              True),
     # Live now, where it used to need a restart: speech.py reads
     # config.VOICE per request rather than importing the value, so
     # /voice can audition a blend while she's mid-conversation. The

@@ -8,6 +8,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 
 import requests
 import sounddevice as sd
@@ -624,6 +625,33 @@ def _shift_pitch(samples, semitones):
     return np.interp(position, np.arange(len(samples)), samples).astype(np.float32)
 
 
+def _speakable(text):
+    """What's left of a sentence once the things meant for the eye are
+    gone: emoji, markdown asterisks and backticks, and the ~ of "Mrrp~"
+    (tts.strip_tilde - Kokoro says "tilde", some voices stretch the word
+    instead). Kokoro reads emoji out loud otherwise ("crescent moon",
+    "sparkles", "paw prints"). The screen keeps them; only the voice
+    loses them. Returns "" when nothing speakable is left."""
+    out = []
+
+    for ch in str(text or ""):
+        code = ord(ch)
+        if (unicodedata.category(ch) in ("So", "Sk", "Cs", "Co")
+                or 0x1F000 <= code <= 0x1FAFF          # emoji and pictographs
+                or 0x2600 <= code <= 0x27BF             # symbols, dingbats (sparkles)
+                or code in (0x200D, 0xFE0E, 0xFE0F, 0x20E3)):   # joiners, variation selectors
+            out.append(" ")
+        elif ch in "*_`#|<>^" or (ch == "~" and getattr(config, "TTS_STRIP_TILDE", True)):
+            out.append(" ")
+        else:
+            out.append(ch)
+
+    text = re.sub(r"\s+", " ", "".join(out))
+    text = re.sub(r"\s+([,.!?;:])", r"\1", text).strip()
+
+    return text if re.search(r"[0-9A-Za-z\u00C0-\uFFFF]", text) else ""
+
+
 def _synthesize(text):
     """POST one chunk to /tts and decode the WAV it returns."""
     try:
@@ -999,8 +1027,9 @@ def speak_queue(inbox, reset=True):
                     done = True
                     break
 
-                for piece in _split_chunks(item):
-                    pending.append(_pool.submit(_synthesize, piece))
+                for piece in _split_chunks(_speakable(item)):
+                    if _speakable(piece):
+                        pending.append(_pool.submit(_synthesize, piece))
 
             if state.stop_speaking:
                 return
