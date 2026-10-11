@@ -228,6 +228,7 @@ STEP_PROMPT = (
     "(You're playing Minecraft as {username}, in a world the user opened for you. "
     "Your goal: {goal}\n"
     "Places you pinned: {spots}\n"
+    "Your notes on this world (yours - kept between sessions):\n{project}\n\n"
     "What you've done so far, oldest first:\n{notes}\n\n"
     "Take the next step. Check your position or inventory if you need to, find what you "
     "need, then do one to three actions towards the goal with your Minecraft tools. If a "
@@ -236,7 +237,9 @@ STEP_PROMPT = (
     "goal is unclear (which way, what size, what material), ask in the game chat "
     "instead of guessing, and look for the answer next step. Pin places you'll need "
     "again (base, chest, the build site) with remember_minecraft_spot. If something "
-    "fails twice, try a different way. End with ONE short line: what you just did and "
+    "fails twice, try a different way. Write down what you'd want to remember next time "
+    "with game_note: where things are, what you've built, what worked and what didn't, your "
+    "plan. End with ONE short line: what you just did and "
     "what's next. If the goal is complete, start that line with DONE. If you're truly "
     "stuck, start it with STUCK and say why.)"
 )
@@ -249,11 +252,16 @@ def _step():
     notes = "\n".join(f"- {n}" for n in _state["notes"][-6:]) or "- nothing yet, you just arrived"
     spots = "; ".join(f"{k} at {v['x']}, {v['y']}, {v['z']}" + (f" ({v['note']})" if v.get("note") else "")
                       for k, v in _spots().items()) or "none yet"
-    prompt = STEP_PROMPT.format(username=s["username"], goal=_state["goal"], notes=notes, spots=spots)
-    allowed = list(_state["tools"]) + ["set_minecraft_goal", "remember_minecraft_spot"]
+    allowed = list(_state["tools"]) + ["set_minecraft_goal", "remember_minecraft_spot", "game_note"]
+
+    import projects
+
+    pid = projects.game_project(NAME, _state["goal"])
+    prompt = STEP_PROMPT.format(username=s["username"], goal=_state["goal"], notes=notes, spots=spots,
+                                project=projects.game_block(pid))
 
     answer = assistant.respond_to_job(prompt, _state["model"], "minecraft", allowed,
-                                      speak=bool(s["speak"])) or ""
+                                      speak=bool(s["speak"]), project_id=pid) or ""
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
     line = lines[-1][:200] if lines else "(no report)"
     _state["notes"] = (_state["notes"] + [line])[-12:]

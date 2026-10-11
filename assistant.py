@@ -138,7 +138,8 @@ def respond_to_chat(prompt, model, source, who, said,
             ui.set_status("Idle")
 
 
-def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=None):
+def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=None,
+                   project_id=None):
     """A scheduled job firing (plugins/cron.py).
 
     Waits its turn like chat does. Fresh context and nothing stored, so a
@@ -156,6 +157,7 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
         ui.begin_message(AGENT_NAME.lower())
         state.job.name = job
         state.job.max_rounds = max_rounds    # None: the usual tools.max_rounds
+        state.job.project_id = project_id    # a game's notes, for game_note
 
         def on_sentence(sentence):
             if not state.stop_speaking:
@@ -179,6 +181,7 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
         finally:
             state.job.name = None
             state.job.max_rounds = None
+            state.job.project_id = None
             ui.set_status("Idle")
 
 

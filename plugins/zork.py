@@ -221,6 +221,12 @@ def _new_game():
 
     _state.update(notes=[], steps=0)
     try:
+        import projects
+
+        projects.new_game(NAME, GOAL)     # fresh notes; the old ones are retired, not lost
+    except Exception:
+        pass
+    try:
         with open(os.path.join(SAVES, "transcript.txt"), "a", encoding="utf-8") as f:
             f.write("\n" + "=" * 60 + "\n[a new game]\n")
     except OSError:
@@ -301,10 +307,14 @@ def _set_playing(on):
 # ---------------------------------------------------------------------------
 # Playing on her own
 # ---------------------------------------------------------------------------
+GOAL = "350 points: every treasure in the trophy case"
+
+
 STEP_PROMPT = (
     "(You're playing Zork I, the classic text adventure, with your Zork tools. The goal is "
     "treasure and points: 350 is a perfect score. Explore, pick up anything useful, read what "
     "you find, and keep a light source once you go underground - the dark has a grue in it.\n"
+    "Your notes on this playthrough (yours - kept between sessions):\n{project}\n\n"
     "Your last moves, oldest first:\n{notes}\n\n"
     "The game screen right now (your last command and what the game said):\n"
     "-----\n{screen}\n-----\n\n"
@@ -313,7 +323,13 @@ STEP_PROMPT = (
     "it did next turn. Don't repeat a move that just failed or changed nothing; try something "
     "new instead (another direction, another object). You only need zork_status if the screen "
     "above is empty. Save with zork_save before anything dangerous; zork_restore if you die.\n"
-    "End with ONE short line: what you did and why, in your own voice.)"
+    "When you learn something worth remembering - a room and its exits, a puzzle, an item and "
+    "what it's for, what killed you - write it down with game_note, and update your plan. "
+    "Read your notes before moving; don't repeat what they say failed.\n"
+    "Then talk to the player watching, in your own voice, 2 to 4 sentences: what you see, what "
+    "you make of it, why you chose this move, how you feel about it (grues are scary; treasure "
+    "is exciting). Make your last sentence a plain summary: what you did and what you'll try "
+    "next.)"
 )
 
 
@@ -358,6 +374,14 @@ def _pretty_turn(turn, said, width=78):
     return "\n".join(out)
 
 
+
+def _last_sentence(answer, limit=200):
+    """Her turn's last sentence - the what-I-did-and-what's-next that goes
+    into her one-liner notes. The rest is commentary for the player."""
+    text = " ".join((answer or "").split())
+    parts = [p for p in re.split(r"(?<=[.!?])\s+", text) if p.strip()]
+    return (parts[-1] if parts else "(no report)")[:limit]
+
 def _screen(lines=30):
     """The tail of the game's transcript, without her own comments - what
     a player would be looking at before typing the next command."""
@@ -388,17 +412,65 @@ def _screen(lines=30):
     return re.sub(r"\n{3,}", "\n\n", tail) or "(nothing yet - a new game)"
 
 
+# One move per turn, enforced rather than asked for: the model was told
+# "ONE command" and still sent three or four. During a play turn the
+# first zork_command goes through; any more in the same turn are turned
+# back, and she sees the result of the one she made next turn. In
+# conversation (not a play turn) there's no limit.
+_turn = {"active": False, "moves": 0}
+
+ONE_MOVE = ("You've already made your move this turn - that command wasn't sent. Don't send "
+            "more: say what you did and why, write a game_note if you learned something, and "
+            "stop. You'll see what your move did next turn.")
+
+
+def _one_move_per_turn():
+    import tools
+
+    name = next((t for t in _state["tools"] if t.endswith("zork_command")), None)
+    entry = tools._REGISTRY.get(name) if name else None
+
+    if not entry or getattr(entry["run"], "_one_move", False):
+        return
+
+    inner = entry["run"]
+
+    def run(**kwargs):
+        if _turn["active"]:
+            if _turn["moves"] >= 1:
+                return ONE_MOVE
+            _turn["moves"] += 1
+        return inner(**kwargs)
+
+    run._one_move = True
+    entry["run"] = run
+
+
 def _step():
     import assistant
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-20:]) or "- nothing yet: a new game"
-    allowed = list(_state["tools"]) + ["play_zork"]
+    allowed = list(_state["tools"]) + ["play_zork", "game_note"]
 
-    answer = assistant.respond_to_job(STEP_PROMPT.format(notes=notes, screen=_screen()), _state["model"], "zork",
-                                      allowed, speak=bool(s["speak"])) or ""
+    import projects
+
+    pid = projects.game_project(NAME, GOAL)
+
+    _one_move_per_turn()
+    _turn.update(active=True, moves=0)
+
+    try:
+        # A move, a note, maybe a status check - more rounds than that is
+        # her trying to play several moves blind.
+        answer = assistant.respond_to_job(
+            STEP_PROMPT.format(notes=notes, screen=_screen(), project=projects.game_block(pid)),
+            _state["model"], "zork", allowed, speak=bool(s["speak"]), project_id=pid,
+            max_rounds=3) or ""
+    finally:
+        _turn["active"] = False
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
-    line = lines[-1][:200] if lines else "(no report)"
+    line = _last_sentence(answer) if lines else "(no report)"
     _state["notes"] = (_state["notes"] + [line])[-30:]
     _state["steps"] += 1
 

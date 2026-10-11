@@ -603,6 +603,31 @@ machine.
 
 `goal` empty means "grow the town without running out of money".
 
+## Her memory of a game
+
+Each game turn starts fresh, so on their own her turns would only know
+what happened in the last few. Each game she plays also has a
+**project** of its own (see [Learning](learning.md)): "Zork playthrough",
+"Vibe City as mayor", "Minecraft world", made the first time she plays.
+
+- Every turn of that game shows her that project: the goal, her latest
+  notes and her plan.
+- She writes in it with `game_note` as she plays: the map, puzzles and
+  their answers, items and what they're for, what killed her, what
+  failed, the plan from here. It's her only memory tool during a game,
+  and it only works on that game's project.
+- It's kept in `agent/projects.db`, so a playthrough is remembered
+  across turns and restarts.
+- It's a normal project too: `/projects` shows it, and in conversation
+  she sees it alongside your other projects, so "how's Zork going?" has
+  an answer without her checking.
+- `/zork new` marks the old playthrough done and starts a fresh
+  project. The old one is retired, not deleted: `/projects restore <n>`.
+
+Your own memory (facts about you, your conversations) still stays out
+of game turns. It doesn't help her play, and it would cost tokens on
+every move.
+
 ## Reading a game back
 
 Every game (Minecraft, Zork, Vibe City) writes what she says on each of

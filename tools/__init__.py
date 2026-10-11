@@ -131,6 +131,7 @@ _GROUPS = (
     ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
               "reflect_now", "save_skill")),
     ("Projects", ("start_project", "update_project", "project_notes")),
+    ("Games", ("game_note",)),
 )
 
 

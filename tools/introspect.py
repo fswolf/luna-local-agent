@@ -667,3 +667,52 @@ def _project_notes(project):
         lines.append(f"next: {p['next']}")
 
     return "\n".join(lines) if log or p["next"] else lines[0] + "\n(nothing recorded yet)"
+
+
+# ---------------------------------------------------------------------------
+# Her notes on the game she's playing
+# ---------------------------------------------------------------------------
+def _game_project():
+    """The project of the game turn in flight, or None outside one. Set
+    only by assistant.respond_to_job for a game plugin, on this thread."""
+    try:
+        import state
+
+        return getattr(state.job, "project_id", None)
+    except Exception:
+        return None
+
+
+@tool(
+    "game_note",
+    "Write in your notes on the game you're playing - they're shown to you every turn and "
+    "kept between sessions. Note what you'd want to remember next time: the map (what's "
+    "where, which way), puzzles and their answers, items and what they're for, what killed "
+    "you, what failed, and your plan. Short and specific. Only works during a game turn.",
+    {
+        "found": {"type": "string", "description": "Something learned - a place, an item, a rule of the game."},
+        "tried": {"type": "string", "description": "What you just tried and what happened."},
+        "decided": {"type": "string", "description": "A decision or strategy."},
+        "next": {"type": "string", "description": "Your plan from here, replacing the old one."},
+    },
+)
+def _game_note(found="", tried="", decided="", next=""):
+    pid = _game_project()
+
+    if not pid:
+        return "Only during a game turn."
+
+    import projects
+
+    wrote = []
+
+    for kind, text in (("found", found), ("tried", tried), ("decided", decided)):
+        if str(text or "").strip():
+            projects.log(pid, kind, text)
+            wrote.append(kind)
+
+    if str(next or "").strip():
+        projects.set_next(pid, next)
+        wrote.append("plan")
+
+    return f"Noted ({', '.join(wrote)})." if wrote else "Nothing to note - say what you found, tried or decided."

@@ -45,6 +45,7 @@ same way look_at_screen does - attached to the next message - so a
 vision model (an mmproj on llama-server, or a vision model in LM
 Studio) sees her city. A text-only model is told it can't.
 """
+import re
 import threading
 import urllib.parse
 
@@ -255,6 +256,7 @@ STEP_PROMPT = (
     "tools. The player is watching the game window, so narrate with the say tool.\n"
     "Your goal: {goal}\n"
     "{brief}"
+    "Your notes on this city (yours - kept between sessions):\n{project}\n\n"
     "What you've done so far, oldest first:\n{notes}\n\n"
     "Take your next turn, two to six moves:\n"
     "1. get_city first. If a window is waiting for an answer (a milestone, a neighbour link, the "
@@ -269,9 +271,13 @@ STEP_PROMPT = (
     "about $2,000 in reserve. If a build fails, read why and fix that, not the same build again.\n"
     "5. Now and then take a screenshot to see how the town looks.\n"
     "6. Close any window you opened (set_tax, open_window...) with close_windows.\n"
+    "7. Write down what you'd want to remember next time with game_note: where the "
+    "neighbourhoods, power and water are, what failed and why, what the city needs, your plan.\n"
     "If a call says the player took over, stop and end with PAUSED.\n"
-    "End with ONE short line: what you built, with its coordinates, anything left unconnected "
-    "or unfinished, and what you'll do next.)"
+    "End by talking to the player watching, in your own voice, 2 to 4 sentences: how the "
+    "city's doing, what you built and why, what worries you or excites you about it. Make your "
+    "last sentence a plain summary: what you built (with coordinates), anything left "
+    "unconnected or unfinished, and what you'll do next.)"
 )
 
 BRIEF = ("This is your first turn this session: call how_to_play first, then list_tools, so you "
@@ -280,20 +286,35 @@ BRIEF = ("This is your first turn this session: call how_to_play first, then lis
          "name_city.\n")
 
 
+
+def _last_sentence(answer, limit=200):
+    """Her turn's last sentence - the what-I-did-and-what's-next that goes
+    into her one-liner notes. The rest is commentary for the player."""
+    text = " ".join((answer or "").split())
+    parts = [p for p in re.split(r"(?<=[.!?])\s+", text) if p.strip()]
+    return (parts[-1] if parts else "(no report)")[:limit]
+
 def _step():
     import assistant
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-12:]) or "- nothing yet"
-    prompt = STEP_PROMPT.format(goal=_goal(), brief="" if _state["briefed"] else BRIEF, notes=notes)
-    allowed = list(_state["tools"]) + ["play_vibe_city"]
+    prompt = STEP_PROMPT.format(goal=_goal(), brief="" if _state["briefed"] else BRIEF, notes=notes,
+                                project="{project}")
+    allowed = list(_state["tools"]) + ["play_vibe_city", "game_note"]
 
+    import projects
+
+    pid = projects.game_project(NAME, _goal())
+
+    prompt = prompt.replace("{project}", projects.game_block(pid))
     answer = assistant.respond_to_job(prompt, _state["model"], "vibecity", allowed,
                                       speak=bool(s["speak"]),
-                                      max_rounds=int(s["max_rounds"] or 12)) or ""
+                                      max_rounds=int(s["max_rounds"] or 12),
+                                      project_id=pid) or ""
     _state["briefed"] = True
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
-    line = lines[-1][:200] if lines else "(no report)"
+    line = _last_sentence(answer) if lines else "(no report)"
     _state["notes"] = (_state["notes"] + [line])[-30:]
     _state["steps"] += 1
 

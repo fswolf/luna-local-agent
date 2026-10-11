@@ -15,6 +15,13 @@ She keeps them current with three tools: start_project, update_project
 (tried / found / next / done) and project_notes (the whole log). You can
 see and steer them with /projects.
 
+Games use them too: each game she plays (Zork, Vibe City, Minecraft) has
+a project of its own - "Zork playthrough" - made the first time she
+plays it. Every game turn shows her that project's log, and she keeps
+it current with game_note: maps, puzzles, what killed her, the plan. So
+a playthrough is remembered across turns and restarts, and in normal
+chat it shows up with her other projects.
+
 agent/projects.db, gitignored. Nothing is deleted: a dropped project is
 retired and /projects restore <n> brings it back.
 """
@@ -270,3 +277,57 @@ def prompt_block(query=""):
                      "one up): " + "; ".join(f"#{p['id']} {p['title']}" for p in paused[:5]))
 
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Games: one project per game, her memory of the playthrough
+# ---------------------------------------------------------------------------
+GAME_TITLES = {"zork": "Zork playthrough", "vibecity": "Vibe City as mayor",
+               "minecraft": "Minecraft world"}
+
+
+def game_project(game, goal=""):
+    """The id of this game's project, made the first time she plays it.
+    An existing one (active, paused or done, not retired) is picked back
+    up and made active."""
+    title = GAME_TITLES.get(game, f"{game} playthrough")
+    pid, _new = start(title, goal)
+    return pid
+
+
+def new_game(game, goal=""):
+    """A fresh project for a fresh playthrough. The old one is marked done
+    and retired - /projects restore <n> brings it back."""
+    title = GAME_TITLES.get(game, f"{game} playthrough")
+    old = next((p for p in projects() if p["title"].lower() == title.lower()), None)
+
+    if old:
+        set_status(old["id"], "done")
+        retire(old["id"])
+
+    return game_project(game, goal)
+
+
+def game_block(project_id, recent=15):
+    """What a game turn shows her: the goal, her recent notes, the plan."""
+    project = get(project_id)
+
+    if not project:
+        return "(no notes yet)"
+
+    lines = [f"{project['title']}" + (f" - goal: {project['goal']}" if project["goal"] else "")]
+    notes = [e for e in entries(project_id) if e["kind"] != "next"]
+
+    if len(notes) > recent:
+        lines.append(f"   ({len(notes) - recent} older notes - the most recent are below)")
+
+    for e in notes[-recent:]:
+        lines.append(f"   {e['kind']}: {e['text']}")
+
+    if not notes:
+        lines.append("   (nothing written down yet)")
+
+    if project["next"]:
+        lines.append(f"   plan: {project['next']}")
+
+    return "\n".join(lines)
