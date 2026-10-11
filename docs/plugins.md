@@ -417,7 +417,7 @@ when you open it) in config:
 ```json
 "minecraft": { "enabled": false, "host": "localhost", "port": 25565,
                "username": "Luna", "step_seconds": 20, "max_steps": 60,
-               "speak": false }
+               "speak": true }
 ```
 
 She gets 16 of the server's 22 tools (`mc_tools` changes the list):
@@ -436,6 +436,7 @@ rest of the time. `speak: true` reads each step aloud.
 /zork on        load the game          /zork play      she plays on her own
 /zork pause     stop playing           /zork off       put it away (saved)
 /zork watch     a terminal window showing the game as she plays
+/zork new       start over (the old game is kept as a save named old-<date>)
 /zork           score and what she's been up to
 ```
 
@@ -474,13 +475,15 @@ tools only exist while it's on.
 
 ### Playing on her own
 
-`/zork play` hands her the controls. Whenever nobody has spoken for
-`step_seconds` (30) she takes a turn of two to five commands and says in one
-line where she is and what's next. Like Minecraft, a turn is a job:
-fresh context, nothing in your history, only her Zork tools, and the
-last dozen of her one-liners as her memory of the game. Talking to her
-pauses play until you stop. After `max_steps` turns she pauses and says
-so.
+`/zork play` hands her the controls, one move at a time. Whenever
+nobody has spoken for `step_seconds` (8) she takes a turn: she reads the
+game screen (her last command and what the game answered), makes **one**
+move, and says in a line what she did and why. The next turn she sees
+what that move did before choosing another, the way a person plays.
+Like Minecraft, a turn is a job: fresh context, nothing in your history,
+only her Zork tools, the screen, and her last twenty one-liners as her
+memory of the game. Talking to her pauses play until you stop. After
+`max_steps` (200) moves she pauses and says so.
 
 The game **autosaves** every five commands and when the plugin stops,
 and picks the autosave back up next time, so a playthrough survives
@@ -504,9 +507,9 @@ python games/zork/watch.py agent/zork
 ```json
 "zork": {
     "enabled": false,
-    "step_seconds": 30,
-    "max_steps": 80,
-    "speak": false,
+    "step_seconds": 8,
+    "max_steps": 200,
+    "speak": true,
     "interpreter": "",
     "watch": false,
     "terminal": ""
@@ -588,7 +591,7 @@ machine.
     "url": "http://127.0.0.1:47823/mcp",
     "step_seconds": 30,
     "max_steps": 60,
-    "speak": false,
+    "speak": true,
     "goal": "",
     "skip_tools": [],
     "pause_game": true
@@ -596,6 +599,23 @@ machine.
 ```
 
 `goal` empty means "grow the town without running out of money".
+
+## Reading a game back
+
+Every game (Minecraft, Zork, Vibe City) writes what she says on each of
+her turns to a text file, one per game per day:
+
+```
+agent/playlogs/zork-2026-10-11.txt
+agent/playlogs/vibecity-2026-10-11.txt
+```
+
+Each turn is stamped with its number and the time, followed by her
+narration and her one-line report, as she said them. For Zork her words
+also go into the game's own `agent/zork/transcript.txt`, between the
+commands and the game's replies, so the watch window and the file show
+the whole playthrough: what she typed, what the game answered, and what
+she made of it. The folder is gitignored.
 
 ## Your home: Home Assistant
 

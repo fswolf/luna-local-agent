@@ -1088,3 +1088,7 @@ def _store(path, value):
 
     settings.clear()
     settings.update(stored)
+
+    # plugin_settings reads this; keep it pointing at the fresh block
+    global _plugins_cfg
+    _plugins_cfg = settings.get("plugins", {})

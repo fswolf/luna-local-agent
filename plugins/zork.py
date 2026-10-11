@@ -4,6 +4,7 @@
     /zork play        she plays on her own while you're quiet
     /zork pause       stop taking turns (the game stays where it is)
     /zork watch       open a terminal window showing the game as she plays
+    /zork new         start over from the beginning (the old game is kept as old-<date>)
     /zork off         put it away (saved, picked up next time)
     /zork             status: score, moves, what she's been up to
 
@@ -13,8 +14,9 @@ game is hers in conversation too: "what's in the mailbox?", "try going
 north", "how many points have you got?".
 
 /zork play hands her the controls: whenever nobody has spoken for
-step_seconds she takes a turn - a few commands - and says in one line
-what happened. Like Minecraft, those turns are jobs: fresh context,
+step_seconds she takes a turn - one move: she reads the screen, types one
+command, and says in a line what she did and why - then waits to see
+what it did. Like Minecraft, those turns are jobs: fresh context,
 nothing stored in your history, only her Zork tools, and the last dozen
 of her one-liners as her memory of the game so far. Talking to her
 pauses play until you stop.
@@ -31,9 +33,9 @@ games/zork/. dfrotz has to be installed:
 
     "zork": {
         "enabled": false,
-        "step_seconds": 30,     # quiet needed before her next turn
-        "max_steps": 80,        # turns per /zork play, then she pauses
-        "speak": false,         # read each turn's line aloud
+        "step_seconds": 8,      # quiet needed before her next move
+        "max_steps": 200,       # moves per /zork play, then she pauses
+        "speak": true,          # narrate each turn out loud
         "interpreter": "",      # path to dfrotz if it's somewhere odd
         "watch": false,         # open the watch window with /zork play
         "terminal": ""          # e.g. "kitty" or "gnome-terminal --"; "" = find one
@@ -46,6 +48,7 @@ wezterm, konsole, gnome-terminal or xterm (Terminal.app on a Mac);
 "terminal" picks one. Closing it doesn't stop the game.
 """
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -64,7 +67,7 @@ SERVER_SCRIPT = os.path.join(HERE, "games", "zork", "zork_server.py")
 WATCH_SCRIPT = os.path.join(HERE, "games", "zork", "watch.py")
 SAVES = os.path.join(HERE, "agent", "zork")      # gitignored, like her other state
 
-DEFAULTS = {"step_seconds": 30, "max_steps": 80, "speak": False, "interpreter": "",
+DEFAULTS = {"step_seconds": 8, "max_steps": 200, "speak": True, "interpreter": "",
             "watch": False, "terminal": ""}
 
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "playing": False,
@@ -188,7 +191,41 @@ def command(text):
     if word == "watch":
         return _open_watch()
 
-    return "zork: on | off | play | pause | watch"
+    if word in ("new", "restart", "new game"):
+        return _new_game()
+
+    return "zork: on | off | play | pause | watch | new"
+
+
+def _new_game():
+    """Start Zork over from the beginning, and forget the old game's notes
+    so she doesn't play the new one from memories of the last. The old
+    game is kept first, in a save named old-<date>-<time>."""
+    import tools
+    from datetime import datetime
+
+    name = next((t for t in _state["tools"] if t.endswith("zork_restart")), None)
+    saver = next((t for t in _state["tools"] if t.endswith("zork_save")), None)
+    if not name:
+        return "zork: load the game first - /zork on"
+
+    kept = ""
+    if saver:
+        slot = f"old-{datetime.now():%Y%m%d-%H%M}"
+        if not tools.call(saver, {"slot": slot}).startswith("Error"):
+            kept = f" The old game is saved as {slot} - ask her to restore {slot} to go back to it."
+
+    reply = tools.call(name, {})
+    if reply.startswith("Error"):
+        return f"zork: couldn't restart ({reply})"
+
+    _state.update(notes=[], steps=0)
+    try:
+        with open(os.path.join(SAVES, "transcript.txt"), "a", encoding="utf-8") as f:
+            f.write("\n" + "=" * 60 + "\n[a new game]\n")
+    except OSError:
+        pass
+    return "zork: new game - back at West of House. /zork play to start." + kept
 
 
 # ---------------------------------------------------------------------------
@@ -268,28 +305,107 @@ STEP_PROMPT = (
     "(You're playing Zork I, the classic text adventure, with your Zork tools. The goal is "
     "treasure and points: 350 is a perfect score. Explore, pick up anything useful, read what "
     "you find, and keep a light source once you go underground - the dark has a grue in it.\n"
-    "What you've done so far, oldest first:\n{notes}\n\n"
-    "Take your next turn: two to five commands with zork_command, short verb-noun ones like "
-    "'north', 'open mailbox', 'take lamp'. If you've lost track, start with zork_status. "
-    "Save with zork_save before anything dangerous. If you die, zork_restore goes back. If a "
-    "command fails twice, try something different.\n"
-    "End with ONE short line: where you are, what just happened, what you'll try next.)"
+    "Your last moves, oldest first:\n{notes}\n\n"
+    "The game screen right now (your last command and what the game said):\n"
+    "-----\n{screen}\n-----\n\n"
+    "Read the screen, think about what it tells you, then make ONE move: a single zork_command, "
+    "short and verb-noun like 'north', 'open mailbox', 'take lamp'. Then stop - you'll see what "
+    "it did next turn. Don't repeat a move that just failed or changed nothing; try something "
+    "new instead (another direction, another object). You only need zork_status if the screen "
+    "above is empty. Save with zork_save before anything dangerous; zork_restore if you die.\n"
+    "End with ONE short line: what you did and why, in your own voice.)"
 )
+
+
+_STATUS = re.compile(r"^\s*(\S.*?)\s{2,}Score:\s*(-?\d+)\s+Moves:\s*(\d+)\s*$")
+
+
+def _pretty_turn(turn, said, width=78):
+    """This move laid out like the watch window, as plain text for the
+    playlog: her command, a status bar, the game's reply wrapped, then
+    what she said about it."""
+    import textwrap
+    from datetime import datetime
+
+    from plugins import _playlog
+
+    screen = _screen(lines=40)
+    starts = [i for i, ln in enumerate(screen.splitlines()) if ln.startswith("> ")]
+    lines = screen.splitlines()[starts[-1]:] if starts else screen.splitlines()
+
+    out = [f"=== move {turn}  {datetime.now():%H:%M:%S} " + "=" * max(3, width - 22)]
+    blank = False
+    for line in lines:
+        status = _STATUS.match(line)
+        if status:
+            room, score, moves = status.groups()
+            label = f" {room}  ·  score {score}  ·  move {moves} "
+            out.append("--" + label + "-" * max(2, width - len(label) - 2))
+        elif line.startswith(("[saved", "[restored")):
+            continue
+        elif not line.strip():
+            if not blank:
+                out.append("")
+            blank = True
+            continue
+        else:
+            indent = line[:len(line) - len(line.lstrip())]
+            out += textwrap.wrap(line.strip(), width, initial_indent=indent, subsequent_indent=indent) or [""]
+        blank = False
+
+    if said:
+        out += ["", _playlog.said_block(said, width)]
+    return "\n".join(out)
+
+
+def _screen(lines=30):
+    """The tail of the game's transcript, without her own comments - what
+    a player would be looking at before typing the next command."""
+    path = os.path.join(SAVES, "transcript.txt")
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 12000))
+            text = f.read().decode("utf-8", "replace")
+    except OSError:
+        return "(nothing yet - a new game)"
+
+    keep, skipping = [], False
+    for line in text.splitlines():
+        if line.startswith("[") and not line.startswith(("[saved", "[restored")):
+            skipping = True          # her comment: runs to the next blank line
+            continue
+        if skipping and line.strip():
+            continue
+        skipping = False
+        # dfrotz pads its status line to 200 columns; squeeze it
+        keep.append(re.sub(r"\s{3,}", "   ", line.rstrip()))
+
+    # from the start of the last two commands, at most `lines` lines
+    starts = [i for i, ln in enumerate(keep) if ln.startswith("> ")]
+    tail = keep[starts[-2]:] if len(starts) >= 2 else keep
+    tail = "\n".join(tail[-lines:]).strip()
+    return re.sub(r"\n{3,}", "\n\n", tail) or "(nothing yet - a new game)"
 
 
 def _step():
     import assistant
 
     s = settings()
-    notes = "\n".join(f"- {n}" for n in _state["notes"][-12:]) or "- nothing yet: a new game"
+    notes = "\n".join(f"- {n}" for n in _state["notes"][-20:]) or "- nothing yet: a new game"
     allowed = list(_state["tools"]) + ["play_zork"]
 
-    answer = assistant.respond_to_job(STEP_PROMPT.format(notes=notes), _state["model"], "zork",
+    answer = assistant.respond_to_job(STEP_PROMPT.format(notes=notes, screen=_screen()), _state["model"], "zork",
                                       allowed, speak=bool(s["speak"])) or ""
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
     line = lines[-1][:200] if lines else "(no report)"
     _state["notes"] = (_state["notes"] + [line])[-30:]
     _state["steps"] += 1
+
+    from plugins import _playlog
+
+    _playlog.write(NAME, _state["steps"], answer, block=_pretty_turn(_state["steps"], answer),
+                   also=[os.path.join(SAVES, "transcript.txt")])
 
     if _state["steps"] >= int(s["max_steps"]):
         _state["playing"] = False

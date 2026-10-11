@@ -33,7 +33,7 @@ Builds cost in-game money only, so nothing here asks for approval.
         "url": "http://127.0.0.1:47823/mcp",
         "step_seconds": 30,
         "max_steps": 60,
-        "speak": false,
+        "speak": true,             # narrate each turn out loud
         "goal": "",
         "skip_tools": [],              # e.g. ["screenshot"] for a model that can't see
         "pause_game": true             # pause the game when she stops playing
@@ -58,7 +58,7 @@ DEFAULT_GOAL = ("grow the town: roads, homes, shops and industry, with power and
                 "without running out of money")
 
 DEFAULTS = {"url": "http://127.0.0.1:47823/mcp", "step_seconds": 30, "max_steps": 60,
-            "speak": False, "goal": "", "skip_tools": [], "pause_game": True}
+            "speak": True, "goal": "", "skip_tools": [], "pause_game": True}
 
 _state = {"model": None, "tools": [], "goal": "", "notes": [], "steps": 0, "playing": False,
           "busy": False, "error": "", "briefed": False}
@@ -294,6 +294,10 @@ def _step():
     line = lines[-1][:200] if lines else "(no report)"
     _state["notes"] = (_state["notes"] + [line])[-30:]
     _state["steps"] += 1
+
+    from plugins import _playlog
+
+    _playlog.write(NAME, _state["steps"], answer)
 
     if "PAUSED" in line.upper() or "took over" in answer.lower():
         _state["playing"] = False

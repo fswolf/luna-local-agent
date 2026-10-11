@@ -43,7 +43,10 @@ import sys
 import threading
 import time
 
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.fastmcp import FastMCP          # mcp 1.x
+except ImportError:
+    from mcp.server.mcpserver import MCPServer as FastMCP   # mcp 2.x renamed it
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUTOSAVE = "autosave"

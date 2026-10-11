@@ -36,7 +36,7 @@ Setup:
         "username": "Luna",
         "step_seconds": 20,     # quiet needed before she takes the next step
         "max_steps": 60,        # per goal, then she pauses and asks
-        "speak": false          # say each step out loud
+        "speak": true           # say each step out loud
     }
 """
 import json
@@ -65,7 +65,7 @@ CORE_TOOLS = ["get-position", "move-to-position", "look-at", "find-blocks", "dig
               "get-block-info", "get-recipe", "detect-gamemode"]
 
 DEFAULTS = {"host": "localhost", "port": 25565, "username": "Luna", "step_seconds": 20,
-            "max_steps": 60, "speak": False, "mc_tools": CORE_TOOLS, "command": ""}
+            "max_steps": 60, "speak": True, "mc_tools": CORE_TOOLS, "command": ""}
 
 # Places she pinned with remember_minecraft_spot - kept across restarts,
 # per world, because "the base" is the same place tomorrow.
@@ -258,6 +258,10 @@ def _step():
     line = lines[-1][:200] if lines else "(no report)"
     _state["notes"] = (_state["notes"] + [line])[-12:]
     _state["steps"] += 1
+
+    from plugins import _playlog
+
+    _playlog.write(NAME, _state["steps"], answer)
     _state["last"] = line
 
     if line.upper().startswith("DONE"):

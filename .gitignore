@@ -32,6 +32,8 @@ agent/cron.json
 agent/minecraft.json
 # Zork saves (plugins/zork.py), and any made running the server by hand.
 agent/zork/
+# What she said on each game turn - see docs/plugins.md
+agent/playlogs/
 games/zork/saves/
 
 # llama.cpp is built in place by llama/install.sh; only the scripts and

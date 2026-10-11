@@ -897,10 +897,45 @@ def _tool_groups():
     except Exception:
         groups = []
 
+    groups = _with_plugin_switches(groups)
     extra = [g for g in (_feature_group(), _thoughts_group(), _self_group(), _portrait_group()) if g]
     perms = _perm_group()
 
     return ([perms] if perms else []) + groups + extra
+
+
+def _with_plugin_switches(groups):
+    """Each MCP plugin (home, vibecity, minecraft, zork) gets a switch at
+    the top of its MCP group, and keeps the group while it's off - so
+    connecting is a space press here, not a /command you have to know.
+    Its server's own tools join the group once it's connected."""
+    try:
+        import plugins
+    except Exception:
+        return groups
+
+    out = list(groups)
+
+    for name in plugins.names():
+        plugin = plugins.get(name)
+
+        if not plugin or not getattr(plugin.module, "SERVER", None):
+            continue
+
+        running = plugin.running()
+        ready = running or plugin.available()
+        why = "connected" if running else (plugin.why_unavailable() if not ready else f"space connects - /{name} on")
+        row = (f"{name} plugin", running, ready, why, 0, "plugin:" + name)
+        label = f"MCP: {name}"
+
+        for i, (glabel, members, live, total) in enumerate(out):
+            if glabel == label:
+                out[i] = (glabel, [row] + list(members), live, total)
+                break
+        else:
+            out.append((label, [row], 0, 0))
+
+    return out
 
 
 def _tool_rows():
@@ -1135,6 +1170,8 @@ def _tool_toggle():
             config.save_setting("portrait.model", nxt)
             livefeed.emit("reload")
             add_message("system", f"Portrait model: {_model_name(nxt)} ({nxt}) - an open portrait reloads now.")
+        elif setting and setting.startswith("plugin:"):
+            _toggle_plugin(setting[len("plugin:"):], on)
         elif setting and setting.startswith("perm:"):
             import config
 
@@ -1182,6 +1219,37 @@ def _tool_toggle():
     _refresh()
 
 
+def _toggle_plugin(name, on):
+    """Connect or disconnect a plugin from the tools pane, saved like
+    /<name> on|off. In a thread: connecting can take a few seconds."""
+    import sys
+
+    import config
+    import plugins
+
+    plugin = plugins.get(name)
+
+    if plugin is None:
+        return
+
+    def go():
+        model = getattr(sys.modules.get("__main__"), "MODEL", None)
+        ok, message = plugin.stop() if on else plugin.start(model)
+
+        if ok:
+            try:
+                config.set_plugin_enabled(plugin.name, not on)
+                message += " (saved)"
+            except Exception:
+                pass
+
+        add_message("system", message)
+        _refresh()
+
+    add_message("system", f"{'Disconnecting' if on else 'Connecting'} {name}...")
+    threading.Thread(target=go, daemon=True, name=f"plugin-{name}").start()
+
+
 def _tool_group_toggle():
     """Switch every row in the selected row's group at once: all off if
     they're all on, otherwise all on. Rows that cycle (Permissions) or
@@ -1195,7 +1263,7 @@ def _tool_group_toggle():
     else:
         return
 
-    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "pick:"))]
+    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "pick:", "plugin:"))]
 
     if not rows:
         add_message("system", f"{label}: nothing here switches as a group")
@@ -1664,7 +1732,7 @@ _HELP_SECTIONS = [
         ("/context", "how big every prompt is vs the model's context"),
         ("/scroll", "why the wheel isn't scrolling, if it isn't"),
         "",
-        "in the tools pane: up/down or the wheel choose, space toggles.",
+        "in the tools pane: up/down or the wheel choose, space toggles, a the whole group.",
         "the Mood group at the bottom switches moods, her voice tint",
         "and warmth sensing from the same place; Thoughts switches the",
         "reasoning log; Learning switches lessons, episodes, fact cleanup,",

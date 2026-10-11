@@ -83,6 +83,15 @@ def _run_loop():
     _loop.run_forever()
 
 
+def _reason(e):
+    """The useful line from an error. anyio wraps the real one in an
+    ExceptionGroup ("unhandled errors in a TaskGroup"), which says
+    nothing; dig down to what actually went wrong."""
+    while isinstance(e, BaseExceptionGroup) and e.exceptions:
+        e = e.exceptions[0]
+    return f"{type(e).__name__}: {e}"
+
+
 def _field(obj, snake, camel, default=None):
     """mcp 2.x names fields in snake_case (is_error, input_schema), 1.x in
     camelCase (isError, inputSchema). Read whichever this version has."""
@@ -142,7 +151,9 @@ async def _serve(name, spec, ready):
                 ready.set()
                 await entry["stop"].wait()
     except Exception as e:
-        entry["error"] = f"{type(e).__name__}: {e}"
+        entry["error"] = _reason(e)
+        if entry.get("errlog"):
+            entry["error"] += f" (the server's own output: {entry['errlog'].name})"
         logbook.warn("mcp", "%s: %s", name, entry["error"])
     finally:
         entry["session"] = None
