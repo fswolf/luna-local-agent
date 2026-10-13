@@ -95,6 +95,19 @@ def allowed_tools(requested):
     return sorted(TOOL_CEILING & set(requested or ()))
 
 
+def _show(who, message, room):
+    """Every message, answered or not, to the portrait: a viewer's hi,
+    !hug or "lol" can get a wave, a hug or a bounce out of her. Local
+    pages only, and nothing waits on it."""
+    try:
+        import livefeed
+
+        if livefeed.watching():
+            livefeed.emit("chat", who=who[:40], text=message[:200], room=room)
+    except Exception:
+        pass
+
+
 class ChatRoom:
     """The brain behind one chat source.
 
@@ -160,6 +173,7 @@ class ChatRoom:
 
         self.seen += 1
         self._recent.append((who, message))
+        _show(who, message, self.name)
 
         if not self._named.search(message.lower()):
             return

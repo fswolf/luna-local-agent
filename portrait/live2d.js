@@ -19,7 +19,7 @@ const say = (text, keep) => { note.textContent = text; note.classList.toggle('hi
 if (params.get('bg') === 'transparent') document.body.classList.add('transparent');
 if (params.get('debug')) document.body.classList.add('debug');
 
-const cfg = await fetch('config.json').then(r => r.json()).catch(() => ({}));
+const cfg = await fetch('config.json' + location.search).then(r => r.json()).catch(() => ({}));
 const L2 = cfg.live2d || {};
 
 const app = new PIXI.Application({ resizeTo: window, backgroundAlpha: 0, antialias: true,
@@ -138,8 +138,7 @@ function handle(ev) {
       break;
     }
     case 'holo':        // /holo or the tools pane, while the page is open
-      // ?holo= on the URL only sets how the page starts; /holo and the
-      // tools pane always win after that, OBS browser sources included.
+      if (params.has('holo')) break;            // the URL said, the URL wins
       if (ev.on) { holo ? holo.on() : (holo = createHologram(PIXI, app, model, holoCfg)); }
       else holo?.off();
       break;

@@ -158,16 +158,29 @@ class _Handler(BaseHTTPRequestHandler):
     _TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
               ".json": "application/json", ".vrm": "model/gltf-binary", ".glb": "model/gltf-binary",
               ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp",
-              ".moc3": "application/octet-stream"}
+              ".moc3": "application/octet-stream", ".vrma": "model/gltf-binary"}
 
     def _portrait(self, rel):
-        """The portrait page and its files, from portrait/ - and nothing
-        outside it, whatever the path says."""
+        """The portrait page and its files - and nothing outside portrait/,
+        whatever the path says. The page itself lives in portrait/viewer/;
+        models/, animations/ and vendor/ beside it are served at the same
+        level, so the page finds them as models/..., vendor/...."""
+        from urllib.parse import unquote
+        rel = unquote(rel)   # a model folder with spaces or non-latin letters in its name
         if rel == "config.json":
-            return self._body(json.dumps(portrait_config()).encode(), "application/json")
+            # ?model=... previews another model without switching to it
+            from urllib.parse import parse_qs, urlsplit
+            want = (parse_qs(urlsplit(self.path).query).get("model") or [""])[0]
+            return self._body(json.dumps(portrait_config(want if want in portrait_models() else None)).encode(),
+                              "application/json")
+
+        if rel == "models.json":
+            return self._body(json.dumps(portrait_models()).encode(), "application/json")
 
         root = os.path.realpath(os.path.join(config.BASE_DIR, "portrait"))
-        full = os.path.realpath(os.path.join(root, rel or "index.html"))
+        full = os.path.realpath(os.path.join(root, "viewer", rel or "index.html"))
+        if not os.path.isfile(full):
+            full = os.path.realpath(os.path.join(root, rel or "index.html"))
         ext = os.path.splitext(full)[1].lower()
 
         if not full.startswith(root + os.sep) or ext not in self._TYPES or not os.path.isfile(full):
@@ -177,7 +190,7 @@ class _Handler(BaseHTTPRequestHandler):
 
         with open(full, "rb") as f:
             self._body(f.read(), self._TYPES[ext], cache=ext in (".vrm", ".glb", ".png", ".jpg", ".webp", ".moc3")
-                       and "vendor" not in full)
+                       and "vendor" not in full)  # .vrma not cached: you're likely re-recording it
 
     def _body(self, body, kind, cache=False):
         self.send_response(200)
@@ -290,6 +303,50 @@ def portrait_models():
     return found
 
 
+def portrait_clips():
+    """The animation clips in portrait/animations: every .vrma, with its
+    settings from clips.json (keyed by file name, without .vrma).
+
+    A clip plays as the gesture it's named after - wave.vrma replaces the
+    built-in wave, wave-2.vrma is a second one to pick from at random -
+    or as whatever "as" says. Anything in animations/private/ is private:
+    never played from chat, and only offered to her in your own turns.
+    """
+    base = os.path.join(config.BASE_DIR, "portrait")
+    root = os.path.join(base, "animations")
+    settings = {}
+
+    for sub in ("", "private"):
+        try:
+            with open(os.path.join(root, sub, "clips.json"), encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                settings.update({k: v for k, v in data.items() if isinstance(v, dict)})
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError) as e:
+            logbook.warn("monitor", "ignoring %s/clips.json: %s", sub or "animations", e)
+
+    found = []
+
+    for dirpath, _dirs, files in sorted(os.walk(root)):
+        if dirpath[len(root):].count(os.sep) > 1:
+            continue
+
+        for f in sorted(files):
+            if not f.lower().endswith(".vrma"):
+                continue
+
+            stem = f[:-5]
+            opts = dict(settings.get(stem, {}))
+            name = str(opts.pop("as", "") or re.sub(r"[-_ ]?\d+$", "", stem) or stem).strip().lower().replace(" ", "_")
+            rel = os.path.relpath(os.path.join(dirpath, f), base).replace(os.sep, "/")
+            private = bool(opts.get("private", "/private/" in "/" + rel + "/"))
+            found.append(dict(opts, name=name, file=rel, private=private))
+
+    return found
+
+
 def _model_sidecar(path):
     """The luna.json beside a model, or {} - a broken one is a log line,
     not a portrait that won't load."""
@@ -306,31 +363,56 @@ def _model_sidecar(path):
         return {}
 
 
-def portrait_config():
+def _gesture_mode():
+    try:
+        import gestures
+
+        return gestures.mode()
+    except Exception:
+        return "keywords"
+
+
+def gesture_mode_changed():
+    """Tell an open portrait the gesture settings changed."""
+    emit("gesture_mode", mode=_gesture_mode(),
+         chat=bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)))
+
+
+def portrait_config(preview=None):
     """What the portrait page needs from config.json: which model, and
     which nodes are her ears if their names don't say so. A model that
-    isn't there falls back to Sigewinne; with neither, the page says so."""
+    isn't there falls back to Luna's robot model, then Sigewinne; with
+    neither, the page says so."""
     root = os.path.join(config.BASE_DIR, "portrait")
-    model = str(getattr(config, "PORTRAIT_MODEL", "") or "")
+    model = str(preview or getattr(config, "PORTRAIT_MODEL", "") or "")
     missing = ""
 
     if not model or not os.path.isfile(os.path.join(root, model)):
         missing = model
-        fallback = getattr(config, "_SIGEWINNE", "models/sigewinne/sigewinne.model3.json")
-        model = fallback if os.path.isfile(os.path.join(root, fallback)) else ""
+        model = ""
+        for fallback in (getattr(config, "_LUNA_ROBOT", "models/luna/robot_default.vrm"),
+                         getattr(config, "_SIGEWINNE", "models/sigewinne/sigewinne.model3.json")):
+            if os.path.isfile(os.path.join(root, fallback)):
+                model = fallback
+                break
 
     # The live2d block belongs to one model, so it travels with it: a
     # luna.json in the model's folder (framing, expressions, credit).
     # Without one, what config.json says, else Sigewinne's expressions
     # for Sigewinne and nothing for anything else.
     sidecar = _model_sidecar(os.path.join(root, model)) if model else {}
-    live2d = sidecar.get("live2d") or config._stored("portrait.live2d") or {}
+    live2d = sidecar.get("live2d") or (config._stored("portrait.live2d")
+                                       if model == getattr(config, "PORTRAIT_MODEL", "") else None) or {}
     if not live2d and model == getattr(config, "_SIGEWINNE", ""):
         live2d = {"expressions": {"sad": "tears", "flustered": "x_eyes", "confused": "spiral_eyes"}}
 
     return {"model": model, "missing": missing,
             "ear_bones": list(getattr(config, "PORTRAIT_EAR_BONES", []) or []),
             "live2d": live2d, "credit": str(sidecar.get("credit") or ""),
+            "vrm": dict(sidecar.get("vrm") or {}),
+            "gestures": _gesture_mode(),
+            "chat_gestures": bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)),
+            "clips": portrait_clips(),
             "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},
                              enabled=bool(getattr(config, "PORTRAIT_HOLOGRAM_ENABLED", False)))}
 

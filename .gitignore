@@ -94,9 +94,11 @@ discord.json
 
 # Portrait models you add (often large, always someone else's licence),
 # Live2D's core, and Blender's backup files. The Sigewinne Live2D model
-# ships with the repo.
+# and Luna's own models (portrait/models/luna/)
+# ship with the repo.
 portrait/models/*/
 !portrait/models/sigewinne/
+!portrait/models/luna/
 portrait/vendor/live2dcubismcore.min.js
 *.blend1
 

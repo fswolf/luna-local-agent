@@ -1,0 +1,7 @@
+{
+    "wave_big": { "as": "wave" },
+    "happy_dance": { "about": "celebrating, really happy", "speed": 1.0 },
+    "sway": { "idle": true, "loop": true, "repeat": 4 },
+    "hand_talk": { "talk": true, "look": true },
+    "nuzzle": { "as": "cuddle", "about": "close, tender moment", "private": true, "expr": { "relaxed": 0.6 } }
+}

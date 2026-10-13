@@ -338,6 +338,18 @@ def _run(token, owners):
             await message.add_reaction("👍")
             return
 
+        # !hug, !wave... are for the portrait, not a question for her
+        if text.lower().split()[0] in ("!wave", "!hug", "!jump", "!bounce", "!dance",
+                                       "!shrug", "!stretch"):
+            try:
+                import chatroom
+
+                chatroom._show(message.author.display_name, text, NAME)
+                await message.add_reaction("✨")
+            except Exception:
+                pass
+            return
+
         if text == "!stop":
             state.stop_generating = state.stop_speaking = True
             await message.add_reaction("🛑")

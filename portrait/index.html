@@ -14,27 +14,37 @@
   #note { position: fixed; inset: auto 0 12px 0; text-align: center; color: var(--dim);
           pointer-events: none; transition: opacity .6s; }
   #note.hidden { opacity: 0; }
-  #debug { position: fixed; top: 8px; left: 8px; max-width: 46vw; max-height: 90vh; overflow: auto;
-           background: #120d1ccc; border: 1px solid #3a2d55; border-radius: 8px; padding: 8px 10px;
-           display: none; }
+  #debug { position: fixed; top: 8px; left: 8px; width: 360px; height: 60vh; min-width: 180px; min-height: 80px;
+           max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow: auto; resize: both;
+           background: #120d1ccc; border: 1px solid #3a2d55; border-radius: 8px; padding: 0 10px 8px;
+           display: none; box-sizing: border-box; }
+  #dbar { position: sticky; top: 0; margin: 0 -10px; padding: 6px 10px; background: #1a1328; cursor: move;
+          user-select: none; border-bottom: 1px solid #3a2d55; z-index: 1; }
+  #dbar .hint { float: right; color: var(--dim); }
+  #debug details > summary { cursor: pointer; color: var(--accent); font-weight: 600; margin: 8px 0 2px; }
   body.debug #debug { display: block; }
   #debug button { background: #2a2040; color: var(--text); border: 1px solid #4a3a70;
                   border-radius: 6px; padding: 3px 8px; margin: 2px; cursor: pointer; font: inherit; }
   #debug button:hover { border-color: var(--accent); }
   #debug pre { white-space: pre-wrap; margin: 6px 0 0; color: var(--dim); }
   #debug h4 { margin: 8px 0 2px; color: var(--accent); font-weight: 600; }
+  #debug select { background: #2a2040; color: var(--text); border: 1px solid #4a3a70; border-radius: 6px; font: inherit; max-width: 100%; }
 </style>
 </head>
 <body>
 <div id="note">loading…</div>
 <div id="debug">
-  <div><b>portrait debug</b> - <span id="dstate"></span></div>
+  <div id="dbar"><b>portrait debug</b> - <span id="dstate"></span>
+    <span class="hint">drag here · corner resizes · h hides</span></div>
+  <h4>model</h4><select id="dmodel"></select>
+  <h4>view</h4><div id="dview"></div>
   <h4>try</h4>
   <div id="dbuttons"></div>
+  <h4>clips</h4><div id="dclips"><span class="dim">none in portrait/animations</span></div>
   <h4>tune</h4><div id="dtune"></div>
-  <h4>ears</h4><pre id="dears"></pre>
-  <h4>expressions</h4><pre id="dexpr"></pre>
-  <h4>bones that might be ears or hair</h4><pre id="dbones"></pre>
+  <details data-key="ears"><summary>ears</summary><pre id="dears"></pre></details>
+  <details data-key="expr"><summary>expressions</summary><pre id="dexpr"></pre></details>
+  <details data-key="bones"><summary>bones that might be ears or hair</summary><pre id="dbones"></pre></details>
 </div>
 <script type="module" src="./boot.js"></script>
 </body>

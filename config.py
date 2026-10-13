@@ -698,25 +698,36 @@ SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
 # The portrait window (portrait/, served by the live monitor at
 # /portrait/): a VRM model that blinks, looks around, twitches its ears
 # and moves its mouth with her voice. /portrait opens it.
-#   "portrait": { "model": "models/sigewinne/sigewinne.model3.json", "ear_bones": [],
+#   "portrait": { "model": "models/luna/robot_default.vrm", "ear_bones": [],
 #                 "browser": "", "size": "420x560" }
 _portrait_cfg = setting("portrait", {})
-# The Sigewinne Live2D model ships with the repo and is the default, and
-# the fallback when portrait.model points at something that isn't there.
+# Luna's own model (portrait/models/luna/, ships with the repo) is the
+# default, and the fallback when portrait.model points at something that
+# isn't there. Sigewinne (Live2D) if the robot model is missing.
+_LUNA_ROBOT = "models/luna/robot_default.vrm"
 _SIGEWINNE = "models/sigewinne/sigewinne.model3.json"
-_DEFAULT_PORTRAIT = _SIGEWINNE
+_DEFAULT_PORTRAIT = (_LUNA_ROBOT if os.path.isfile(os.path.join(BASE_DIR, "portrait", _LUNA_ROBOT))
+                     else _SIGEWINNE)
 PORTRAIT_MODEL = str(_portrait_cfg.get("model") or _DEFAULT_PORTRAIT)
 PORTRAIT_EAR_BONES = list(_portrait_cfg.get("ear_bones", []) or [])
 PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))
 PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 # Live2D only: which expression is which (portrait/add_live2d.py fills it
 # in), and which parameters are the ears if their names don't say so.
-# The hologram look (portrait/hologram.js): off unless "enabled": true, or
+# The hologram look (portrait/viewer/hologram.js): off unless "enabled": true, or
 # ?holo=1 on the portrait URL. tint, mix (0 = her own colours, 1 = all
 # tint), intensity, glitch (how often it tears), base (the projector glow).
 #   "hologram": { "enabled": true, "tint": "#c37bff", "mix": 0.8 }
 PORTRAIT_HOLOGRAM = dict(_portrait_cfg.get("hologram", {}) or {})
 PORTRAIT_HOLOGRAM_ENABLED = bool(PORTRAIT_HOLOGRAM.get("enabled", False))
+# Gestures on a 3D model (gestures.py, portrait/viewer/gestures.js). How her
+# replies set them off: "tags" (she picks, keywords as fallback),
+# "meaning" (the embedding model, keywords as fallback), "keywords",
+# "off". chat_gestures: viewers' !hug, hi, lol. meaning_margin: how far
+# a gesture must beat an ordinary reply in meaning mode.
+PORTRAIT_GESTURES = str(_portrait_cfg.get("gestures", "tags"))
+PORTRAIT_CHAT_GESTURES = bool(_portrait_cfg.get("chat_gestures", True))
+PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
 PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
 if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
     # Its three expressions, so moods show on her face out of the box.
@@ -966,6 +977,9 @@ SETTINGS = {
     "portrait.browser":           ("PORTRAIT_BROWSER",             True),
     "portrait.size":              ("PORTRAIT_SIZE",                True),
     "portrait.hologram.enabled":  ("PORTRAIT_HOLOGRAM_ENABLED",    True),
+    "portrait.gestures":          ("PORTRAIT_GESTURES",            True),
+    "portrait.chat_gestures":     ("PORTRAIT_CHAT_GESTURES",       True),
+    "portrait.meaning_margin":    ("PORTRAIT_MEANING_MARGIN",      True),
 }
 
 _TRUE = ("1", "true", "yes", "on", "y")

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rebuild the two vendored bundles, so the portrait works offline with no
 # build step at run time:
-#   luna-three.js  three.js + GLTFLoader + three-vrm       (3D / VRM models)
+#   luna-three.js  three.js + GLTFLoader + three-vrm + three-vrm-animation (3D / VRM models, .vrma clips)
 #   luna-pixi.js   pixi.js 6 + pixi-live2d-display 0.4     (Live2D models)
 #   portrait/vendor/build.sh            (needs node/npm, once)
 set -euo pipefail
@@ -9,17 +9,19 @@ VENDOR="$(cd "$(dirname "$0")" && pwd)"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 npm init -y >/dev/null
-npm install --silent three @pixiv/three-vrm pixi.js@6.5.10 pixi-live2d-display@0.4.0 esbuild
+# three-vrm and three-vrm-animation must be the same version
+npm install --silent three @pixiv/three-vrm @pixiv/three-vrm-animation pixi.js@6.5.10 pixi-live2d-display@0.4.0 esbuild
 
 cat > entry.js <<'JS'
 export * as THREE from 'three';
 export { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 export { VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName, VRMHumanBoneName } from '@pixiv/three-vrm';
+export { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 JS
 npx esbuild entry.js --bundle --format=esm --minify --legal-comments=eof --outfile=out.js
 three=$(node -p "require('three/package.json').version")
 vrm=$(node -p "require('@pixiv/three-vrm/package.json').version")
-{ printf '/* three.js %s (MIT) and @pixiv/three-vrm %s (MIT), bundled by build.sh. */\n' "$three" "$vrm"; cat out.js; } \
+{ printf '/* three.js %s (MIT), @pixiv/three-vrm and three-vrm-animation %s (MIT), bundled by build.sh. */\n' "$three" "$vrm"; cat out.js; } \
     > "$VENDOR/luna-three.js"
 
 cat > entry2d.js <<'JS'

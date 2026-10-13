@@ -13,6 +13,7 @@ from config import LM_URL, TOOLS_ENABLED, MAX_TOOL_ROUNDS, LLM_HEADERS
 from config import AGENT_NAME, PERSONALITY, TONE, TRAITS, RULES, GENERATION
 from config import memory
 import history
+import gestures
 import livefeed
 import lmstudio
 import logbook
@@ -247,7 +248,7 @@ Traits:
 
 Rules:
 {', '.join(RULES)}
-{build_tools_prompt(private)}
+{gestures.prompt_line(private)}{build_tools_prompt(private)}
 {build_memory_prompt(query) if private else ""}
 {build_self_prompt(query) if private else ""}
 {summary_block}
@@ -728,6 +729,9 @@ def _visible(raw):
     if opened:
         text = text[:opened.start()]
 
+    # A gesture tag ([hug]) goes to the portrait, not the screen or the voice.
+    text = gestures.strip(text)
+
     return re.sub(r"<[a-z_/=]{0,12}$", "", text, flags=re.IGNORECASE)
 
 
@@ -832,6 +836,11 @@ class _Narrator:
             return
 
         self.raw += piece
+
+        if "]" in piece:
+            answer = _THINK_BLOCK.sub("", self.raw)
+            gestures.from_tags(re.split(r"<think>", answer, maxsplit=1, flags=re.IGNORECASE)[0])
+
         text = self._presentable()
 
         if self._on_text and len(text) > self._shown:
@@ -1104,7 +1113,7 @@ def _content(message):
     if "<think>" in content:
         content = content.split("<think>", 1)[0]
 
-    return content.strip()
+    return gestures.strip(content).strip()
 
 
 def _force_prose(payload, on_text=None, on_sentence=None):
@@ -1167,6 +1176,9 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
         message = _chat_completion(payload, narrator)
         calls = message.get("tool_calls") or []
         text = narrator.finish() if streaming else _content(message)
+
+        if not streaming:
+            gestures.from_tags(_THINK_BLOCK.sub("", message.get("content") or ""))
 
         # Some turns the model writes the call out as text instead of
         # sending it (Qwen's <function=...> form slipping past the
@@ -2068,6 +2080,7 @@ def ask(text, model, on_text=None, on_sentence=None,
 
     # The live monitor's view of the turn's start. Chat turns pass a
     # context of their own, which is how they're told apart here.
+    gestures.new_turn()
     livefeed.emit("turn", text=text,
                   source=source or ("chat" if context is not None else state.turn_source))
     livefeed.emit("server", model=payload["model"], backend=getattr(config, "LLM_BACKEND", ""))
@@ -2229,6 +2242,7 @@ def ask(text, model, on_text=None, on_sentence=None,
             pass
 
     livefeed.emit("done", seconds=round(time.monotonic() - started, 1), conf=conf)
+    gestures.after_reply(text, answer)
 
     try:
         import reflect

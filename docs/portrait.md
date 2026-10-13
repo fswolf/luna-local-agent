@@ -39,22 +39,43 @@ you, to the side, then down for a moment as if weighing it, switches
 sides, and glances back at you now and then. Her eyes dart in small
 movements, her head follows further and wanders on its own, tilts
 towards the side she's looking, and her brow lifts a little. It's the
-same for the Live2D and the 3D portrait (`portrait/look.js`).
+same for the Live2D and the 3D portrait (`portrait/viewer/look.js`).
 
 Page options: `?bg=transparent` (OBS), `?frame=face` (closer crop),
+`?frame=full` (all of her, 3D models),
 `?debug=1` (test buttons for every reaction, including *you: left /
 right / ahead* to try the looking), `?demo=1` (acts out a conversation
 on its own).
 
+## Trying models without Luna
+
+```bash
+./viewer.sh
+```
+
+It serves the portrait on its own (port 8793, so it works while Luna
+runs too) and opens the debug page. Everything is in the panel:
+
+- **model**: everything in `portrait/models`
+- **view**: bust, face or full body; hologram, see-through background,
+  and a demo that acts out a conversation on a loop
+- a button for every gesture, expression and reaction
+
+`h` hides the panel. Picking a model there only previews it; Luna keeps
+the one she uses. With Luna running,
+`http://127.0.0.1:8792/portrait/?debug=1` has the same panel.
+
 ## Switching models
 
-Drop a model into `portrait/models/` (a Live2D model's folder, or a
+Out of the box she's Luna's own model, the branded robot in
+`portrait/models/luna/robot_default.vrm` (made in VRoid Studio, ships
+with the repo). Drop a model into `portrait/models/` (a Live2D model's folder, or a
 `.vrm` file) and switch to it from Luna:
 
 ```
 /portrait models          list what's there, with the one in use marked
 /portrait use 2           switch by number
-/portrait use sigewinne   or by any part of its name
+/portrait use robot       or by any part of its name
 ```
 
 The choice is saved to `config.json`, and an open portrait reloads with
@@ -164,15 +185,15 @@ before putting it on stream.
 
 ### Hologram
 
-Any Live2D model can be shown as a hologram: tinted towards one colour,
+Any model, Live2D or VRM, can be shown as a hologram: tinted towards one colour,
 see-through, a glowing edge, scanlines rolling up, a faint flicker and
 a projector glow under her. Now and then the picture tears sideways for
 a moment, and it always does when a tool fails or you talk over her.
 She brightens a little while she talks.
 
-It's a filter over the finished picture (`portrait/hologram.js`), so
-blinking, talking, the hair and ear physics and everything else come
-through it unchanged.
+It's a filter over the finished picture (`portrait/viewer/hologram.js` for
+Live2D, `portrait/viewer/hologram3d.js` for VRM), so blinking, talking, the
+hair and ear physics and everything else come through it unchanged.
 
 Switch it with `/holo` (or `/holo on`, `/holo off`), or the **hologram
 look** row in the tools pane's Portrait group. Either one saves the
@@ -218,8 +239,109 @@ look-at come from the VRM itself. Ears are nodes named like `Ear_L`, or
 listed in `portrait.ear_bones`. VRoid Studio exports VRM models that
 work as they are.
 
+### Gestures
+
+A 3D model moves more than her head. She waves, hugs, jumps, shrugs,
+and does small things on her own:
+
+| What | When |
+|------|------|
+| Wave | You say hi or bye and she says it back, she wakes up, or she writes `*waves*` |
+| Hug | You ask for a hug, or she writes `*hugs*` (or 🤗). Arms out to you, eyes closed |
+| Jump, bounce | She writes `*jumps*`, `*bounces*`, `*hops*` |
+| Shrug | A tool fails, or she writes `*shrugs*` |
+| Stretch, look at her hand, tuck her hair | On her own, every half minute or so while idle |
+| A hand while she talks | Now and then mid-sentence |
+| Tail wag | With the happy ones, and when her mood warms up |
+
+### Animation clips (.vrma)
+
+The built-in gestures are poses typed in as numbers. For real motion,
+record or keyframe a clip and drop it in `portrait/animations/`:
+
+| File | Plays as |
+|------|----------|
+| `wave.vrma` | the wave: replaces the built-in one everywhere (tags, chat, `/portrait wave`) |
+| `wave-2.vrma`, `wave-3.vrma` | more waves, one picked at random each time |
+| `happy_dance.vrma` | a new gesture, `happy_dance`: `/portrait happy_dance`, a button in the viewer |
+| `private/anything.vrma` | private: never played from chat, only offered to her in your own turns |
+
+New clips show up within 20 seconds, no restart (reload the viewer to
+see them there). The viewer has a button per clip under **clips**, with
+🔒 on private ones, and lists any file that wouldn't load.
+
+Settings per clip go in `portrait/animations/clips.json` (or
+`private/clips.json`), keyed by file name without `.vrma`.
+`clips.example.json` shows them all:
+
+| Key | What it does |
+|-----|--------------|
+| `as` | play as this gesture instead of the file name |
+| `about` | offer it to her in tags mode, with this as when to use it. Without it, she won't pick the clip herself (it still plays from `/portrait`, the viewer, and as a built-in it replaces) |
+| `idle` | joins the things she does on her own when idle |
+| `talk` | joins the hand gestures she makes while talking |
+| `loop`, `repeat` | loop the clip `repeat` times (default 3) |
+| `speed` | `0.5` half speed, `2` double |
+| `look` | keep her own head and eyes (still looking at you) instead of the clip's |
+| `private` | same as being in `private/` |
+| `expr` | expressions to hold while it plays, `{"happy": 0.7}` |
+| `fade` | seconds to blend in and out, `[0.45, 0.55]` |
+
+Clips play on the standard VRM skeleton, so one recorded on any model
+plays on every VRM. Her breathing, blinking and lip-sync carry on
+underneath; a clip's own facial expressions are mixed in.
+
+Making clips: [XR Animator](https://github.com/ButzYung/SystemAnimatorOnline)
+records one from your webcam and exports `.vrma`; Blender with the VRM
+add-on keyframes and exports them; VRoid publishes free samples. Check a
+clip's licence before it goes in a public repo.
+
+**How her replies set them off** is up to you: the **gestures** row in
+the tools pane's Portrait group (space cycles it), or `/portrait
+gestures <mode>`.
+
+| Mode | How | Cost |
+|------|-----|------|
+| `tags` (default) | She picks. A line in her prompt lets her put one hidden tag like `[hug]` where it fits; it's cut out before anything is shown, spoken or saved, and sent to the portrait. Keywords catch what she forgets | About 60 prompt tokens (cached by llama.cpp, so read once) and a few output tokens when she uses one. No extra time |
+| `meaning` | After she answers, the embedding model compares what was said with a short description of each gesture, and plays the one that clearly beats "an ordinary reply". Keywords as a fallback | One embedding call per reply, 10 to 30 ms, off the turn's path. Needs the embedding server; without it this is keywords only |
+| `keywords` | Only `*hugs*`, `*waves*`, 🤗 and the like in what she writes, and your hi or hug request | Nothing |
+| `off` | Nothing from the conversation. Idle moves and chat still work | Nothing |
+
+The tag line only goes in her prompt while the portrait model is a 3D
+one. In `meaning` mode the log shows every score
+(`gestures  hug  hug 0.61 none 0.55 ...`), and `/portrait meaning <some
+text>` scores a line by hand. If she gestures too often, raise
+`portrait.meaning_margin` (default `0.04`); too rarely, lower it.
+
+**Chat can set them off too.** Every message in stream chat (Twitch,
+YouTube, IRC, pomf) and Discord reaches the portrait, answered or not:
+
+| In chat | She |
+|---------|-----|
+| `!wave` `!hug` `!jump` `!bounce` (`!dance`) `!shrug` `!stretch` | Does it. Anyone can, once every few seconds |
+| A hug for her: `*hugs Luna*`, `hug luna`, 🤗 | Hugs back |
+| Someone's first message is hi, hey, o/, 👋 | Waves |
+| bye, gn, cya | Waves |
+| pog, hype, let's go | Sometimes jumps |
+| lol, lmao, 😂 | Sometimes bounces |
+
+Chat triggers are rate-limited (five seconds between commands, twelve
+between the rest) so a busy chat doesn't keep her flailing.
+The **chat gestures** row in the tools pane turns them off, or
+`"portrait": {"chat_gestures": false}`.
+
+`/portrait wave` (or `hug`, `jump`, `bounce`, `shrug`, `stretch`,
+`look_hand`, `tuck_hair`) plays one by hand, good for a stream. The
+`?debug=1` page has a button for each.
+
+They're built on the standard VRM skeleton (`portrait/viewer/gestures.js`), so
+they work on any VRM model, including VRoid ones and outfits made from
+the same base. The tail wag looks for spring bones named like `tail`.
+Live2D models keep their own motions.
+
 If `portrait.model` points at a file that isn't there, the portrait
-falls back to Sigewinne and says which file it couldn't find.
+falls back to Luna's robot model (or Sigewinne if that's missing too)
+and says which file it couldn't find.
 
 `portrait/vendor/build.sh` rebuilds the two bundled libraries
 (three.js + three-vrm, pixi.js + pixi-live2d-display) if you ever want

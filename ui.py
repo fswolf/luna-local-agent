@@ -725,7 +725,33 @@ _FEATURES = (
 # How the portrait looks - nothing to do with the prompt, so no cost.
 _PORTRAIT_FEATURES = (
     ("hologram look", "PORTRAIT_HOLOGRAM_ENABLED", "portrait.hologram.enabled", "/holo, live"),
+    ("chat gestures", "PORTRAIT_CHAT_GESTURES", "portrait.chat_gestures", "!hug, hi, lol in chat"),
 )
+
+# How her replies set off gestures (gestures.py); space cycles.
+_GESTURE_NOTES = {
+    "tags": "she picks, ~60 cached tokens + keywords",
+    "meaning": "embedding model, 1 call/reply + keywords",
+    "keywords": "*hugs*, *waves* in what she writes",
+    "off": "none from the conversation",
+}
+
+
+def _gesture_note():
+    import gestures
+
+    m = gestures.mode()
+    note = _GESTURE_NOTES[m]
+    if m == "meaning":
+        try:
+            import embedmem
+
+            # the last known state - drawing the pane mustn't wait on a server
+            if embedmem._state.get("up") is False:
+                note = "embeddings off - keywords only"
+        except Exception:
+            pass
+    return m, note
 
 # Costs nothing in context - it records what the model already produced
 # - so it carries no token figure, just what it does.
@@ -851,6 +877,11 @@ def _portrait_group():
     where = f"{found.index(current) + 1} of {len(found)}" if current in found else f"{len(found)} found"
     members = [("model", True, bool(found), f"{where} in portrait/models - space: next" if found
                 else "drop a model into portrait/models", 0, "pick:portrait.model")]
+    try:
+        _, note = _gesture_note()
+        members.append(("gestures", True, True, f"{note} - space: next", 0, "pick:portrait.gestures"))
+    except Exception:
+        pass
     members += [(label, bool(getattr(config, key, False)), True, note, 0, path)
                 for label, key, path, note in _PORTRAIT_FEATURES]
 
@@ -1047,7 +1078,8 @@ def _tool_fragments():
             if setting and setting.startswith("pick:"):
                 import config
 
-                mark = _model_name(getattr(config, "PORTRAIT_MODEL", ""))[:12]
+                mark = (_gesture_note()[0] if setting == "pick:portrait.gestures"
+                        else _model_name(getattr(config, "PORTRAIT_MODEL", "")))[:12]
                 fragments.append(("class:key" if selected else "class:dim", pointer))
                 fragments.append(("class:ok", f" {mark:<12} "))
                 fragments.append(("class:agent bold" if selected else "class:agent", f"{name:<7}"))
@@ -1170,6 +1202,15 @@ def _tool_toggle():
             config.save_setting("portrait.model", nxt)
             livefeed.emit("reload")
             add_message("system", f"Portrait model: {_model_name(nxt)} ({nxt}) - an open portrait reloads now.")
+        elif setting == "pick:portrait.gestures":
+            import config
+            import gestures
+            import livefeed
+
+            nxt = gestures.MODES[(gestures.MODES.index(gestures.mode()) + 1) % len(gestures.MODES)]
+            config.save_setting("portrait.gestures", nxt)
+            livefeed.gesture_mode_changed()
+            add_message("system", f"Portrait gestures: {nxt} - {_gesture_note()[1]}.")
         elif setting and setting.startswith("plugin:"):
             _toggle_plugin(setting[len("plugin:"):], on)
         elif setting and setting.startswith("perm:"):
@@ -1209,6 +1250,10 @@ def _tool_toggle():
                 import livefeed
 
                 livefeed.emit("holo", on=not on)
+            if setting == "portrait.chat_gestures":
+                import livefeed
+
+                livefeed.gesture_mode_changed()
         else:
             import tools
 
@@ -1672,6 +1717,8 @@ _HELP_SECTIONS = [
         ("/portrait", "her animated portrait in its own window (again closes it)"),
         ("/portrait models", "list the models in portrait/models; /portrait use <n> switches"),
         ("/portrait obs", "the see-through URL for an OBS browser source"),
+        ("/portrait wave", "act it out: wave hug jump bounce shrug stretch look_hand tuck_hair (3D models)"),
+        ("/portrait gestures", "how her replies set them off: tags, meaning, keywords, off"),
         "/set thoughts.enabled false stops recording it.",
         "",
         ("/reflect", "dream pass now: lessons, session notes, fact cleanup"),

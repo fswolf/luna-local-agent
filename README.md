@@ -1,4 +1,4 @@
-<img src="assets/luna-github-banner-v1.png" alt="Luna — Your voice. Your machine. Your Luna." width="100%">
+<img src="assets/luna-github-banner-v1.png" alt="Luna: Your voice. Your machine. Your Luna." width="100%">
 
 <hr>
 
@@ -45,6 +45,14 @@ Powered by:
 - 💬 Full-screen terminal interface
 
 Everything runs locally. No cloud APIs required.
+
+## Her portrait
+
+<img width="1210" alt="Luna's VRM model as she normally looks, beside the same model in hologram mode" src="assets/luna-hologram.jpg" />
+
+Luna's own model, made in VRoid Studio, as she normally looks and in
+hologram mode. `/holo` switches between them live, in the portrait
+window and in OBS. Live2D and other VRM models work too ([details](docs/portrait.md#portrait)).
 
 ## See inside her
 

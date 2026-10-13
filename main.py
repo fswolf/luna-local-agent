@@ -1106,6 +1106,46 @@ def handle_input(text):
         ui.add_message("system", f"Portrait model: {pick} (saved; an open portrait reloads now).")
         return
 
+    if text == "/portrait gestures" or text.startswith("/portrait gestures "):
+        import gestures
+        import livefeed
+
+        want = text[len("/portrait gestures"):].strip().lower()
+        if want in gestures.MODES:
+            config.save_setting("portrait.gestures", want)
+            livefeed.gesture_mode_changed()
+        elif want:
+            ui.add_message("system", f"Gesture modes: {', '.join(gestures.MODES)}.")
+            return
+        ui.add_message("system", f"Portrait gestures: {gestures.mode()} "
+                       f"(tags: she picks / meaning: embedding model / keywords / off). "
+                       f"Chat gestures {'on' if config.PORTRAIT_CHAT_GESTURES else 'off'}.")
+        return
+
+    if text.startswith("/portrait meaning "):
+        import gestures
+
+        pick, scores = gestures.classify(text[len("/portrait meaning "):])
+        ui.add_message("system", "No embedding server answering." if scores is None else
+                       f"{pick or 'no gesture'}: " + ", ".join(
+                           f"{k} {v:.3f}" for k, v in sorted(scores.items(), key=lambda kv: -kv[1]))
+                       + f"  (margin over none: {config.PORTRAIT_MEANING_MARGIN})")
+        return
+
+    _GESTURES = ("wave", "hug", "jump", "bounce", "shrug", "stretch", "look_hand", "tuck_hair", "explain")
+    if text.startswith("/portrait ") and len(text.split()) == 2 and text.split()[1] not in (
+            "models", "obs", "gestures"):
+        import livefeed
+
+        name = text.split()[1].replace("-", "_")
+        if name not in _GESTURES and name not in {c["name"] for c in livefeed.portrait_clips()}:
+            ui.add_message("system", f"No gesture or clip called {name!r} - built in: "
+                           f"{', '.join(_GESTURES)}; clips go in portrait/animations.")
+            return
+        livefeed.emit("gesture", name=name)
+        ui.add_message("system", f"Portrait: {name} (3D models only).")
+        return
+
     if text in ("/portrait", "/portrait obs"):
         _toggle_portrait(obs=text.endswith("obs"))
         return

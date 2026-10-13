@@ -34,7 +34,13 @@ ai-voice/
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── embedmem.py       # recalling facts by meaning (and reranking), when those servers are up
 ├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792 (and /portrait)
-├── portrait/         # her animated portrait: boot.js, live2d.js, portrait.js (VRM), look.js (where she looks), add_live2d.py, hologram.js, models/, vendor/
+├── portrait/         # her animated portrait
+│   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
+│   │                 #   look.js (where she looks), hologram.js / hologram3d.js, view.py (./viewer.sh)
+│   ├── models/       #   Live2D folders and .vrm files
+│   ├── animations/   #   .vrma clips (clips.json)
+│   ├── vendor/       #   bundled three.js / pixi.js
+│   └── add_live2d.py
 ├── introspection/    # injected-thought experiments - make_vectors, trial, report, blind
 ├── memory-manager/
 │   ├── manager.py
