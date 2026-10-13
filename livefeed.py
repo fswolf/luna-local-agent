@@ -174,6 +174,15 @@ class _Handler(BaseHTTPRequestHandler):
             return self._body(json.dumps(portrait_config(want if want in portrait_models() else None)).encode(),
                               "application/json")
 
+        if rel == "gestures/index.json":
+            # every gesture file the page should load (portrait/viewer/gestures/)
+            gdir = os.path.join(config.BASE_DIR, "portrait", "viewer", "gestures")
+            try:
+                names = sorted(f[:-3] for f in os.listdir(gdir) if f.endswith(".js") and not f.startswith("_"))
+            except OSError:
+                names = []
+            return self._body(json.dumps(names).encode(), "application/json")
+
         if rel == "models.json":
             return self._body(json.dumps(portrait_models()).encode(), "application/json")
 

@@ -13,6 +13,7 @@
 - [Learning from herself](learning.md)
 - [Moods](moods.md)
 - [Portrait](portrait.md)
+- [Gestures](gestures.md)
 - [Home automation](home.md)
 - [Sysadmin](sysadmin.md)
 - [Plugins](plugins.md)

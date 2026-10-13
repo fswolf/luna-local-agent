@@ -254,7 +254,43 @@ and does small things on her own:
 | A hand while she talks | Now and then mid-sentence |
 | Tail wag | With the happy ones, and when her mood warms up |
 | Blow a kiss, shy | Affectionate ones, for people who role-play with her: fingers to her lips then blown your way; hands together at her chest, looking away, then a peek. Only in your own conversations: never from stream chat, and never offered to her in a chat room's turn |
+| Cry | She writes `[cry]`, or she stays deeply sad for several seconds: tears well on her lower lids, streak down her cheeks with drops running along them, and the cry gesture adds a lowered head and shoulders hitching with sobs. They dry slowly. `"vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}` in luna.json moves them for a non-VRoid face |
 | Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
+
+### Writing a gesture in code
+
+The full guide, with how it all works, is its own page: [Gestures](gestures.md).
+
+Each built-in gesture is a file in `portrait/viewer/gestures/`: `wave.js`,
+`hug.js`, and so on. A new file there is a new gesture, picked up on the
+next page load with nothing else to edit: it gets a button in the viewer,
+`/portrait <name>` plays it, and an `about` line offers it to her as a tag.
+
+```js
+// portrait/viewer/gestures/hand_on_heart.js
+import { fingers } from './_pose.js';
+
+export default {
+  about: "touched, grateful",      // offered to her as [hand_on_heart]
+  dur: 3.0, fade: [0.5, 0.6],
+  keys: [
+    [0.0, { rightUpperArm: [0, 0.8, 1.15], rightLowerArm: [0, 2.15, -0.15], ...fingers('right', 0.2),
+            '+head': [0.08, 0, 0.1] }],
+    [3.0, { rightUpperArm: [0, 0.8, 1.15], rightLowerArm: [0, 2.15, -0.15], ...fingers('right', 0.2) }],
+  ],
+  expr: { blush: 0.5, happy: [[0, 0], [0.8, 0.5]] },
+};
+```
+
+Rotations are `[x, y, z]` in radians on the standard VRM bone names
+(`rightUpperArm` z: 0 is straight out, 1.22 hanging down; `rightLowerArm`
+z negative bends the forearm up, a 4th number twists it; `'+head'` and
+`'+spine'` add on top of what she's doing). `_pose.js` has the helpers:
+`both()` mirrors a pose to both arms, `fingers(side, curl)`, `open(side)`.
+Other keys: `idle: true` (she does it on her own), `left: true` (also a
+left-handed `<name>_left`), `private: true` (never from stream chat),
+`osc` (a wobble), `hips` (lift her, metres). The header of
+`portrait/viewer/gestures.js` lists them all.
 
 ### Animation clips (.vrma)
 
@@ -352,7 +388,7 @@ The **chat gestures** row in the tools pane turns them off, or
 `look_hand`, `tuck_hair`) plays one by hand, good for a stream. The
 `?debug=1` page has a button for each.
 
-They're built on the standard VRM skeleton (`portrait/viewer/gestures.js`), so
+They're built on the standard VRM skeleton (one file each in `portrait/viewer/gestures/`), so
 they work on any VRM model, including VRoid ones and outfits made from
 the same base. The tail wag looks for spring bones named like `tail`.
 Live2D models keep their own motions.

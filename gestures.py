@@ -15,6 +15,7 @@ portrait.gestures picks how her own replies turn into movement:
 Chat triggers (!hug, a viewer's hi) are separate: portrait.chat_gestures.
 """
 
+import os
 import re
 import threading
 import time
@@ -23,14 +24,46 @@ import config
 import logbook
 
 MODES = ("tags", "meaning", "keywords", "off")
-NAMES = ("wave", "hug", "jump", "bounce", "shrug", "stretch", "kiss", "shy")
-# Affectionate ones: offered only in your own turns, never in a chat room's.
-PRIVATE = ("kiss", "shy")
+# The built-in gestures are files in portrait/viewer/gestures/ (wave.js,
+# hug.js...). Each says what it's for ("about"), whether it's private
+# (never from stream chat), and so on; read from there, so a new file is a
+# new gesture with nothing else to edit.
+_GESTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portrait", "viewer", "gestures")
+_files = {"at": 0.0, "found": {}}
 
-# What each built-in tag is for, in her prompt.
-ABOUT = {"wave": "hello, goodbye", "hug": "affection, comfort", "jump": "big excitement",
-         "bounce": "happy, playful", "shrug": "don't know, oh well", "stretch": "tired, waking up",
-         "kiss": "blowing a kiss, affection", "shy": "bashful, flustered by a compliment"}
+
+def builtin():
+    """{name: {"about": str, "private": bool, "left": bool}} for every gesture file."""
+    if time.monotonic() - _files["at"] < 20:
+        return _files["found"]
+    found = {}
+    try:
+        names = sorted(f[:-3] for f in os.listdir(_GESTURE_DIR) if f.endswith(".js") and not f.startswith("_"))
+    except OSError:
+        names = []
+    for name in names:
+        try:
+            with open(os.path.join(_GESTURE_DIR, name + ".js"), encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            continue
+        about = re.search(r"""^\s*about:\s*(["'])(.*?)\1""", text, re.M)
+        found[name] = {"about": about.group(2) if about else "",
+                       "private": bool(re.search(r"^\s*private:\s*true", text, re.M)),
+                       "left": bool(re.search(r"^\s*left:\s*true", text, re.M))}
+    _files.update(at=time.monotonic(), found=found)
+    return found
+
+
+def all_names():
+    """Every built-in gesture, left-handed copies included."""
+    out = []
+    for name, g in builtin().items():
+        out.append(name)
+        if g["left"]:
+            out.append(name + "_left")
+    return out
+
 
 _PARTIAL = re.compile(r"\[([a-z_]{0,24})$", re.IGNORECASE)
 _clips = {"at": 0.0, "list": []}
@@ -52,7 +85,8 @@ def clips():
 
 def names():
     """Every tag that means something: the built-ins and every clip."""
-    return tuple(dict.fromkeys(NAMES + tuple(c["name"] for c in clips())))
+    return tuple(dict.fromkeys(tuple(n for n, g in builtin().items() if g["about"])
+                               + tuple(c["name"] for c in clips())))
 
 
 _tag_cache = {}
@@ -87,7 +121,7 @@ def prompt_line(private=True):
     if mode() != "tags" or not _three_d():
         return ""
 
-    about = {n: a for n, a in ABOUT.items() if private or n not in PRIVATE}
+    about = {n: g["about"] for n, g in builtin().items() if g["about"] and (private or not g["private"])}
     for c in clips():
         if c.get("about") and (private or not c.get("private")):
             about[c["name"]] = str(c["about"])[:60]
@@ -126,10 +160,11 @@ def from_tags(answer_text):
         return
 
     for m in _tag().finditer(answer_text):
-        name = m.group(1).lower()
+        # the name as the file spells it (sultryBeckon), whatever case she wrote
+        name = next((n for n in names() if n.lower() == m.group(1).lower()), m.group(1))
 
-        if name not in _turn["sent"]:
-            _turn["sent"].add(name)
+        if name.lower() not in _turn["sent"]:
+            _turn["sent"].add(name.lower())
             _emit(name, "tag")
 
 

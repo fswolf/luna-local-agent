@@ -15,6 +15,7 @@ Everything the README only touches on, one subject per page.
 - [Learning from herself](learning.md): lessons, episodes, fact cleanup, calibration
 - [Moods](moods.md)
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
+- [Gestures](gestures.md): how her body moves, and writing your own
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
 - [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](plugins.md): stream chat, Minecraft, Zork, Vibe City, Home Assistant, cron jobs, Discord

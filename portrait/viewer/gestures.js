@@ -1,236 +1,60 @@
-// Gestures for the 3D (VRM) portrait: wave, hug, jump, shrug, and the
-// little things she does on her own when nothing's happening.
+// Gestures for the 3D (VRM) portrait: the player, and the list of what
+// she can do. Each gesture is its own file in gestures/ (wave.js, hug.js,
+// ...); add a file and it's picked up, no list to edit anywhere.
 //
-// Every VRM has the same humanoid skeleton, so these work on any model
-// (written for the T-pose rest VRM 1.0 and VRoid use). A gesture is a few
-// keyframes of bone rotations, eased between, blended in and out over
-// whatever the portrait is already doing (breathing, looking, talking),
-// so starting or ending one never snaps.
+// Every VRM has the same humanoid skeleton, so these work on any model.
+// A gesture is a few keyframes of bone rotations, eased between, blended
+// in and out over whatever the portrait is already doing (breathing,
+// looking, talking), so starting or ending one never snaps.
 //
-//   bones      absolute rotations [x, y, z], radians, normalized bones;
-//              a 4th number twists the bone about its own length first
-//              (turning a forearm so the palm faces the right way)
+// In a gesture file (export default { ... }):
+//   dur, fade  seconds; fade = [in, out]
+//   keys       [[time, pose], ...]; a pose is { bone: [x, y, z] }, radians,
+//              normalized bones; a 4th number twists the bone about its
+//              own length first (turning a forearm so the palm faces right)
 //   '+bone'    added on top of what the portrait does (head, spine)
 //   hips       an offset to the hips position, metres (jumping)
-//   expr       expressions held while it plays ({happy: 0.8})
+//   expr       expressions while it plays: { happy: 0.8 } or a timeline
+//              [[t, v], ...]; also blush and tears
 //   osc        a wobble on top: [bone, axis, amplitude, hz]
+//   add        poses added on top for the whole gesture
+//   sob        shoulders hitch (crying)
+//   about      when to use it: offered to her as a [tag] in tags mode
+//   idle       one of the things she does on her own
+//   private    never from stream chat; only offered in your own turns
+//   left       also make a left-handed copy, <name>_left
 //
 // Animation clips (.vrma, portrait/animations/) can stand in for any of
-// these or add new ones: addClip() below. A clip plays through the same
-// blend, so it eases in and out over her breathing like the rest.
-//
-// Poses are written for the right side; mirror() makes the left one.
-// Her left is +X, she faces +Z (towards the camera).
+// these or add new ones: addClip() below.
 
-const R = (o) => o;   // readability: a pose
-const L_OF = { right: 'left', left: 'right' };
+import { REST, mirrorGesture } from './gestures/_pose.js';
+export { REST };
 
-function mirrorName(n) {
-  const add = n.startsWith('+') ? '+' : '';
-  const b = add ? n.slice(1) : n;
-  const m = b.replace(/^(right|left)/, s => L_OF[s]);
-  return add + m;
-}
-function mirrorPose(p) {
-  const out = {};
-  for (const [k, v] of Object.entries(p)) {
-    if (k === 'hips' || k === 'expr') { out[k] = v; continue; }
-    out[mirrorName(k)] = v.length > 3 ? [v[0], -v[1], -v[2], v[3]] : [v[0], -v[1], -v[2]];
+// The list comes from the server (every gesture/*.js not starting with _);
+// without one (a static copy of the page), the built-ins.
+const BUILT_IN = ['wink', 'shh', 'wave', 'hug', 'jump', 'shrug', 'kiss', 'shy', 'cry', 'stretch', 'look_hand',
+                  'tuck_hair', 'bounce', 'explain'];
+export const FAILED = {};      // name -> why it didn't load (shown on the debug page)
+const list = await fetch('gestures/index.json').then(r => r.ok ? r.json() : null).catch(() => null);
+if (!list) FAILED['(the list)'] = "the server didn't send gestures/index.json, so only the built-ins loaded - "
+  + 'restart Luna or ./viewer.sh (an older copy is still running)';
+
+export const GESTURES = {};
+export const ABOUT = {};
+for (const name of list || BUILT_IN) {
+  try {
+    const g = (await import(`./gestures/${name}.js`)).default;
+    GESTURES[name] = g;
+    if (g.about) ABOUT[name] = g.about;
+    if (g.left) GESTURES[`${name}_left`] = Object.assign(mirrorGesture(g), { about: undefined, left: false });
+  } catch (e) {
+    console.warn(`gesture ${name}:`, e);
+    FAILED[name] = String(e.message || e);
   }
-  return out;
-}
-// both arms: the right one given, the left mirrored
-function both(p) { return Object.assign({}, p, mirrorPose(p)); }
-
-// The arms hanging naturally: down, elbows soft, fingers a little curled.
-export const REST = both({
-  rightUpperArm: [0, 0.05, 1.22], rightLowerArm: [0, 0.22, 0], rightHand: [0, 0, 0.08],
-});
-const FINGERS = ['Index', 'Middle', 'Ring', 'Little'];
-for (const side of ['right', 'left']) {
-  const s = side === 'right' ? 1 : -1;
-  FINGERS.forEach((f, i) => {
-    const c = 0.18 + i * 0.07;
-    REST[`${side}${f}Proximal`] = [0, 0, s * c];
-    REST[`${side}${f}Intermediate`] = [0, 0, s * (c + 0.1)];
-    REST[`${side}${f}Distal`] = [0, 0, s * c];
-  });
-}
-for (const b of ['UpperLeg', 'LowerLeg', 'Foot']) { REST['right' + b] = [0, 0, 0]; REST['left' + b] = [0, 0, 0]; }
-
-// fist-ish / open hand helpers
-function fingers(side, curl) {
-  const s = side === 'right' ? 1 : -1, out = {};
-  FINGERS.forEach((f, i) => {
-    out[`${side}${f}Proximal`] = [0, 0, s * curl * (1 + i * 0.1)];
-    out[`${side}${f}Intermediate`] = [0, 0, s * curl * 1.2];
-    out[`${side}${f}Distal`] = [0, 0, s * curl];
-  });
-  return out;
-}
-const open = side => fingers(side, 0.05);
-
-// ---------------------------------------------------------------------------
-// The gestures
-// ---------------------------------------------------------------------------
-// rightHand x: the wrist turned so the palm faces whoever she's waving at
-const WAVE_UP = R({ rightUpperArm: [0, 0.5, 0.75], rightLowerArm: [0, -0.2, -2.45], rightHand: [-1.2, 0, -0.1],
-                    ...open('right'), '+head': [0, -0.08, -0.08], '+spine': [0, 0, -0.03] });
-const HUG_OPEN = both({ rightUpperArm: [0, 0.85, 0.1], rightLowerArm: [0, 0.35, 0], rightHand: [0, 0, 0] });
-const HUG_HOLD = both({ rightUpperArm: [0, 1.1, 0.05], rightLowerArm: [0, 1.15, -0.1], rightHand: [0, 0.3, 0] });
-
-export const GESTURES = {
-  wave: {
-    dur: 2.6, fade: [0.35, 0.45],
-    keys: [[0, WAVE_UP], [2.6, WAVE_UP]],
-    osc: [['rightLowerArm', 2, 0.22, 2.3], ['rightHand', 1, 0.3, 2.3]],   // forearm sways, hand rocks in its own plane
-    expr: { happy: 0.6 },
-  },
-  hug: {
-    dur: 3.6, fade: [0.4, 0.6],
-    keys: [
-      [0.0, { ...HUG_OPEN, '+spine': [0.06, 0, 0], '+head': [0.05, 0, 0] }],
-      [0.6, { ...HUG_OPEN, '+spine': [0.12, 0, 0], '+head': [0.08, 0, 0] }],
-      [1.1, { ...HUG_HOLD, '+spine': [0.16, 0, 0], '+head': [0.12, 0, 0.16] }],
-      [2.8, { ...HUG_HOLD, '+spine': [0.15, 0.04, 0], '+head': [0.12, 0.05, 0.2] }],
-      [3.6, { ...HUG_OPEN, '+spine': [0.06, 0, 0], '+head': [0.04, 0, 0.05] }],
-    ],
-    expr: { happy: 0.85, blush: 0.55, blink: [[0, 0], [0.9, 0], [1.2, 0.85], [2.8, 0.85], [3.1, 0]] },
-  },
-  jump: {
-    dur: 1.35, fade: [0.12, 0.3],
-    keys: [
-      [0.00, { ...REST }],
-      [0.22, { ...both({ rightUpperArm: [0, -0.35, 1.3], rightLowerArm: [0, 0.3, 0] }),
-               ...both({ rightUpperLeg: [-0.55, 0, 0], rightLowerLeg: [1.05, 0, 0], rightFoot: [-0.5, 0, 0] }),
-               '+spine': [0.12, 0, 0], hips: [0, -0.09, 0] }],
-      [0.42, { ...both({ rightUpperArm: [0, 0.2, -0.7], rightLowerArm: [0, 0.2, -0.2], ...open('right') }),
-               ...both({ rightUpperLeg: [0.05, 0, 0], rightLowerLeg: [0.1, 0, 0], rightFoot: [0.3, 0, 0] }),
-               '+spine': [-0.06, 0, 0], '+head': [-0.1, 0, 0], hips: [0, 0.16, 0] }],
-      [0.62, { ...both({ rightUpperArm: [0, 0.2, -0.4], rightLowerArm: [0, 0.2, -0.3] }),
-               ...both({ rightUpperLeg: [-0.25, 0, 0], rightLowerLeg: [0.4, 0, 0], rightFoot: [0, 0, 0] }),
-               hips: [0, 0.11, 0] }],
-      [0.80, { ...both({ rightUpperArm: [0, 0, 0.9], rightLowerArm: [0, 0.4, 0] }),
-               ...both({ rightUpperLeg: [-0.5, 0, 0], rightLowerLeg: [0.9, 0, 0], rightFoot: [-0.4, 0, 0] }),
-               '+spine': [0.1, 0, 0], hips: [0, -0.07, 0] }],
-      [1.35, { ...REST, hips: [0, 0, 0] }],
-    ],
-    expr: { happy: 0.9, surprised: [[0, 0], [0.35, 0.5], [0.8, 0]] },
-  },
-  shrug: {
-    dur: 2.2, fade: [0.3, 0.45],
-    keys: [[0, both({ rightUpperArm: [0, 0.3, 1.0], rightLowerArm: [0, 1.65, -0.75], rightHand: [-0.8, 0, 0], ...open('right'),
-                      rightShoulder: [0, 0, -0.2] })],
-           [2.2, both({ rightUpperArm: [0, 0.3, 1.0], rightLowerArm: [0, 1.65, -0.75], rightHand: [-0.8, 0, 0], ...open('right'),
-                        rightShoulder: [0, 0, -0.2] })]],
-    add: { '+head': [0.02, 0, 0.14] },
-    expr: { relaxed: 0.3 },
-  },
-  // ---- affectionate: only in your own conversations, never from chat ----
-  kiss: {        // fingers to her lips, eyes closed, then blown your way
-    dur: 3.0, fade: [0.45, 0.6],
-    keys: [
-      [0.0, { rightUpperArm: [0, 1.2, 0.4], rightLowerArm: [0, 2.0, -0.55, -0.4], rightHand: [-0.4, 0, 0], ...fingers('right', 0.45),
-              '+head': [0.06, -0.05, -0.06], '+spine': [0.03, 0, 0] }],
-      [1.0, { rightUpperArm: [0, 1.2, 0.4], rightLowerArm: [0, 2.0, -0.55, -0.4], rightHand: [-0.4, 0, 0], ...fingers('right', 0.5),
-              '+head': [0.08, -0.05, -0.08], '+spine': [0.04, 0, 0] }],
-      [1.45, { rightUpperArm: [0, 1.1, 0.2], rightLowerArm: [0, 0.95, -0.55, 1.2], rightHand: [1.3, 0, 0], ...open('right'),
-               '+head': [-0.04, -0.04, -0.1], '+spine': [0.07, 0, 0] }],
-      [3.0, { rightUpperArm: [0, 1.1, 0.25], rightLowerArm: [0, 0.9, -0.55, 1.2], rightHand: [1.3, 0, 0], ...open('right'),
-              '+head': [-0.02, -0.03, -0.12], '+spine': [0.05, 0, 0] }],
-    ],
-    expr: { blush: 0.85, blink: [[0, 0], [0.3, 1], [1.15, 1], [1.45, 0]], ou: [[0, 0], [0.3, 0.75], [1.05, 0.75], [1.3, 0]],
-            happy: [[0, 0], [1.25, 0], [1.6, 0.6]] },
-  },
-  shy: {         // hands together at her chest, looking away, then a peek at you
-    dur: 4.2, fade: [0.6, 0.8],
-    keys: [
-      [0.0, { ...both({ rightUpperArm: [0, 0.8, 1.15], rightLowerArm: [0, 2.15, -0.15], rightHand: [0, 0.2, 0],
-                        rightShoulder: [0, 0, -0.12] }), ...fingers('right', 0.45), ...fingers('left', 0.45),
-              '+spine': [0.05, 0, 0.03], '+head': [0.2, 0.28, 0.12] }],
-      [1.6, { '+spine': [0.06, 0, -0.03], '+head': [0.22, 0.3, 0.14] }],
-      [2.2, { '+spine': [0.05, 0, 0], '+head': [0.12, 0.06, 0.08] }],       // a peek
-      [2.9, { '+spine': [0.05, 0, 0.02], '+head': [0.12, 0.05, 0.08] }],
-      [3.4, { '+spine': [0.06, 0, 0.03], '+head': [0.2, 0.26, 0.12] }],     // and away again
-      [4.2, { '+spine': [0.05, 0, 0.0], '+head': [0.18, 0.24, 0.1] }],
-    ],
-    expr: { blush: 1, relaxed: 0.35 },
-  },
-  // ---- on her own, when idle ----
-  stretch: {
-    dur: 4.2, fade: [0.8, 0.9],
-    keys: [
-      [0.0, { ...both({ rightUpperArm: [0, 0.1, -1.35], rightLowerArm: [0, 0.6, 0], rightHand: [0, 0.3, 0] }),
-              '+spine': [-0.07, 0, 0], '+head': [-0.18, 0, 0] }],
-      [1.6, { ...both({ rightUpperArm: [0, 0.05, -1.45], rightLowerArm: [0, 0.3, 0], rightHand: [0, 0.3, 0] }),
-              '+spine': [-0.1, 0, 0.06], '+head': [-0.2, 0, 0.08] }],
-      [3.0, { ...both({ rightUpperArm: [0, 0.05, -1.45], rightLowerArm: [0, 0.3, 0], rightHand: [0, 0.3, 0] }),
-              '+spine': [-0.1, 0, -0.06], '+head': [-0.2, 0, -0.08] }],
-      [4.2, { ...both({ rightUpperArm: [0, 0.1, -1.3], rightLowerArm: [0, 0.6, 0], rightHand: [0, 0.3, 0] }),
-              '+spine': [-0.05, 0, 0], '+head': [-0.1, 0, 0] }],
-    ],
-    expr: { relaxed: 0.6, blink: [[0, 0], [0.5, 1], [3.4, 1], [3.9, 0]], aa: [[0, 0], [0.8, 0.55], [2.0, 0.6], [2.6, 0]] },
-  },
-  look_hand: {
-    dur: 3.6, fade: [0.6, 0.7],
-    keys: [
-      [0.0, { leftUpperArm: [0, -0.85, -0.75], leftLowerArm: [0, -1.9, 0.35], leftHand: [0.6, 0, 0.2], ...fingers('left', 0.1),
-              '+head': [0.22, 0.18, 0.06] }],
-      [1.8, { leftUpperArm: [0, -0.9, -0.7], leftLowerArm: [0, -1.95, 0.4], leftHand: [1.1, 0, 0.2], ...fingers('left', 0.5),
-              '+head': [0.24, 0.2, 0.1] }],
-      [3.6, { leftUpperArm: [0, -0.85, -0.75], leftLowerArm: [0, -1.9, 0.35], leftHand: [0.5, 0, 0.2], ...fingers('left', 0.2),
-              '+head': [0.2, 0.16, 0.06] }],
-    ],
-    expr: { relaxed: 0.35 },
-  },
-  tuck_hair: {
-    dur: 2.6, fade: [0.55, 0.6],
-    keys: [
-      [0.0, { rightUpperArm: [0, 0.7, 0.5], rightLowerArm: [0, 0, -2.55, -1.0], rightHand: [-1.1, 0.3, 0], ...fingers('right', 0.15),
-              '+head': [0, -0.1, -0.14] }],
-      [1.4, { rightUpperArm: [0, 0.7, 0.45], rightLowerArm: [0, 0, -2.65, -1.0], rightHand: [-1.2, 0.45, 0], ...fingers('right', 0.15),
-              '+head': [0, -0.12, -0.18] }],
-      [2.6, { rightUpperArm: [0, 0.68, 0.55], rightLowerArm: [0, 0, -2.45, -1.0], rightHand: [-1.1, 0.3, 0], ...fingers('right', 0.15),
-              '+head': [0, -0.08, -0.1] }],
-    ],
-    expr: { relaxed: 0.4 },
-  },
-  bounce: {      // a happy little double bob
-    dur: 1.3, fade: [0.15, 0.3],
-    keys: [
-      [0.00, { hips: [0, 0, 0], ...both({ rightUpperLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0] }) }],
-      [0.18, { hips: [0, -0.035, 0], ...both({ rightUpperLeg: [-0.25, 0, 0], rightLowerLeg: [0.45, 0, 0], rightFoot: [-0.2, 0, 0] }) }],
-      [0.38, { hips: [0, 0.03, 0], ...both({ rightUpperLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], rightFoot: [0, 0, 0] }) }],
-      [0.58, { hips: [0, -0.035, 0], ...both({ rightUpperLeg: [-0.25, 0, 0], rightLowerLeg: [0.45, 0, 0], rightFoot: [-0.2, 0, 0] }) }],
-      [0.80, { hips: [0, 0.025, 0], ...both({ rightUpperLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], rightFoot: [0, 0, 0] }) }],
-      [1.30, { hips: [0, 0, 0] }],
-    ],
-    add: { '+head': [0, 0, 0.08] },
-    expr: { happy: 0.75 },
-  },
-  explain: {     // a hand that comes up while she talks
-    dur: 2.4, fade: [0.5, 0.6],
-    keys: [[0, { rightUpperArm: [0, 0.3, 1.05], rightLowerArm: [0, 1.2, 0], rightHand: [-0.9, 0, 0.15], ...fingers('right', 0.1) }],
-           [1.2, { rightUpperArm: [0, 0.35, 1.0], rightLowerArm: [0, 1.3, 0], rightHand: [-1.1, 0, 0.1], ...fingers('right', 0.1) }],
-           [2.4, { rightUpperArm: [0, 0.3, 1.05], rightLowerArm: [0, 1.2, 0], rightHand: [-0.9, 0, 0.15], ...fingers('right', 0.15) }]],
-  },
-};
-// left-handed versions, so it isn't always the same hand
-GESTURES.wave_left = mirrorGesture(GESTURES.wave);
-GESTURES.explain_left = mirrorGesture(GESTURES.explain);
-GESTURES.tuck_hair_left = mirrorGesture(GESTURES.tuck_hair);
-
-function mirrorGesture(g) {
-  return Object.assign({}, g, {
-    keys: g.keys.map(([t, p]) => [t, mirrorPose(p)]),
-    add: g.add && mirrorPose(g.add),
-    osc: g.osc && g.osc.map(([b, ax, a, hz]) => [mirrorName(b), ax, ax === 0 ? a : -a, hz]),
-  });
 }
 
-export const IDLE = ['stretch', 'look_hand', 'tuck_hair', 'tuck_hair_left', 'bounce'];
-// Never from stream chat, and only offered to her in your own turns.
-export const PRIVATE = ['kiss', 'shy'];
+export const IDLE = Object.keys(GESTURES).filter(n => GESTURES[n].idle);
+export const PRIVATE = Object.keys(GESTURES).filter(n => GESTURES[n].private);
 export const NAMES = Object.keys(GESTURES);
 
 // ---------------------------------------------------------------------------
@@ -249,7 +73,10 @@ function sample(keys, name, t) {
   if (!prev) return next ? next[1] : null;
   if (!next) return prev[1];
   const k = ease((t - prev[0]) / (next[0] - prev[0]));
-  return prev[1].map((v, i) => v + (next[1][i] - v) * k);
+  // a key with a twist (4th number) next to one without: the missing one is 0,
+  // never undefined - NaN in a rotation makes the limb vanish
+  const n = Math.max(prev[1].length, next[1].length);
+  return Array.from({ length: n }, (_, i) => (prev[1][i] ?? 0) + ((next[1][i] ?? 0) - (prev[1][i] ?? 0)) * k);
 }
 function sampleScalar(v, t) {
   if (!Array.isArray(v)) return v;
@@ -263,7 +90,12 @@ export function createGestures(THREE, vrm) {
   const hips = vrm.humanoid.getNormalizedBoneNode('hips');
   const hipsRest = hips ? hips.position.clone() : null;
   const bone = n => vrm.humanoid.getNormalizedBoneNode(n);
-  const active = [];          // {g, name, t, out}
+  const active = [];
+  // bones the portrait sets itself every frame, before the gestures
+  const MANAGED = new Set(['head', 'neck', 'spine', 'leftShoulder', 'rightShoulder',
+                           bone('upperChest') ? 'upperChest' : 'chest']);
+  const touched = new Set();      // every bone a gesture has written to
+  const touchedObj = new Set();   // ...and every node a .vrma clip has          // {g, name, t, out}
   const qa = new THREE.Quaternion(), e = new THREE.Euler();
   // VRM 0.x faces the other way in its own space: same pose, x and z flipped.
   const fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
@@ -356,6 +188,19 @@ export function createGestures(THREE, vrm) {
         if (b) b.rotation.set(fx * v[0], v[1], fx * v[2]);
       }
       if (hips && hipsRest) hips.position.copy(hipsRest);
+      // Any other bone a gesture has moved (chest, hips, toes...) starts each
+      // frame from straight again. Without this, '+chest' added a little more
+      // every frame and she spun round at the waist.
+      for (const n of touched) {
+        if (MANAGED.has(n) || n in REST) continue;
+        const b = bone(n);
+        if (b) b.quaternion.identity();
+      }
+      for (const o of touchedObj) {
+        const n = Object.keys(vrm.humanoid.humanBones).find(k => bone(k) === o);
+        if (n && (MANAGED.has(n) || n in REST)) continue;
+        o.quaternion.identity();
+      }
     },
 
     // After the portrait has set its own pose for the frame.
@@ -378,7 +223,7 @@ export function createGestures(THREE, vrm) {
           r.action.time = a.loop ? ct % r.length : Math.min(ct, r.length);
           r.mixer.update(0);
           for (const b of r.binds) {
-            if (b.kind === 'quaternion') b.target.quaternion.slerp(b.g.quaternion, w);
+            if (b.kind === 'quaternion') { b.target.quaternion.slerp(b.g.quaternion, w); touchedObj.add(b.target); }
             else if (b.kind === 'position') b.target.position.lerp(b.g.position, w);
             else if (b.kind === 'expr') exprNow[b.expr] = Math.max(exprNow[b.expr] || 0, b.g.weight * w);
           }
@@ -396,6 +241,7 @@ export function createGestures(THREE, vrm) {
           const additive = name.startsWith('+');
           const b = bone(additive ? name.slice(1) : name);
           if (!b) continue;
+          touched.add(additive ? name.slice(1) : name);
           if (additive) {
             euler(v[0] * w, v[1] * w, v[2] * w);
             b.quaternion.multiply(qa.setFromEuler(e));
@@ -409,9 +255,18 @@ export function createGestures(THREE, vrm) {
             b.quaternion.slerp(qa, w);
           }
         }
+        if (g.sob) {
+          const hitch = Math.max(0, Math.sin(t * 7.5)) ** 3 * (0.5 + 0.5 * Math.sin(t * 1.3)) * w;
+          for (const [n, z] of [['leftShoulder', 1], ['rightShoulder', -1]]) {
+            const b = bone(n); if (b) { euler(0, 0, z * 0.09 * hitch); b.quaternion.multiply(qa.setFromEuler(e)); }
+          }
+          const sp = bone('upperChest') || bone('chest');
+          if (sp) { euler(-0.04 * hitch, 0, 0); sp.quaternion.multiply(qa.setFromEuler(e)); }
+        }
         for (const [name, v] of Object.entries(g.add || {})) {
           const b = bone(name.slice(1));
           if (!b) continue;
+          touched.add(name.slice(1));
           euler(v[0] * w, v[1] * w, v[2] * w);
           b.quaternion.multiply(qa.setFromEuler(e));
         }

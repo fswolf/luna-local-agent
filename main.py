@@ -1132,8 +1132,8 @@ def handle_input(text):
                        + f"  (margin over none: {config.PORTRAIT_MEANING_MARGIN})")
         return
 
-    _GESTURES = ("wave", "hug", "jump", "bounce", "shrug", "stretch", "look_hand", "tuck_hair", "explain",
-                 "kiss", "shy")
+    import gestures as _g
+    _GESTURES = tuple(_g.all_names())
     if text.startswith("/portrait ") and len(text.split()) == 2 and text.split()[1] not in (
             "models", "obs", "gestures"):
         import livefeed

@@ -16,7 +16,7 @@ import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils,
          VRMAnimationLoaderPlugin, createVRMAnimationClip } from './vendor/luna-three.js';
 import { createLook } from './look.js';
 import { createHologram3D } from './hologram3d.js';
-import { createGestures, IDLE } from './gestures.js';
+import { createGestures, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
 const note = document.getElementById('note');
@@ -136,11 +136,34 @@ function frame() {
   camera.position.set(0, lookY + 0.01, p.z + dist);
   camera.lookAt(0, lookY, p.z);
   base.follow = full ? 0 : 0.7;   // close crops follow her up when she jumps
+  base.dist = dist;
   base.lookY = lookY;
   base.headZ = p.z;
 }
 
-const base = { lookY: 1.45, headZ: 0, follow: 0.7 };
+const base = { lookY: 1.45, headZ: 0, follow: 0.7, dist: 2 };
+
+// The viewer (?debug=1): drag to turn around her, wheel to zoom, double-click
+// to put the camera back. Off on the live portrait, so a stray click in OBS
+// or on the desktop never moves her.
+const orbit = { yaw: 0, pitch: 0, zoom: 1 };
+if (params.get('debug')) {
+  const el = renderer.domElement;
+  let drag = null;
+  el.style.cursor = 'grab';
+  el.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); el.style.cursor = 'grabbing'; });
+  el.addEventListener('pointermove', e => {
+    if (!drag) return;
+    orbit.yaw -= (e.clientX - drag.x) * 0.008;
+    orbit.pitch = Math.max(-1.2, Math.min(1.2, orbit.pitch + (e.clientY - drag.y) * 0.006));
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  const stop = () => { drag = null; el.style.cursor = 'grab'; };
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+  el.addEventListener('wheel', e => { e.preventDefault(); orbit.zoom = Math.max(0.25, Math.min(4, orbit.zoom * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  el.addEventListener('dblclick', () => { orbit.yaw = 0; orbit.pitch = 0; orbit.zoom = 1; });
+}
 
 // ---------------------------------------------------------------------------
 // What she's doing - from the event stream
@@ -363,12 +386,12 @@ function blinkValue(now, dt) {
   }
   if (blink.t < 0) return 0;
   blink.t += dt;
-  const len = 0.16;
+  const len = 0.16 * (1 + moodNow.sad * 0.8);   // heavier lids when she's low
   const k = blink.t / len;
   let v = k < 0.45 ? k / 0.45 : Math.max(0, 1 - (k - 0.45) / 0.55);
   if (blink.t >= len) {
     blink.t = -1;
-    blink.next = now + (blink.double ? 0.09 : rand(2.2, 6.5));
+    blink.next = now + (blink.double ? 0.09 : rand(2.2, 6.5) * (1 + moodNow.sad * 0.6));
     blink.double = false;
   }
   return Math.max(0, Math.min(1, v));
@@ -394,6 +417,10 @@ function twitch(side = 0, strength = 1) {
   }
 }
 const earsNext = { t: rand(3, 7) };
+// How far the ears may move. VRoid's cat ears are separate pieces that float
+// off the head if they turn far, so they get a small range; "vrm":
+// {"ear_range": 0..1} in the model's luna.json sets it (1 = full).
+let earRange = 1;
 const tilt = { v: 0, target: 0 };
 
 function earTargets() {
@@ -419,7 +446,7 @@ function updateEars(now, dt) {
     e.vz += (-k * (e.z - t.z * e.side) - c * e.vz) * dt;
     e.x += e.vx * dt;
     e.z += e.vz * dt;
-    eul.set(e.x, 0, e.z * e.side);
+    eul.set(e.x * earRange, 0, e.z * e.side * earRange);
     qa.setFromEuler(eul);
     e.node.quaternion.copy(e.rest).multiply(qa);
   }
@@ -464,6 +491,10 @@ function setExpr(name, v) {
   if (has.has(name)) vrm.expressionManager.setValue(name, v);
 }
 
+// set by the portrait every frame; a gesture can only add to these
+const PORTRAIT_SETS = new Set(['blink', 'happy', 'sad', 'angry', 'relaxed', 'surprised', 'aa', 'ih', 'ou', 'ee', 'oh']);
+const gestureOwned = new Set();
+
 // Moods: gentle, never a full grin from the dials alone.
 const moodNow = { happy: 0, sad: 0, angry: 0, relaxed: 0, surprised: 0 };
 
@@ -472,14 +503,17 @@ function updateMood(dt, talking) {
   const target = {
     happy: Math.max(0, Math.min(0.55, w * 0.45 + e * 0.15 + (talking ? 0.08 : 0))),
     relaxed: Math.max(0, Math.min(0.4, w * 0.3 - e * 0.2)),
-    sad: Math.max(0, Math.min(0.45, -e * 0.35 - w * 0.1)),
-    angry: Math.max(0, Math.min(0.4, -w * 0.4 - 0.1)),
+    // with separate brow/eye/mouth shapes she can show more without the
+    // whole-face presets taking over
+    sad: moodParts() ? Math.max(0, Math.min(0.9, -e * 0.7 - w * 0.15)) : Math.max(0, Math.min(0.45, -e * 0.35 - w * 0.1)),
+    angry: moodParts() ? Math.max(0, Math.min(0.85, -w * 0.8 - 0.1)) : Math.max(0, Math.min(0.4, -w * 0.4 - 0.1)),
     surprised: mind.stage === 'waking' ? 0.35 : 0,
   };
   for (const k in target) {
     moodNow[k] = damp(moodNow[k], target[k], 2.5, dt);
     // a quiet smile while she isn't talking: VRoid's "happy" opens the mouth
-    setExpr(k, k === 'happy' && quietSmile() ? moodNow[k] * mouthShut.talk : moodNow[k]);
+    setExpr(k, k === 'happy' && quietSmile() ? moodNow[k] * mouthShut.talk
+               : (k === 'sad' || k === 'angry') && moodParts() ? 0 : moodNow[k]);
   }
 }
 
@@ -526,6 +560,7 @@ function animate() {
     headRot.y = damp(headRot.y, (gaze.x * L.headGain + L.wander.x * LOOK_X) * 0.9 + sway, rate, dt);
     headRot.x = damp(headRot.x, -(gaze.y * L.headGain + L.wander.y * LOOK_Y) * 0.7
                      + (mind.stage === 'listening' ? 0.06 : 0)
+                     + moodNow.sad * 0.12 + moodNow.angry * 0.05
                      + talking * 0.05 * Math.sin(now * 9), L.thinking ? 2.5 : 4, dt);
     headRot.z = damp(headRot.z, tilt.v + Math.sin(now * 0.45) * 0.02, 3, dt);
     const head = bone('head'), neck = bone('neck');
@@ -559,14 +594,28 @@ function animate() {
     idleMoves(now, talking > 0.05);
     moves.update(Math.min(raw, 0.2));   // real time, so a wave lasts as long on a slow machine
     const hy = moves.hipsY() * base.follow;
-    camera.position.y = base.lookY + 0.01 + hy;
-    camera.lookAt(0, base.lookY + hy, base.headZ);
-    for (const [k, v] of Object.entries(moves.expr())) {
+    const d = base.dist * orbit.zoom, ty = base.lookY + hy;
+    camera.position.set(Math.sin(orbit.yaw) * Math.cos(orbit.pitch) * d, ty + 0.01 + Math.sin(orbit.pitch) * d,
+                        base.headZ + Math.cos(orbit.yaw) * Math.cos(orbit.pitch) * d);
+    camera.lookAt(0, ty, base.headZ);
+    // Expressions the portrait sets itself every frame (blink, moods, mouth)
+    // are only ever raised by a gesture. Any other one a gesture touches
+    // (a wink's blinkRight) belongs to the gesture alone: set outright, and
+    // put back to 0 when the gesture lets go - or the eye stays shut.
+    const gx = moves.expr();
+    for (const k of gestureOwned) if (!Object.hasOwn(gx, k)) { vrm.expressionManager.setValue(k, 0); gestureOwned.delete(k); }
+    for (const [k, v] of Object.entries(gx)) {
       if (k === 'blush') blush.gesture = v;
-      else if (has.has(k)) vrm.expressionManager.setValue(k, Math.max(vrm.expressionManager.getValue(k) || 0, v));
+      else if (k === 'tears') tears.gesture = v;
+      else if (!has.has(k)) continue;
+      else if (PORTRAIT_SETS.has(k)) vrm.expressionManager.setValue(k, Math.max(vrm.expressionManager.getValue(k) || 0, v));
+      else { vrm.expressionManager.setValue(k, v); gestureOwned.add(k); }
     }
     if (!Object.hasOwn(moves.expr(), 'blush')) blush.gesture = 0;
+    if (!Object.hasOwn(moves.expr(), 'tears')) tears.gesture = 0;
     updateBlush(dt);
+    updateBrows();
+    updateTears(dt, now);
 
     vrm.update(dt);
     closeMouth(talking);
@@ -602,13 +651,17 @@ function fakeVoice(seconds = 2.4) {
 // the grin comes back as she talks. Gestures keep their open smiles.
 const mouthShut = { amount: cfg.vrm?.mouth_close ?? 0.7, targets: null, smile: null, now: 0, talk: 0 };
 function findMorphs() {
-  mouthShut.targets = []; mouthShut.smile = [];
+  mouthShut.targets = []; mouthShut.smile = []; mouthShut.parts = [];
   vrm.scene.traverse(o => {
     const d = o.morphTargetDictionary;
     if (!d) return;
     const key = Object.keys(d).find(k => /(^|_)mth_close$|mouth_?close/i.test(k));
     if (key !== undefined) mouthShut.targets.push([o, d[key]]);
     if ('Fcl_EYE_Joy' in d && 'Fcl_MTH_Fun' in d) mouthShut.smile.push([o, d.Fcl_EYE_Joy, d.Fcl_MTH_Fun]);
+    const parts = [];
+    for (const [mood, list] of Object.entries(MOOD_PARTS))
+      for (const [name, wgt, isMouth, onTop] of list) if (name in d) parts.push([mood, d[name], wgt, !!isMouth, !!onTop]);
+    if (parts.length) mouthShut.parts.push([o, parts]);
   });
 }
 function quietSmile() {
@@ -627,6 +680,27 @@ function closeMouth(talking) {
     const s = moodNow.happy * (1 - mouthShut.talk);
     for (const [o, eye, mth] of mouthShut.smile) { o.morphTargetInfluences[eye] = s * 0.8; o.morphTargetInfluences[mth] = s; }
   }
+  // sad and cross, part by part: brows lead, eyes follow, the mouth eases off
+  // while she talks so the words still read
+  if (moodParts()) {
+    for (const [o, parts] of mouthShut.parts) for (const [mood, idx, wgt, isMouth, onTop] of parts) {
+      const val = moodNow[mood] * wgt * (isMouth ? 1 - 0.7 * mouthShut.talk : 1);
+      // a shape a VRM expression also drives (the blink): never pull it below that
+      o.morphTargetInfluences[idx] = onTop ? Math.max(o.morphTargetInfluences[idx], val) : val;
+    }
+  }
+}
+
+// VRoid faces carry brows, eyes and mouth as separate shapes; sad and cross
+// are built from those instead of the whole-face presets.
+const MOOD_PARTS = {
+  // (brows are often under the bangs, so the eyes and mouth do the work)
+  sad: [['Fcl_BRW_Sorrow', 1], ['Fcl_EYE_Sorrow', 1.1], ['Fcl_MTH_Sorrow', 1.2, true]],
+  angry: [['Fcl_BRW_Angry', 1.9], ['Fcl_EYE_Angry', 1.8], ['Fcl_MTH_Angry', 1.3, true], ['Fcl_EYE_Close', 0.45, false, true]],
+};
+function moodParts() {
+  if (!mouthShut.smile) findMorphs();
+  return mouthShut.parts.length > 0 && cfg.vrm?.mood_parts !== false;
 }
 
 // Blush. VRoid paints the cheeks into the face texture, so there's no
@@ -648,7 +722,7 @@ function blushLayer() {
   const o = cfg.vrm?.blush || {};
   let skin = null;
   vrm.scene.traverse(m => {
-    if (!skin && m.isSkinnedMesh && [].concat(m.material).some(x => /face.*skin|skin.*face/i.test(x.name || ''))) skin = m;
+    if (!skin && m.isSkinnedMesh && !m.userData.overlay && [].concat(m.material).some(x => /face.*skin|skin.*face/i.test(x.name || ''))) skin = m;
   });
   if (!skin || o.enabled === false) return null;
   const S = 512, cv = document.createElement('canvas');
@@ -670,6 +744,7 @@ function blushLayer() {
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false,
                                             polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   const layer = new THREE.SkinnedMesh(skin.geometry, mat);
+  layer.userData.overlay = true;
   layer.bind(skin.skeleton, skin.bindMatrix);
   layer.morphTargetInfluences = skin.morphTargetInfluences;      // same array: same expression, always
   layer.morphTargetDictionary = skin.morphTargetDictionary;
@@ -688,6 +763,140 @@ function updateBlush(dt) {
   if (has.has('blush')) { vrm.expressionManager.setValue('blush', blush.now); return; }
   const l = blushLayer();
   if (l) { l.mat.opacity = blush.now * l.strength; l.mesh.visible = blush.now > 0.01; }
+}
+
+// Tears. The same trick as the blush: a copy of the face skin that moves
+// with every expression, carrying a texture painted in the face's own
+// layout - here redrawn as she cries: a wet shine on the lower lids, then
+// streaks that grow down her cheeks with drops running along them.
+// What brings them: the cry gesture, or staying deeply sad for a while.
+// luna.json, "vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}
+// (where each tear starts, below the eye; the default is VRoid's layout).
+const tears = { now: 0, gesture: 0, sadFor: 0, layer: null, tried: false, test: null, drops: [] };
+function tearLayer() {
+  if (tears.tried) return tears.layer;
+  tears.tried = true;
+  if (cfg.vrm?.tears?.enabled === false) return null;
+  let skin = null;
+  vrm.scene.traverse(m => {
+    if (!skin && m.isSkinnedMesh && m.renderOrder !== 1000 && !m.userData.overlay
+        && [].concat(m.material).some(x => /face.*skin|skin.*face/i.test(x.name || ''))) skin = m;
+  });
+  if (!skin) return null;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 512;
+  const tex = new THREE.CanvasTexture(cv);
+  tex.flipY = false;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 1, depthWrite: false,
+                                            polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+  const layer = new THREE.SkinnedMesh(skin.geometry, mat);
+  layer.userData.overlay = true;
+  layer.bind(skin.skeleton, skin.bindMatrix);
+  layer.morphTargetInfluences = skin.morphTargetInfluences;
+  layer.morphTargetDictionary = skin.morphTargetDictionary;
+  layer.frustumCulled = false;
+  layer.renderOrder = (skin.renderOrder || 0) + 2;
+  skin.parent.add(layer);
+  layer.position.copy(skin.position); layer.quaternion.copy(skin.quaternion); layer.scale.copy(skin.scale);
+  const o = cfg.vrm?.tears || {};
+  tears.layer = { mesh: layer, tex, g: cv.getContext('2d'),
+                  starts: [o.left || [0.335, 0.565], o.right || [0.665, 0.565]], length: o.length || 0.3 };
+  return tears.layer;
+}
+function updateTears(dt, now) {
+  // deeply sad for ~6 s brings tears on its own
+  tears.sadFor = moodNow.sad > 0.55 ? tears.sadFor + dt : Math.max(0, tears.sadFor - dt * 2);
+  const target = tears.test ?? Math.min(1, Math.max(tears.gesture, tears.sadFor > 6 ? Math.min(1, (tears.sadFor - 6) / 4) : 0));
+  tears.now = damp(tears.now, target, target > tears.now ? 0.9 : 0.35, dt);    // well up slowly, dry slower
+  if (has.has('tears')) { vrm.expressionManager.setValue('tears', tears.now); return; }
+  const l = tearLayer();
+  if (!l) return;
+  l.mesh.visible = tears.now > 0.01;
+  if (!l.mesh.visible) { tears.drops.length = 0; return; }
+  const g = l.g, S = 512, k = tears.now;
+  g.clearRect(0, 0, S, S);
+  // drops: born at the lid every so often, sliding down and slowing
+  if (k > 0.35 && Math.random() < dt * 1.4 * k) {
+    const side = Math.random() < 0.5 ? 0 : 1;
+    tears.drops.push({ side, y: 0, v: 0.05 + Math.random() * 0.04, wob: Math.random() * 6 });
+  }
+  for (const [i, [u, v]] of l.starts.entries()) {
+    const x = u * S, y0 = v * S, len = l.length * S * Math.min(1, k * 1.3), dir = i === 0 ? 1 : -1;
+    // wet lower lid: a soft, bright line
+    const lid = g.createRadialGradient(x, y0, 0, x, y0, 30);
+    lid.addColorStop(0, `rgba(150,200,255,${0.6 * k})`);
+    lid.addColorStop(1, 'rgba(225,240,255,0)');
+    g.fillStyle = lid;
+    g.beginPath(); g.ellipse(x, y0, 30, 7, 0, 0, Math.PI * 2); g.fill();
+    // the streak: thin, glossy, curving slightly outward as it runs down
+    if (k > 0.25) {
+      const path = t => [x + dir * -Math.sin(t * 1.4) * 6, y0 + t * len];
+      const grad = g.createLinearGradient(x, y0, x, y0 + len);
+      grad.addColorStop(0, `rgba(120,175,250,${0.85 * k})`);
+      grad.addColorStop(0.85, `rgba(120,175,250,${0.6 * k})`);
+      grad.addColorStop(1, 'rgba(120,175,250,0)');
+      g.strokeStyle = grad; g.lineWidth = 7; g.lineCap = 'round';
+      g.beginPath();
+      for (let t = 0; t <= 1.001; t += 0.05) { const [px, py] = path(t); t ? g.lineTo(px, py) : g.moveTo(px, py); }
+      g.stroke();
+      g.strokeStyle = `rgba(255,255,255,${0.6 * k})`; g.lineWidth = 2;    // highlight down its middle
+      g.beginPath();
+      for (let t = 0; t <= 0.9; t += 0.05) { const [px, py] = path(t); t ? g.lineTo(px - dir, py) : g.moveTo(px - dir, py); }
+      g.stroke();
+      for (const d of tears.drops) {
+        if (d.side !== i) continue;
+        const [px, py] = path(Math.min(1.15, d.y));
+        g.fillStyle = `rgba(110,170,250,${0.9 * k * Math.max(0, 1 - Math.max(0, d.y - 0.9) * 4)})`;
+        g.beginPath(); g.ellipse(px, py, 5.5, 8, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = `rgba(255,255,255,${0.9 * k})`;
+        g.beginPath(); g.arc(px - 1.3, py - 2, 1.4, 0, Math.PI * 2); g.fill();
+      }
+    }
+  }
+  for (const d of tears.drops) { d.y += d.v * dt * 6 * (1 - Math.min(0.6, d.y * 0.5)); }
+  tears.drops = tears.drops.filter(d => d.y < 1.3);
+  l.tex.needsUpdate = true;
+}
+
+// Brows through the bangs, the anime way: a copy of the brows drawn over
+// the hair, sharing the face's skeleton and shape keys. Faint normally,
+// stronger when she's cross or sad, so her brows can actually say it.
+// "vrm": {"brows_over_hair": 0..1} in luna.json sets the resting strength (0 = off).
+const brows = { layer: null, tried: false };
+function browLayer() {
+  if (brows.tried) return brows.layer;
+  brows.tried = true;
+  let src = null;
+  vrm.scene.traverse(m => { if (!src && m.isSkinnedMesh && /facebrow/i.test([].concat(m.material)[0]?.name || '')) src = m; });
+  if (!src || (cfg.vrm?.brows_over_hair ?? 0.35) <= 0 && cfg.vrm?.brows_over_hair !== undefined) return null;
+  const from = [].concat(src.material)[0];
+  const mat = new THREE.MeshBasicMaterial({ map: from.map, color: 0x6e3550, transparent: true, opacity: 0,
+                                            depthTest: false, depthWrite: false, alphaTest: 0.05 });
+  const layer = new THREE.SkinnedMesh(src.geometry, mat);
+  layer.bind(src.skeleton, src.bindMatrix);
+  layer.morphTargetInfluences = src.morphTargetInfluences;
+  layer.morphTargetDictionary = src.morphTargetDictionary;
+  layer.frustumCulled = false;
+  layer.renderOrder = 1000;          // after the hair (VRM sets its own orders in the teens)
+  src.parent.add(layer);
+  layer.position.copy(src.position); layer.quaternion.copy(src.quaternion); layer.scale.copy(src.scale);
+  brows.layer = { mesh: layer, mat };
+  return brows.layer;
+}
+const _hf = new THREE.Vector3(), _hc = new THREE.Vector3(), _hp = new THREE.Vector3();
+function updateBrows() {
+  const l = browLayer();
+  if (!l) return;
+  const rest = cfg.vrm?.brows_over_hair ?? 0.35;
+  // only from the front: from behind they'd show through her head
+  const head = vrm.humanoid.getNormalizedBoneNode('head');
+  head.getWorldPosition(_hp);
+  _hf.set(0, 0, fx).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion()));
+  _hc.copy(camera.position).sub(_hp).normalize();
+  const facing = Math.max(0, Math.min(1, (_hf.dot(_hc) - 0.2) * 2.5));
+  l.mat.opacity = Math.min(1, rest + moodNow.angry * 0.9 + moodNow.sad * 0.6) * facing;
+  l.mesh.visible = l.mat.opacity > 0.01;
 }
 
 function debugPanel() {
@@ -711,12 +920,14 @@ function debugPanel() {
     shrug: () => gesture('shrug'), stretch: () => gesture('stretch'), 'look at hand': () => gesture('look_hand'),
     'tuck hair': () => gesture('tuck_hair'), bounce: () => gesture('bounce'), explain: () => gesture('explain'),
     'blow a kiss': () => gesture('kiss'), shy: () => gesture('shy'), fluster: () => { blush.fluster = 1; },
+    cry: () => gesture('cry'), 'tears on/off': () => { tears.test = tears.test ? null : 1; },
     'wag tail': () => { moves.wag(1); setTimeout(() => moves.wag(0), 3000); },
     'holo on/off': () => setHolo(!(holo && holo.isOn())),
   };
   const tune = document.getElementById('dtune');
   if (tune) {
     const row = document.createElement('label');
+    row.style.display = 'block';
     row.textContent = 'mouth closed ';
     const r = document.createElement('input');
     Object.assign(r, { type: 'range', min: 0, max: 1, step: 0.05, value: mouthShut.amount });
@@ -726,21 +937,33 @@ function debugPanel() {
     row.append(r, out);
     tune.appendChild(row);
     const row2 = document.createElement('label');
-    row2.textContent = ' blush ';
+    row2.style.display = 'block';
+    row2.textContent = 'blush ';
     const r2 = document.createElement('input');
     Object.assign(r2, { type: 'range', min: -0.05, max: 1, step: 0.05, value: -0.05, title: 'left end: automatic' });
     const out2 = document.createElement('span');
     out2.textContent = ' auto';
     r2.oninput = () => { blush.test = +r2.value < 0 ? null : +r2.value; out2.textContent = blush.test == null ? ' auto' : ` ${r2.value}`; };
-    row2.append(document.createElement('br'), r2, out2);
+    row2.append(r2, out2);
     row.after(row2);
   }
+  // a button for any gesture file without one above (a new gestures/*.js)
+  const covered = new Set(['wave', 'hug', 'jump', 'shrug', 'stretch', 'look_hand', 'tuck_hair', 'bounce', 'explain',
+                           'kiss', 'shy', 'cry']);
+  for (const n of GESTURE_NAMES) if (!covered.has(n) && !n.endsWith('_left')) buttons[n.replace(/_/g, ' ')] = () => gesture(n);
   const box = document.getElementById('dbuttons');
   for (const [label, fn] of Object.entries(buttons)) {
     const b = document.createElement('button');
     b.textContent = label;
     b.onclick = fn;
     box.appendChild(b);
+  }
+  // a gesture file with a mistake in it: say which and why, instead of a missing button
+  if (Object.keys(GESTURE_FAILED).length) {
+    const p = document.createElement('pre');
+    p.style.color = '#ff8aa8';
+    p.textContent = Object.entries(GESTURE_FAILED).map(([n, why]) => n.startsWith('(') ? why : `gestures/${n}.js didn't load: ${why}`).join('\n');
+    box.appendChild(p);
   }
   document.getElementById('dears').textContent = ears.length
     ? ears.map(e => `${e.node.name} (${e.side > 0 ? 'left' : 'right'})`).join('\n')
@@ -811,10 +1034,11 @@ async function loadClips() {
 try {
   vrm = await load(cfg.model);
   moves = createGestures(THREE, vrm);
+  earRange = cfg.vrm?.ear_range ?? (ears.some(e => /catear/i.test(e.node.name)) ? 0.3 : 1);
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
   say('');
-  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, mouthShut, blush, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
+  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, mouthShut, blush, tears, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
   if (params.get('debug')) debugPanel();
   loadClips();
   if (params.get('demo')) demo(); else connect();
