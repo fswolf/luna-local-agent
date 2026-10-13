@@ -171,6 +171,8 @@ if (params.get('debug')) {
 const mind = {
   stage: 'idle',              // idle listening thinking speaking waking
   energy: 0, warmth: 0,       // mood dials, about -1..1
+  face: null,                 // the mood's face from agent/moods.json (null: work it out from the dials)
+  idle: [],                   // gestures this mood drifts into
   voice: [],                  // queued {env, zcr, fps, start}
   lastEvent: 0,
 };
@@ -236,8 +238,16 @@ function handle(ev) {
       if (w > 0.85 && mind.warmth <= 0.85 || w - mind.warmth > 0.3) blush.fluster = 1;   // that landed
       mind.energy = +ev.energy || 0;
       mind.warmth = w;
+      mind.face = ev.face && typeof ev.face === 'object' ? ev.face : null;
+      mind.idle = Array.isArray(ev.idle) ? ev.idle : [];
       break;
     }
+    case 'feeling':    // a quick one from reading the exchange: laughing, embarrassed...
+      feel.face = ev.face || {};
+      feel.start = clock.elapsedTime;
+      feel.seconds = +ev.seconds || 6;
+      if (ev.gesture && moves && !moves.busy()) gesture(ev.gesture);
+      break;
     case 'tool':
       twitch(Math.random() < 0.5 ? 1 : -1, 0.8);
       look.glance(0.6);
@@ -361,7 +371,9 @@ function idleMoves(now, talking) {
   if (!moves || moves.busy()) return;
   if (mind.stage === 'idle' && now > idle.next) {
     let pick;
-    const pool = IDLE.concat(moves.clipsWhere('idle'));   // clips marked "idle" join in
+    // half the time, something that suits her mood (agent/moods.json "idle")
+    const fits = mind.idle.filter(n => moves.names.includes(n) || moves.hasClip(n));
+    const pool = fits.length && Math.random() < 0.5 ? fits : IDLE.concat(moves.clipsWhere('idle'));   // clips marked "idle" join in
     do { pick = pool[Math.floor(Math.random() * pool.length)]; } while (pick === idle.last && pool.length > 1);
     idle.last = pick;
     moves.play(pick);
@@ -513,8 +525,33 @@ const gestureOwned = new Set();
 // Moods: gentle, never a full grin from the dials alone.
 const moodNow = { happy: 0, sad: 0, angry: 0, relaxed: 0, surprised: 0 };
 
+// A quick feeling: in fast, held, out over the last second and a half.
+const feel = { face: {}, start: -99, seconds: 6 };
+function feelWeight(now) {
+  const t = now - feel.start;
+  if (t < 0 || t > feel.seconds) return 0;
+  return Math.min(1, t / 0.4, (feel.seconds - t) / 1.5);
+}
+
 function updateMood(dt, talking) {
   const w = mind.warmth, e = mind.energy;
+  const fw = feelWeight(clock.elapsedTime);
+  const over = k => Math.min(1, (feel.face[k] || 0) * fw);
+  if (mind.face) {
+    // the mood's own face, from agent/moods.json; a model without separate
+    // brow/eye/mouth shapes shows sad and cross at half, or the presets take over
+    const f = mind.face, half = moodParts() ? 1 : 0.5;
+    const target = {
+      happy: Math.max(f.happy || 0, over('happy')) + (talking ? 0.08 : 0),
+      relaxed: Math.max(f.relaxed || 0, over('relaxed')),
+      sad: Math.max(f.sad || 0, over('sad')) * half,
+      angry: Math.max(f.angry || 0, over('angry')) * half,
+      surprised: Math.max(mind.stage === 'waking' ? 0.35 : 0, f.surprised || 0, over('surprised')),
+    };
+    blush.mood = Math.max(f.blush || 0, over('blush'));
+    return applyMood(target, dt);
+  }
+  blush.mood = over('blush');
   const target = {
     happy: Math.max(0, Math.min(0.55, w * 0.45 + e * 0.15 + (talking ? 0.08 : 0))),
     relaxed: Math.max(0, Math.min(0.4, w * 0.3 - e * 0.2)),
@@ -524,6 +561,10 @@ function updateMood(dt, talking) {
     angry: moodParts() ? Math.max(0, Math.min(0.85, -w * 0.8 - 0.1)) : Math.max(0, Math.min(0.4, -w * 0.4 - 0.1)),
     surprised: mind.stage === 'waking' ? 0.35 : 0,
   };
+  for (const k in target) target[k] = Math.max(target[k], over(k));
+  applyMood(target, dt);
+}
+function applyMood(target, dt) {
   for (const k in target) {
     moodNow[k] = damp(moodNow[k], target[k], 2.5, dt);
     // a quiet smile while she isn't talking: VRoid's "happy" opens the mouth
@@ -730,7 +771,7 @@ function moodParts() {
 // luna.json, "vrm": {"blush": {"left": [u, v], "right": [u, v], "size": 0.075,
 //                               "color": "#ff5f86", "strength": 0.65}}
 // (u, v from the top-left of the face texture; the default is VRoid's.)
-const blush = { now: 0, gesture: 0, fluster: 0, layer: null, tried: false, test: null };
+const blush = { now: 0, gesture: 0, fluster: 0, mood: 0, layer: null, tried: false, test: null };
 function blushLayer() {
   if (blush.tried) return blush.layer;
   blush.tried = true;
@@ -773,7 +814,7 @@ function blushLayer() {
 function updateBlush(dt) {
   blush.fluster = Math.max(0, blush.fluster - dt / 7);                 // flustered fades over ~7 s
   const warm = Math.max(0, (mind.warmth - 0.6) * 0.9);
-  const target = blush.test ?? Math.min(1, Math.max(blush.gesture, blush.fluster, warm));
+  const target = blush.test ?? Math.min(1, Math.max(blush.gesture, blush.fluster, blush.mood, warm));
   blush.now = damp(blush.now, target, target > blush.now ? 2.5 : 0.8, dt);   // rises quicker than it fades
   if (has.has('blush')) { vrm.expressionManager.setValue('blush', blush.now); return; }
   const l = blushLayer();

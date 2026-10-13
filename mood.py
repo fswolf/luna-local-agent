@@ -18,9 +18,8 @@ turn up at 4am.
 
 ## Where it comes from
 
-Nothing is sentiment-scored and nothing costs a model call. The inputs
-are the *shape* of the session, which is free and turns out to be the
-more honest signal anyway:
+Almost all of it is the *shape* of the session, which is free and
+turns out to be the more honest signal anyway:
 
     time of day        the baseline - 6am is not 9pm
     hours at it        a long session wears her down
@@ -29,6 +28,10 @@ more honest signal anyway:
     a clean run        things going smoothly lifts her
     barge-in           being talked over, repeatedly, is wearing
     tempo              fast short turns read as engaged
+
+plus one small model call after your turn that reads the exchange: how
+warm you were, whether it livened her up or wore on her, and a quick
+feeling (laughing, embarrassed...) that shows on her face for a moment.
 
 ## Three things learned the hard way
 
@@ -45,6 +48,19 @@ to be clearly wrong before it changes.
 **The wording varies.** The same sentence every turn is one a model
 either stops seeing or starts performing. Each state has a few
 phrasings and rotates when the state changes.
+
+## What's data and what's code
+
+The names, the lines she's told, her face, her voice and the idle moves
+for each mood live in agent/moods.json, along with the quick feelings
+the model can pick after a turn. Edit it and the next turn picks it up.
+What stays in code is the engine and the rules below: those aren't a
+matter of taste.
+
+Two settings shape all of it: mood.intensity (0 = almost flat, the
+ship's-computer end; 1 = as designed; 2 = wears her heart on her
+sleeve) and mood.recovery (how fast she settles). mood.prompt,
+mood.voice, mood.face and mood.gestures say where it shows.
 
 ## What it never does
 
@@ -66,6 +82,7 @@ import logbook
 from config import BASE_DIR
 
 STATE_FILE = os.path.join(BASE_DIR, "agent", "mood.json")
+MOODS_FILE = os.path.join(BASE_DIR, "agent", "moods.json")
 
 _lock = threading.Lock()
 _energy = 0.0
@@ -82,6 +99,88 @@ _clean_run = 0     # turns since the last thing went wrong
 
 def _clamp(value):
     return max(-1.0, min(1.0, value))
+
+
+def _intensity():
+    """mood.intensity: 0 flat .. 1 as designed .. 2 very visible."""
+    try:
+        return max(0.0, min(2.0, float(getattr(config, "MOOD_INTENSITY", 1.0))))
+    except (TypeError, ValueError):
+        return 1.0
+
+
+# ---------------------------------------------------------------------------
+# The moods file
+# ---------------------------------------------------------------------------
+# Used when agent/moods.json is missing or broken, so a typo in the file
+# costs you your edits, never a working assistant. The shipped file is
+# the real list; this is the smallest thing that still makes sense.
+_FALLBACK = {
+    "energy": {"edges": [-0.20, 0.35], "words": ["tired", "even", "wired"]},
+    "warmth": {"edges": [-0.20, 0.35, 0.66], "words": ["cool", "neutral", "warm", "very warm"]},
+    "grid": [["sad", "annoyed", "mad"], ["tired", "calm", "focused"],
+             ["sleepy", "happy", "excited"], ["cuddly", "loving", "flirty"]],
+    "states": {},
+    "feelings": {},
+}
+_moods = {"data": None, "mtime": None, "error": ""}
+
+
+def _check(data):
+    """The file's shape, or a ValueError saying what's wrong with it."""
+    energy, warmth = data.get("energy") or {}, data.get("warmth") or {}
+    e_edges, w_edges = list(energy.get("edges") or []), list(warmth.get("edges") or [])
+    grid = data.get("grid") or []
+
+    if len(grid) != len(w_edges) + 1:
+        raise ValueError(f"grid has {len(grid)} rows but warmth has {len(w_edges)} edges - "
+                         "it needs one more row than edges")
+
+    for row in grid:
+        if len(row) != len(e_edges) + 1:
+            raise ValueError(f"grid row {row} needs {len(e_edges) + 1} moods, one more "
+                             "than energy has edges")
+
+    if e_edges != sorted(e_edges) or w_edges != sorted(w_edges):
+        raise ValueError("edges must go from low to high")
+
+    data["energy"] = dict(energy, edges=e_edges)
+    data["warmth"] = dict(warmth, edges=w_edges)
+    data["states"] = data.get("states") or {}
+    data["feelings"] = data.get("feelings") or {}
+
+    return data
+
+
+def moods():
+    """agent/moods.json, re-read whenever it changes on disk."""
+    try:
+        mtime = os.path.getmtime(MOODS_FILE)
+    except OSError:
+        mtime = None
+
+    if _moods["data"] is not None and mtime == _moods["mtime"]:
+        return _moods["data"]
+
+    _moods["mtime"] = mtime
+
+    try:
+        with open(MOODS_FILE, encoding="utf-8") as handle:
+            _moods["data"] = _check(json.load(handle))
+        _moods["error"] = ""
+    except (OSError, ValueError) as e:
+        if _moods["data"] is None:     # keep the last good copy if there is one
+            _moods["data"] = _FALLBACK
+        _moods["error"] = f"agent/moods.json: {e}"
+        logbook.warn("mood", "%s - %s", _moods["error"],
+                     "keeping the last good version" if _moods["data"] is not _FALLBACK
+                     else "using the built-in names")
+
+    return _moods["data"]
+
+
+def _state(name):
+    return (moods().get("states") or {}).get(name) or {}
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +211,11 @@ def _energy_baseline(now=None):
 
 
 def _warmth_baseline():
-    return float(getattr(config, "MOOD_WARMTH", 0.45))
+    """mood.warmth, pulled toward plain neutral as intensity drops: at 0
+    she rests calm, not happy - the flat end has no fondness to show."""
+    home = float(getattr(config, "MOOD_WARMTH", 0.45))
+
+    return 0.1 + (home - 0.1) * min(1.0, _intensity())
 
 
 # ---------------------------------------------------------------------------
@@ -124,9 +227,11 @@ def _nudge(energy=0.0, warmth=0.0, why=""):
     if not config.MOOD_ENABLED:
         return
 
+    k = _intensity()
+
     with _lock:
-        _energy = _clamp(_energy + energy)
-        _warmth = _clamp(_warmth + warmth)
+        _energy = _clamp(_energy + energy * k)
+        _warmth = _clamp(_warmth + warmth * k)
 
         if why:
             _recent.append((why, time.time()))
@@ -167,7 +272,8 @@ def note_turn():
         # at five in the morning.
         lift = max(0.0, _warmth - _warmth_baseline()) * 0.5
 
-        target = _clamp(_energy_baseline() - drag + lift)
+        k = _intensity()
+        target = _clamp((_energy_baseline() - drag + lift) * min(1.0, k))
         _energy += (target - _energy) * pull
 
         # Warmth drifts home asymmetrically. Coming back UP from a cold
@@ -182,14 +288,14 @@ def note_turn():
         # A long stretch where nothing broke is its own small signal.
         # Only counted in runs of ten so it can't outpace the drift.
         if _clean_run and _clean_run % 10 == 0:
-            _warmth = _clamp(_warmth + 0.05)
-            _energy = _clamp(_energy + 0.03)
+            _warmth = _clamp(_warmth + 0.05 * k)
+            _energy = _clamp(_energy + 0.03 * k)
             _recent.append(("it's been going smoothly", time.time()))
 
         if gap is not None:
             energy_delta, warmth_delta, why = _returning(gap)
-            _energy = _clamp(_energy + energy_delta)
-            _warmth = _clamp(_warmth + warmth_delta)
+            _energy = _clamp(_energy + energy_delta * k)
+            _warmth = _clamp(_warmth + warmth_delta * k)
 
             if why:
                 _recent.append((why, time.time()))
@@ -418,60 +524,93 @@ def note_bargein():
 # more than one turn of drift, or the signal is decorative.
 _RATING = {1: 0.08, 2: 0.18, 3: 0.30}
 
-_AFFECTION_PROMPT = (
-    "Rate how warm or affectionate this message is toward the assistant "
-    "it was sent to. Reply with a single digit and nothing else.\n"
-    "0 - neutral, businesslike, blunt, or praise of the work rather "
-    "than of the assistant\n"
-    "1 - polite warmth: thanks, please, a friendly greeting\n"
-    "2 - clear affection or praise aimed at the assistant herself\n"
-    "3 - strong affection\n"
-    "Swearing is not unfriendly by itself. When unsure, answer 0.\n\n"
-    "Message: {text}"
+# The one model call moods make. It used to rate only how warm your
+# message was; it now reads the whole exchange - your message and her
+# answer - and returns four small things on one line, which a 9B model
+# manages reliably where a free-form "how does she feel?" would not:
+#
+#   warmth of YOUR message, 0-3      the old rating, same rules
+#   energy  - = +                    did the exchange liven her up or wear her down
+#   warmth  - = +                    "-" only for real hostility: bluntness is not it
+#   a feeling from moods.json        shown on her face for a few seconds
+#
+# Still one call, still off the turn's path, still off with
+# mood.affection false.
+_APPRAISE_PROMPT = (
+    "Read this moment from a conversation between a user and his assistant, {name}.\n\n"
+    "User: {said}\n{name}: {answer}\n\n"
+    "Answer with one line of four fields separated by spaces, nothing else:\n"
+    "1. how warm or affectionate the USER's message is toward her: 0 neutral, businesslike "
+    "or blunt (swearing is not unfriendly by itself), 1 polite warmth (thanks, a friendly "
+    "greeting), 2 clear affection or praise of her, 3 strong affection\n"
+    "2. how the exchange leaves her energy: - (draining), = (no change), + (lively, fun)\n"
+    "3. how it leaves her warmth toward him: - (only if he was clearly hostile or hurtful "
+    "to her), =, +\n"
+    "4. the one feeling she shows right now, from: none {feelings}\n"
+    "When unsure: 0 = = none\n"
+    "Example: 2 + + laughing"
 )
 
 _affection_recent = 0.0
 _last_rating = None    # what the last message scored, for /mood
+_last_feeling = None   # the last quick feeling, for /mood
 
 
-def _rate_affection(text, model):
-    """Ask the model for a 0-3, defensively. 0 on anything unexpected."""
+def _appraise(said, answer, model):
+    """(rating 0-3, energy -1/0/1, warmth -1/0/1, feeling or None).
+    (0, 0, 0, None) on anything unexpected - a mood is never worth an error."""
     import requests
 
     from config import LM_URL, LLM_HEADERS
 
+    feelings = list((moods().get("feelings") or {}).keys())
+
     try:
         import lmstudio
 
+        name = getattr(config, "AGENT_NAME", "the assistant")
+        prompt = _APPRAISE_PROMPT.format(name=name, said=str(said)[:600],
+                                         answer=str(answer or "(no answer)")[:600],
+                                         feelings=" ".join(feelings))
         response = requests.post(LM_URL, headers=LLM_HEADERS, json=lmstudio.chore({
             "model": model,
-            "messages": [{"role": "user",
-                          "content": _AFFECTION_PROMPT.format(text=text[:600])}],
+            "messages": [{"role": "user", "content": prompt}],
             "temperature": 0,
         }, max_tokens=200), timeout=30)
         reply = response.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        logbook.info("mood", "couldn't rate warmth: %s", e)
+        logbook.info("mood", "couldn't read the exchange: %s", e)
 
-        return 0
+        return 0, 0, 0, None
 
+    return _parse_appraisal(reply, feelings)
+
+
+def _parse_appraisal(reply, feelings):
     # A reasoning model thinks out loud first; the answer is the last
-    # digit it settles on, not the first one it mentions.
-    reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL)
+    # line that has the right shape, not the first thing it mentions.
+    reply = re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL)
+    signs = {"-": -1, "=": 0, "+": 1}
+    shape = re.compile(r"\b([0-3])\s+([-=+])\s+([-=+])\s+([A-Za-z_]+)")
+    found = shape.findall(reply)
+
+    if found:
+        rating, energy, warmth, feeling = found[-1]
+        feeling = feeling.lower()
+
+        return (int(rating), signs[energy], signs[warmth],
+                feeling if feeling in feelings else None)
+
+    # A model that only managed the digit still gets its warmth counted.
     digits = re.findall(r"\b([0-3])\b", reply)
 
-    return int(digits[-1]) if digits else 0
+    return (int(digits[-1]) if digits else 0), 0, 0, None
 
 
-def _apply_affection(text, model):
-    rating = _rate_affection(text, model)
+def _apply_exchange(said, answer, model):
+    global _affection_recent, _last_rating, _last_feeling
 
-    if rating < 1:
-        return
-
-    global _affection_recent
-
-    global _last_rating
+    rating, energy, warmth, feeling = _appraise(said, answer, model)
 
     with _lock:
         # Repeats fade: the fifth kind word in a row shouldn't land like
@@ -484,14 +623,58 @@ def _apply_affection(text, model):
         # were consistently warm registered less than a single stray
         # "thanks". It tapers now, it doesn't collapse.
         scaled = _RATING.get(rating, 0.0) / (1.0 + _affection_recent * 0.4)
-        _affection_recent += 1.0
+
+        if rating >= 1:
+            _affection_recent += 1.0
+
         _last_rating = rating
+        _last_feeling = feeling
 
-    _nudge(energy=scaled * 0.45, warmth=scaled, why=f"you were warm with her ({rating})")
+    if scaled:
+        _nudge(energy=scaled * 0.45, warmth=scaled, why=f"you were warm with her ({rating})")
+
+    # The exchange itself: small, and a cold one smaller than a warm one
+    # - she bounces back from a rough moment on her own anyway.
+    if energy or warmth:
+        _nudge(energy=0.06 * energy, warmth=0.05 * warmth if warmth > 0 else 0.08 * warmth,
+               why="that " + ("livened her up" if energy > 0 else "wore on her" if energy < 0
+                              else "warmed her" if warmth > 0 else "stung a bit"))
+
+    if feeling:
+        _feel(feeling)
 
 
-def note_affection(text, model=None):
-    """Notice whether that was a kind thing to say. Fire and forget.
+def _feel(feeling):
+    """A quick feeling: on her face for a few seconds, a gesture if it has
+    one, and a small push on the slow dials."""
+    spec = (moods().get("feelings") or {}).get(feeling) or {}
+    nudge = list(spec.get("nudge") or [0, 0]) + [0, 0]
+
+    if nudge[0] or nudge[1]:
+        _nudge(float(nudge[0]), float(nudge[1]))
+
+    if not config.MOOD_ENABLED:
+        return
+
+    k = min(1.0, _intensity())
+
+    if k <= 0:
+        return
+
+    try:
+        import livefeed
+
+        face = {f: round(float(v) * k, 3) for f, v in (spec.get("face") or {}).items()} \
+            if getattr(config, "MOOD_FACE", True) else {}
+        gesture = spec.get("gesture") if getattr(config, "MOOD_GESTURES", True) else None
+        livefeed.emit("feeling", name=feeling, face=face, gesture=gesture or "",
+                      seconds=float(spec.get("seconds", 6)))
+    except Exception:
+        pass
+
+
+def note_exchange(said, answer, model=None):
+    """Notice what that exchange did to her. Fire and forget.
 
     On a worker because it is a model call and a mood must never be
     something a turn waits for.
@@ -504,11 +687,21 @@ def note_affection(text, model=None):
     if not (config.MOOD_ENABLED and config.MOOD_AFFECTION and model):
         return
 
-    if not str(text or "").strip():
+    if not str(said or "").strip():
         return
 
-    threading.Thread(target=_apply_affection, args=(text, model),
+    threading.Thread(target=_apply_exchange, args=(said, answer, model),
                      daemon=True).start()
+
+
+def note_affection(text, model=None):
+    """Older name: just your message, no answer to read."""
+    note_exchange(text, "", model)
+
+
+def last_feeling():
+    with _lock:
+        return _last_feeling
 
 
 # Older name, still called by anything that knows an explicit thank-you.
@@ -522,18 +715,6 @@ def note_thanks():
 # Hysteresis: a value has to clear the boundary by this much to change
 # the band it's in. Without it the resting warmth sat a whisker above an
 # edge and the header flickered between two labels every single turn.
-_ENERGY_EDGES = (-0.20, 0.35)
-
-# Warmth gets a fourth band. With three, half an hour of being nice to
-# her ran the dial up past 0.9 and the header never moved off the cell
-# it reached on turn two - the top band started at 0.35 and there was
-# nothing above it. The extra edge is what makes praise legible.
-#
-# The top edge sits at 0.66, not higher: warmth rests at 0.45 and
-# clamps at 1.0, so an edge at 0.78 left the top band only 0.22 wide
-# and a clear compliment landed just short of it every time.
-_WARMTH_EDGES = (-0.20, 0.35, 0.66)
-
 _STICK = 0.07
 
 
@@ -555,65 +736,20 @@ def _band(value, edges, current=None):
     return len(edges)
 
 
-# [warmth band][energy band] - low/okay/good/close by tired/even/up.
-# Plain words: these show on the Status row, and anyone should know at
-# a glance what "sleepy" or "mad" means. Several phrasings each: the
-# same sentence every turn is one the model stops reading, or starts
-# acting out.
-_GRID = [
-    [("sad", ["sad and worn out",
-              "low, and short on patience"]),
-     ("annoyed", ["annoyed and not in the mood for much",
-                  "a bit fed up"]),
-     ("mad", ["mad and wound up",
-              "cross, with no patience to spare"])],
-
-    [("tired", ["tired, but here",
-                "tired enough that everything takes a beat longer"]),
-     ("calm", ["calm, nothing much either way",
-               "fine, unhurried"]),
-     ("focused", ["focused and interested",
-                  "alert, and enjoying having something to chew on"])],
-
-    [("sleepy", ["sleepy and glad of the company",
-                 "sleepy and happy to just be here with him"]),
-     ("happy", ["happy, easy company",
-                "happy and relaxed with him"]),
-     ("excited", ["excited and enjoying this",
-                  "wide awake, happy and talking a little fast"])],
-
-    [("cuddly", ["sleepy and cuddly, not wanting to be anywhere else",
-                 "half asleep and very attached to him"]),
-     ("loving", ["openly fond of him, and not hiding it",
-                 "loving, and soft on him"]),
-     ("flirty", ["flirty and playful with him",
-                 "in a teasing, flirty mood, pleased with him"])],
-]
-
-
 def _cell():
     """(label, phrasings) for where the dials are, sticky about changing."""
     global _label, _phrasing
 
-    current = None
+    data = moods()
+    grid = data["grid"]
+    current_row = next((i for i, row in enumerate(grid) if _label in row), None)
 
-    for row in _GRID:
-        for name, _phrases in row:
-            if name == _label:
-                current = (row, name)
-
-    warmth_band = _band(
-        _warmth,
-        _WARMTH_EDGES,
-        _GRID.index(current[0]) if current else None,
-    )
-    energy_band = _band(
-        _energy,
-        _ENERGY_EDGES,
-        [n for n, _p in _GRID[warmth_band]].index(_label)
-        if current and _label in [n for n, _p in _GRID[warmth_band]] else None,
-    )
-    name, phrases = _GRID[warmth_band][energy_band]
+    warmth_band = _band(_warmth, data["warmth"]["edges"], current_row)
+    row = grid[warmth_band]
+    energy_band = _band(_energy, data["energy"]["edges"],
+                        row.index(_label) if _label in row else None)
+    name = row[energy_band]
+    phrases = list(_state(name).get("lines") or []) or [name]
 
     if name != _label:
         # Rotate on arrival, so a mood she returns to doesn't sound the
@@ -627,7 +763,7 @@ def _cell():
 
 
 def label():
-    """One word for the header: 'bright', 'terse'."""
+    """One word for the header: 'happy', 'mad'."""
     if not config.MOOD_ENABLED:
         return ""
 
@@ -635,7 +771,26 @@ def label():
         return _cell()[0]
 
 
-def line():
+def _public(name):
+    """A mood marked private never colours a stream or Discord turn: the
+    nearest one in the same row that isn't, or the middle of the grid."""
+    if not _state(name).get("private"):
+        return name
+
+    grid = moods()["grid"]
+
+    for row in grid:
+        if name in row:
+            at = row.index(name)
+            for other in sorted(row, key=lambda n: abs(row.index(n) - at)):
+                if not _state(other).get("private"):
+                    return other
+
+    middle = grid[len(grid) // 2]
+    return middle[len(middle) // 2]
+
+
+def line(private=True):
     """The line that goes into the system prompt, or "" when off.
 
     Phrased as a state of affairs rather than an instruction. "You are
@@ -643,11 +798,15 @@ def line():
     "right now you feel tired and glad of the company" colours the
     voice and then gets out of the way.
     """
-    if not config.MOOD_ENABLED:
+    if not (config.MOOD_ENABLED and getattr(config, "MOOD_PROMPT", True)):
         return ""
 
     with _lock:
-        _name, described = _cell()
+        name, described = _cell()
+
+    if not private and _public(name) != name:
+        lines = _state(_public(name)).get("lines") or [_public(name)]
+        described = lines[0]
 
     return (
         f"\nRight now you feel {described}. Let that colour how you "
@@ -670,12 +829,40 @@ def voice_tint():
 
     with _lock:
         energy = _energy
+        name = _cell()[0]
 
-    return 1.0 + 0.07 * energy, 0.45 * energy
+    # The mood's own tint from moods.json if it has one, else a little
+    # slower when tired and quicker when wired, straight off the dial.
+    voice = _state(name).get("voice") or {}
+    speed = float(voice.get("speed", 1.0 + 0.07 * energy)) - 1.0
+    pitch = float(voice.get("pitch", 0.45 * energy))
+    k = _intensity()
+
+    return 1.0 + max(-0.07, min(0.07, speed * k)), max(-0.45, min(0.45, pitch * k))
 
 
-_ENERGY_WORDS = ("flat", "level", "wired")
-_WARMTH_WORDS = ("prickly", "steady", "fond", "soft")
+def face():
+    """What the portrait shows for the current mood, scaled by intensity."""
+    if not (config.MOOD_ENABLED and getattr(config, "MOOD_FACE", True)):
+        return {}
+
+    with _lock:
+        name = _cell()[0]
+
+    k = min(1.0, _intensity())
+
+    return {f: round(float(v) * k, 3) for f, v in (_state(name).get("face") or {}).items()}
+
+
+def idle():
+    """Gestures she drifts into now and then in this mood."""
+    if not (config.MOOD_ENABLED and getattr(config, "MOOD_GESTURES", True)) or _intensity() <= 0:
+        return []
+
+    with _lock:
+        name = _cell()[0]
+
+    return [str(g) for g in (_state(name).get("idle") or [])]
 
 
 def state():
@@ -706,11 +893,15 @@ def bands():
     you whether being nice to her is landing. Knowing it reads as 'fond,
     one band short of the top' does.
     """
+    data = moods()
+
+    def word(dial, value):
+        words = list(data[dial].get("words") or [])
+        band = _band(value, data[dial]["edges"])
+        return words[band] if band < len(words) else f"band {band + 1}"
+
     with _lock:
-        return (
-            _ENERGY_WORDS[_band(_energy, _ENERGY_EDGES)],
-            _WARMTH_WORDS[_band(_warmth, _WARMTH_EDGES)],
-        )
+        return word("energy", _energy), word("warmth", _warmth)
 
 
 def set_mood(energy=None, warmth=None):
@@ -787,6 +978,17 @@ def _restore():
     return True
 
 
+def portrait_state():
+    """What the live monitor and the portrait get: the mood, the dials,
+    its face and idle moves. With mood.face off she shows nothing - the
+    dials go out as neutral so nothing else reads a mood off them."""
+    name, energy, warmth, _why = state()
+    show = config.MOOD_ENABLED and getattr(config, "MOOD_FACE", True) and _intensity() > 0
+
+    return {"label": name, "energy": energy if show else 0.0,
+            "warmth": warmth if show else 0.0, "face": face() if show else {}, "idle": idle()}
+
+
 def _announce():
     try:
         import ui
@@ -794,6 +996,13 @@ def _announce():
         ui.set_mood(label())
     except Exception:
         pass  # headless, or the UI isn't up yet
+
+    try:
+        import livefeed
+
+        livefeed.emit("mood", **portrait_state())
+    except Exception:
+        pass
 
 
 def _watch_machine(interval=120):

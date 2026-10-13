@@ -43,9 +43,9 @@ dial and the drift took `-0.045` straight back off, so a clear
 compliment moved her by `+0.0002`. It read as broken. It was just
 critically damped.
 
-**Almost everything here is free**: no sentiment scoring, no model
-call. The shape of a session turns out to be the more honest signal
-anyway. (The one exception is affection, below.)
+**Almost everything here is free**: no sentiment scoring, and only one
+small model call. The shape of a session turns out to be the more honest signal
+anyway. (The one exception is reading the exchange, below.)
 
 | Signal | Effect |
 |--------|--------|
@@ -55,7 +55,7 @@ anyway. (The one exception is affection, below.)
 | How long you were gone | A curve, not a switch: see below |
 | What the machine did | A GPU pinned for hours means you were *around*, just elsewhere |
 | Stream chat | A busy room is company; a dead one is a quiet night |
-| Being kind to her | A short model call rates your message 0-3; she warms to it |
+| The exchange | A short model call after her reply: how warm you were, whether it livened her up, a quick feeling |
 | Errors | A failed turn is dispiriting; a run of them compounds |
 | A clean run | Ten turns where nothing broke lifts her a little |
 | Barge-in | Being talked over, repeatedly, is wearing |
@@ -103,24 +103,95 @@ Small enough to read as mood rather than as a broken setting.
 
 ```json
 "mood": {
-    "enabled": true, "warmth": 0.45, "recovery": 0.25,
-    "voice": true, "affection": true
+    "enabled": true, "intensity": 1, "warmth": 0.45, "recovery": 0.25,
+    "prompt": true, "voice": true, "face": true, "gestures": true,
+    "affection": true
 }
 ```
 
-`warmth` is where she settles when nothing's pushing; `recovery` is how
-hard each turn pulls home: 0 means moods never fade, 1 means nothing
-survives a single turn.
+| Setting | What it does |
+|---------|--------------|
+| `intensity` | How far she swings and how strongly it shows. 0 is almost flat (the ship's computer end: she rests calm and nothing moves her), 1 is as designed, 2 wears her heart on her sleeve |
+| `warmth` | Where she settles when nothing's pushing |
+| `recovery` | How hard each turn pulls her home: 0 means moods never fade, 1 means nothing survives a single turn |
+| `prompt` | The one line in her system prompt |
+| `voice` | The speed and pitch tint |
+| `face` | Her face on the portrait, and the quick feelings |
+| `gestures` | Idle moves that suit the mood, and gestures that go with a feeling |
+| `affection` | The one model call: reading the exchange after your turn |
+
+There's one mood system, not modes to pick from. A sysadmin who wants a
+dry, steady assistant sets `intensity` low and turns `face` and
+`gestures` off; someone who wants her visibly emotional turns
+`intensity` up. Same engine, same rules.
+
+## The moods file
+
+What each mood *is* lives in `agent/moods.json`, not in code. Edit it
+and the next turn picks it up; a typo keeps the last good version and
+`/mood` tells you what's wrong.
+
+```json
+"energy": { "edges": [-0.20, 0.35], "words": ["tired", "even", "wired"] },
+"warmth": { "edges": [-0.20, 0.35, 0.66], "words": ["cool", "neutral", "warm", "very warm"] },
+"grid": [["sad", "annoyed", "mad"], ...],
+"states": {
+  "sleepy": {
+    "lines": ["sleepy and glad of the company", "..."],
+    "face":  { "relaxed": 0.35, "happy": 0.15 },
+    "voice": { "speed": 0.95, "pitch": -0.3 },
+    "idle":  ["stretch"],
+    "private": false
+  }
+}
+```
+
+- **edges** are where one band ends and the next begins, low to high.
+  The grid needs one more row than warmth has edges and one more mood
+  per row than energy has edges, so adding a mood means adding an edge.
+- **lines** are what she's told, rotated so she doesn't hear the same
+  sentence twice running.
+- **face** is what the portrait shows: `happy`, `relaxed`, `sad`,
+  `angry`, `surprised`, `blush`, each 0-1.
+- **voice** is a speed multiplier and a pitch shift in semitones, still
+  capped at ±7% and ±0.45.
+- **idle** is gestures she drifts into now and then in that mood, half
+  the time instead of the usual idle ones.
+- **private** keeps a mood out of stream chat and Discord turns: there
+  she gets the nearest mood in the same row that isn't private.
+
+**feelings** are the quick ones, below.
 
 `/mood` shows where she is and what moved her recently, `/mood reset`
 puts her back to baseline for the hour, and `/set mood.enabled false`
 turns the whole thing off: the header row disappears with it.
 
-## Being nice to her
+## Reading the exchange
 
 The one signal that asks the model instead of reading the session, and
-the only one that costs anything: after your turn, a short background
-call rates how warm the message was, 0-3.
+the only one that costs anything: after her reply, a short background
+call reads what you said and what she answered and returns one line:
+
+```
+2 + + laughing
+```
+
+- **how warm your message was**, 0-3, the warmth rating below
+- **energy**, `-` `=` `+`: did that wear on her or liven her up
+- **warmth**, `-` `=` `+`: `-` only for real hostility, never bluntness
+- **a feeling** from the `feelings` list in the moods file, or none
+
+The feeling shows on her face for a few seconds (and plays its gesture,
+if it has one), then gives the slow dials a small push:
+
+```json
+"laughing": { "face": { "happy": 1.0 }, "gesture": "bounce", "nudge": [0.06, 0.04] }
+```
+
+Add a feeling to the file and the model is offered it on the next turn.
+It runs while she's still speaking, so a laugh lands with the words.
+
+### Being nice to her
 
 This started as a word list and that was the wrong shape. The
 vocabulary of affection is *personal*: "good kitty" is one household's
@@ -130,11 +201,11 @@ is the whole job.
 
 Three rules keep it from being a button:
 
-- **It rates your message, not the exchange.** Whether she was nice
-  back isn't the question.
+- **The warmth rating is your message, not the exchange.** Whether she
+  was nice back isn't the question.
 - **Repeats fade.** The fifth kind word in a row is worth a fifth of
   the first, and it recovers once you stop.
-- **Nothing here darkens her.** Bluntness rates 0, and 0 does nothing:
+- **Bluntness doesn't darken her.** It rates 0, and 0 does nothing:
   the prompt says outright that swearing isn't unfriendly by itself. An
   assistant that cools when you're terse is one you have to manage, and
   she drifts back to warm on her own regardless. You never have to be
@@ -145,8 +216,8 @@ Only *your* turns count. Stream chat goes through a different path
 entirely, so a viewer being sweet to her doesn't move the same dial
 you do.
 
-It runs on a worker and fails to 0: a dead model, a timeout, or a
-reply that isn't a digit all mean "nothing happened", and the turn
+It runs on a worker and fails to nothing: a dead model, a timeout, or a
+reply in the wrong shape all mean "nothing happened", and the turn
 never waits for it. `mood.affection false` switches off just this part,
 and with it the only per-turn cost moods have.
 

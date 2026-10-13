@@ -239,7 +239,7 @@ time_until instead.
 
 Personality:
 {PERSONALITY}
-{mood.line()}
+{mood.line(private)}
 Tone:
 {TONE}
 
@@ -2091,8 +2091,7 @@ def ask(text, model, on_text=None, on_sentence=None,
     livefeed.emit("context", used=lmstudio.estimate_tokens(payload), window=_window())
 
     try:
-        label, energy, warmth, _why = mood.state()
-        livefeed.emit("mood", label=label, energy=energy, warmth=warmth)
+        livefeed.emit("mood", **mood.portrait_state())
     except Exception:
         pass
 

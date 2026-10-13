@@ -972,11 +972,19 @@ def handle_input(text):
 
         if config.MOOD_AFFECTION:
             rating = mood.last_rating()
+            feeling = mood.last_feeling()
             lines.append(
-                "Warmth sensing: last message rated "
+                "Reading the exchange: last message rated "
                 + (f"{rating}/3" if rating is not None
                    else "nothing yet this session")
+                + (f", she felt {feeling}" if feeling else "")
             )
+
+        if config.MOOD_INTENSITY != 1.0:
+            lines.append(f"Intensity {config.MOOD_INTENSITY:g} (0 flat, 1 normal, 2 very visible)")
+
+        if getattr(mood, "_moods", {}).get("error"):
+            lines.append("Moods file problem: " + mood._moods["error"])
 
         lines.append(
             "Drifts back on its own - /mood reset to force it, "

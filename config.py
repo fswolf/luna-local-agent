@@ -509,10 +509,11 @@ CAMERA_DEVICE = int(_camera_cfg.get("device", 0))
 CAMERA_WIDTH = int(_camera_cfg.get("width", 1280))
 CAMERA_WARMUP = int(_camera_cfg.get("warmup", 5))
 
-# How she happens to be feeling - see mood.py. Colours tone only, from
-# free signals (clock, session length, errors, barge-ins), never a
-# model call.
-#   "mood": { "enabled": true, "warmth": 0.4, "recovery": 0.25 }
+# How she happens to be feeling - see mood.py. Colours tone only, mostly
+# from free signals (clock, session length, errors, barge-ins), plus one
+# small model call after your turn (mood.affection). The names, lines,
+# faces and voices of the moods themselves are in agent/moods.json.
+#   "mood": { "enabled": true, "intensity": 1, "warmth": 0.45, "recovery": 0.25 }
 _mood_cfg = setting("mood", {})
 MOOD_ENABLED = bool(_mood_cfg.get("enabled", True))
 # Where warmth settles when nothing is pushing it - the resting state
@@ -530,6 +531,13 @@ MOOD_VOICE = bool(_mood_cfg.get("voice", True))
 # costs a model call - a small one, on a worker, after the turn - so
 # it's the one worth being able to switch off.
 MOOD_AFFECTION = bool(_mood_cfg.get("affection", True))
+# How far her moods swing and how strongly they show: 0 = almost flat
+# (the ship's computer end), 1 = as designed, 2 = very visibly emotional.
+MOOD_INTENSITY = max(0.0, min(2.0, float(_mood_cfg.get("intensity", 1.0))))
+# Where the mood shows. voice (above) is one; these are the others.
+MOOD_PROMPT = bool(_mood_cfg.get("prompt", True))      # the line in her system prompt
+MOOD_FACE = bool(_mood_cfg.get("face", True))          # the portrait's face and quick feelings
+MOOD_GESTURES = bool(_mood_cfg.get("gestures", True))  # idle moves and feeling gestures
 
 _files_cfg = setting("files", {})
 FILES_ENABLED = bool(_files_cfg.get("enabled", True))
@@ -914,6 +922,10 @@ SETTINGS = {
     "mood.recovery":              ("MOOD_RECOVERY",                True),
     "mood.voice":                 ("MOOD_VOICE",                   True),
     "mood.affection":             ("MOOD_AFFECTION",               True),
+    "mood.intensity":             ("MOOD_INTENSITY",               True),
+    "mood.prompt":                ("MOOD_PROMPT",                  True),
+    "mood.face":                  ("MOOD_FACE",                    True),
+    "mood.gestures":              ("MOOD_GESTURES",                True),
 
     "files.enabled":              ("FILES_ENABLED",                True),
     "files.read":                 ("FILES_READ",                   True),

@@ -1,0 +1,62 @@
+{
+  "_about": "Her moods: names, what she's told, her face, her voice and what she does while idle. Edit freely; Luna picks changes up on the next turn. docs/moods.md explains every field.",
+
+  "energy": { "edges": [-0.20, 0.35], "words": ["tired", "even", "wired"] },
+  "warmth": { "edges": [-0.20, 0.35, 0.66], "words": ["cool", "neutral", "warm", "very warm"] },
+
+  "grid": [
+    ["sad",    "annoyed", "mad"],
+    ["tired",  "calm",    "focused"],
+    ["sleepy", "happy",   "excited"],
+    ["cuddly", "loving",  "flirty"]
+  ],
+
+  "states": {
+    "sad":     { "lines": ["sad and worn out", "low, and short on patience"],
+                 "face": { "sad": 0.7, "angry": 0.1 }, "voice": { "speed": 0.95, "pitch": -0.35 } },
+    "annoyed": { "lines": ["annoyed and not in the mood for much", "a bit fed up"],
+                 "face": { "angry": 0.35, "sad": 0.1 } },
+    "mad":     { "lines": ["mad and wound up", "cross, with no patience to spare"],
+                 "face": { "angry": 0.85 }, "voice": { "speed": 1.04, "pitch": 0.2 } },
+
+    "tired":   { "lines": ["tired, but here", "tired enough that everything takes a beat longer"],
+                 "face": { "sad": 0.3, "relaxed": 0.15 }, "voice": { "speed": 0.95, "pitch": -0.3 },
+                 "idle": ["stretch"] },
+    "calm":    { "lines": ["calm, nothing much either way", "fine, unhurried"],
+                 "face": { "happy": 0.06 } },
+    "focused": { "lines": ["focused and interested", "alert, and enjoying having something to chew on"],
+                 "face": { "happy": 0.12 }, "voice": { "speed": 1.03, "pitch": 0.2 },
+                 "idle": ["look_hand"] },
+
+    "sleepy":  { "lines": ["sleepy and glad of the company", "sleepy and happy to just be here with him"],
+                 "face": { "relaxed": 0.35, "happy": 0.15 }, "voice": { "speed": 0.95, "pitch": -0.3 },
+                 "idle": ["stretch"] },
+    "happy":   { "lines": ["happy, easy company", "happy and relaxed with him"],
+                 "face": { "happy": 0.3, "relaxed": 0.1 } },
+    "excited": { "lines": ["excited and enjoying this", "wide awake, happy and talking a little fast"],
+                 "face": { "happy": 0.45 }, "voice": { "speed": 1.05, "pitch": 0.35 },
+                 "idle": ["bounce", "dance"] },
+
+    "cuddly":  { "lines": ["sleepy and cuddly, not wanting to be anywhere else", "half asleep and very attached to him"],
+                 "face": { "relaxed": 0.4, "happy": 0.3, "blush": 0.2 }, "voice": { "speed": 0.96, "pitch": -0.25 },
+                 "idle": ["shy", "stretch"] },
+    "loving":  { "lines": ["openly fond of him, and not hiding it", "loving, and soft on him"],
+                 "face": { "happy": 0.4, "relaxed": 0.2, "blush": 0.25 },
+                 "idle": ["shy"] },
+    "flirty":  { "lines": ["flirty and playful with him", "in a teasing, flirty mood, pleased with him"],
+                 "face": { "happy": 0.45, "blush": 0.35 }, "voice": { "speed": 1.03, "pitch": 0.25 },
+                 "idle": ["wink"] }
+  },
+
+  "feelings": {
+    "happy":       { "face": { "happy": 0.7 }, "nudge": [0.03, 0.03] },
+    "laughing":    { "face": { "happy": 1.0 }, "gesture": "bounce", "nudge": [0.06, 0.04] },
+    "surprised":   { "face": { "surprised": 0.7 }, "nudge": [0.05, 0] },
+    "embarrassed": { "face": { "happy": 0.3, "blush": 1.0 }, "gesture": "shy", "nudge": [0, 0.03] },
+    "touched":     { "face": { "happy": 0.5, "relaxed": 0.4, "blush": 0.5 }, "nudge": [0, 0.06] },
+    "playful":     { "face": { "happy": 0.6 }, "gesture": "wink", "nudge": [0.04, 0.03] },
+    "curious":     { "face": { "surprised": 0.25, "happy": 0.15 }, "nudge": [0.03, 0] },
+    "sad":         { "face": { "sad": 0.7 }, "nudge": [-0.05, 0] },
+    "annoyed":     { "face": { "angry": 0.5 }, "nudge": [0.02, -0.04] }
+  }
+}
