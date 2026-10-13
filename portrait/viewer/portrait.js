@@ -285,13 +285,14 @@ function fromYou(text) {
 let waveBack = false;
 
 // Chat, answered or not. Viewers can ask with !wave, !hug, !jump,
-// !bounce (or !dance), !shrug, !stretch; plain chat works too: a hug
+// !bounce, !dance, !jog (or !run), !shrug, !stretch; plain chat works too: a hug
 // for her, someone new saying hi, bye, laughing, hype. Rate-limited so
 // a busy chat doesn't keep her flailing.
 const chatSeen = new Set();
 const chatCool = { cmd: 0, auto: 0 };
 const CHAT_CMDS = { wave: 'wave', hug: 'hug', jump: 'jump', bounce: 'bounce',
-                    shrug: 'shrug', stretch: 'stretch', hi: 'wave', hello: 'wave', hop: 'bounce', dance: 'dance' };
+                    shrug: 'shrug', stretch: 'stretch', hi: 'wave', hello: 'wave', hop: 'bounce', dance: 'dance',
+                    jog: 'jog', run: 'jog' };
 function fromChat(ev) {
   const t = String(ev.text || '').toLowerCase().trim(), who = String(ev.who || '').toLowerCase();
   const now = clock.elapsedTime, first = who && !chatSeen.has(who);

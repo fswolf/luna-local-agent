@@ -1694,7 +1694,7 @@ _HELP_SECTIONS = [
     ("Mood", [
         ("/mood", "how she's feeling, both dials, and what moved it"),
         ("/mood reset", "back to baseline for the hour"),
-        "shown on the Status row - 'Idle - drowsy', and it tints her",
+        "shown on the Status row - 'Idle - sleepy', and it tints her",
         "voice a few percent. Survives a restart, faded by how long you",
         "were gone. She drifts with the",
         "clock, how long you've been at it, errors",

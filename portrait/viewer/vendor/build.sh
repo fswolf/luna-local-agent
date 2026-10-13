@@ -3,7 +3,7 @@
 # build step at run time:
 #   luna-three.js  three.js + GLTFLoader + three-vrm + three-vrm-animation (3D / VRM models, .vrma clips)
 #   luna-pixi.js   pixi.js 6 + pixi-live2d-display 0.4     (Live2D models)
-#   portrait/vendor/build.sh            (needs node/npm, once)
+#   portrait/viewer/vendor/build.sh     (needs node/npm, once)
 set -euo pipefail
 VENDOR="$(cd "$(dirname "$0")" && pwd)"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT

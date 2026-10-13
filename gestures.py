@@ -24,11 +24,11 @@ import config
 import logbook
 
 MODES = ("tags", "meaning", "keywords", "off")
-# The built-in gestures are files in portrait/viewer/gestures/ (wave.js,
+# The built-in gestures are files in portrait/gestures/ (wave.js,
 # hug.js...). Each says what it's for ("about"), whether it's private
 # (never from stream chat), and so on; read from there, so a new file is a
 # new gesture with nothing else to edit.
-_GESTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portrait", "viewer", "gestures")
+_GESTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portrait", "gestures")
 _files = {"at": 0.0, "found": {}}
 
 

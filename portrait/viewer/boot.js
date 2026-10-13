@@ -92,7 +92,7 @@ addEventListener('keydown', e => {
 });
 
 if (model.endsWith('.model3.json')) {
-  // Live2D's Cubism Core: a local copy if there is one (portrait/vendor/,
+  // Live2D's Cubism Core: a local copy if there is one (portrait/viewer/vendor/,
   // get it with get_cubism_core.sh for offline use), otherwise Live2D's CDN.
   try {
     await script('vendor/live2dcubismcore.min.js');
@@ -100,7 +100,7 @@ if (model.endsWith('.model3.json')) {
     try {
       await script('https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js');
     } catch (e) {
-      note.textContent = "couldn't load Live2D's Cubism Core - run portrait/vendor/get_cubism_core.sh";
+      note.textContent = "couldn't load Live2D's Cubism Core - run portrait/viewer/vendor/get_cubism_core.sh";
       throw e;
     }
   }

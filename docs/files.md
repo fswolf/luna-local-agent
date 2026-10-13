@@ -38,8 +38,10 @@ her prompt tells her to say so and stop.
 on a file popup and file writes and edits stop asking until you restart
 Luna; `/allow` says whether it's on and `/allow off` ends it early. It
 covers only what you'd have been asked about at the keyboard: her own
-folder, `~/.config` and `~/.local` still ask every time (a write there
-is code that runs later, and a page she reads can steer a write as
+folder, `~/.config`, `~/.local`, `~/bin`, editor startup files
+(`.vimrc`, `.emacs`, `.tmux.conf`), macOS `~/Library/LaunchAgents` and
+the Windows Startup folder still ask every time (a write there is code
+that runs later, and a page she reads can steer a write as
 easily as you can), the deny list still refuses, and Discord turns and
 scheduled jobs keep their own rules. Commands never get an allow-all.
 
@@ -59,12 +61,38 @@ and scheduled jobs keep their own rules.
 
 **What she can't touch, no matter what.** A deny list sits underneath
 the popup, and neither the model nor a reflexive `Y` gets past it:
-anything outside `~`; `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/ai-voice`
-(her own credentials), keyrings and browser profiles; shell startup
-files (`.bashrc`, `.zshrc`, `.profile`...); anything ending in `.key`,
-`.pem`, `.gpg` and the like. That list applies to *reading* too: a
-read puts the file into the prompt, and from there into history and
-the log.
+
+- anything outside `~`
+- keys and logins: `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.azure`,
+  `~/.kube`, `~/.docker`, `~/.config/gh`, `~/.config/gcloud`,
+  `~/.config/git`, `~/.claude`, `~/.codex`, `~/.cargo/credentials.toml`,
+  `~/.vault-token`, and `~/.config/ai-voice` (her own credentials)
+- keyrings, password stores and wallets
+- browser, mail and chat app profiles (their cookies are logins),
+  including the snap and Flatpak copies, `~/Library` on a Mac and
+  `AppData` on Windows
+- shell startup files (`.bashrc`, `.zshrc`, `.zshenv`, `.profile`,
+  `.bash_login`, `.xprofile`...) and `.gitconfig`
+- private keys by name (`id_rsa`, `id_ed25519`...) or ending
+  (`.key`, `.pem`, `.gpg`, `.ppk`, `.keystore`...), shell histories
+- `.env` and `.env.anything`, and any file named for a credential, a
+  token or a secret (`credentials.json`, `api_token.txt`,
+  `client_secret.json`). Whole words only, so `tokenizer.json` beside a
+  model is still readable.
+
+That list applies to *reading* too: a read puts the file into the
+prompt, and from there into history and the log. Names are matched
+without regard to case.
+
+### Outside content
+
+Once a turn has read something someone else wrote (a web page, search
+results, research, an MCP tool's output such as Minecraft chat), file
+reads ask first, even with read set to *allow*. The popup says why.
+Allow-all, write *allow* and Discord's auto-approve step aside for the
+rest of that turn too, and so does auto-approve for commands. A
+scheduled job reading or writing inside its own `job_write_dirs` is
+left alone, since nobody is there to ask. The next turn starts clean.
 
 `edit_file` works by exact match: she reads the file, quotes the
 passage to change, and it has to appear exactly once, the same
@@ -121,9 +149,11 @@ doesn't close it and quitting Luna doesn't either. The popup says
 *runs in the background* when that's what you're approving. If the
 program doesn't exist or dies straight away, she's told the error.
 
-It runs as you, through `bash -c`, with nothing attached to its input,
-so anything that wants to ask (sudo's password, a y/n prompt) fails
-instead of hanging. It's killed, whole process group and all, after
+It runs as you, through `bash -c` (PowerShell on Windows: `pwsh` if
+you have it, else the built-in one, and she's told which so she writes
+the right syntax), with nothing attached to its input, so anything that
+wants to ask (sudo's password, a y/n prompt) fails instead of hanging.
+It's killed, along with everything it started, after
 `shell.timeout` seconds, and its output is capped at the first and last
 parts of `max_output_chars` and handed back marked as untrusted. The
 folder has to be under `~` and pass the file deny list, but **the

@@ -326,3 +326,19 @@ own terminal. See [Vision](vision.md#vision).
 
 The same socket works on Sway, KDE or GNOME; only the bind syntax
 changes.
+
+**Windows.** Python there has no unix sockets, so Luna listens on a
+random localhost port instead, and writes the port and a random key to
+`%LOCALAPPDATA%\ai-voice\control.json`. `ai-voice-ctl.py` reads that
+file, so the commands are the same. A command without the key is
+ignored, which keeps a web page that finds the port from driving her.
+Bind it with [AutoHotkey](https://www.autohotkey.com/) (v2):
+
+```ahk
+#Home::Run 'pythonw ai-voice-ctl.py ptt', 'C:\Users\you\ai-voice'
+```
+
+`pythonw` runs it without a console window flashing up.
+
+**macOS** has unix sockets, so it works as on Linux: point a
+Shortcuts, Hammerspoon or skhd bind at `python3 ai-voice-ctl.py ptt`.

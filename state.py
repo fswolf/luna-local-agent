@@ -42,3 +42,10 @@ job = threading.local()
 # Set only by assistant.respond_remote. files.py lets it write without
 # the popup when the source is listed in files.auto_approve_sources.
 remote = threading.local()
+
+# What this turn has taken in, on this thread. seen names the first
+# outside content (a web page, search results, an MCP tool's output) and
+# read_local is set once she has read one of your files. llm.ask clears
+# both at the start of a turn and tools.call sets seen; tools/files.py
+# and tools/web.py ask before a read or a fetch that would mix the two.
+untrusted = threading.local()

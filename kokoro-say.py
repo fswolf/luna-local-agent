@@ -15,6 +15,10 @@ which is what you actually want when a reply turns out to be long:
     # hyprland.lua
     hl.bind("SUPER + R", hl.dsp.exec_cmd("python3 ~/ai-voice/kokoro-say.py"))
 
+On Windows, bind it with AutoHotkey (or a shortcut's hotkey field):
+
+    #r::Run "pythonw kokoro-say.py", "C:\path\to\ai-voice"
+
 Stdlib only, so it doesn't need the venv.
 """
 import json
@@ -35,23 +39,32 @@ SPEED = float(os.environ.get("KOKORO_SPEED", "1.0"))
 # The server truncates at 1200 characters, so split below that.
 MAX_CHARS = 1000
 
+WINDOWS = os.name == "nt"
+
 PID_FILE = os.path.join(
-    os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "kokoro-say.pid"
+    os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir(), "kokoro-say.pid"
 )
 
-# First one installed wins. All of these read a WAV from stdin.
+# First one installed wins. "-" means it reads the WAV from stdin; the
+# rest get the file's path. Windows needs none of these: it plays
+# through winsound, which comes with Python.
 PLAYERS = (
     ("pw-play", ["pw-play", "-"]),
     ("paplay", ["paplay"]),
     ("aplay", ["aplay", "-q", "-"]),
+    ("afplay", ["afplay"]),                 # macOS, always there
     ("ffplay", ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", "-"]),
 )
 
 
 def clipboard():
     """Selection first, then clipboard - selecting text and hitting the
-    key shouldn't need an explicit copy."""
+    key shouldn't need an explicit copy. (Windows and macOS have no
+    selection buffer, so there it's the clipboard.)"""
     for command in (
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+         "[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-Clipboard -Raw"],
+        ["pbpaste"],
         ["wl-paste", "--primary", "--no-newline"],
         ["wl-paste", "--no-newline"],
         ["xclip", "-o", "-selection", "primary"],
@@ -63,7 +76,8 @@ def clipboard():
 
         try:
             result = subprocess.run(
-                command, capture_output=True, text=True, timeout=5
+                command, capture_output=True, text=True, timeout=5,
+                encoding="utf-8", errors="replace",
             )
         except (OSError, subprocess.SubprocessError):
             continue
@@ -83,9 +97,15 @@ def stop_playing():
         return False
 
     try:
-        os.killpg(os.getpgid(pid), signal.SIGTERM)
-        stopped = True
-    except (ProcessLookupError, PermissionError, OSError):
+        if WINDOWS:
+            # No process groups: end the tree (this run and its player).
+            done = subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)],
+                                  capture_output=True, timeout=10)
+            stopped = done.returncode == 0
+        else:
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+            stopped = True
+    except (ProcessLookupError, PermissionError, OSError, subprocess.SubprocessError):
         stopped = False
 
     try:
@@ -155,6 +175,9 @@ def synthesize(text):
 
 
 def player():
+    if WINDOWS:
+        return ["winsound"]
+
     for name, command in PLAYERS:
         if shutil.which(name):
             return command
@@ -162,7 +185,33 @@ def player():
     return None
 
 
+def play(command, audio):
+    """One chunk, start to finish. The file is closed before anything
+    opens it again - Windows won't let a second open in while it isn't."""
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wav:
+        wav.write(audio)
+
+    try:
+        if command[0] == "winsound":
+            import winsound
+
+            winsound.PlaySound(wav.name, winsound.SND_FILENAME)
+        elif command[-1] != "-":
+            subprocess.run(command + [wav.name], check=False)
+        else:
+            with open(wav.name, "rb") as f:
+                subprocess.run(command, stdin=f, check=False)
+    finally:
+        try:
+            os.unlink(wav.name)
+        except OSError:
+            pass
+
+
 def main():
+    if sys.stderr is None:   # pythonw (a Windows hotkey) has no console
+        sys.stderr = open(os.devnull, "w")
+
     args = [a for a in sys.argv[1:] if a not in ("--stop", "-s")]
     stopping = len(args) != len(sys.argv[1:])
 
@@ -174,7 +223,7 @@ def main():
 
     if args:
         text = " ".join(args)
-    elif not sys.stdin.isatty():
+    elif sys.stdin is not None and not sys.stdin.isatty():
         text = sys.stdin.read()
     else:
         text = clipboard()
@@ -195,8 +244,10 @@ def main():
         )
         return 1
 
-    # Own process group, so stopping kills the player too.
-    os.setpgrp()
+    # Own process group, so stopping kills the player too. (Windows has
+    # none; stop_playing ends the tree there instead.)
+    if hasattr(os, "setpgrp"):
+        os.setpgrp()
 
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
@@ -209,14 +260,7 @@ def main():
                 print(f"Kokoro server unreachable at {URL}: {e}", file=sys.stderr)
                 return 1
 
-            with tempfile.NamedTemporaryFile(suffix=".wav") as wav:
-                wav.write(audio)
-                wav.flush()
-
-                if command[0] == "paplay":
-                    subprocess.run(command + [wav.name], check=False)
-                else:
-                    subprocess.run(command, stdin=open(wav.name, "rb"), check=False)
+            play(command, audio)
     finally:
         try:
             os.unlink(PID_FILE)

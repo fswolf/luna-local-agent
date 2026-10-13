@@ -530,7 +530,7 @@ def backend(state):
 def extras_files(extras):
     if "live2d" in extras:
         step("Live2D runtime")
-        dest = os.path.join(ROOT, "portrait", "vendor", "live2dcubismcore.min.js")
+        dest = os.path.join(ROOT, "portrait", "viewer", "vendor", "live2dcubismcore.min.js")
         if os.path.exists(dest):
             ok("already here")
         else:
@@ -538,7 +538,7 @@ def extras_files(extras):
             got = download(CUBISM_URL, dest)
             note("live2d runtime", got, "" if got else
                  "not fatal: the portrait loads it from Live2D's site instead. "
-                 "To keep a copy: bash portrait/vendor/get_cubism_core.sh")
+                 "To keep a copy: bash portrait/viewer/vendor/get_cubism_core.sh")
     if "embeddings" in extras:
         step("Embedding model")
         dest = os.path.join(ROOT, "llama", "models", os.path.basename(EMBED_URL))
@@ -565,7 +565,8 @@ def launchers(state):
     if WIN:
         cmd = os.path.join(ROOT, "luna.cmd")
         with open(cmd, "w", encoding="utf-8") as f:
-            f.write(f'@echo off\r\ncd /d "{ROOT}"\r\n"{py}" "{launch}" %*\r\n')
+            # pause on a crash, so the window stays open long enough to read why
+            f.write(f'@echo off\r\ncd /d "{ROOT}"\r\n"{py}" "{launch}" %*\r\nif errorlevel 1 pause\r\n')
         ok(f"luna.cmd - double-click it, or run it from a terminal")
         if ask("Add a Start menu shortcut?"):
             menu = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs",

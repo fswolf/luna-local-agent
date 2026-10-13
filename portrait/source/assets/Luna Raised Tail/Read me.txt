@@ -1,0 +1,15 @@
+Luna Raised Tail — first version
+
+Smoky plum / dusty rose texture matching the revised hair.
+Closed smooth mesh, 12 deform bones, gentle 4-second swish demo.
+.blend: editable source with packed texture. Workshop scene contains tail; original startup scene retained.
+.fbx: rigged exchange asset for Unity; assign the included PNG if material texture does not resolve.
+.glb: textured animated preview/runtime asset, not a VRM or VRoid custom item.
+
+Root is at origin; tail extends along Blender +Y and upward +Z. Fit and scale at the avatar's tail attachment before use. No avatar is included.
+
+VRoid Studio route: import FBX into Unity, set up material and accessory using XWear Packager, export XWear, then use VRoid dress-up Add Costume and attach to Hips. This asset has NOT yet been packaged or tested in VRoid. Animation clips are a demo; VRM spring bones or runtime swish must be configured separately for the final avatar.
+https://vroid.pixiv.help/hc/en-us/articles/38728822779289-How-do-I-use-accessories
+https://vroid.pixiv.help/hc/en-us/articles/38903414455449-How-to-install-the-XWear-Packager
+
+Checks: 1922 vertices, 1944 faces, 0 non-manifold edges, 0 unweighted vertices. Visually reviewed in Blender.

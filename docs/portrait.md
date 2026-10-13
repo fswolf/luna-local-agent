@@ -177,7 +177,7 @@ parameters on a slider, named from its display file. That's the way to
 find out what an unlabelled parameter like Sigewinne's `Param27` does.
 
 Live2D's Cubism Core comes from Live2D's CDN. For offline use, run
-`bash portrait/vendor/get_cubism_core.sh` once. It's Live2D's code under
+`bash portrait/viewer/vendor/get_cubism_core.sh` once. It's Live2D's code under
 their licence, so it's downloaded rather than shipped here. Models you
 add are gitignored. They're usually big and always someone else's: the
 Sigewinne model is marked personal use only, so check its Booth page
@@ -225,7 +225,7 @@ well; `&holo=1` or `&holo=0` on the URL only sets how the page starts.
 
 | What you see | What to do |
 |---|---|
-| "couldn't load Live2D's Cubism Core" | Your machine can't reach Live2D's CDN. Run `bash portrait/vendor/get_cubism_core.sh` once. |
+| "couldn't load Live2D's Cubism Core" | Your machine can't reach Live2D's CDN. Run `bash portrait/viewer/vendor/get_cubism_core.sh` once. |
 | She doesn't react | Open `http://127.0.0.1:8792/portrait/?debug=1`. Its buttons fire each reaction by hand, so you can tell the model from the events. |
 | Too much or too little of her shows | Add `"crop": {"top": 0.02, "height": 0.42}` under `portrait.live2d`. A bigger `height` shows more; `crop_face` does the same for `?frame=face`. |
 | Ears don't twitch | The debug panel lists the ear parameters it found. Name them in `portrait.live2d.ear_params` if it found none. |
@@ -261,13 +261,13 @@ and does small things on her own:
 
 The full guide, with how it all works, is its own page: [Gestures](gestures.md).
 
-Each built-in gesture is a file in `portrait/viewer/gestures/`: `wave.js`,
+Each built-in gesture is a file in `portrait/gestures/`: `wave.js`,
 `hug.js`, and so on. A new file there is a new gesture, picked up on the
 next page load with nothing else to edit: it gets a button in the viewer,
 `/portrait <name>` plays it, and an `about` line offers it to her as a tag.
 
 ```js
-// portrait/viewer/gestures/hand_on_heart.js
+// portrait/gestures/hand_on_heart.js
 import { fingers } from './_pose.js';
 
 export default {
@@ -388,7 +388,7 @@ The **chat gestures** row in the tools pane turns them off, or
 `look_hand`, `tuck_hair`) plays one by hand, good for a stream. The
 `?debug=1` page has a button for each.
 
-They're built on the standard VRM skeleton (one file each in `portrait/viewer/gestures/`), so
+They're built on the standard VRM skeleton (one file each in `portrait/gestures/`), so
 they work on any VRM model, including VRoid ones and outfits made from
 the same base. The tail wag looks for spring bones named like `tail`.
 Live2D models keep their own motions.
@@ -397,6 +397,6 @@ If `portrait.model` points at a file that isn't there, the portrait
 falls back to Luna's robot model (or Sigewinne if that's missing too)
 and says which file it couldn't find.
 
-`portrait/vendor/build.sh` rebuilds the two bundled libraries
+`portrait/viewer/vendor/build.sh` rebuilds the two bundled libraries
 (three.js + three-vrm, pixi.js + pixi-live2d-display) if you ever want
 newer ones.

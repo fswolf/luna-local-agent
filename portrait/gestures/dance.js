@@ -6,8 +6,9 @@ const BEAT = 0.5;                         // seconds per beat (120 bpm)
 
 // arm poses (right side; both() mirrors)
 const FISTS = both({ rightUpperArm: [0, 0.8, 1.05], rightLowerArm: [0, 2.0, -0.35], rightHand: [0, 0.2, 0], ...fingers('right', 0.8) });
-const UP_R = { rightUpperArm: [0, 0.2, -1.1], rightLowerArm: [0, 0.3, -0.3], rightHand: [0, 0, 0], ...open('right') };
-const UP_L = { leftUpperArm: [0, -0.2, 1.1], leftLowerArm: [0, -0.3, 0.3], leftHand: [0, 0, 0], ...open('left') };
+// arms up, palms turned in to face each other (forearm and wrist share the turn)
+const UP_R = { rightUpperArm: [0, 0.2, -1.1], rightLowerArm: [0, 0.3, -0.3, -1.65], rightHand: [-1.1, 0, 0], ...open('right') };
+const UP_L = { leftUpperArm: [0, -0.2, 1.1], leftLowerArm: [0, -0.3, 0.3, -1.65], leftHand: [-1.1, 0, 0], ...open('left') };
 const HIP_R = { rightUpperArm: [0, -0.3, 0.75], rightLowerArm: [0, 0.5, 1.3], rightHand: [0, 0.3, 0.6] };
 const HIP_L = { leftUpperArm: [0, 0.3, -0.75], leftLowerArm: [0, -0.5, -1.3], leftHand: [0, -0.3, -0.6] };
 const KNEES = (k) => both({ rightUpperLeg: [-0.18 * k, 0, 0], rightLowerLeg: [0.36 * k, 0, 0], rightFoot: [-0.18 * k, 0, 0] });

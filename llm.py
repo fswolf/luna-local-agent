@@ -2001,6 +2001,10 @@ def ask(text, model, on_text=None, on_sentence=None,
 
     past = [] if context is not None else history.get_messages_full()
     turn["private"] = context is None
+    # A fresh turn starts clean. A stream-chat turn starts marked: its
+    # words are a stranger's from the first token.
+    state.untrusted.seen = "stream chat" if context is not None else None
+    state.untrusted.read_local = False
     turn["lessons"] = []
     turn["skills"] = []
     messages = [{

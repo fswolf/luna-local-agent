@@ -24,11 +24,11 @@ so the palm faces you". The portrait eases smoothly from one key to the
 next and blends the whole thing over whatever she's already doing
 (breathing, looking around, talking), so a gesture never snaps on or off.
 
-Each gesture is one file in `portrait/viewer/gestures/`:
+Each gesture is one file in `portrait/gestures/`:
 
 ```
-portrait/viewer/
-├── gestures.js        the player: loads the files, blends them, plays them
+portrait/
+├── viewer/gestures.js   the player: loads the files, blends them, plays them
 └── gestures/
     ├── _pose.js       shared helpers (rest pose, mirroring, fingers)
     ├── wave.js
@@ -64,7 +64,7 @@ with `_` are helpers or notes and are never loaded as gestures.
 ### When the page loads
 
 1. The portrait asks the server for `gestures/index.json`: a list of every
-   `.js` file in `portrait/viewer/gestures/` except the `_` ones.
+   `.js` file in `portrait/gestures/` except the `_` ones.
 2. It loads each file and reads its settings. `left: true` makes a mirrored
    copy called `<name>_left`, `idle: true` adds it to her idle moves,
    `private: true` keeps it away from stream chat.
@@ -285,6 +285,7 @@ export default {
 | `add` | Poses added on top for the whole gesture, like `{'+head': [0, 0, 0.14]}` |
 | `hips` | (inside a pose) Her position, metres |
 | `sob` | `true`: little shoulder hitches, used by `cry` |
+| `then` | `'pant'`: another gesture that fades in as this one ends, used by `jog` |
 
 ### Settings
 
@@ -351,7 +352,7 @@ rightIndexProximal: [0, 0, 0], rightIndexIntermediate: [0, 0, 0], rightIndexDist
 
 Say you want her to put a hand on her heart.
 
-**1. Start with one bone.** Make `portrait/viewer/gestures/hand_on_heart.js`:
+**1. Start with one bone.** Make `portrait/gestures/hand_on_heart.js`:
 
 ```js
 export default {
@@ -416,7 +417,7 @@ hand_on_heart` works.
 |---|---|---|
 | Made with | A text editor and the viewer | XR Animator (webcam), Blender, or a download |
 | Good for | Poses, holds, small expressive moves | Fluid full-body motion: dances, walks, anything acted out |
-| Lives in | `portrait/viewer/gestures/` | `portrait/animations/` |
+| Lives in | `portrait/gestures/` | `portrait/animations/` |
 | Settings | Inside the file | `portrait/animations/clips.json` |
 
 Both play through the same blend, both can carry `expr` (blush, tears,

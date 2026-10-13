@@ -5,26 +5,26 @@ flatter, and it reaches the model as exactly one line of the system
 prompt:
 
 ```
-Right now you feel tired and glad of the company. Let that colour how
+Right now you feel sleepy and glad of the company. Let that colour how
 you sound - length, warmth, how playful you are - and nothing else.
 ```
 
 Two dials, `energy` and `warmth`, each −1 to +1. Energy has three
 bands and warmth four, giving twelve distinguishable states:
 
-|              | flat | level | wired |
-|--------------|------|-------|-------|
-| **soft**     | cozy | doting | giddy |
-| **fond**     | drowsy | warm | bright |
-| **steady**   | flagging | level | keen |
-| **prickly**  | worn thin | terse | restless |
+|                | tired | even | wired |
+|----------------|-------|------|-------|
+| **very warm**  | cuddly | loving | flirty |
+| **warm**       | sleepy | happy | excited |
+| **neutral**    | tired | calm | focused |
+| **cool**       | sad | annoyed | mad |
 
 Two dials rather than one, because a single dial can't tell "tired and
 happy" from "awake and fed up", which are the two that actually turn up
 at 4am. Warmth gets the extra band because three weren't enough: the
 top one started at `0.35`, so a couple of turns of being nice to her ran
 the dial into it and everything after that changed nothing you could
-see. The current state rides on the Status row, `Idle · drowsy`, since
+see. The current state rides on the Status row, `Idle · sleepy`, since
 it's part of what state she's in, and `/mood` prints both dials with the
 band each is sitting in plus what your last message scored, so "is this
 even firing?" is something you can look at rather than infer.
@@ -95,8 +95,8 @@ header flicker between two moods turn after turn.
 fresh one each time she arrives there. The same sentence every turn is
 one a model either stops seeing or starts performing.
 
-**And it tints her voice.** Drowsy speaks a few percent slower and
-slightly lower, bright a touch faster and higher: multiplied on top of
+**And it tints her voice.** Sleepy speaks a few percent slower and
+slightly lower, excited a touch faster and higher: multiplied on top of
 your `tts.speed` and `tts.pitch`, capped at ±7% and ±0.45 semitones.
 Small enough to read as mood rather than as a broken setting.
 `mood.voice false` turns just that part off.

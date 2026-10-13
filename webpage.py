@@ -39,6 +39,7 @@ import ipaddress
 import math
 import re
 import socket
+import threading
 
 from collections import Counter
 from html import unescape
@@ -183,9 +184,9 @@ def _local_reason(url):
     """Why this address may not be read, or "" if it's on the internet.
 
     Resolved here and checked per address, so a public-looking name
-    that points at 127.0.0.1 is caught too. (A server that changes its
-    answer between this lookup and the connection could still slip
-    through; this is a guard against being steered, not a firewall.)
+    that points at 127.0.0.1 is caught too. A name that changes its
+    answer between this lookup and the connection is caught by
+    _pinned_connect below.
     """
     if getattr(config, "PAGE_ALLOW_LOCAL", False):
         return ""
@@ -211,6 +212,48 @@ def _local_reason(url):
                     "public sites can be read (web_search.allow_local)")
 
     return ""
+
+
+# The check above looks the name up, and then requests looks it up again
+# to connect - a name that answers 8.8.8.8 the first time and 127.0.0.1
+# the second (DNS rebinding) got past it. So while one of her fetches is
+# connecting, urllib3's connect goes through here instead: one lookup,
+# every address checked, and the connection made to exactly the address
+# that was checked. TLS still checks the certificate against the name.
+# Only her fetches, and only on the thread making one - llama-server,
+# the embedding server and everything else connect as they always did.
+_pinning = threading.local()
+
+try:
+    from urllib3.util import connection as _u3conn
+
+    _plain_connect = _u3conn.create_connection
+
+    def _pinned_connect(address, *args, **kwargs):
+        if not getattr(_pinning, "on", False):
+            return _plain_connect(address, *args, **kwargs)
+
+        host, port = address[0], address[1]
+        infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        last = None
+
+        for info in infos:
+            ip = ipaddress.ip_address(str(info[4][0]).split("%")[0])
+
+            if not ip.is_global:
+                raise OSError(f"{host} now points at {ip}, which isn't a public address - refused")
+
+        for info in infos:
+            try:
+                return _plain_connect((info[4][0], port), *args, **kwargs)
+            except OSError as e:
+                last = e
+
+        raise last or OSError(f"couldn't connect to {host}")
+
+    _u3conn.create_connection = _pinned_connect
+except Exception:   # an urllib3 without this hook: the lookup check above still runs
+    _u3conn = None
 
 
 def _charset(kind, raw):
@@ -239,6 +282,11 @@ def _get(url):
         if problem:
             return None, f"refused: {problem}"
 
+        # Through a proxy, the proxy does the lookup and the connection is
+        # to the proxy, so there's nothing here to pin.
+        _pinning.on = (not getattr(config, "PAGE_ALLOW_LOCAL", False)
+                       and not requests.utils.select_proxy(url, requests.utils.get_environ_proxies(url)))
+
         try:
             response = requests.get(
                 url,
@@ -249,6 +297,8 @@ def _get(url):
             )
         except requests.exceptions.RequestException as e:
             return None, f"couldn't reach it ({e})"
+        finally:
+            _pinning.on = False
 
         if not response.is_redirect:
             return response, url

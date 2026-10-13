@@ -36,10 +36,11 @@ ai-voice/
 ├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792 (and /portrait)
 ├── portrait/         # her animated portrait
 │   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
-│   │                 #   look.js (where she looks), hologram.js / hologram3d.js, view.py (./viewer.sh)
+│   │                 #   look.js (where she looks), hologram.js / hologram3d.js, view.py (./viewer.sh),
+│   │                 #   vendor/ (bundled three.js and pixi.js; build.sh rebuilds them)
+│   ├── gestures/     #   one file per gesture (wave.js, hug.js...), _pose.js helpers
 │   ├── models/       #   Live2D folders and .vrm files
 │   ├── animations/   #   .vrma clips (clips.json)
-│   ├── vendor/       #   bundled three.js / pixi.js
 │   └── add_live2d.py
 ├── introspection/    # injected-thought experiments - make_vectors, trial, report, blind
 ├── memory-manager/

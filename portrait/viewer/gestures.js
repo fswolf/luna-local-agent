@@ -1,5 +1,5 @@
 // Gestures for the 3D (VRM) portrait: the player, and the list of what
-// she can do. Each gesture is its own file in gestures/ (wave.js, hug.js,
+// she can do. Each gesture is its own file in portrait/gestures/ (wave.js, hug.js,
 // ...); add a file and it's picked up, no list to edit anywhere.
 //
 // Every VRM has the same humanoid skeleton, so these work on any model.
@@ -19,6 +19,7 @@
 //   osc        a wobble on top: [bone, axis, amplitude, hz]
 //   add        poses added on top for the whole gesture
 //   sob        shoulders hitch (crying)
+//   then       another gesture to flow into as this one ends ('pant')
 //   about      when to use it: offered to her as a [tag] in tags mode, and
 //              what the meaning mode compares the conversation with
 //   keywords   ["beckon", "come hither", "🤫"]: plays it when she writes one
@@ -35,17 +36,17 @@ export { REST };
 
 // The list comes from the server (every gesture/*.js not starting with _);
 // without one (a static copy of the page), the built-ins.
-const BUILT_IN = ['wink', 'shh', 'wave', 'hug', 'jump', 'shrug', 'kiss', 'shy', 'cry', 'stretch', 'look_hand',
+const BUILT_IN = ['dance', 'jog', 'pant', 'sultry_beckon', 'wink', 'shh', 'wave', 'hug', 'jump', 'shrug', 'kiss', 'shy', 'cry', 'stretch', 'look_hand',
                   'tuck_hair', 'bounce', 'explain'];
 export const FAILED = {};      // name -> why it didn't load (shown on the debug page)
 const list = await fetch('gestures/index.json').then(r => r.ok ? r.json() : null).catch(() => null);
-if (!list) FAILED['(the list)'] = "the server didn't send gestures/index.json, so only the built-ins loaded - "
+if (!list || !list.length) FAILED['(the list)'] = "the server didn't list any gesture files, so only the built-ins loaded - "
   + 'restart Luna or ./viewer.sh (an older copy is still running)';
 
 export const GESTURES = {};
 export const ABOUT = {};
 export const KEYWORDS = {};    // name -> ["hug", "cuddle", "🤗"]: the keyword fallback
-for (const name of list || BUILT_IN) {
+for (const name of (list && list.length ? list : BUILT_IN)) {
   try {
     const g = (await import(`./gestures/${name}.js`)).default;
     GESTURES[name] = g;
@@ -221,6 +222,12 @@ export function createGestures(THREE, vrm) {
         const [fi, fo] = g.fade || [0.3, 0.4];
         const end = a.out ? a.out + fo : g.dur;
         if (a.t >= end) { a.gone = true; continue; }
+        // flow into the next one: it fades in while this one fades out
+        if (g.then && !a.out && !a.chained && a.t >= g.dur - fo && GESTURES[g.then]) {
+          a.chained = true;
+          const n = GESTURES[g.then];
+          active.push({ g: n, name: g.then, t: 0, out: 0, ch: channels(n) });
+        }
         const wIn = Math.min(1, a.t / fi);
         const wOut = a.out ? 1 - (a.t - a.out) / fo : Math.min(1, (g.dur - a.t) / fo);
         const w = ease(Math.max(0, Math.min(wIn, wOut)));

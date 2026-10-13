@@ -57,6 +57,21 @@ def shutdown(code=0):
 # -------------------------
 logbook.start()
 
+
+def _log_crash(kind, value, tb):
+    """An uncaught error goes to the log file as well as the console, so a
+    crash at startup (where the console window may close) can be read."""
+    try:
+        import traceback
+        logbook.error("crash", "uncaught %s: %s\n%s", kind.__name__, value,
+                      "".join(traceback.format_exception(kind, value, tb)))
+    except Exception:
+        pass
+    sys.__excepthook__(kind, value, tb)
+
+
+sys.excepthook = _log_crash
+
 if transcript.trim():
     logbook.info("transcript", "trimmed past the size cap")
 

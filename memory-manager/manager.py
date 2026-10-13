@@ -209,6 +209,40 @@ def apply(action, body):
 # ---------------------------------------------------------------------------
 # HTTP
 # ---------------------------------------------------------------------------
+def _request_ok(handler, post=False):
+    """Only this machine's own page may talk to this server.
+
+    Host must be 127.0.0.1 or localhost on our port: a page on some other
+    site that re-points its own name at 127.0.0.1 (DNS rebinding) still
+    sends its own name as Host, and is turned away here. A browser always
+    sends Origin on a cross-site POST, so that must be ours too. And a
+    POST must say application/json - a plain HTML form can't send that,
+    and a script on another site can't send it without a preflight that
+    this server never answers.
+
+    Served through the live monitor (/memory/, /thoughts/), the monitor
+    has already checked Host and Origin against its own port.
+    """
+    if not getattr(handler, "_checked_by_monitor", False):
+        here = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
+
+        if handler.headers.get("Host") not in here:
+            return False
+
+        origin = handler.headers.get("Origin")
+
+        if origin is not None and origin.split("://", 1)[-1] not in here:
+            return False
+
+    if post:
+        kind = (handler.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+
+        if kind != "application/json":
+            return False
+
+    return True
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass  # quiet - it's a local page, not a service
@@ -222,6 +256,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self):
+        if not _request_ok(self):
+            self._send(403, '{"error": "forbidden"}')
+
+            return
+
         if self.path == "/":
             self._send(200, PAGE, "text/html")
         elif self.path == "/api/state":
@@ -230,6 +269,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, '{"error": "not found"}')
 
     def do_POST(self):
+        if not _request_ok(self, post=True):
+            self._send(403, '{"error": "forbidden"}')
+
+            return
+
         if not self.path.startswith("/api/"):
             self._send(404, '{"error": "not found"}')
 

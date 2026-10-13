@@ -20,7 +20,7 @@ import time
 
 import requests
 
-from config import LM_URL, LLM_BACKEND, LLM_HEADERS
+from config import LM_URL, LLM_BACKEND, LLM_HEADERS, LLM_MODEL
 
 MODELS_URL = LM_URL.replace("/chat/completions", "/models")
 # LM Studio's own (non-OpenAI) endpoint: the only place it reports the
@@ -61,11 +61,29 @@ def probe(timeout=5):
         response = requests.get(MODELS_URL, headers=LLM_HEADERS, timeout=timeout)
         response.raise_for_status()
         data = response.json()
-        loaded = (data.get("data") or [{}])[0].get("id", "")
+        ids = [m.get("id", "") for m in data.get("data") or []]
+        loaded = ids[0] if ids else ""
     except Exception as e:
         _set(False, str(e))
 
         return ""
+
+    if LLM_MODEL:
+        # pinned: that one or nothing, never a silent stand-in
+        if LLM_MODEL not in ids:
+            _set(False, f"{LLM_MODEL} isn't on the server")
+            return ""
+        loaded = LLM_MODEL
+    elif LLM_BACKEND != "llama" and len(ids) > 1:
+        # LM Studio lists every downloaded model; the one actually loaded
+        # is marked in its own API. Asking for another would JIT-load it.
+        try:
+            for entry in requests.get(NATIVE_MODELS_URL, headers=LLM_HEADERS, timeout=2).json().get("data") or []:
+                if entry.get("state") == "loaded" and entry.get("id") in ids:
+                    loaded = entry["id"]
+                    break
+        except Exception:
+            pass
 
     with _lock:
         previous = model
@@ -154,7 +172,7 @@ def context_length(timeout=3):
             return 0
 
     try:
-        response = requests.get(NATIVE_MODELS_URL, timeout=timeout)
+        response = requests.get(NATIVE_MODELS_URL, headers=LLM_HEADERS, timeout=timeout)
         response.raise_for_status()
 
         for entry in response.json().get("data") or []:
@@ -190,7 +208,7 @@ def accepts_images(max_age=30):
             if isinstance(modalities, dict):
                 answer = bool(modalities.get("vision"))
         else:
-            for entry in requests.get(NATIVE_MODELS_URL, timeout=1).json().get("data") or []:
+            for entry in requests.get(NATIVE_MODELS_URL, headers=LLM_HEADERS, timeout=1).json().get("data") or []:
                 if entry.get("state") == "loaded" and entry.get("type") in ("llm", "vlm"):
                     answer = entry.get("type") == "vlm"
                     break

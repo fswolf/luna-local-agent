@@ -1,0 +1,9 @@
+Luna branding — saved for reuse
+
+Approved emblem: dark violet crescent moon containing a terminal >_ mark, with a small pink dot at the upper right. See luna-emblem-reference.png.
+
+Keep the same symbol and colors across the robot and clothed human cat-woman versions. User prefers a small, understated emblem; the first robot chest application was too large. Current smaller robot texture: body-robot-pearl-pink-v5-small-logo.png.
+
+Future task: apply this branding to the shirt shown in luna-shirt-placement-reference.png. Exact placement and size to be decided when editing the shirt texture. Shirt has not been edited yet.
+
+The emblem reference is the original small screenshot, with its background intact; it is not a transparent production decal.

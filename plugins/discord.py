@@ -192,24 +192,52 @@ def _ask_in_discord(kind, title, body, guarded):
         return False
 
     timeout = max(30, int(settings().get("approval_timeout", 300)))
-    shown = "\n".join(str(line) for line in body).replace(FENCE, "'''")
+    full = "\n".join(str(line) for line in body)
+    shown = full.replace(FENCE, "'''")
+    # Too long for one message: the whole thing goes along as a file,
+    # never a cut-down version - a yes to the first 1500 characters of a
+    # command is a yes to whatever came after them too.
+    attach = len(shown) > 1500
 
-    if len(shown) > 1500:
-        shown = shown[:1500] + "\n..."
+    if attach:
+        shown = shown[:1200] + "\n... (cut here - the whole request is in the attached file)"
 
     what = {"command": "run a command", "write": "change a file", "read": "read a file",
-            "mcp": "use", "skill": "save a recipe"}.get(kind, kind)
-    warn = ("\n**This is her own code or a config folder.**" if kind in ("write", "read")
-            else "\n**Flagged: it always asks.**") if guarded else ""
+            "web": "reach the web", "mcp": "use", "skill": "save a recipe"}.get(kind, kind)
+
+    if not guarded:
+        warn = ""
+    elif kind == "write" and "outside content" not in "\n".join(str(b) for b in body):
+        warn = "\n**This is her own code or a config folder.**"
+    elif kind in ("read", "web", "command"):
+        warn = "\n**This turn has read outside content - check it's something you asked for.**"
+    else:
+        warn = "\n**Flagged: it always asks.**"
+
     head = f"**Luna wants to {what}**" + ("" if kind == "command" else f"{'' if kind == 'mcp' else ':'} {title}")
     wait = f"{timeout // 60} min" if timeout >= 60 else f"{timeout}s"
     text = (f"{head}{warn}\n{FENCE}\n{shown}\n{FENCE}\n"
-            f"Reply **y** or **n** (or tap a reaction) - {wait}, then it's a no.")
+            + ("**Open the attached file and read all of it before answering.**\n" if attach else "")
+            + f"Reply **y** or **n** (or tap a reaction) - {wait}, then it's a no.")
+
+    if len(text) > 1990:   # a long title on top: the request goes as a file alone
+        attach = True
+        text = (f"{head[:900]}{warn}\n**The request is in the attached file - read all of it "
+                f"before answering.**\nReply **y** or **n** (or tap a reaction) - {wait}, then it's a no.")
+
     slot = {"event": threading.Event(), "answer": None, "message_id": None}
     _pending[channel.id] = slot
 
     async def post():
-        message = await channel.send(text[:1990])
+        if attach:
+            import io
+
+            import discord
+
+            file = discord.File(io.BytesIO(full.encode("utf-8")), filename="request.txt")
+            message = await channel.send(text[:1990], file=file)
+        else:
+            message = await channel.send(text[:1990])
         slot["message_id"] = message.id
 
         for emoji in ("✅", "❌"):

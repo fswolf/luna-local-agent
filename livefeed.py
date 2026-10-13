@@ -146,6 +146,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self.wfile.write(body)
                 return True
             original_path, original_cls = self.path, self.__class__
+            self._checked_by_monitor = True   # Host and Origin, just above
             self.path = self.path[len(prefix):] or "/"
             self.__class__ = cls
             try:
@@ -162,9 +163,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _portrait(self, rel):
         """The portrait page and its files - and nothing outside portrait/,
-        whatever the path says. The page itself lives in portrait/viewer/;
-        models/, animations/ and vendor/ beside it are served at the same
-        level, so the page finds them as models/..., vendor/...."""
+        whatever the path says. The page and its libraries live in
+        portrait/viewer/ (vendor/ inside it); models/ and animations/ beside
+        it are served at the same level, so the page finds them as models/...,
+        gestures/..."""
         from urllib.parse import unquote
         rel = unquote(rel)   # a model folder with spaces or non-latin letters in its name
         if rel == "config.json":
@@ -175,8 +177,8 @@ class _Handler(BaseHTTPRequestHandler):
                               "application/json")
 
         if rel == "gestures/index.json":
-            # every gesture file the page should load (portrait/viewer/gestures/)
-            gdir = os.path.join(config.BASE_DIR, "portrait", "viewer", "gestures")
+            # every gesture file the page should load (portrait/gestures/)
+            gdir = os.path.join(config.BASE_DIR, "portrait", "gestures")
             try:
                 names = sorted(f[:-3] for f in os.listdir(gdir) if f.endswith(".js") and not f.startswith("_"))
             except OSError:

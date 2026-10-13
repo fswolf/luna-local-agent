@@ -8,10 +8,10 @@ performance of tiredness in every sentence.
 
 Two dials, both -1..+1:
 
-    energy   flagging ...... wired
-    warmth   prickly ....... fond
+    energy   tired ......... wired
+    warmth   cross ......... fond
 
-Two is enough for nine distinguishable moods and few enough that every
+Two is enough for twelve distinguishable moods and few enough that every
 signal has an obvious place to push. One dial can't tell "tired and
 happy" from "awake and fed up", which are the two states that actually
 turn up at 4am.
@@ -555,37 +555,39 @@ def _band(value, edges, current=None):
     return len(edges)
 
 
-# [warmth band][energy band] - prickly/steady/fond/soft by
-# flagging/level/wired. Several phrasings each: the same sentence every
-# turn is one the model stops reading, or starts acting out.
+# [warmth band][energy band] - low/okay/good/close by tired/even/up.
+# Plain words: these show on the Status row, and anyone should know at
+# a glance what "sleepy" or "mad" means. Several phrasings each: the
+# same sentence every turn is one the model stops reading, or starts
+# acting out.
 _GRID = [
-    [("worn thin", ["short on sleep and short on patience",
-                    "frayed, and not in the mood to be gentle about it"]),
-     ("terse", ["not in the mood for much",
-                "flat, and disinclined to dress it up"]),
-     ("restless", ["wound up and a bit irritable",
-                   "twitchy, with no patience to spare"])],
+    [("sad", ["sad and worn out",
+              "low, and short on patience"]),
+     ("annoyed", ["annoyed and not in the mood for much",
+                  "a bit fed up"]),
+     ("mad", ["mad and wound up",
+              "cross, with no patience to spare"])],
 
-    [("flagging", ["running low, but here",
-                   "tired enough that everything takes a beat longer"]),
-     ("level", ["even, unhurried",
-                "steady - nothing much either way"]),
-     ("keen", ["sharp and interested",
-               "alert, and enjoying having something to chew on"])],
+    [("tired", ["tired, but here",
+                "tired enough that everything takes a beat longer"]),
+     ("calm", ["calm, nothing much either way",
+               "fine, unhurried"]),
+     ("focused", ["focused and interested",
+                  "alert, and enjoying having something to chew on"])],
 
-    [("drowsy", ["tired and glad of the company",
-                 "sleepy and content to just be here with him"]),
-     ("warm", ["comfortable, easy company",
-               "relaxed and fond of him"]),
-     ("bright", ["wide awake and enjoying this",
-                 "lit up, and pleased with how this is going"])],
+    [("sleepy", ["sleepy and glad of the company",
+                 "sleepy and happy to just be here with him"]),
+     ("happy", ["happy, easy company",
+                "happy and relaxed with him"]),
+     ("excited", ["excited and enjoying this",
+                  "wide awake, happy and talking a little fast"])],
 
-    [("cozy", ["worn out, and not wanting to be anywhere else",
-               "half asleep and thoroughly attached to him"]),
-     ("doting", ["soft on him, and not hiding it",
-                 "openly fond - she has decided she likes him"]),
-     ("giddy", ["delighted with him and running on it",
-                "buoyant, pleased with him, talking a little fast"])],
+    [("cuddly", ["sleepy and cuddly, not wanting to be anywhere else",
+                 "half asleep and very attached to him"]),
+     ("loving", ["openly fond of him, and not hiding it",
+                 "loving, and soft on him"]),
+     ("flirty", ["flirty and playful with him",
+                 "in a teasing, flirty mood, pleased with him"])],
 ]
 
 
@@ -659,7 +661,7 @@ def line():
 def voice_tint():
     """(speed multiplier, pitch shift in semitones) for the TTS.
 
-    Small on purpose. The point is that a drowsy Luna sounds a little
+    Small on purpose. The point is that a sleepy Luna sounds a little
     slower, not that the voice audibly breaks - anything past a few
     percent reads as a misconfigured setting rather than a mood.
     """

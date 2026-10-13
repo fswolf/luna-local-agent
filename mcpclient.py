@@ -310,7 +310,7 @@ def _register(server):
         tools.register_external(
             name, f"[{server}] {description}", schema.get("properties", {}),
             required=schema.get("required", ()), run=_make_runner(server, t),
-            group=f"MCP: {server}",
+            group=f"MCP: {server}", outside=True,
             available=lambda s=server: _servers.get(s, {}).get("session") is not None,
             why=lambda s=server: f"the {s} MCP server isn't connected - /mcp shows why",
         )

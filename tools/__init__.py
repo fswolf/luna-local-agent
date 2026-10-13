@@ -61,11 +61,24 @@ _EXTERNAL_GROUPS = {}   # tool name -> group, for tools registered at run time
 
 
 def register_external(name, description, properties, required=(), run=None, group="Other",
-                      available=None, why=None):
+                      available=None, why=None, outside=False):
     """A tool that isn't in this package - an MCP server's, say. Same
-    shape as @tool, registered at run time, grouped as given."""
+    shape as @tool, registered at run time, grouped as given. outside:
+    what it returns was written by someone else (an MCP server, a game's
+    chat), so a turn that calls it counts as having read outside content."""
     tool(name, description, properties, required, available, why)(run)
     _EXTERNAL_GROUPS[name] = group
+
+    if outside:
+        OUTSIDE.add(name)
+    else:
+        OUTSIDE.discard(name)
+
+
+# Tools whose results are someone else's words. Once one has run, the
+# turn is marked (state.untrusted.seen) and file reads, and web requests
+# after a file read, ask first - see tools/files.py and tools/web.py.
+OUTSIDE = {"web_search", "read_page", "research"}
 
 
 def specs(only=None):
@@ -286,6 +299,18 @@ def call(name, arguments):
         return f"Error: wrong arguments for {name}: {e}"
     except Exception as e:
         return f"Error running {name}: {e}"
+    finally:
+        if name in OUTSIDE:
+            _mark_outside(name)
+
+
+def _mark_outside(name):
+    """After it runs, so its own request isn't held up by it - and in a
+    finally, so one that fails halfway still counts."""
+    import state
+
+    if not getattr(state.untrusted, "seen", None):
+        state.untrusted.seen = name
 
 
 # ---------------------------------------------------------------------------

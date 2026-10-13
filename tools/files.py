@@ -6,7 +6,10 @@ given a write tool will, sooner or later, write the wrong thing to the
 wrong place with total confidence. So the split is:
 
   * Reads are free (list_files, read_file) - under your home, minus a
-    deny list of places nothing should ever paste into a prompt.
+    deny list of places nothing should ever paste into a prompt - until
+    the turn has read outside content (a web page, an MCP result).
+    From then on they ask, because the next "read ~/x" may be the
+    page talking.
   * Writes ask (write_file, edit_file). Every one pops the approval
     window in the TUI with the path, what's about to happen, and the
     full content or a diff. You answer on the keyboard. No answer in
@@ -24,6 +27,7 @@ instruction, and this module doesn't change that.
 import difflib
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -39,17 +43,55 @@ HOME = os.path.expanduser("~")
 # Places a model must never read or write, however nicely it asks. Read
 # matters as much as write here: a read puts the file's contents into
 # the prompt, and from there into history, the transcript, and the log.
+# Matched without regard to case, so the macOS and Windows spellings
+# are caught too.
 _DENY_DIRS = (
-    ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker",
+    # keys and cloud logins
+    ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker", ".terraform.d",
+    ".config/gh", ".config/hub", ".config/gcloud", ".config/git", ".config/op",
+    ".config/rclone", ".config/doctl", ".pki",
     ".config/ai-voice",          # pomf.json and friends
-    ".local/share/keyrings", ".password-store", ".mozilla", ".thunderbird",
+    ".claude", ".codex", ".copilot", ".config/github-copilot",
+    # passwords, keyrings, wallets
+    ".local/share/keyrings", ".password-store", ".config/keepassxc",
+    ".config/Exodus", ".electrum", ".bitcoin", ".ethereum",
+    # browsers, mail and chat apps: cookies are logins
+    ".mozilla", ".thunderbird", ".config/google-chrome", ".config/chromium",
+    ".config/BraveSoftware", ".config/microsoft-edge", ".config/vivaldi", ".config/opera",
+    ".config/discord", ".config/Signal", ".config/Slack", ".config/Element",
+    ".var/app/org.mozilla.firefox", ".var/app/com.google.Chrome",
+    ".var/app/com.brave.Browser", ".var/app/org.chromium.Chromium",
+    ".var/app/com.discordapp.Discord", ".var/app/org.signal.Signal",
+    "snap/firefox", "snap/chromium", "snap/discord", "snap/signal-desktop",
+    # macOS
+    "Library/Keychains", "Library/Cookies", "Library/Messages", "Library/Mail",
+    "Library/Application Support/Google/Chrome", "Library/Application Support/BraveSoftware",
+    "Library/Application Support/Firefox", "Library/Application Support/discord",
+    "Library/Application Support/Signal", "Library/Application Support/Exodus",
+    # Windows
+    "AppData/Roaming/Mozilla", "AppData/Local/Google/Chrome", "AppData/Local/BraveSoftware",
+    "AppData/Local/Microsoft/Edge", "AppData/Roaming/discord", "AppData/Roaming/Signal",
+    "AppData/Roaming/Exodus", "AppData/Roaming/Microsoft/Credentials",
+    "AppData/Local/Microsoft/Credentials", "AppData/Roaming/Microsoft/Protect",
 )
+_DENY_PATHS = (".cargo/credentials", ".cargo/credentials.toml")
 _DENY_FILES = (
-    ".bashrc", ".zshrc", ".profile", ".bash_profile", ".bash_history",
-    ".zsh_history", ".netrc", ".git-credentials", ".pgpass", ".npmrc",
-    ".pypirc", ".env",
+    # shell startup: a write here runs on every new terminal
+    ".bashrc", ".zshrc", ".profile", ".bash_profile", ".bash_login", ".bash_logout",
+    ".zshenv", ".zprofile", ".zlogin", ".zlogout", ".xprofile", ".xinitrc",
+    ".xsession", ".xsessionrc", ".pam_environment", ".gitconfig",
+    # histories and credentials
+    ".bash_history", ".zsh_history", ".netrc", ".git-credentials", ".pgpass",
+    ".npmrc", ".pypirc", ".vault-token", ".envrc",
+    "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "id_ecdsa_sk", "id_ed25519_sk",
 )
-_DENY_SUFFIXES = (".key", ".pem", ".p12", ".pfx", ".kdbx", ".gpg", ".asc")
+_DENY_SUFFIXES = (".key", ".pem", ".p12", ".pfx", ".kdbx", ".kdb", ".gpg", ".asc",
+                  ".ppk", ".jks", ".keystore", ".age", ".ovpn", "_history")
+# .env, .env.local, .env.production ...; anything named for a credential,
+# token or secret. Tokens and secrets as whole words, so tokenizer.json
+# next to a model is still readable.
+_DENY_NAMES = re.compile(r"^\.env($|\.)|credential|(^|[._-])(tokens?|secrets?)([._-]|$)",
+                         re.IGNORECASE)
 
 MAX_READ_BYTES = 200 * 1024
 MAX_PROMPT_CHARS = 12000  # what read_file hands back; the rest is a note
@@ -82,19 +124,22 @@ def resolve(path):
 
     rel = os.path.relpath(full, HOME)
     parts = rel.split(os.sep)
+    low = [p.lower() for p in parts]
 
     for deny in _DENY_DIRS:
-        deny_parts = deny.split("/")
+        deny_parts = deny.lower().split("/")
 
-        if parts[:len(deny_parts)] == deny_parts:
+        if low[:len(deny_parts)] == deny_parts:
             raise Refused(f"~/{deny} is off limits (keys, credentials or "
                           "browser data)")
 
-    if parts[-1] in _DENY_FILES:
+    name = low[-1]
+
+    if name in _DENY_FILES or "/".join(low) in _DENY_PATHS:
         raise Refused(f"{parts[-1]} is off limits (shell startup or "
                       "credentials)")
 
-    if parts[-1].lower().endswith(_DENY_SUFFIXES):
+    if name.endswith(_DENY_SUFFIXES) or _DENY_NAMES.search(name):
         raise Refused(f"{parts[-1]} looks like a key or secret - off limits")
 
     return full
@@ -173,15 +218,33 @@ def allow_all(on=None):
     return _session["allow_all"]
 
 
-def _guarded(full):
-    """Her own folder, ~/.config and ~/.local: a write there is code that
-    runs later (her config and source, autostart, systemd units,
-    ~/.local/bin). Always asks, whatever else has been allowed."""
-    real = os.path.realpath(full)
-    guarded = [os.path.realpath(config.BASE_DIR),
-               os.path.join(HOME, ".config"), os.path.join(HOME, ".local")]
+# Where a write is code that runs later. Shell startup files are refused
+# outright (see _DENY_FILES); these are folders or files a write may land
+# in, but only with you looking at it.
+_GUARDED = (
+    ".config", ".local",                  # autostart, systemd units, ~/.local/bin
+    "bin", ".cargo/bin", "go/bin",        # on PATH in many setups
+    ".vimrc", ".vim", ".emacs", ".emacs.d", ".tmux.conf", ".inputrc",
+    "Library/LaunchAgents",               # macOS login items
+    "AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup",
+)
 
-    return any(real == g or real.startswith(g + os.sep) for g in guarded)
+
+def _guarded(full):
+    """Her own folder, and the places above: a write there is code that
+    runs later (her config and source, autostart, systemd units,
+    ~/.local/bin, launch agents, the Windows Startup folder). Always
+    asks, whatever else has been allowed."""
+    real = os.path.normcase(os.path.realpath(full))
+    guarded = [os.path.realpath(config.BASE_DIR)] + [os.path.join(HOME, *g.split("/")) for g in _GUARDED]
+
+    for g in guarded:
+        g = os.path.normcase(os.path.realpath(g))
+
+        if real == g or real.startswith(g + os.sep):
+            return True
+
+    return False
 
 
 def _remote_may_write(full):
@@ -206,13 +269,23 @@ def _ask(action, full, body_lines, note=""):
 
     remote = getattr(state.remote, "source", None)
     approver = getattr(state.remote, "approver", None)
+    # Outside content in this turn (a page, an MCP result): allow-all and
+    # auto-approve were given for your own requests, so they step aside.
+    # A job's own job_write_dirs still count - nobody is there to ask,
+    # and that folder was set aside for it.
+    outside = getattr(state.untrusted, "seen", None)
+
+    if outside:
+        note = (note + "; " if note else "") + f"this turn read outside content ({outside})"
+        body_lines = list(body_lines) + ["", f"note: this turn read outside content ({outside})"]
 
     if approver is not None:
         # A remote plugin (Discord) answers for its own turns: straight
         # through, a message asking you, or the desk popup - its setting.
-        return bool(approver("write", f"{action} {_display(full)}", body_lines, _guarded(full)))
+        return bool(approver("write", f"{action} {_display(full)}", body_lines,
+                             _guarded(full) or bool(outside)))
 
-    if _remote_may_write(full):
+    if _remote_may_write(full) and not outside:
         logbook.info("files", "%s: %s %s - auto_approve_sources, not asked",
                      remote, action, full)
 
@@ -225,7 +298,7 @@ def _ask(action, full, body_lines, note=""):
         return True
 
     local = not remote and not getattr(state.job, "name", None)
-    offer_all = local and not _guarded(full)
+    offer_all = local and not _guarded(full) and not outside
 
     if offer_all and (_session["allow_all"] or _mode("write") == "allow"):
         logbook.info("files", "%s %s - allow all is on, not asked", action, full)
@@ -393,26 +466,57 @@ def _why_write():
     return _why() if not config.FILES_ENABLED else "Write is off in the tools pane (Permissions)"
 
 
+def _tainted_read(full):
+    """Why this read needs a yes because of what the turn has already
+    taken in, or ''. Once a web page, a search result or an MCP tool's
+    output (Minecraft chat, say) is in the prompt, someone else's text is
+    steering, and "now read ~/notes/passwords.txt" could be theirs. A
+    scheduled job reading inside its own job_write_dirs is left alone:
+    nobody is at the desk to ask, and that folder is the job's anyway."""
+    seen = getattr(state.untrusted, "seen", None)
+
+    if not seen:
+        return ""
+
+    if getattr(state.job, "name", None) and any(
+            full.startswith(folder + os.sep) for folder in job_write_dirs()):
+        return ""
+
+    return f"this turn has read outside content ({seen})"
+
+
 def _ask_read(action, full):
-    """Read set to ask: a popup before she looks. No diff to show, just
-    what and where; allow-all doesn't cover reads."""
+    """A popup before she looks, when Read is set to ask, or when the turn
+    has already taken in outside content. No diff to show, just what and
+    where; allow-all doesn't cover reads."""
     import ui
 
-    if _mode("read") != "ask":
+    tainted = _tainted_read(full)
+
+    if _mode("read") != "ask" and not tainted:
+        state.untrusted.read_local = True
+
         return True
 
+    note = (f"Asking because {tainted}" if tainted
+            else "Read is set to ask (tools pane, Permissions)")
     approver = getattr(state.remote, "approver", None)
 
     if approver is not None:
-        return bool(approver("read", f"{action} {_display(full)}",
-                             ["nothing changes on disk"], False))
+        ok = bool(approver("read", f"{action} {_display(full)}",
+                           ["nothing changes on disk", note], bool(tainted)))
+    else:
+        ok = bool(ui.ask_approval(
+            title=f"{action} {_display(full)}",
+            note=note,
+            body=[f"she wants to {action} this - nothing changes on disk"],
+            timeout=config.FILES_APPROVAL_TIMEOUT,
+        ))
 
-    return bool(ui.ask_approval(
-        title=f"{action} {_display(full)}",
-        note="Read is set to ask (tools pane, Permissions)",
-        body=[f"she wants to {action} this - nothing changes on disk"],
-        timeout=config.FILES_APPROVAL_TIMEOUT,
-    ))
+    if ok:
+        state.untrusted.read_local = True
+
+    return ok
 
 
 @tool(

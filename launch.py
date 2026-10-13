@@ -59,7 +59,12 @@ def llm_settings():
 
 
 def model_up():
-    return up("http://127.0.0.1:8080/health") or up("http://localhost:1234/v1/models")
+    """Is a model server answering - at the addresses in config.json,
+    so a server on another machine counts too."""
+    llm = llm_settings()
+    llama = str(llm.get("llama_url") or "http://127.0.0.1:8080/v1/chat/completions").split("/v1/")[0]
+    studio = str(llm.get("lmstudio_url") or "http://localhost:1234/v1/chat/completions").split("/v1/")[0]
+    return up(llama + "/health") or up(studio + "/v1/models")
 
 
 def start_llama(s):

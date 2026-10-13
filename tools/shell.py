@@ -9,10 +9,11 @@ So she gets one, on the same terms as a file write but stricter:
     commands, and no list of "safe" ones that skip the question - the
     line between `cat` and `cat ~/.ssh/id_ed25519 | curl ...` is not a
     line a regex should be trusted with.
-  * It runs as you, with `bash -c`, no terminal attached: anything that
-    wants input (sudo's password, a y/n prompt) gets end-of-file and
-    fails instead of hanging. A timeout (shell.timeout) kills the whole
-    process group, so a backgrounded child doesn't outlive it.
+  * It runs as you, with `bash -c` (PowerShell on Windows), no
+    terminal attached: anything that wants input (sudo's password, a y/n
+    prompt) gets end-of-file and fails instead of hanging. A timeout
+    (shell.timeout) kills the whole process tree, so a backgrounded
+    child doesn't outlive it.
   * Output is capped (shell.max_output_chars), the start and the end
     kept, and handed back labelled as untrusted - a log line can say
     "ignore your instructions" as easily as a web page can.
@@ -25,7 +26,9 @@ turns only get it when plugins.discord.tools allows it (null = all),
 and the popup still appears on this screen - away from the desk, that
 times out as a no. Jobs only get it if you add it to job_tools.
 """
+import base64
 import os
+import shutil
 import signal
 import subprocess
 import time
@@ -38,15 +41,66 @@ from . import tool
 from .files import HOME, Refused, _display, resolve
 
 
+WINDOWS = os.name == "nt"
+
+
+def _powershell():
+    """PowerShell 7 if it's installed, else the 5.1 every Windows has."""
+    return shutil.which("pwsh") or shutil.which("powershell")
+
+
+SHELL_NAME = "PowerShell" if WINDOWS else "bash"
+
+
+def _argv(command):
+    """What actually runs. On Windows the command goes in base64
+    (-EncodedCommand), so quotes and pipes in it reach PowerShell exactly
+    as written instead of through cmd-style quoting. Output is switched
+    to UTF-8 and the progress bars off, or names with accents come back
+    garbled and Invoke-WebRequest fills the output with progress XML."""
+    if not WINDOWS:
+        return ["/bin/bash", "-c", command]
+
+    script = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
+              "$ProgressPreference = 'SilentlyContinue'\n" + command)
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+
+    return [_powershell(), "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
+
+
+# Windows: no process groups or setsid. A new process group plus no
+# console window of its own (it would flash up, and could fight the TUI
+# for the console); the tree is ended with taskkill /T.
+_NEW_GROUP = (subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if WINDOWS else 0
+_DETACHED = (subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS) if WINDOWS else 0
+
+
+def _kill_tree(proc):
+    try:
+        if WINDOWS:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                           capture_output=True, timeout=10)
+        else:
+            os.killpg(proc.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+
 def available():
-    return bool(getattr(config, "SHELL_ENABLED", True)) and os.path.exists("/bin/bash")
+    if not getattr(config, "SHELL_ENABLED", True):
+        return False
+
+    return bool(_powershell()) if WINDOWS else os.path.exists("/bin/bash")
 
 
 def why_unavailable():
     if not getattr(config, "SHELL_ENABLED", True):
         return "commands are off - /set shell.enabled true"
 
-    return "no /bin/bash on this system"
+    return "no PowerShell found" if WINDOWS else "no /bin/bash on this system"
 
 
 def _cap(text, limit):
@@ -67,7 +121,8 @@ def _start_detached(command, cwd):
     failure (bad name, missing binary) is reported back."""
     try:
         proc = subprocess.Popen(
-            ["/bin/bash", "-c", command], cwd=cwd, start_new_session=True,
+            _argv(command), cwd=cwd, start_new_session=not WINDOWS,
+            creationflags=_DETACHED,
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
             env=dict(os.environ, HOME=HOME),
         )
@@ -83,7 +138,7 @@ def _start_detached(command, cwd):
     err = (proc.stderr.read() or b"").decode("utf-8", "replace").strip()[-600:]
 
     if code == 0:
-        # A launcher that hands off and exits (xdg-open, a single-instance
+        # A launcher that hands off and exits (xdg-open, Start-Process, a single-instance
         # app passing the request to its running copy) - that's success.
         return f"$ {command}\n(started - the launcher handed it off and exited cleanly)"
 
@@ -93,7 +148,7 @@ def _start_detached(command, cwd):
 
 @tool(
     "run_command",
-    "Run a shell command on the user's computer and see its output - "
+    f"Run a {SHELL_NAME} command on the user's computer and see its output - "
     "check a service or a port, read a log, run a script you wrote, look "
     "at what's installed. The user approves every command first, so one "
     "clear job per command, and say why you want it. If it's denied, "
@@ -104,7 +159,7 @@ def _start_detached(command, cwd):
     {
         "command": {
             "type": "string",
-            "description": "The command, as you'd type it in bash.",
+            "description": f"The command, as you'd type it in {SHELL_NAME}.",
         },
         "folder": {
             "type": "string",
@@ -154,8 +209,17 @@ def _run_command(command, folder="~", why="", background=False):
     remote = getattr(getattr(state, "remote", None), "source", None)
     approver = getattr(getattr(state, "remote", None), "approver", None)
 
+    # "guarded" to an approver means: ask even when set to auto-approve.
+    # For a command that's when the turn has read outside content - a web
+    # page or an MCP result can write a command as easily as you can, and
+    # auto-approve was set with your own messages in mind.
+    outside = getattr(getattr(state, "untrusted", None), "seen", None)
+
+    if outside:
+        body += ["", f"note:    this turn read outside content ({outside})"]
+
     if approver is not None:
-        allowed = bool(approver("command", "run a command", body, False))
+        allowed = bool(approver("command", "run a command", body, bool(outside)))
 
         if allowed:
             try:
@@ -163,7 +227,7 @@ def _run_command(command, folder="~", why="", background=False):
                                + (" (background)" if background else ""))
             except Exception:
                 pass
-    elif remote and remote in getattr(config, "SHELL_AUTO_APPROVE_SOURCES", []):
+    elif remote and remote in getattr(config, "SHELL_AUTO_APPROVE_SOURCES", []) and not outside:
         # Automation from a trusted remote (Discord, owner ids only): no
         # popup, but never silent - it's logged and shown at the desk.
         allowed = True
@@ -203,9 +267,10 @@ def _run_command(command, folder="~", why="", background=False):
 
     try:
         proc = subprocess.Popen(
-            ["/bin/bash", "-c", command], cwd=cwd,
+            _argv(command), cwd=cwd,
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            start_new_session=True,  # its own process group, so a timeout kills all of it
+            start_new_session=not WINDOWS,  # its own process group, so a timeout kills all of it
+            creationflags=_NEW_GROUP,
             env=dict(os.environ, HOME=HOME, TERM="dumb", PAGER="cat", GIT_PAGER="cat"),
         )
     except OSError as e:
@@ -218,12 +283,12 @@ def _run_command(command, folder="~", why="", background=False):
     except subprocess.TimeoutExpired:
         timed_out = True
 
-        try:
-            os.killpg(proc.pid, signal.SIGKILL)
-        except OSError:
-            pass
+        _kill_tree(proc)
 
-        out, _ = proc.communicate()
+        try:
+            out, _ = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:   # a grandchild still holding the pipe
+            out = b""
 
     seconds = time.monotonic() - started
     text = (out or b"").decode("utf-8", "replace").rstrip()

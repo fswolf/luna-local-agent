@@ -99,6 +99,11 @@ LM_STUDIO_URL = str(_llm_cfg.get("lmstudio_url", LM_URL))
 LLAMA_URL = str(_llm_cfg.get("llama_url",
                              "http://127.0.0.1:8080/v1/chat/completions"))
 LLM_BACKEND_WANTED = str(_llm_cfg.get("backend", "auto")).lower()
+# The model id sent with every request. Empty: what the server has loaded
+# (LM Studio: the one marked loaded; otherwise the first it lists). Set it
+# on a server holding several - LM Studio with JIT loading, Ollama, vLLM -
+# and if that model isn't there she says so instead of using another.
+LLM_MODEL = str(_llm_cfg.get("model", "") or "").strip()
 
 
 def _root(url):
@@ -164,8 +169,30 @@ def _pick_backend():
 
 LLM_BACKEND, LM_URL = _pick_backend()
 
-# Sent with every request to the model server. Empty for LM Studio.
-LLM_HEADERS = dict(_LLAMA_HEADERS) if LLM_BACKEND == "llama" else {}
+# An API key for a model server that wants one (LM Studio with auth, vLLM
+# --api-key, any OpenAI-compatible endpoint): llm.api_key in config.json,
+# or better, outside the repo in ~/.config/ai-voice/llm.json as
+# {"api_key": "..."}. llama/start.sh's own key is used for llama-server.
+def _llm_key():
+    try:
+        with open(os.path.expanduser("~/.config/ai-voice/llm.json"), encoding="utf-8") as f:
+            key = str((json.load(f) or {}).get("api_key") or "").strip()
+            if key:
+                return key
+    except (OSError, ValueError):
+        pass
+    return str(_llm_cfg.get("api_key", "") or "").strip()
+
+
+LLM_API_KEY = _llm_key()
+
+# Sent with every request to the model server.
+if LLM_BACKEND == "llama":
+    LLM_HEADERS = dict(_LLAMA_HEADERS)
+elif LLM_API_KEY:
+    LLM_HEADERS = {"Authorization": f"Bearer {LLM_API_KEY}"}
+else:
+    LLM_HEADERS = {}
 
 # The embedding server (started by llama/start.sh) for recalling facts by meaning.
 # Optional: nothing needs it, and fact recall falls back to matching
@@ -467,6 +494,12 @@ TOOLS_DISABLED = list(setting("tools", {}).get("disabled", []))
 # the master switch further down.
 _opt_in = setting("tools", {}).get("opt_in", [])
 TOOLS_OPT_IN = list(_opt_in) if isinstance(_opt_in, (list, tuple)) else []
+# An older config.json kept this list under tools.enabled, which is also
+# the master on/off switch. A list there means: the camera list (moved
+# here) with tools on. Fixed in the file on the next save of either.
+_old_enabled = setting("tools", {}).get("enabled", True)
+if isinstance(_old_enabled, (list, tuple)):
+    TOOLS_OPT_IN = sorted(set(TOOLS_OPT_IN) | set(_old_enabled))
 
 # The webcam, for look_at_camera. The switch is the tool's row in the
 # tools pane; these only say which camera and how big.
@@ -490,7 +523,7 @@ MOOD_WARMTH = float(_mood_cfg.get("warmth", 0.45))
 # How hard each turn pulls both dials home. 0 = moods never fade,
 # 1 = nothing persists past a single turn.
 MOOD_RECOVERY = float(_mood_cfg.get("recovery", 0.25))
-# Whether the mood also tints the voice - a drowsy Luna a few percent
+# Whether the mood also tints the voice - a sleepy Luna a few percent
 # slower and lower. Small by design; see mood.voice_tint.
 MOOD_VOICE = bool(_mood_cfg.get("voice", True))
 # Whether being kind to her registers. It's the one mood signal that
@@ -755,6 +788,8 @@ MONITOR_PORT = int(_monitor_cfg.get("port", 8792))
 # rejects the payload we fall back automatically at runtime.
 _tools_cfg = setting("tools", {})
 TOOLS_ENABLED = _tools_cfg.get("enabled", True)
+if not isinstance(TOOLS_ENABLED, bool):      # the old opt-in list (see TOOLS_OPT_IN)
+    TOOLS_ENABLED = True
 # How many times the model may call tools before it must answer in prose.
 MAX_TOOL_ROUNDS = int(_tools_cfg.get("max_rounds", 4))
 

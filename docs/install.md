@@ -165,6 +165,13 @@ Which server she uses:
 `auto` checks once at startup. `lmstudio` or `llama` forces one. To
 switch servers mid-session, restart her.
 
+Two more keys in the same block, both optional:
+
+| Key | |
+|-----|--|
+| `model` | The model id to ask for, like `"qwen3.8-27b"`. Leave it out and she uses whatever the server has loaded. Set it on a server that holds several models (LM Studio with JIT loading, Ollama, vLLM); if that model isn't there, she shows offline instead of quietly using another |
+| `api_key` | For a server that wants a key (LM Studio with authentication, vLLM `--api-key`, a hosted OpenAI-compatible endpoint). Better kept outside the repo in `~/.config/ai-voice/llm.json` as `{"api_key": "..."}`. Not needed for llama.cpp: `llama/.api_key` is used automatically |
+
 **The model on another machine.** Put that machine's address in the
 URLs above (`http://192.168.1.50:8080/...`), then on the model machine:
 
