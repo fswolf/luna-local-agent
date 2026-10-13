@@ -19,7 +19,10 @@
 //   osc        a wobble on top: [bone, axis, amplitude, hz]
 //   add        poses added on top for the whole gesture
 //   sob        shoulders hitch (crying)
-//   about      when to use it: offered to her as a [tag] in tags mode
+//   about      when to use it: offered to her as a [tag] in tags mode, and
+//              what the meaning mode compares the conversation with
+//   keywords   ["beckon", "come hither", "🤫"]: plays it when she writes one
+//              inside an *action*, or the emoji anywhere (keyword fallback)
 //   idle       one of the things she does on her own
 //   private    never from stream chat; only offered in your own turns
 //   left       also make a left-handed copy, <name>_left
@@ -41,11 +44,13 @@ if (!list) FAILED['(the list)'] = "the server didn't send gestures/index.json, s
 
 export const GESTURES = {};
 export const ABOUT = {};
+export const KEYWORDS = {};    // name -> ["hug", "cuddle", "🤗"]: the keyword fallback
 for (const name of list || BUILT_IN) {
   try {
     const g = (await import(`./gestures/${name}.js`)).default;
     GESTURES[name] = g;
     if (g.about) ABOUT[name] = g.about;
+    if (Array.isArray(g.keywords) && g.keywords.length) KEYWORDS[name] = g.keywords;
     if (g.left) GESTURES[`${name}_left`] = Object.assign(mirrorGesture(g), { about: undefined, left: false });
   } catch (e) {
     console.warn(`gesture ${name}:`, e);
@@ -110,6 +115,9 @@ export function createGestures(THREE, vrm) {
     if (/tail/i.test(j.bone?.name || '')) tail.push({ j, dir: j.settings.gravityDir.clone(), power: j.settings.gravityPower });
   }
   const wag = { amount: 0, target: 0, phase: 0 };
+  const wagUp = new THREE.Vector3();
+  // how a wag carries the tail: lift (pull), sweep (side to side), back (behind her)
+  const TAIL = { lift: 3.0, sweep: 1.8, back: 0.5 };
 
   // .vrma clips: name -> [{clip, opts}], several = variants picked at random
   const clips = {};
@@ -278,13 +286,20 @@ export function createGestures(THREE, vrm) {
       for (let i = active.length - 1; i >= 0; i--) if (active[i].gone) active.splice(i, 1);
 
       // tail
-      wag.amount += (wag.target - wag.amount) * (1 - Math.exp(-3 * dt));
+      // The tail hangs down at rest, so swinging it sideways from there sends it
+      // between her legs - out of view. A wag lifts it first: the joints are
+      // pulled up and back behind her (gravity reversed, strong enough to beat
+      // the tail's stiffness), then swept side to side, so it rises into view
+      // beside her waist and swishes there.
+      wag.amount += (wag.target - wag.amount) * (1 - Math.exp(-(wag.target > wag.amount ? 2.5 : 1.2) * dt));
       if (tail.length) {
-        wag.phase += dt * Math.PI * 2 * 1.6;
-        const s = Math.sin(wag.phase) * wag.amount;
+        wag.phase += dt * Math.PI * 2 * 1.3;
+        const a = wag.amount, s = Math.sin(wag.phase);
         for (const { j, dir, power } of tail) {
-          j.settings.gravityDir.set(dir.x + s * 1.6, dir.y, dir.z).normalize();
-          j.settings.gravityPower = power + Math.abs(wag.amount) * 0.6;
+          if (a < 0.01) { j.settings.gravityDir.copy(dir); j.settings.gravityPower = power; continue; }
+          const up = wagUp.set(s * TAIL.sweep, 1, -TAIL.back).normalize();
+          j.settings.gravityDir.copy(dir).lerp(up, Math.min(1, a * 1.5)).normalize();
+          j.settings.gravityPower = power + a * TAIL.lift;
         }
       }
     },

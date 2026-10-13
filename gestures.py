@@ -200,13 +200,31 @@ _INSTRUCT = ("Instruct: Given a moment in a conversation, retrieve the body lang
              "that fits it\nQuery: ")
 
 
-def _scores(text):
+def _prototypes(private=True):
+    """The built-in descriptions above, plus one for every gesture file and
+    clip with an "about" line that isn't described already - so a gesture
+    you write is matched by meaning too. Private ones only in private turns."""
+    protos = {k: list(v) for k, v in PROTOTYPES.items()}
+    found = [(n, g["about"], g["private"]) for n, g in builtin().items()]
+    found += [(c["name"], str(c.get("about") or ""), bool(c.get("private"))) for c in clips()]
+    for name, about, is_private in found:
+        if not about or name in protos or (is_private and not private):
+            continue
+        protos[name] = [f"A moment for the gesture {name.replace('_', ' ')}: {about}."]
+    if not private:
+        for name in [n for n, g in builtin().items() if g["private"]]:
+            protos.pop(name, None)
+    return protos
+
+
+def _scores(text, private=True):
     import embedmem
 
     if not embedmem.available():
         return None
 
-    docs = [d for ds in PROTOTYPES.values() for d in ds]
+    protos = _prototypes(private)
+    docs = [d for ds in protos.values() for d in ds]
     vecs = embedmem.vectors(docs)
 
     if not vecs:
@@ -215,13 +233,13 @@ def _scores(text):
     q = embedmem._embed([_INSTRUCT + text[:600]])[0]
 
     return {name: max(embedmem.cosine(q, vecs[d]) for d in ds)
-            for name, ds in PROTOTYPES.items()}
+            for name, ds in protos.items()}
 
 
-def classify(text):
+def classify(text, private=True):
     """(gesture or None, scores). A gesture must beat the best "none" row
     by portrait.meaning_margin."""
-    scores = _scores(text)
+    scores = _scores(text, private)
 
     if not scores:
         return None, None
@@ -232,7 +250,7 @@ def classify(text):
     return (best if scores[best] - scores["none"] >= margin else None), scores
 
 
-def after_reply(said, answer):
+def after_reply(said, answer, private=True):
     """In meaning mode: what she just said (and what to), off the turn's
     path. Skipped if she already tagged one."""
     if mode() != "meaning" or not _three_d() or not answer or _turn["sent"]:
@@ -240,7 +258,7 @@ def after_reply(said, answer):
 
     def run():
         try:
-            pick, scores = classify(f"They said: {said[:200]}\nShe answered: {answer[:500]}")
+            pick, scores = classify(f"They said: {said[:200]}\nShe answered: {answer[:500]}", private)
 
             if scores:
                 logbook.info("gestures", "%s  %s", pick or "-",

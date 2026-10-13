@@ -9,6 +9,7 @@ const HUG_LET_GO = both({ rightUpperArm: [0, 0.6, 0.6], rightLowerArm: [0, 0.6, 
 
 
 export default {
+  keywords: ["hug", "cuddle", "squeez", "embrace", "🤗"],   // in what she writes, *like this*
   about: "affection, comfort",   // offered to her as [hug] in tags mode
   dur: 4.6, fade: [0.4, 0.6],
   keys: [

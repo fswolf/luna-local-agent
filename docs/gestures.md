@@ -8,6 +8,7 @@ motions and don't use any of this.
 
 - [What a gesture is](#what-a-gesture-is)
 - [From her reply to her body](#from-her-reply-to-her-body)
+- [How she picks one](#how-she-picks-one)
 - [What happens every frame](#what-happens-every-frame)
 - [The skeleton and its numbers](#the-skeleton-and-its-numbers)
 - [Anatomy of a gesture file](#anatomy-of-a-gesture-file)
@@ -80,7 +81,7 @@ is enough.
 |---------|-----|
 | She chooses | In `tags` mode (the default) her prompt lists every gesture that has an `about:` line, and she writes the tag where it fits. Private ones are only offered in your own conversations |
 | Meaning | In `meaning` mode the embedding model compares what was said with each gesture's description |
-| Keywords | `*hugs*`, `*waves*`, 🤗 in what she writes, or you saying hi or asking for a hug |
+| Keywords | A word from a gesture's `keywords` inside an action she writes (`*beckons you closer*`), or its emoji anywhere. Also you saying hi or asking for a hug |
 | Chat | Viewers' `!wave`, `!hug`, a first "hi", "lol" (never private gestures) |
 | You | `/portrait wink`, or the button in the viewer |
 | On her own | Gestures with `idle: true`, every 25 to 55 seconds while she's idle |
@@ -89,6 +90,79 @@ is enough.
 `/portrait gestures <mode>`, or the **gestures** row in the tools pane,
 switches between `tags`, `meaning`, `keywords` and `off`. See
 [Portrait](portrait.md#gestures) for the details of each.
+
+## How she picks one
+
+There are three ways, and you choose which with `/portrait gestures <mode>`
+or the **gestures** row in the tools pane. Every gesture file and clip
+takes part in all three; the same two lines in a file feed them:
+
+```js
+about: "sultry come-hither, teasing, inviting",          // tags and meaning
+keywords: ["beckon", "come hither", "crooks a finger"],  // keyword fallback
+```
+
+### Tags (the default): she decides
+
+Her system prompt gets one line listing every gesture that has an `about`:
+
+> Body: you have an animated 3D body on screen. When a gesture fits what
+> you say, put one tag where it happens: [wave] (hello, goodbye), [hug]
+> (affection, comfort), [sultry_beckon] (sultry come-hither, teasing,
+> inviting), ... At most one per reply, most replies need none.
+
+The language model reads the conversation and, when it fits, writes the
+tag into its reply like any other word. Nothing else chooses: it's the
+same reasoning that picks her words, so it understands the moment, not
+just the vocabulary. That's why it suits role-play: "come a little
+closer..." in a teasing scene gets `[sultry_beckon]` with no keyword in
+sight.
+
+As the reply streams in, the tag is cut out before anything is shown,
+spoken or saved, and the portrait is told to play it. Private gestures are
+left out of the line in chat rooms, so she can't pick them there.
+
+The `about` text is the whole interface: write it as "when to use this",
+short and concrete. A vague `about` gets picked at odd times; no `about`
+means she never picks it herself.
+
+Cost: about 60 tokens of prompt (cached by llama.cpp, so read once) plus a
+few output tokens when she uses one.
+
+### Meaning: the embedding model decides
+
+After she answers, the embedding model (the one that recalls her memories)
+turns two things into vectors, lists of numbers that capture meaning:
+
+- the exchange: "They said: ... She answered: ...";
+- a short description of each gesture. The built-ins have hand-written
+  ones; every other gesture or clip with an `about` gets "A moment for the
+  gesture sultry beckon: sultry come-hither, teasing, inviting."
+
+It compares the exchange with every description (cosine similarity, 0 to
+1) and also with a few "ordinary reply" descriptions (facts, a finished
+task, an explanation). A gesture plays only if it beats the best
+"ordinary" score by `portrait.meaning_margin` (0.04 by default), so most
+replies get nothing. `/portrait meaning <text>` shows the scores for any
+line, and the log records them for every reply.
+
+It runs after the reply, off the turn's path (10 to 30 ms), needs the
+embedding server, and is fuzzier than tags. Private gestures only take part
+in your own conversations.
+
+### Keywords: the safety net
+
+Underneath both modes (and alone in `keywords` mode), the portrait watches
+what she writes. A word from a gesture's `keywords` inside an action
+(`*beckons*`, `*puts a finger to her lips*`) plays it; an emoji in the list
+(🤫) plays it anywhere. A keyword matches the start of a word, so `hug`
+catches hugs and hugging. A tag she wrote herself always wins over a
+keyword, and the earliest match in the reply wins over later ones.
+
+Keywords only look inside `*actions*`, never at ordinary sentences, so
+"I hugged a tree today" doesn't make her hug.
+
+For a `.vrma` clip, put `about` and `keywords` in `clips.json`.
 
 ## What happens every frame
 
@@ -216,7 +290,8 @@ export default {
 
 | Setting | What it does |
 |---------|--------------|
-| `about: "..."` | When to use it. Offers it to her as a tag in tags mode. Without it she won't choose it herself, but it still plays from buttons, commands and idle |
+| `about: "..."` | When to use it. Offers it to her as a tag in tags mode, and is what meaning mode compares with. Without it she won't choose it herself, but it still plays from buttons, commands and idle |
+| `keywords: [...]` | Words that play it when she writes them inside an `*action*`, and emoji that play it anywhere |
 | `idle: true` | One of the things she does on her own when nothing's happening |
 | `private: true` | Never triggered from stream chat, and only offered to her in your own conversations |
 | `left: true` | Also make a mirrored copy, `<name>_left` |

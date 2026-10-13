@@ -6,6 +6,7 @@ const WAVE_UP = R({ rightUpperArm: [0, 0.5, 0.75], rightLowerArm: [0, -0.2, -2.4
                     ...open('right'), '+head': [0, -0.08, -0.08], '+spine': [0, 0, -0.03] });
 
 export default {
+  keywords: ["wave", "waving", "👋"],   // in what she writes, *like this*
   about: "hello, goodbye",   // offered to her as [wave] in tags mode
   left: true,         // also a left-handed version, wave_left
   dur: 2.6, fade: [0.35, 0.45],

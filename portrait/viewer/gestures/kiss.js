@@ -2,6 +2,7 @@
 import { fingers, open } from './_pose.js';
 
 export default {
+  keywords: ["blows a kiss", "blowing a kiss", "blows you a kiss", "😘"],   // in what she writes, *like this*
   about: "blowing a kiss, affection",   // offered to her as [kiss] in tags mode
   private: true,      // never from stream chat
   dur: 3.0, fade: [0.45, 0.6],

@@ -16,7 +16,7 @@ import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils,
          VRMAnimationLoaderPlugin, createVRMAnimationClip } from './vendor/luna-three.js';
 import { createLook } from './look.js';
 import { createHologram3D } from './hologram3d.js';
-import { createGestures, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED } from './gestures.js';
+import { createGestures, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
 const note = document.getElementById('note');
@@ -290,8 +290,8 @@ let waveBack = false;
 // a busy chat doesn't keep her flailing.
 const chatSeen = new Set();
 const chatCool = { cmd: 0, auto: 0 };
-const CHAT_CMDS = { wave: 'wave', hug: 'hug', jump: 'jump', bounce: 'bounce', dance: 'bounce',
-                    shrug: 'shrug', stretch: 'stretch', hi: 'wave', hello: 'wave', hop: 'bounce' };
+const CHAT_CMDS = { wave: 'wave', hug: 'hug', jump: 'jump', bounce: 'bounce',
+                    shrug: 'shrug', stretch: 'stretch', hi: 'wave', hello: 'wave', hop: 'bounce', dance: 'dance' };
 function fromChat(ev) {
   const t = String(ev.text || '').toLowerCase().trim(), who = String(ev.who || '').toLowerCase();
   const now = clock.elapsedTime, first = who && !chatSeen.has(who);
@@ -315,21 +315,35 @@ function fromChat(ev) {
 const said = { text: '', done: new Set(), tagged: false };
 // How her replies set gestures off (gestures.py): tags, meaning, keywords, off.
 const gmode = { mode: cfg.gestures || 'tags', chat: cfg.chat_gestures !== false };
-const ACTS = [
-  ['hug', /\*[^*\n]{0,40}\b(hug|hugs|hugging|cuddle|cuddles|squeez)\w*[^*\n]{0,40}\*|🤗/i],
-  ['wave', /\*[^*\n]{0,40}\b(wave|waves|waving)\b[^*\n]{0,40}\*|👋/i],
-  ['jump', /\*[^*\n]{0,40}\b(jump|jumps|jumping|leaps?)\b[^*\n]{0,40}\*/i],
-  ['bounce', /\*[^*\n]{0,40}\b(bounc\w*|hops?|hopping|wiggles?|happy dance)\b[^*\n]{0,40}\*/i],
-  ['stretch', /\*[^*\n]{0,40}\b(stretch\w*|yawns?)\b[^*\n]{0,40}\*/i],
-  ['shrug', /\*[^*\n]{0,40}\bshrug\w*[^*\n]{0,40}\*|🤷/i],
-  ['tuck_hair', /\*[^*\n]{0,40}\b(tucks?|brush\w*) (her |a )?(hair|strand)[^*\n]{0,40}\*/i],
-];
+// Built from each gesture file's "keywords" (and clips.json's): a word
+// inside an action she writes (*beckons you closer*) or an emoji anywhere.
+// A keyword matches as the start of a word, so "hug" also catches hugs,
+// hugging. Built once the gestures and clips have loaded.
+let ACTS = [];
+function buildActs() {
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  const lists = Object.entries(GESTURE_KEYWORDS).concat((cfg.clips || []).filter(c => c.keywords).map(c => [c.name, c.keywords]));
+  ACTS = [];
+  for (const [name, kws] of lists) {
+    const words = kws.filter(k => /\w/.test(k)), marks = kws.filter(k => !/\w/.test(k));
+    const parts = [];
+    if (words.length) parts.push(`\\*[^*\\n]{0,60}\\b(?:${words.map(esc).join('|')})\\w*[^*\\n]{0,60}\\*`);
+    if (marks.length) parts.push(marks.map(esc).join('|'));
+    if (parts.length) ACTS.push([name, new RegExp(parts.join('|'), 'iu')]);
+  }
+}
 function actOut(text) {
   if (said.tagged) return;          // she picked one herself: that wins
+  // the earliest match in what she's written so far
+  let best = null;
   for (const [name, re] of ACTS) {
-    if (said.done.has(name) || !re.test(text)) continue;
-    said.done.add(name);
-    gesture(name);
+    if (said.done.has(name)) continue;
+    const m = re.exec(text);
+    if (m && (!best || m.index < best[1])) best = [name, m.index];
+  }
+  if (best) {
+    said.done.add(best[0]);
+    gesture(best[0]);
     return;
   }
   // said hi back without acting it out: wave anyway
@@ -951,12 +965,31 @@ function debugPanel() {
   const covered = new Set(['wave', 'hug', 'jump', 'shrug', 'stretch', 'look_hand', 'tuck_hair', 'bounce', 'explain',
                            'kiss', 'shy', 'cry']);
   for (const n of GESTURE_NAMES) if (!covered.has(n) && !n.endsWith('_left')) buttons[n.replace(/_/g, ' ')] = () => gesture(n);
+  // grouped, each group alphabetical; anything not listed is a gesture
+  const GROUPS = [
+    ['her state', ['idle', 'listen', 'talk', 'think']],
+    ['face and mood', ['blink', 'cross', 'fluster', 'happy', 'neutral', 'sad', 'tears on/off']],
+    ['looking', ['you: ahead', 'you: left', 'you: right']],
+    ['body', ['left ear', 'twitch', 'wag tail']],
+    ['effects', ['glitch', 'holo on/off']],
+  ];
+  const grouped = new Set(GROUPS.flatMap(([, l]) => l));
+  GROUPS.splice(1, 0, ['gestures', Object.keys(buttons).filter(l => !grouped.has(l))]);
   const box = document.getElementById('dbuttons');
-  for (const [label, fn] of Object.entries(buttons)) {
-    const b = document.createElement('button');
-    b.textContent = label;
-    b.onclick = fn;
-    box.appendChild(b);
+  for (const [title, labels] of GROUPS) {
+    const list = labels.filter(l => buttons[l]).sort((a, b) => a.localeCompare(b));
+    if (!list.length) continue;
+    const h = document.createElement('div');
+    h.className = 'dim';
+    h.style.margin = '6px 0 1px';
+    h.textContent = title;
+    box.appendChild(h);
+    for (const label of list) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.onclick = buttons[label];
+      box.appendChild(b);
+    }
   }
   // a gesture file with a mistake in it: say which and why, instead of a missing button
   if (Object.keys(GESTURE_FAILED).length) {
@@ -1040,7 +1073,8 @@ try {
   say('');
   window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, mouthShut, blush, tears, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
   if (params.get('debug')) debugPanel();
-  loadClips();
+  buildActs();
+  loadClips().then(buildActs);
   if (params.get('demo')) demo(); else connect();
 } catch (e) {
   console.error(e);

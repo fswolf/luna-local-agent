@@ -2242,7 +2242,7 @@ def ask(text, model, on_text=None, on_sentence=None,
             pass
 
     livefeed.emit("done", seconds=round(time.monotonic() - started, 1), conf=conf)
-    gestures.after_reply(text, answer)
+    gestures.after_reply(text, answer, private=bool(turn.get("private", True)))
 
     try:
         import reflect

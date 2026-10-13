@@ -1,5 +1,6 @@
 // cry: head down, shoulders shaking with little sobs, tears
 export default {
+  keywords: ["cries", "crying", "sob", "tears up", "😭", "😢"],   // in what she writes, *like this*
   about: "deeply sad or hurt, moved to tears",   // offered to her as [cry] in tags mode
   dur: 7.0, fade: [0.9, 1.4],
   keys: [

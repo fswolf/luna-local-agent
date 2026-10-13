@@ -7,6 +7,7 @@ const SHH_HAND = { ...fingers('right', 0.9), rightIndexProximal: [0, 0, 0], righ
 const SHH = { rightUpperArm: [0, 1.1, 0.4], rightLowerArm: [0, 2.2, -0.3, 0.18], rightHand: [0.12, -0.3, -1.0], ...SHH_HAND };
 
 export default {
+  keywords: ["shh", "finger to her lips", "finger to my lips", "🤫"],   // in what she writes, *like this*
   about: "a secret, mischief, being sly",
   dur: 2.8, fade: [0.45, 0.6],
   keys: [

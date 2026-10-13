@@ -1,4 +1,4 @@
-// sultryBeckon: a come-hither curl of the fingers, other hand on her hip,
+// sultry_beckon: a come-hither curl of the fingers, other hand on her hip,
 // weight on one leg, a sly smile. Ryan's first gesture, tidied up.
 import { fingers } from './_pose.js';
 
@@ -10,6 +10,7 @@ const HIP = { leftUpperArm: [0, 0.3, -0.75], leftLowerArm: [0, -0.5, -1.3], left
 const POP = { hips: [-0.025, 0, 0], '+spine': [0, 0, 0.06], '+chest': [0, 0, -0.03] };
 
 export default {
+  keywords: ["beckon", "come hither", "come-hither", "crooks a finger", "curls a finger"],   // in what she writes, *like this*
   about: "sultry come-hither, teasing, inviting",
   private: true,
   dur: 3.4,
