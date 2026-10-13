@@ -110,6 +110,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Learning from herself](docs/learning.md): lessons, episodes, fact cleanup, calibration
 - [Moods](docs/moods.md)
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
+- [Gestures](docs/gestures.md): how her body moves, what sets it off, writing your own
 - [Home automation](docs/home.md): Home Assistant on your own network, setup, what always asks, local devices
 - [Sysadmin](docs/sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](docs/plugins.md): stream chat, Minecraft, Zork, Vibe City, Home Assistant, cron jobs, Discord
