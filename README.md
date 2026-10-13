@@ -3,7 +3,6 @@
 <hr>
 
 <img width="1210" alt="Luna in the terminal beside her animated Live2D portrait" src="assets/luna-desktop.png" />
-<img width="1210" alt="A conversation in the full-screen terminal interface" src="assets/ui-conversation.png" />
 
 # luna-local-agent
 
