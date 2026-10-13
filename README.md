@@ -1,3 +1,7 @@
+<img src="assets/luna-github-banner-v1.png" alt="Luna — Your voice. Your machine. Your Luna." width="100%">
+
+<hr>
+
 <img width="1210" alt="Luna in the terminal beside her animated Live2D portrait" src="assets/luna-desktop.png" />
 <img width="1210" alt="A conversation in the full-screen terminal interface" src="assets/ui-conversation.png" />
 
