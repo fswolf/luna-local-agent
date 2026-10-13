@@ -95,7 +95,7 @@ export const GESTURES = {
       [2.8, { ...HUG_HOLD, '+spine': [0.15, 0.04, 0], '+head': [0.12, 0.05, 0.2] }],
       [3.6, { ...HUG_OPEN, '+spine': [0.06, 0, 0], '+head': [0.04, 0, 0.05] }],
     ],
-    expr: { happy: 0.85, blink: [[0, 0], [0.9, 0], [1.2, 0.85], [2.8, 0.85], [3.1, 0]] },
+    expr: { happy: 0.85, blush: 0.55, blink: [[0, 0], [0.9, 0], [1.2, 0.85], [2.8, 0.85], [3.1, 0]] },
   },
   jump: {
     dur: 1.35, fade: [0.12, 0.3],
@@ -125,6 +125,36 @@ export const GESTURES = {
                         rightShoulder: [0, 0, -0.2] })]],
     add: { '+head': [0.02, 0, 0.14] },
     expr: { relaxed: 0.3 },
+  },
+  // ---- affectionate: only in your own conversations, never from chat ----
+  kiss: {        // fingers to her lips, eyes closed, then blown your way
+    dur: 3.0, fade: [0.45, 0.6],
+    keys: [
+      [0.0, { rightUpperArm: [0, 1.2, 0.4], rightLowerArm: [0, 2.0, -0.55, -0.4], rightHand: [-0.4, 0, 0], ...fingers('right', 0.45),
+              '+head': [0.06, -0.05, -0.06], '+spine': [0.03, 0, 0] }],
+      [1.0, { rightUpperArm: [0, 1.2, 0.4], rightLowerArm: [0, 2.0, -0.55, -0.4], rightHand: [-0.4, 0, 0], ...fingers('right', 0.5),
+              '+head': [0.08, -0.05, -0.08], '+spine': [0.04, 0, 0] }],
+      [1.45, { rightUpperArm: [0, 1.1, 0.2], rightLowerArm: [0, 0.95, -0.55, 1.2], rightHand: [1.3, 0, 0], ...open('right'),
+               '+head': [-0.04, -0.04, -0.1], '+spine': [0.07, 0, 0] }],
+      [3.0, { rightUpperArm: [0, 1.1, 0.25], rightLowerArm: [0, 0.9, -0.55, 1.2], rightHand: [1.3, 0, 0], ...open('right'),
+              '+head': [-0.02, -0.03, -0.12], '+spine': [0.05, 0, 0] }],
+    ],
+    expr: { blush: 0.85, blink: [[0, 0], [0.3, 1], [1.15, 1], [1.45, 0]], ou: [[0, 0], [0.3, 0.75], [1.05, 0.75], [1.3, 0]],
+            happy: [[0, 0], [1.25, 0], [1.6, 0.6]] },
+  },
+  shy: {         // hands together at her chest, looking away, then a peek at you
+    dur: 4.2, fade: [0.6, 0.8],
+    keys: [
+      [0.0, { ...both({ rightUpperArm: [0, 0.8, 1.15], rightLowerArm: [0, 2.15, -0.15], rightHand: [0, 0.2, 0],
+                        rightShoulder: [0, 0, -0.12] }), ...fingers('right', 0.45), ...fingers('left', 0.45),
+              '+spine': [0.05, 0, 0.03], '+head': [0.2, 0.28, 0.12] }],
+      [1.6, { '+spine': [0.06, 0, -0.03], '+head': [0.22, 0.3, 0.14] }],
+      [2.2, { '+spine': [0.05, 0, 0], '+head': [0.12, 0.06, 0.08] }],       // a peek
+      [2.9, { '+spine': [0.05, 0, 0.02], '+head': [0.12, 0.05, 0.08] }],
+      [3.4, { '+spine': [0.06, 0, 0.03], '+head': [0.2, 0.26, 0.12] }],     // and away again
+      [4.2, { '+spine': [0.05, 0, 0.0], '+head': [0.18, 0.24, 0.1] }],
+    ],
+    expr: { blush: 1, relaxed: 0.35 },
   },
   // ---- on her own, when idle ----
   stretch: {
@@ -199,6 +229,8 @@ function mirrorGesture(g) {
 }
 
 export const IDLE = ['stretch', 'look_hand', 'tuck_hair', 'tuck_hair_left', 'bounce'];
+// Never from stream chat, and only offered to her in your own turns.
+export const PRIVATE = ['kiss', 'shy'];
 export const NAMES = Object.keys(GESTURES);
 
 // ---------------------------------------------------------------------------
@@ -303,6 +335,7 @@ export function createGestures(THREE, vrm) {
     state() { return active.map(a => ({ name: a.name, t: +a.t.toFixed(2), out: a.out })); },
     // publicOnly: from chat, so a clip marked private never plays
     play(name, publicOnly = false) {
+      if (publicOnly && PRIVATE.includes(name)) return false;
       const vs = (clips[name] || []).filter(v => !publicOnly || !v.opts.private);
       const g = GESTURES[name];
       if (!vs.length && !g) return false;

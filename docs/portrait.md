@@ -253,6 +253,8 @@ and does small things on her own:
 | Stretch, look at her hand, tuck her hair | On her own, every half minute or so while idle |
 | A hand while she talks | Now and then mid-sentence |
 | Tail wag | With the happy ones, and when her mood warms up |
+| Blow a kiss, shy | Affectionate ones, for people who role-play with her: fingers to her lips then blown your way; hands together at her chest, looking away, then a peek. Only in your own conversations: never from stream chat, and never offered to her in a chat room's turn |
+| Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
 
 ### Animation clips (.vrma)
 
@@ -313,6 +315,22 @@ one. In `meaning` mode the log shows every score
 text>` scores a line by hand. If she gestures too often, raise
 `portrait.meaning_margin` (default `0.04`); too rarely, lower it.
 
+**The blush.** VRoid paints the cheeks into the face texture, so there's
+no blush expression to turn up. The portrait lays a second copy of the
+face skin over it, sharing its skeleton and shape keys, with a pink glow
+in the cheek area of VRoid's face layout; it fades in and out and moves
+with every expression. A model with its own `blush` expression uses that
+instead. The viewer's **tune** section has a blush slider for trying it
+(left end is automatic). Per model, in its folder's `luna.json`:
+
+```json
+{ "vrm": { "blush": { "left": [0.33, 0.61], "right": [0.67, 0.61], "size": 0.075,
+                      "color": "#ff5f86", "strength": 0.65 } } }
+```
+
+`left` and `right` are where the cheeks sit in the face texture (0 to 1
+from the top left); `"enabled": false` turns it off.
+
 **Chat can set them off too.** Every message in stream chat (Twitch,
 YouTube, IRC, pomf) and Discord reaches the portrait, answered or not:
 
@@ -330,7 +348,7 @@ between the rest) so a busy chat doesn't keep her flailing.
 The **chat gestures** row in the tools pane turns them off, or
 `"portrait": {"chat_gestures": false}`.
 
-`/portrait wave` (or `hug`, `jump`, `bounce`, `shrug`, `stretch`,
+`/portrait wave` (or `hug`, `jump`, `bounce`, `shrug`, `stretch`, `kiss`, `shy`,
 `look_hand`, `tuck_hair`) plays one by hand, good for a stream. The
 `?debug=1` page has a button for each.
 

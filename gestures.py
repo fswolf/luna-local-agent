@@ -23,11 +23,14 @@ import config
 import logbook
 
 MODES = ("tags", "meaning", "keywords", "off")
-NAMES = ("wave", "hug", "jump", "bounce", "shrug", "stretch")
+NAMES = ("wave", "hug", "jump", "bounce", "shrug", "stretch", "kiss", "shy")
+# Affectionate ones: offered only in your own turns, never in a chat room's.
+PRIVATE = ("kiss", "shy")
 
 # What each built-in tag is for, in her prompt.
 ABOUT = {"wave": "hello, goodbye", "hug": "affection, comfort", "jump": "big excitement",
-         "bounce": "happy, playful", "shrug": "don't know, oh well", "stretch": "tired, waking up"}
+         "bounce": "happy, playful", "shrug": "don't know, oh well", "stretch": "tired, waking up",
+         "kiss": "blowing a kiss, affection", "shy": "bashful, flustered by a compliment"}
 
 _PARTIAL = re.compile(r"\[([a-z_]{0,24})$", re.IGNORECASE)
 _clips = {"at": 0.0, "list": []}
@@ -84,7 +87,7 @@ def prompt_line(private=True):
     if mode() != "tags" or not _three_d():
         return ""
 
-    about = dict(ABOUT)
+    about = {n: a for n, a in ABOUT.items() if private or n not in PRIVATE}
     for c in clips():
         if c.get("about") and (private or not c.get("private")):
             about[c["name"]] = str(c["about"])[:60]

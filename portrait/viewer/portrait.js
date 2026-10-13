@@ -210,6 +210,7 @@ function handle(ev) {
     case 'mood': {
       const w = +ev.warmth || 0;
       if (w - mind.warmth > 0.2) moves?.wag(0.8), setTimeout(() => moves?.wag(0), 4000);
+      if (w > 0.85 && mind.warmth <= 0.85 || w - mind.warmth > 0.3) blush.fluster = 1;   // that landed
       mind.energy = +ev.energy || 0;
       mind.warmth = w;
       break;
@@ -561,8 +562,11 @@ function animate() {
     camera.position.y = base.lookY + 0.01 + hy;
     camera.lookAt(0, base.lookY + hy, base.headZ);
     for (const [k, v] of Object.entries(moves.expr())) {
-      if (has.has(k)) vrm.expressionManager.setValue(k, Math.max(vrm.expressionManager.getValue(k) || 0, v));
+      if (k === 'blush') blush.gesture = v;
+      else if (has.has(k)) vrm.expressionManager.setValue(k, Math.max(vrm.expressionManager.getValue(k) || 0, v));
     }
+    if (!Object.hasOwn(moves.expr(), 'blush')) blush.gesture = 0;
+    updateBlush(dt);
 
     vrm.update(dt);
     closeMouth(talking);
@@ -614,14 +618,76 @@ function quietSmile() {
 function closeMouth(talking) {
   if (!mouthShut.targets) findMorphs();
   mouthShut.talk += ((talking > 0.03 ? 1 : 0) - mouthShut.talk) * (talking > 0.03 ? 0.3 : 0.05);
-  const open = Math.max(Math.min(1, talking * 5), vrm.expressionManager?.getValue('surprised') || 0,
-                        vrm.expressionManager?.getValue('aa') || 0, vrm.expressionManager?.getValue('happy') || 0);
+  const em = vrm.expressionManager, v = k => em?.getValue(k) || 0;
+  const open = Math.max(Math.min(1, talking * 5), v('surprised'), v('happy'),
+                        v('aa'), v('ih'), v('ou'), v('ee'), v('oh'));   // a pucker or a yawn isn't held shut
   mouthShut.now += (mouthShut.amount * (1 - open) - mouthShut.now) * 0.25;
   for (const [o, i] of mouthShut.targets) o.morphTargetInfluences[i] = mouthShut.now;
   if (quietSmile()) {
     const s = moodNow.happy * (1 - mouthShut.talk);
     for (const [o, eye, mth] of mouthShut.smile) { o.morphTargetInfluences[eye] = s * 0.8; o.morphTargetInfluences[mth] = s; }
   }
+}
+
+// Blush. VRoid paints the cheeks into the face texture, so there's no
+// expression to turn up; instead a second copy of the face skin, sharing
+// its skeleton and shape keys, carries a pink glow painted in the face's
+// own texture layout and fades in over the cheeks. It moves with every
+// expression because it is the same face. A model with its own "blush"
+// expression uses that instead.
+//
+// What raises it: a gesture that asks (hug, kiss, shy), a big jump in
+// warmth (flustered, then fading), and a little while warmth stays high.
+// luna.json, "vrm": {"blush": {"left": [u, v], "right": [u, v], "size": 0.075,
+//                               "color": "#ff5f86", "strength": 0.65}}
+// (u, v from the top-left of the face texture; the default is VRoid's.)
+const blush = { now: 0, gesture: 0, fluster: 0, layer: null, tried: false, test: null };
+function blushLayer() {
+  if (blush.tried) return blush.layer;
+  blush.tried = true;
+  const o = cfg.vrm?.blush || {};
+  let skin = null;
+  vrm.scene.traverse(m => {
+    if (!skin && m.isSkinnedMesh && [].concat(m.material).some(x => /face.*skin|skin.*face/i.test(x.name || ''))) skin = m;
+  });
+  if (!skin || o.enabled === false) return null;
+  const S = 512, cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  const col = new THREE.Color(o.color || '#ff5f86'), [r, gg, b] = [col.r, col.g, col.b].map(x => Math.round(x * 255));
+  for (const [u, v] of [o.left || [0.33, 0.61], o.right || [0.67, 0.61]]) {
+    const rad = (o.size || 0.075) * S;
+    const grad = g.createRadialGradient(u * S, v * S, 0, u * S, v * S, rad);
+    grad.addColorStop(0, `rgba(${r},${gg},${b},0.75)`);
+    grad.addColorStop(0.45, `rgba(${r},${gg},${b},0.38)`);
+    grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+    g.fillStyle = grad;
+    g.beginPath(); g.ellipse(u * S, v * S, rad * 1.25, rad, 0, 0, Math.PI * 2); g.fill();
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.flipY = false;                       // glTF texture layout
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false,
+                                            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  const layer = new THREE.SkinnedMesh(skin.geometry, mat);
+  layer.bind(skin.skeleton, skin.bindMatrix);
+  layer.morphTargetInfluences = skin.morphTargetInfluences;      // same array: same expression, always
+  layer.morphTargetDictionary = skin.morphTargetDictionary;
+  layer.frustumCulled = false;
+  layer.renderOrder = (skin.renderOrder || 0) + 1;
+  skin.parent.add(layer);
+  layer.position.copy(skin.position); layer.quaternion.copy(skin.quaternion); layer.scale.copy(skin.scale);
+  blush.layer = { mesh: layer, mat, strength: o.strength ?? 0.65 };
+  return blush.layer;
+}
+function updateBlush(dt) {
+  blush.fluster = Math.max(0, blush.fluster - dt / 7);                 // flustered fades over ~7 s
+  const warm = Math.max(0, (mind.warmth - 0.6) * 0.9);
+  const target = blush.test ?? Math.min(1, Math.max(blush.gesture, blush.fluster, warm));
+  blush.now = damp(blush.now, target, target > blush.now ? 2.5 : 0.8, dt);   // rises quicker than it fades
+  if (has.has('blush')) { vrm.expressionManager.setValue('blush', blush.now); return; }
+  const l = blushLayer();
+  if (l) { l.mat.opacity = blush.now * l.strength; l.mesh.visible = blush.now > 0.01; }
 }
 
 function debugPanel() {
@@ -644,6 +710,7 @@ function debugPanel() {
     wave: () => gesture('wave'), hug: () => gesture('hug'), jump: () => gesture('jump'),
     shrug: () => gesture('shrug'), stretch: () => gesture('stretch'), 'look at hand': () => gesture('look_hand'),
     'tuck hair': () => gesture('tuck_hair'), bounce: () => gesture('bounce'), explain: () => gesture('explain'),
+    'blow a kiss': () => gesture('kiss'), shy: () => gesture('shy'), fluster: () => { blush.fluster = 1; },
     'wag tail': () => { moves.wag(1); setTimeout(() => moves.wag(0), 3000); },
     'holo on/off': () => setHolo(!(holo && holo.isOn())),
   };
@@ -658,6 +725,15 @@ function debugPanel() {
     r.oninput = () => { mouthShut.amount = +r.value; out.textContent = ` ${r.value}  ("vrm": {"mouth_close": ${r.value}} in luna.json)`; };
     row.append(r, out);
     tune.appendChild(row);
+    const row2 = document.createElement('label');
+    row2.textContent = ' blush ';
+    const r2 = document.createElement('input');
+    Object.assign(r2, { type: 'range', min: -0.05, max: 1, step: 0.05, value: -0.05, title: 'left end: automatic' });
+    const out2 = document.createElement('span');
+    out2.textContent = ' auto';
+    r2.oninput = () => { blush.test = +r2.value < 0 ? null : +r2.value; out2.textContent = blush.test == null ? ' auto' : ` ${r2.value}`; };
+    row2.append(document.createElement('br'), r2, out2);
+    row.after(row2);
   }
   const box = document.getElementById('dbuttons');
   for (const [label, fn] of Object.entries(buttons)) {
@@ -738,7 +814,7 @@ try {
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
   say('');
-  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, mouthShut, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
+  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, mouthShut, blush, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
   if (params.get('debug')) debugPanel();
   loadClips();
   if (params.get('demo')) demo(); else connect();
