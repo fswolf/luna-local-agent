@@ -80,8 +80,12 @@ def register_external(name, description, properties, required=(), run=None, grou
 # after a file read, ask first - see tools/files.py and tools/web.py.
 OUTSIDE = {"web_search", "read_page", "research"}
 
+# Tools that exist for the machinery, not as features: never listed in
+# the tools pane, never switched off, only sent when routing needs them.
+_INTERNAL = {"more_tools"}
 
-def specs(only=None):
+
+def specs(only=None, query=None):
     """The tool list sent to the model.
 
     A tool that can't work is left out rather than offered and failed.
@@ -94,20 +98,54 @@ def specs(only=None):
     Ryan's data, so a turn typed by a stranger must not reach most of
     it, and "the model knows not to" is not a control. Leaving the
     tool out of the request is.
+
+    `query` (the user's message) turns on routing: of what's left, only
+    the groups this turn needs travel, plus more_tools to reach the rest
+    (tools/routing.py). Without it, everything allowed is sent.
     """
     allowed = set(only) if only is not None else None
-
-    return [
-        entry["spec"] for name, entry in _REGISTRY.items()
-        if entry["available"]() and enabled(name)
+    pool = {
+        name: entry for name, entry in _REGISTRY.items()
+        if name not in _INTERNAL and entry["available"]() and enabled(name)
         and (allowed is None or name in allowed)
-    ]
+    }
+
+    if query is None or not routing.enabled():
+        return [entry["spec"] for entry in pool.values()]
+
+    return _send(routing.choose(query, pool, group_of))
+
+
+def _send(chosen):
+    out = [entry["spec"] for name, entry in _REGISTRY.items() if name in chosen]
+    extra = routing.more_tools_spec()
+
+    return out + [extra] if extra else out
+
+
+def refresh():
+    """This turn's list again, with anything attached since. None if the
+    turn wasn't routed (then the list it has is already everything)."""
+    chosen = routing.current()
+
+    return None if chosen is None else _send(chosen)
+
+
+def attach(name):
+    """A tool this turn wasn't sent was called by name. If it was allowed
+    (on, available, inside the turn's ceiling), attach its group and say
+    yes; the caller runs it. Anything else stays refused."""
+    return routing.attach_tool(name)
+
+
+def begin_turn():
+    routing.begin_turn()
 
 
 def names():
     return sorted(
         name for name, entry in _REGISTRY.items()
-        if entry["available"]() and enabled(name)
+        if name not in _INTERNAL and entry["available"]() and enabled(name)
     )
 
 
@@ -247,6 +285,9 @@ def inventory():
     rows = []
 
     for name, entry in sorted(_REGISTRY.items()):
+        if name in _INTERNAL:
+            continue
+
         ready = entry["available"]()
         rows.append((
             name,
@@ -263,10 +304,11 @@ def budget():
     """(tokens actually being sent, tokens if everything were on)."""
     live = sum(
         cost(name) for name, entry in _REGISTRY.items()
-        if entry["available"]() and enabled(name)
+        if name not in _INTERNAL and entry["available"]() and enabled(name)
     )
     possible = sum(
-        cost(name) for name, entry in _REGISTRY.items() if entry["available"]()
+        cost(name) for name, entry in _REGISTRY.items()
+        if name not in _INTERNAL and entry["available"]()
     )
 
     return live, possible
@@ -277,7 +319,7 @@ def unavailable():
     return [
         (name, entry["why"]())
         for name, entry in sorted(_REGISTRY.items())
-        if not entry["available"]()
+        if name not in _INTERNAL and not entry["available"]()
     ]
 
 
@@ -298,7 +340,12 @@ def call(name, arguments):
         return f"Error: arguments for {name} must be an object"
 
     try:
-        return str(entry["run"](**arguments))
+        result = str(entry["run"](**arguments))
+
+        if name not in _INTERNAL:
+            routing.note_used(name, group_of)
+
+        return result
     except TypeError as e:
         return f"Error: wrong arguments for {name}: {e}"
     except Exception as e:
@@ -338,3 +385,4 @@ from . import shell      # noqa: E402,F401
 from . import mail       # noqa: E402,F401
 from . import textures   # noqa: E402,F401
 from . import network    # noqa: E402,F401
+from . import routing    # noqa: E402,F401

@@ -489,6 +489,16 @@ DESKTOP_ENABLED = bool(_desktop_cfg.get("enabled", True))
 # list rather than a scalar - the tools pane (Tab, twice) edits it, and
 # tools.set_enabled writes it back.
 TOOLS_DISABLED = list(setting("tools", {}).get("disabled", []))
+# Routing: every tool stays on, and each turn is sent only the groups it
+# seems to need (tools/routing.py). The core groups always travel; a
+# group used in the last sticky_turns turns stays; she can attach any
+# other with more_tools. false sends every tool on every turn.
+_tools_cfg = setting("tools", {})
+TOOLS_ROUTING = bool(_tools_cfg.get("routing", True))
+TOOLS_ROUTE_GROUPS = int(_tools_cfg.get("route_groups", 3))
+TOOLS_STICKY_TURNS = int(_tools_cfg.get("sticky_turns", 3))
+_core = _tools_cfg.get("core", ["Time", "Reminders", "Memory", "Shell"])
+TOOLS_CORE = list(_core) if isinstance(_core, (list, tuple)) else ["Time", "Reminders", "Memory", "Shell"]
 # The opt-in tools (tools.OPT_IN, the camera) switched on - an on-list,
 # so they stay off until you choose them. Its own key: tools.enabled is
 # the master switch further down.
@@ -992,6 +1002,9 @@ SETTINGS = {
 
     "tools.enabled":              ("TOOLS_ENABLED",                False),
     "tools.max_rounds":           ("MAX_TOOL_ROUNDS",              True),
+    "tools.routing":              ("TOOLS_ROUTING",                True),
+    "tools.route_groups":         ("TOOLS_ROUTE_GROUPS",           True),
+    "tools.sticky_turns":         ("TOOLS_STICKY_TURNS",           True),
 
     "shell.enabled":              ("SHELL_ENABLED",                True),
     "shell.timeout":              ("SHELL_TIMEOUT",                True),

@@ -41,6 +41,34 @@ The last five are the *Self* group: see [Her reasoning](reasoning.md#her-reasoni
 and [Learning from herself](learning.md#learning-from-herself). None of them are
 offered to stream chat.
 
+## Routing: she picks per turn
+
+Every schema costs context on every turn, called or not, and a local
+model picks worse from forty tools than from ten. So with routing on
+(the default), you leave tools on and each turn is sent only the
+groups it seems to need:
+
+1. **Core groups, always:** Time, Reminders, Memory and Shell
+   (`tools.core`).
+2. **What you said:** groups that match your message, by meaning
+   through the embedding server when it's running, plus plain keyword
+   hits. "Is the tower up?" brings Network; "check my inbox" brings
+   Email. The best `tools.route_groups` (3) by meaning go along.
+3. **What she just used:** a group used in the last
+   `tools.sticky_turns` (3) turns stays, so "and restart it" doesn't
+   lose the tool halfway through a job.
+4. **The rest, on request:** a small `more_tools` tool lists the
+   groups that weren't sent, and she can attach one mid-turn. Calling a
+   hidden tool by name attaches its group too.
+
+What it can't do is reach a tool you switched off, or one a turn isn't
+allowed (stream chat's narrow list holds). The tools pane is still the
+"never" switch; routing only chooses among what's on.
+
+`/context` shows how many tools went out with a turn ("12 of 31
+sent"), and the log says which groups were routed and which were
+hidden. `/set tools.routing false` sends everything, as before.
+
 ## Turning tools off
 
 Every schema above rides along in **every prompt**, called or not: a

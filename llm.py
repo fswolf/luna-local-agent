@@ -217,8 +217,14 @@ and the user finds out later that it didn't.
   If the result says denied, say so and stop - never retry a denied
   write.
 
+{_ROUTING_NUDGE if getattr(config, "TOOLS_ROUTING", True) else ""}
 Chat normally when no tool is needed.
 """
+
+
+_ROUTING_NUDGE = """- Not every tool is attached every turn. If the one you need isn't in
+  your list, call more_tools with its group, then call it. Never tell
+  the user you can't do something before checking more_tools."""
 
 
 def _plugin_lines(private):
@@ -1258,6 +1264,13 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             # outside it still runs.
             offered = {(t.get("function") or {}).get("name") for t in payload.get("tools") or ()}
 
+            # Routing sends only the groups a turn seems to need. A tool
+            # that was allowed but not sent - she knew its name from the
+            # prompt or history - is attached and run, not refused. The
+            # turn's ceiling still decides what "allowed" means.
+            if name not in offered and tools.attach(name):
+                offered.add(name)
+
             if name not in offered:
                 result = f"Error: {name} isn't available right now."
                 logbook.warn("tools", "refused %s - not offered this turn", name)
@@ -1278,6 +1291,13 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
                 "name": name,
                 "content": result,
             })
+
+        # more_tools, or a hidden tool called by name, attached a group:
+        # the next round gets the longer list.
+        routed = tools.refresh()
+
+        if routed is not None and payload.get("tools"):
+            payload["tools"] = routed
 
         # look_at_screen has no way to put an image in a tool result -
         # the field is a string - so it stashes the capture and we hand
@@ -1960,7 +1980,8 @@ def prompt_budget(text="hello"):
         replayed.extend(_replay(m))
 
     demo = _demonstration() if _tools_supported and not _has_tool_example(replayed) else []
-    specs = tools.specs() if _tools_supported else []
+    specs = tools.specs(query=text) if _tools_supported else []
+    every = len(tools.specs()) if _tools_supported else 0
     memory_block = build_memory_prompt(text)
     tools_block = build_tools_prompt()
     self_block = build_self_prompt(text)
@@ -1978,7 +1999,7 @@ def prompt_budget(text="hello"):
         "memory (facts + preferences)": lmstudio.estimate_tokens(memory_block),
         "lessons, recipes, projects + past sessions": lmstudio.estimate_tokens(self_block),
         "tools nudge": lmstudio.estimate_tokens(tools_block),
-        "tool schemas": lmstudio.estimate_tokens(specs),
+        f"tool schemas ({len(specs)} of {every} sent)": lmstudio.estimate_tokens(specs),
         "tool example": lmstudio.estimate_tokens(demo),
         f"history ({len(past)} turns + summary)": lmstudio.estimate_tokens(replayed),
     }
@@ -2120,7 +2141,8 @@ def ask(text, model, on_text=None, on_sentence=None,
         pass
 
     if _tools_supported:
-        payload["tools"] = tools.specs(only=tools_allowed)
+        tools.begin_turn()
+        payload["tools"] = tools.specs(only=tools_allowed, query=text)
 
         try:
             answer = _tool_rounds(payload, model, on_text, on_sentence)
