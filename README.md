@@ -46,7 +46,8 @@ What she does:
 - 🌱 Learns from herself: daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
 - 📺 Streams with you: answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
 - 🎮 Plays games: Minecraft, Zork and Vibe City, on her own when you go quiet ([details](docs/games.md))
-- 🏠 Runs your home and devices: Home Assistant on your own network, and toys through Lovense or Buttplug.io ([details](docs/devices.md))
+- 🏠 Runs your home: lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
+- 🔞 Adult toys: Lovense, and most other brands through Buttplug.io, with limits you set, stop words, and a stop that never goes through her ([details](docs/devices.md#lovense))
 - 📱 From your phone: Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
 - 🪟 Linux first, also on macOS and Windows
 - 💬 Full-screen terminal interface
