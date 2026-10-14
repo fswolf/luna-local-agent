@@ -40,6 +40,7 @@ What she does:
 - 🛡️ Hard to steer: a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
 - 🌙 Moods and feelings: she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md))
 - 📚 Long-term memory: optional permanent SQLite store with its own browser editor
+- 🗂️ Your knowledge base: point her at your notes, manuals, PDFs and docs, and she answers from them and says which file ([details](docs/knowledge.md))
 - 💭 Her reasoning, kept: the model's scratchpad per turn, with a browser viewer for reading it back
 - 🔬 See inside her: token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
 - 🎭 An animated portrait: Live2D or VRM, lip-synced, blinking, gestures, blushes and tears ([details](docs/portrait.md#portrait))
@@ -47,7 +48,7 @@ What she does:
 - 📺 Streams with you: answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
 - 🎮 Plays games: Minecraft, Zork and Vibe City, on her own when you go quiet ([details](docs/games.md))
 - 🏠 Runs your home: lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
-- 🔞 Adult toys: Lovense, and most other brands through Buttplug.io, with limits you set, stop words, and a stop that never goes through her ([details](docs/devices.md#lovense))
+- 🔞 Adult toys: Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
 - 📱 From your phone: Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
 - 🪟 Linux first, also on macOS and Windows
 - 💬 Full-screen terminal interface
@@ -77,6 +78,27 @@ Three local pages, served by Luna while she runs:
 <img width="1210" alt="The memory editor: add, edit, retire or delete the facts she keeps about you" src="assets/memory-manager.png" />
 
 **Memory** (127.0.0.1:8792/memory/): the facts she keeps about you, to add, edit, retire or delete.
+
+## Her knowledge
+
+Give her a folder of your own notes, manuals, PDFs and docs, and she
+answers from them: "what port did I put Jellyfin on?", "what does the
+boss in chapter 3 do?", "my dishwasher says E24". She says which file
+the answer came from, and when something you say matches a note
+closely enough, it comes along with your turn without her having to
+look.
+
+On first start she makes the folder for you:
+
+| System | Folder |
+|--------|--------|
+| Linux | `~/luna-knowledge` |
+| macOS | `~/luna-knowledge` (`/Users/you/luna-knowledge`) |
+| Windows | `%USERPROFILE%\luna-knowledge` (`C:\Users\you\luna-knowledge`) |
+
+Drop files in, or `/knowledge add` any folder you already keep notes
+in. It all stays on your machine, and keys and credentials are skipped
+even if they're in there ([details](docs/knowledge.md)).
 
 ---
 
@@ -114,6 +136,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Email](docs/email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](docs/vision.md): looking at your screen, the webcam
 - [Reminders and alarms](docs/reminders.md)
+- [Knowledge](docs/knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](docs/reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](docs/learning.md): lessons, episodes, fact cleanup, calibration

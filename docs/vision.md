@@ -125,9 +125,31 @@ and, like the screen, a model that can see.
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `device` | `0` | Which camera. `/camera list` shows them; a virtual camera from OBS can take number 0 |
+| `device` | `0` | Which camera: a number (`/camera list` shows them; a virtual camera from OBS can take number 0), a device file like `/dev/video2` on Linux, or a camera server's URL (below) |
 | `width` | `1280` | Pictures are scaled down to this, plenty for reading a label |
 | `warmup` | `5` | Frames thrown away first, because a webcam's first frame is nearly black |
+
+**A camera server instead of a webcam.** If your camera is already
+served over the network (mjpg-streamer, ustreamer, go2rtc, motion, an
+IP camera, a phone app like IP Webcam), point her at its URL:
+
+```bash
+/set camera.device http://192.168.1.20:8080/?action=snapshot
+/set camera.device http://user:password@192.168.1.20:8080/video
+/set camera.device rtsp://192.168.1.20:8554/cam
+```
+
+- A **snapshot URL** (answers with one JPEG) is the fastest and best.
+- An **MJPEG stream** works too: she reads until the first whole
+  picture and hangs up.
+- Both of those go straight over HTTP and don't need OpenCV at all.
+  `user:password@` in the URL is sent as a normal login, and never
+  shown back in her messages.
+- **RTSP** goes through OpenCV.
+
+That's also the easy way round Linux webcam trouble: a server like
+ustreamer owns the device, and everything else (OBS, a browser, Luna)
+reads from it instead of fighting over `/dev/video0`.
 
 **First time on each system:**
 
@@ -137,8 +159,12 @@ and, like the screen, a model that can see.
   Camera, then restart Luna.
 - **Windows** needs Settings > Privacy > Camera > *Let desktop apps
   access your camera*.
-- **Linux** usually just works. If it can't open the camera, check
-  that you're in the `video` group.
+- **Linux** usually just works. She asks for the camera through V4L2
+  in MJPEG, which most USB webcams need to give a full-size picture.
+  If it can't open the camera, check that you're in the `video` group
+  and that nothing else holds it. One webcam often shows up as two
+  `/dev/video` files and only one gives pictures; `/camera list` shows
+  which.
 
 On every system, a camera that OBS or Discord is already using may
 refuse to open. She'll say so rather than guess.

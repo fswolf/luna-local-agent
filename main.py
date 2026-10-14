@@ -155,6 +155,14 @@ ui.set_memory(longterm.status())
 # person. Everything after this is drift off that.
 mood.start()
 
+# Her knowledge base: index the folders in the background.
+try:
+    import knowledge
+
+    knowledge.start()
+except Exception as e:
+    logbook.warn("knowledge", "couldn't start: %s", e)
+
 import livefeed  # noqa: E402
 
 livefeed.start()
@@ -1363,6 +1371,37 @@ def handle_input(text):
             + ["/projects show <n> for the log; done|pause|resume|drop <n> to steer."]))
         return
 
+    if text == "/knowledge" or text.startswith("/knowledge "):
+        import knowledge
+
+        rest = text[len("/knowledge"):].strip()
+        word, _, arg = rest.partition(" ")
+        word, arg = word.lower(), arg.strip()
+
+        if word in ("reindex", "rescan", "refresh"):
+            knowledge.reindex()
+            ui.add_message("system", "Knowledge: looking through the folders again - /knowledge shows progress.")
+        elif word == "add" and arg:
+            path = os.path.realpath(os.path.expanduser(arg))
+
+            if not os.path.isdir(path):
+                ui.add_message("system", f"Knowledge: {arg} isn't a folder.")
+            else:
+                knowledge.set_folders(knowledge.folders() + [path])
+                ui.add_message("system", f"Knowledge: added {path}, indexing it now.")
+        elif word == "remove" and arg:
+            path = os.path.realpath(os.path.expanduser(arg))
+            knowledge.set_folders([f for f in knowledge.folders() if f != path])
+            ui.add_message("system", f"Knowledge: {path} removed; its passages go on the next scan.")
+        elif word == "search" and arg:
+            found, how = knowledge.search(arg, 5)
+            ui.add_message("system", "\n".join(
+                [f"Knowledge search ({how}):"] + [f"  {s:.2f}  {knowledge._where(i)}" for s, i in found]
+                if found else ["Knowledge: nothing matches."]))
+        else:
+            ui.add_message("system", knowledge.status())
+        return
+
     if text == "/camera" or text.startswith("/camera "):
         import camera
         import config
@@ -1381,7 +1420,7 @@ def handle_input(text):
             ui.add_message("system", "\n".join(
                 ["Cameras that open:"] + [f"  {i}: {size}" + ("  <- in use" if i == config.CAMERA_DEVICE else "")
                                           for i, size in found]
-                + ["  /set camera.device <n> picks one"] if found else
+                + ["  /set camera.device <n> picks one (or a camera server's URL)"] if found else
                 ["No camera opened." + (f" ({camera.why_unavailable()})" if camera._cv2() is None else "")]))
         elif word == "test":
             data, what = camera.grab()

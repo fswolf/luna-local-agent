@@ -1,0 +1,20 @@
+{
+  "_about": "Texture presets for portrait/texture.py. template: a file in textures/templates. paint: which part of the template is the part (opaque, transparent, black, white). mode: fill, stamp or inpaint. prompt: words around yours, {you} marks where yours go. Anything in the script's DEFAULTS (checkpoint, steps, cfg, sampler, scheduler, negative, denoise, feather, close) can be set per preset.",
+
+  "bra": {
+    "about": "VRoid bra top: fabric clipped to the cups and straps",
+    "template": "bra.png", "paint": "opaque", "mode": "fill",
+    "prompt": "flat fabric texture, top-down, even lighting, seamless, {you}"
+  },
+  "panties": {
+    "about": "VRoid panties: fabric clipped to the shape",
+    "template": "panties.png", "paint": "opaque", "mode": "fill",
+    "prompt": "flat fabric texture, top-down, even lighting, seamless, {you}"
+  },
+  "irises": {
+    "about": "VRoid eye irises: one iris, stamped into both circles",
+    "template": "irises.png", "paint": "transparent", "mode": "stamp", "mirror": true,
+    "prompt": "anime eye iris, front view, centered, perfectly circular, flat, no eyelids, no skin, {you}",
+    "negative": "lowres, worst quality, bad quality, text, watermark, eyelid, eyelashes, skin, face, person, multiple eyes, cropped, frame"
+  }
+}

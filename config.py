@@ -504,8 +504,27 @@ if isinstance(_old_enabled, (list, tuple)):
 # The webcam, for look_at_camera. The switch is the tool's row in the
 # tools pane; these only say which camera and how big.
 #   "camera": { "device": 0, "width": 1280, "warmup": 5 }
+# Her knowledge base (knowledge.py): folders of your notes, manuals,
+# PDFs and docs she can look things up in. The index is a cache outside
+# the repo (~/.cache/ai-voice/knowledge.db).
+#   "knowledge": { "enabled": true, "folders": ["~/luna-knowledge"], "auto": true,
+#                  "auto_passages": 2, "min_score": 0.55, "rescan_minutes": 10 }
+_knowledge_cfg = setting("knowledge", {})
+KNOWLEDGE_ENABLED = bool(_knowledge_cfg.get("enabled", True))
+KNOWLEDGE_FOLDERS = list(_knowledge_cfg.get("folders") or ["~/luna-knowledge"])
+KNOWLEDGE_AUTO = bool(_knowledge_cfg.get("auto", True))           # matching passages travel with the turn unasked
+KNOWLEDGE_AUTO_PASSAGES = int(_knowledge_cfg.get("auto_passages", 2))
+KNOWLEDGE_MIN_SCORE = float(_knowledge_cfg.get("min_score", 0.55))  # how close, by meaning, to come in unasked
+KNOWLEDGE_RESCAN_MINUTES = float(_knowledge_cfg.get("rescan_minutes", 10))
+
+# ComfyUI, for make_texture (portrait/texture.py).
+#   "comfyui": { "url": "http://127.0.0.1:8188" }
+COMFY_URL = str((setting("comfyui", {}) or {}).get("url", "http://127.0.0.1:8188"))
+
 _camera_cfg = setting("camera", {})
-CAMERA_DEVICE = int(_camera_cfg.get("device", 0))
+# A number (a webcam here), a /dev/video path, or a camera server's URL.
+_cam = _camera_cfg.get("device", 0)
+CAMERA_DEVICE = int(_cam) if isinstance(_cam, (int, float)) or str(_cam).strip().lstrip("-").isdigit() else str(_cam).strip()
 CAMERA_WIDTH = int(_camera_cfg.get("width", 1280))
 CAMERA_WARMUP = int(_camera_cfg.get("warmup", 5))
 
@@ -919,6 +938,14 @@ SETTINGS = {
 
     "vision.enabled":             ("VISION_ENABLED",               True),
     "vision.scale":               ("VISION_SCALE",                 True),
+    "knowledge.enabled":          ("KNOWLEDGE_ENABLED",            True),
+    "knowledge.folders":          ("KNOWLEDGE_FOLDERS",            True),
+    "knowledge.auto":             ("KNOWLEDGE_AUTO",               True),
+    "knowledge.auto_passages":    ("KNOWLEDGE_AUTO_PASSAGES",      True),
+    "knowledge.min_score":        ("KNOWLEDGE_MIN_SCORE",          True),
+
+    "comfyui.url":                ("COMFY_URL",                    True),
+
     "camera.device":              ("CAMERA_DEVICE",                True),
     "camera.width":               ("CAMERA_WIDTH",                 True),
     "camera.warmup":              ("CAMERA_WARMUP",                True),
@@ -1102,6 +1129,9 @@ def _coerce(path, raw):
             return False
 
         raise ValueError(f"{path} is on/off - say true or false, not {raw!r}")
+
+    if path == "camera.device":   # a number, a /dev path or a URL
+        return int(text) if text.lstrip("-").isdigit() else text
 
     if isinstance(existing, int) and not isinstance(existing, bool):
         try:

@@ -23,6 +23,8 @@ check the time, then schedule something.
 | `write_file` / `edit_file` | Create or change a file: **you approve each one on screen** |
 | `run_command` | Run a shell command: **you approve every one, no allow-all** |
 | `check_email` / `read_email` / `search_email` | Your inbox, read-only: nothing gets marked read ([Email](email.md)) |
+| `search_docs` | Your own notes, manuals and PDFs, by meaning, with the file it came from ([Knowledge](knowledge.md)) |
+| `make_texture` | New textures for her 3D model through ComfyUI, from a template ([Textures](textures.md)) |
 | `send_email` | Send or reply as you: **off until you switch it on, then you approve every one** |
 | `read_page` | Open a link and read it, not just the search snippet |
 | `research` | Search, read the top pages at once, keep the parts that answer the question |

@@ -11,11 +11,13 @@ Everything the README only touches on, one subject per page.
 - [Email](email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](vision.md): looking at your screen, the webcam
 - [Reminders and alarms](reminders.md)
+- [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](learning.md): lessons, episodes, fact cleanup, calibration
 - [Moods](moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
+- [Textures](textures.md): new clothes, irises and skin for her 3D model from UV templates, through ComfyUI
 - [Gestures](gestures.md): how her body moves, and writing your own
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
 - [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
