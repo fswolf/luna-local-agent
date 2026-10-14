@@ -7,6 +7,7 @@ a separate product. It's the tools she already has, put together:
 | Piece | What it gives her | Asks first? |
 |-------|-------------------|-------------|
 | `system_status` | VRAM, GPU temp and load, RAM, disk, the loaded model | no, it only reads |
+| `find_device` / `scan_network` | the IP of a machine on your network, by name or MAC | no, it only looks |
 | `run_command` | a shell, as you | **every command** |
 | `read_file` / `list_files` | logs, configs, reports, anywhere under `~` minus the deny list | no (yours to change in the tools pane) |
 | `write_file` / `edit_file` | notes and reports | yes, except a job writing inside `job_write_dirs` |
@@ -17,6 +18,7 @@ a separate product. It's the tools she already has, put together:
 Things you can say at the desk:
 
 - "How's the machine doing?"
+- "What's the Unraid server's address?"
 - "What's using port 8080?"
 - "Is the kokoro service running? Restart it if it isn't."
 - "Show me the last 30 lines of the llama log and tell me what went wrong."
@@ -85,6 +87,32 @@ Each of these can be asked for out loud or pasted into
 
 `/cron` lists the jobs and the last result of each. Ask her "what did
 the morning check say?" and she can read the report back.
+
+## Finding machines on your network
+
+"Find the Unraid server" or "what's my desktop's IP" gets an answer
+without you opening the router page. `find_device` looks, in order:
+
+1. **What she remembers.** A fact like "Ryan's Unraid server has MAC
+   aa:bb:cc:dd:ee:ff" finds it wherever DHCP has moved it. MACs don't
+   change; IPs do.
+2. **Its own name.** `name.local` (mDNS: Unraid answers as
+   `tower.local` out of the box, as do Macs, printers and Linux desktops
+   running avahi), then your router's DNS.
+3. **A look around.** One empty packet to each address on your /24, so
+   everything that's on shows up in the neighbor table, even machines
+   that ignore ping. Then reverse lookups for names. About three
+   seconds.
+
+When she finds one she offers to remember it, MAC and all, in her
+[long-term memory](memory.md). Say yes and next time it's instant.
+`scan_network` lists everything that's on, for the "which one is the
+printer?" moments; name the unknown ones and she remembers those too.
+
+What it doesn't do: no port scans, no root, nothing outside the private
+ranges (192.168, 10, 172.16-31), and nothing beyond your own /24.
+Phones on Wi-Fi often use a made-up MAC per network; she says so when
+she sees one, since remembering it may not stick.
 
 ## Checking other machines
 

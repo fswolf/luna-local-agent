@@ -22,6 +22,7 @@ check the time, then schedule something.
 | `list_files` / `read_file` | Look around and read, anywhere under `~` minus the deny list |
 | `write_file` / `edit_file` | Create or change a file: **you approve each one on screen** |
 | `run_command` | Run a shell command: **you approve every one, no allow-all** |
+| `find_device` / `scan_network` | A machine's IP on your network, by name or MAC, remembered by MAC ([Sysadmin](sysadmin.md#finding-machines-on-your-network)) |
 | `check_email` / `read_email` / `search_email` | Your inbox, read-only: nothing gets marked read ([Email](email.md)) |
 | `search_docs` | Your own notes, manuals and PDFs, by meaning, with the file it came from ([Knowledge](knowledge.md)) |
 | `make_texture` | New textures for her 3D model through ComfyUI, from a template ([Textures](textures.md)) |

@@ -141,6 +141,7 @@ _GROUPS = (
     ("Camera", ("look_at_camera",)),
     ("Web", ("web_search", "research", "read_page")),
     ("Shell", ("run_command",)),
+    ("Network", ("find_device", "scan_network")),
     ("Email", ("check_email", "read_email", "search_email", "send_email")),
     ("Knowledge", ("search_docs",)),
     ("Textures", ("make_texture",)),
@@ -336,3 +337,4 @@ from . import introspect  # noqa: E402,F401
 from . import shell      # noqa: E402,F401
 from . import mail       # noqa: E402,F401
 from . import textures   # noqa: E402,F401
+from . import network    # noqa: E402,F401
