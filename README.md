@@ -28,7 +28,6 @@ Powered by:
 - 🧠 LM Studio or llama.cpp: the local model, with tool calling, picked automatically
 - 🗣️ [kokoro-reader](https://github.com/fswolf/kokoro-reader): Kokoro TTS over local HTTP
 - 🧩 MCP: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
-- 🔌 [Buttplug.io](https://buttplug.io) and Intiface Central: toys of most brands
 
 What she does:
 
