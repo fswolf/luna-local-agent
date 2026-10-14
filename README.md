@@ -24,33 +24,33 @@ git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
 
 Powered by:
 
-- 🎤 [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper): speech to text
-- 🧠 LM Studio or llama.cpp: the local model, with tool calling, picked automatically
-- 🗣️ [kokoro-reader](https://github.com/fswolf/kokoro-reader): Kokoro TTS over local HTTP
-- 🧩 MCP: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
+- [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper): speech to text
+- LM Studio or llama.cpp: the local model, with tool calling, picked automatically
+- [kokoro-reader](https://github.com/fswolf/kokoro-reader): Kokoro TTS over local HTTP
+- MCP: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
 
 What she does:
 
-- 🎹 Talks: push-to-talk in three modes including hands free, replies that start a sentence in, and barge-in (talk over her and she stops)
-- 👀 Sees: your screen, and your webcam when you switch it on
-- ⏰ Reminders and real alarms: she wakes you up, and nags until you're up
-- 📧 Email: checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
-- 📝 Files and commands: writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane
-- 🛡️ Hard to steer: a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
-- 🌙 Moods and feelings: she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md))
-- 📚 Long-term memory: optional permanent SQLite store with its own browser editor
-- 🗂️ Your knowledge base: point her at your notes, manuals, PDFs and docs, and she answers from them and says which file ([details](docs/knowledge.md))
-- 💭 Her reasoning, kept: the model's scratchpad per turn, with a browser viewer for reading it back
-- 🔬 See inside her: token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
-- 🎭 An animated portrait: Live2D or VRM, lip-synced, blinking, gestures, blushes and tears ([details](docs/portrait.md#portrait))
-- 🌱 Learns from herself: daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
-- 📺 Streams with you: answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
-- 🎮 Plays games: Minecraft, Zork and Vibe City, on her own when you go quiet ([details](docs/games.md))
-- 🏠 Runs your home: lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
-- 🔞 Adult toys: Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
-- 📱 From your phone: Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
-- 🪟 Linux first, also on macOS and Windows
-- 💬 Full-screen terminal interface
+- **Talks:** push-to-talk in three modes including hands free, replies that start a sentence in, and barge-in (talk over her and she stops)
+- **Sees:** your screen, and your webcam when you switch it on
+- **Reminders and real alarms:** she wakes you up, and nags until you're up
+- **Email:** checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
+- **Files and commands:** writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane
+- **Hard to steer:** a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
+- **Moods and feelings:** she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md))
+- **Long-term memory:** optional permanent SQLite store with its own browser editor
+- **Your knowledge base:** point her at your notes, manuals, PDFs and docs, and she answers from them and says which file ([details](docs/knowledge.md))
+- **Her reasoning, kept:** the model's scratchpad per turn, with a browser viewer for reading it back
+- **See inside her:** token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
+- **An animated portrait:** Live2D or VRM, lip-synced, blinking, gestures, blushes and tears ([details](docs/portrait.md#portrait))
+- **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
+- **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
+- **Plays games:** Minecraft, Zork and Vibe City, on her own when you go quiet ([details](docs/games.md))
+- **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
+- **Adult toys (18+):** Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
+- **From your phone:** Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
+- Linux first, also on macOS and Windows
+- Full-screen terminal interface
 
 Everything runs locally. No cloud APIs required.
 
