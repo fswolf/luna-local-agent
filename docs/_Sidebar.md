@@ -17,6 +17,9 @@
 - [Home automation](home.md)
 - [Sysadmin](sysadmin.md)
 - [Plugins](plugins.md)
+- [Stream chat](chat.md)
+- [Games](games.md)
+- [Home and devices](devices.md)
 - [Development](development.md)
 
 [Code on GitHub](https://github.com/fswolf/luna-local-agent)

@@ -24,24 +24,31 @@ git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
 
 Powered by:
 
-- 🎤 Faster-Whisper (Speech-to-Text)
-- 🧠 LM Studio or llama.cpp (local LLM) with tool calling, picked automatically
-- 🗣️ [kokoro-reader](https://github.com/fswolf/kokoro-reader) (Kokoro TTS over local HTTP)
-- 🎹 Push-to-talk, three modes including hands free
-- ⚡ Streaming replies: she starts talking a sentence in, not at the end
-- ✋ Barge-in: talk over her and she stops
-- 👀 Optional vision: she can look at your screen, and through your webcam when you switch it on
+- 🎤 [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper): speech to text
+- 🧠 LM Studio or llama.cpp: the local model, with tool calling, picked automatically
+- 🗣️ [kokoro-reader](https://github.com/fswolf/kokoro-reader): Kokoro TTS over local HTTP
+- 🧩 MCP: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
+- 🔌 [Buttplug.io](https://buttplug.io) and Intiface Central: toys of most brands
+
+What she does:
+
+- 🎹 Talks: push-to-talk in three modes including hands free, replies that start a sentence in, and barge-in (talk over her and she stops)
+- 👀 Sees: your screen, and your webcam when you switch it on
 - ⏰ Reminders and real alarms: she wakes you up, and nags until you're up
-- 📝 Writes and edits your files: every change shown in a permission popup first
-- 🖥️ Runs shell commands and opens apps: each one shown and approved first, with read/write/execute permissions you set in the tools pane
-- 🌙 Moods: she runs warmer or flatter with the clock and the session
+- 📧 Email: checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
+- 📝 Files and commands: writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane
+- 🛡️ Hard to steer: a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
+- 🌙 Moods and feelings: she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md))
 - 📚 Long-term memory: optional permanent SQLite store with its own browser editor
 - 💭 Her reasoning, kept: the model's scratchpad per turn, with a browser viewer for reading it back
 - 🔬 See inside her: token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
-- 🎭 An animated portrait: Live2D or VRM, lip-synced to her voice, blinking, looking at your terminal, visibly thinking ([details](docs/portrait.md#portrait))
-- 🌱 Learns from herself: daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure, and picking up where you left off ([details](docs/learning.md#learning-from-herself))
-- 🔌 Plugins: stream chat, Discord (approvals answered right in the chat), scheduled jobs, your smart home through a local Home Assistant, and she can play Minecraft, Zork and Vibe City
-- 🧩 MCP servers: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
+- 🎭 An animated portrait: Live2D or VRM, lip-synced, blinking, gestures, blushes and tears ([details](docs/portrait.md#portrait))
+- 🌱 Learns from herself: daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
+- 📺 Streams with you: answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
+- 🎮 Plays games: Minecraft, Zork and Vibe City, on her own when you go quiet ([details](docs/games.md))
+- 🏠 Runs your home and devices: Home Assistant on your own network, and toys through Lovense or Buttplug.io ([details](docs/devices.md))
+- 📱 From your phone: Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
+- 🪟 Linux first, also on macOS and Windows
 - 💬 Full-screen terminal interface
 
 Everything runs locally. No cloud APIs required.
@@ -103,17 +110,21 @@ The installer asks before anything that touches your system, and can be run agai
 - [Tool calling](docs/tools.md): every tool, turning them off, MCP servers
 - [Files and commands](docs/files.md): reading, writing with approval, allow-all, run_command
 - [Web](docs/web.md): search, research, reading pages
+- [Email](docs/email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](docs/vision.md): looking at your screen, the webcam
 - [Reminders and alarms](docs/reminders.md)
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](docs/reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](docs/learning.md): lessons, episodes, fact cleanup, calibration
-- [Moods](docs/moods.md)
+- [Moods](docs/moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
 - [Gestures](docs/gestures.md): how her body moves, what sets it off, writing your own
 - [Home automation](docs/home.md): Home Assistant on your own network, setup, what always asks, local devices
 - [Sysadmin](docs/sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
-- [Plugins](docs/plugins.md): stream chat, Minecraft, Zork, Vibe City, Home Assistant, cron jobs, Discord
+- [Plugins](docs/plugins.md): how they work, writing your own, scheduled jobs and Discord
+- [Stream chat](docs/chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
+- [Games](docs/games.md): Minecraft, Zork, Vibe City, playing on her own
+- [Home and devices](docs/devices.md): Home Assistant, Lovense, toys of most brands through Buttplug.io
 - [Development](docs/development.md): project structure, extras
 
 The same pages are on the [wiki](https://github.com/fswolf/luna-local-agent/wiki).

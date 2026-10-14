@@ -8,17 +8,21 @@ Everything the README only touches on, one subject per page.
 - [Tool calling](tools.md): every tool, turning them off, MCP servers
 - [Files and commands](files.md): reading, writing with approval, allow-all, run_command
 - [Web](web.md): search, research, reading pages
+- [Email](email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](vision.md): looking at your screen, the webcam
 - [Reminders and alarms](reminders.md)
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](learning.md): lessons, episodes, fact cleanup, calibration
-- [Moods](moods.md)
+- [Moods](moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
 - [Gestures](gestures.md): how her body moves, and writing your own
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
 - [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
-- [Plugins](plugins.md): stream chat, Minecraft, Zork, Vibe City, Home Assistant, cron jobs, Discord
+- [Plugins](plugins.md): how they work, writing your own, scheduled jobs and Discord
+- [Stream chat](chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
+- [Games](games.md): Minecraft, Zork, Vibe City, playing on her own
+- [Home and devices](devices.md): Home Assistant, Lovense, toys of most brands through Buttplug.io
 - [Development](development.md): project structure, extras
 
 ---
