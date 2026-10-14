@@ -20,7 +20,7 @@ which one depends on the server, not the model. With LM Studio's
 reasoning parsing on (the default) it arrives in a `reasoning_content`
 field of its own, streamed alongside the reply; with it off, or on
 another server, it is inline in the reply inside `<think>…</think>`
-tags. `llm.py` takes both: the field is accumulated delta by delta,
+tags. `llm/streaming.py` takes both: the field is accumulated delta by delta,
 and the tags are cut out of the reply text after the stream ends. It's the
 same cut that already keeps them off the screen and away from the
 voice, pointed at a database instead of the bin. Nothing is ever

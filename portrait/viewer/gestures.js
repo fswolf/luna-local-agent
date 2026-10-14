@@ -37,7 +37,7 @@ export { REST };
 // The list comes from the server (every gesture/*.js not starting with _);
 // without one (a static copy of the page), the built-ins.
 const BUILT_IN = ['dance', 'jog', 'pant', 'sultry_beckon', 'wink', 'shh', 'wave', 'hug', 'jump', 'shrug', 'kiss', 'shy', 'cry', 'stretch', 'look_hand',
-                  'tuck_hair', 'bounce', 'explain'];
+                  'tuck_hair', 'bounce', 'explain', 'sulk', 'bashful'];
 export const FAILED = {};      // name -> why it didn't load (shown on the debug page)
 const list = await fetch('gestures/index.json').then(r => r.ok ? r.json() : null).catch(() => null);
 if (!list || !list.length) FAILED['(the list)'] = "the server didn't list any gesture files, so only the built-ins loaded - "

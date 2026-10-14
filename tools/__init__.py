@@ -76,7 +76,7 @@ def register_external(name, description, properties, required=(), run=None, grou
 
 
 # Tools whose results are someone else's words. Once one has run, the
-# turn is marked (state.untrusted.seen) and file reads, and web requests
+# turn is marked (turnctx: the turn's `seen`) and file reads, and web requests
 # after a file read, ask first - see tools/files.py and tools/web.py.
 OUTSIDE = {"web_search", "read_page", "research"}
 
@@ -362,10 +362,12 @@ def call(name, arguments):
 def _mark_outside(name):
     """After it runs, so its own request isn't held up by it - and in a
     finally, so one that fails halfway still counts."""
-    import state
+    import turnctx
 
-    if not getattr(state.untrusted, "seen", None):
-        state.untrusted.seen = name
+    turn = turnctx.current()
+
+    if not turn.seen:
+        turn.seen = name
 
 
 # ---------------------------------------------------------------------------

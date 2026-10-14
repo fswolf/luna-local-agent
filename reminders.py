@@ -583,10 +583,10 @@ def _seconds_until_next():
 
 def _deliver(model, texts, missed=False):
     """Hand the reminder(s) to Luna so she raises them in her own voice."""
+    import interrupts
     import llm
     import ui
     from speech import speak
-    import state
 
     if len(texts) == 1:
         body = f'"{texts[0]}"'
@@ -605,13 +605,16 @@ def _deliver(model, texts, missed=False):
         "own voice.)"
     )
 
-    ui.set_status("Reminder due...")
-    answer = llm.ask(trigger, model, source="reminder")
-    ui.add_message(AGENT_NAME.lower(), answer)
+    # Its own Stop (interrupts): a stop meant for it stops its words and
+    # its speech, and nothing it does clears anyone else's.
+    with interrupts.using(kind="reminder") as stop:
+        ui.set_status("Reminder due...")
+        answer = llm.ask(trigger, model, source="reminder")
+        ui.add_message(AGENT_NAME.lower(), answer)
 
-    if not state.stop_speaking:
-        ui.set_status("Speaking...")
-        speak(answer)
+        if not stop.speaking.is_set():
+            ui.set_status("Speaking...")
+            speak(answer)
 
     ui.set_status("Idle")
 

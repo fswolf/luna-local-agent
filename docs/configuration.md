@@ -16,7 +16,8 @@ as a fallback, so an older install that never split them keeps working
 untouched.
 
 Every block in `config.json` is optional and every value has a default
-in `config.py`, so a missing block means "use the defaults" rather than
+in the `config/` package (one file per area: `voice.py`, `listening.py`,
+`moods.py`...), so a missing block means "use the defaults" rather than
 an error. The file that ships has them written out explicitly, because
 you can't turn a dial that isn't there.
 

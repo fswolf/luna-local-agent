@@ -35,8 +35,8 @@ import requests
 
 import config
 import logbook
+import interrupts
 import notebook
-import state
 
 START = (getattr(config, "STARTED", None) or datetime.now()).replace(microsecond=0)
 _activity = {"last": time.monotonic()}
@@ -606,9 +606,9 @@ def _busy():
     try:
         import assistant
 
-        return bool(state.assistant_busy or state.recording or assistant.busy())
+        return bool(interrupts.busy() or assistant.busy())
     except Exception:
-        return bool(state.assistant_busy)
+        return interrupts.busy()
 
 
 def last_time_line():
@@ -659,32 +659,37 @@ def greet(model):
     if not assistant._turn.acquire(blocking=False):
         return  # he's already talking to her - that's the greeting
 
+    # Its own Stop (interrupts), held like a turn: a message from him cuts
+    # the greeting short rather than waiting for it.
     try:
-        trigger = (
-            "(You've just been started up again; you last talked "
-            f"{_when(ep['ended'])}. Greet the user in one or two short sentences, "
-            "in your own voice. If something was left unfinished last time, bring "
-            "it up; otherwise just say hi. Don't recap the whole conversation.)"
-        )
-        ui.set_status("Waking up...")
-        answer = llm.ask(trigger, model, remember=False, source="greeting")
+        with interrupts.using(kind="greeting") as stop:
+            assistant._hold(stop)
+            trigger = (
+                "(You've just been started up again; you last talked "
+                f"{_when(ep['ended'])}. Greet the user in one or two short sentences, "
+                "in your own voice. If something was left unfinished last time, bring "
+                "it up; otherwise just say hi. Don't recap the whole conversation.)"
+            )
+            ui.set_status("Waking up...")
+            answer = llm.ask(trigger, model, remember=False, source="greeting")
 
-        if answer.strip():
-            ui.add_message(config.AGENT_NAME.lower(), answer)
+            if answer.strip():
+                ui.add_message(config.AGENT_NAME.lower(), answer)
 
-            # In history so his reply has something to answer - after a
-            # user line, because some chat templates refuse two assistant
-            # messages in a row.
-            history.add_message("user", "(started the app)")
-            history.add_message("assistant", answer)
-            history.save()
+                # In history so his reply has something to answer - after a
+                # user line, because some chat templates refuse two assistant
+                # messages in a row.
+                history.add_message("user", "(started the app)")
+                history.add_message("assistant", answer)
+                history.save()
 
-            if not state.stop_speaking:
-                ui.set_status("Speaking...")
-                speak(answer)
+                if not stop.speaking.is_set():
+                    ui.set_status("Speaking...")
+                    speak(answer)
     except Exception as e:
         logbook.warn("reflect", "greeting failed: %s", e)
     finally:
+        assistant._hold(None)
         assistant._turn.release()
         ui.set_status("Idle")
 

@@ -41,7 +41,7 @@ from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 
 import config
 import logbook
-import state
+import turnctx
 
 from . import OUTSIDE, tool
 
@@ -434,15 +434,15 @@ def _approve_send(lines, title):
     flagged request. A scheduled job never sends."""
     import ui
 
-    if getattr(state.job, "name", None):
+    if turnctx.current().job:
         return False
 
-    approver = getattr(state.remote, "approver", None)
+    approver = turnctx.current().approver
 
     if approver is not None:
         return bool(approver("email", title, lines, True))
 
-    if state.turn_source != "typed":
+    if turnctx.current().source == "voice":
         try:
             from speech import speak
 
@@ -508,12 +508,12 @@ def _send_email(to, body, subject="", reply_to=""):
 
     lines = [f"From:    {msg['From']}", f"To:      {to}", f"Subject: {msg['Subject']}", ""]
     lines += str(body or "").splitlines() or ["(empty)"]
-    outside = getattr(state.untrusted, "seen", None)
+    outside = turnctx.current().seen
 
     if outside:
         lines += ["", f"note: this turn read outside content ({outside})"]
 
-    if getattr(state.job, "name", None):
+    if turnctx.current().job:
         return "Scheduled jobs can't send email - tell the user what you'd have sent instead."
 
     if not _approve_send(lines, f"send email to {to[:80]}"):

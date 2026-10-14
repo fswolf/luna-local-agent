@@ -6,7 +6,7 @@ Not a plugin itself: the leading underscore keeps the loader away.
 import re
 
 import config
-import state
+import turnctx
 
 # Said by you, any of these stops every device before she even reads the
 # message - a stop that depends on a model noticing isn't a stop. Whole
@@ -17,10 +17,12 @@ STOP_WORDS = ["stop", "red", "safeword", "enough", "too much", "pause", "ow", "o
 def blocked():
     """Why a device can't be *started* from this turn, or ''. Stopping is
     never blocked."""
-    if getattr(state.job, "name", None):
+    turn = turnctx.current()
+
+    if turn.job:
         return "Not from a scheduled job. Tell him instead."
 
-    seen = getattr(getattr(state, "untrusted", None), "seen", None)
+    seen = turn.seen
 
     if seen:
         return (f"Not from this turn - it read outside content ({seen}), and that "

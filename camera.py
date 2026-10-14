@@ -57,12 +57,10 @@ def _cv2():
 
 def _remote_or_job():
     """A turn that didn't come from you at the keyboard."""
-    try:
-        import state
+    import turnctx
 
-        return bool(getattr(state.remote, "source", None) or getattr(state.job, "name", None))
-    except Exception:
-        return False
+    turn = turnctx.current()
+    return bool(turn.remote or turn.job)
 
 
 def _device():

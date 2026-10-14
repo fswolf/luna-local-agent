@@ -22,13 +22,12 @@ already works and there is one scanner rather than two.
 """
 import os
 import threading
-import time
 
 import numpy as np
 
 import config
+import interrupts
 import logbook
-import state
 
 from config import AGENT_NAME, BASE_DIR
 
@@ -46,6 +45,7 @@ NAGS = (
 
 _ringing = threading.Event()
 _dismissed = threading.Event()
+_ring_stop = [None]     # the ringing alarm's interrupts.Stop, so dismiss() cuts it off mid-line
 _snoozed_for = [0]
 
 
@@ -169,6 +169,9 @@ def dismiss(snooze_minutes=0):
     _snoozed_for[0] = max(0, int(snooze_minutes))
     _dismissed.set()
 
+    if _ring_stop[0] is not None:
+        _ring_stop[0].stop(speaking=True)    # mid-line: quiet now, not at the end of it
+
     return True
 
 
@@ -217,48 +220,52 @@ def ring(model, alarm):
         f"Alarm: {text} - /snooze, or /alarm off to stop it.",
     )
 
-    try:
-        for round_number in range(max(1, config.ALARM_REPEATS)):
-            if _dismissed.is_set():
-                break
+    # Its own Stop (interrupts): whatever stops it (HOME during one of your
+    # turns, Discord's !stop) dismisses it, and its own speaking can't
+    # clear anyone else's stop.
+    with interrupts.using(kind="alarm") as stop:
+        _ring_stop[0] = stop
 
-            if round_number == 0:
-                line = _wake_line(model, text)
-            else:
-                line = NAGS[min(round_number - 1, len(NAGS) - 1)]
-
-            ui.add_message(AGENT_NAME.lower(), line)
-
-            # stop_speaking is barge-in: talking over an alarm is the
-            # most natural way there is to tell it to shut up.
-            if not _dismissed.is_set() and not state.stop_speaking:
-                try:
-                    speak(line)
-                except Exception as e:
-                    logbook.warn("alarm", "couldn't speak: %s", e)
-
-            if state.stop_speaking:
-                _dismissed.set()
-                break
-
-            play_tone()
-
-            if _dismissed.is_set():
-                break
-
-            # Between rounds. Checked often so a dismissal lands
-            # immediately rather than after another 25 seconds.
-            waited = 0.0
-
-            while waited < config.ALARM_GAP_SECONDS:
-                if _dismissed.is_set() or state.stop_speaking:
+        try:
+            for round_number in range(max(1, config.ALARM_REPEATS)):
+                if _dismissed.is_set():
                     break
 
-                time.sleep(0.25)
-                waited += 0.25
-    finally:
-        _ringing.clear()
-        ui.set_status("Idle")
+                if round_number == 0:
+                    line = _wake_line(model, text)
+                else:
+                    line = NAGS[min(round_number - 1, len(NAGS) - 1)]
+
+                ui.add_message(AGENT_NAME.lower(), line)
+
+                if not _dismissed.is_set() and not stop.speaking.is_set():
+                    try:
+                        speak(line)
+                    except Exception as e:
+                        logbook.warn("alarm", "couldn't speak: %s", e)
+
+                if stop.speaking.is_set():
+                    _dismissed.set()
+                    break
+
+                play_tone()
+
+                if _dismissed.is_set():
+                    break
+
+                # Between rounds. Checked often so a dismissal lands
+                # immediately rather than after another 25 seconds.
+                waited = 0.0
+
+                while waited < config.ALARM_GAP_SECONDS:
+                    if _dismissed.is_set() or stop.speaking.wait(0.25):
+                        break
+
+                    waited += 0.25
+        finally:
+            _ring_stop[0] = None
+            _ringing.clear()
+            ui.set_status("Idle")
 
     snooze = _snoozed_for[0]
     _snoozed_for[0] = 0

@@ -39,8 +39,8 @@ import time
 
 from collections import deque
 
+import interrupts
 import logbook
-import state
 
 from config import AGENT_NAME
 
@@ -309,7 +309,7 @@ class ChatRoom:
 
         waited = 0.0
 
-        while state.assistant_busy or assistant.busy():
+        while interrupts.busy() or assistant.busy():
             if self._stop.is_set() or waited >= MAX_WAIT_SECONDS:
                 return False
 

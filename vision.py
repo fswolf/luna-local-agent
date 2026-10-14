@@ -363,9 +363,9 @@ def default_region():
     Asked by voice through a compositor bind, you deliberately focused
     something before you spoke, so the focused window is exactly right.
     """
-    import state
+    import turnctx
 
-    return "active" if getattr(state, "turn_source", "typed") == "voice" else "full"
+    return "active" if turnctx.current().source == "voice" else "full"
 
 
 def capture(region="auto", window=None):

@@ -27,12 +27,9 @@ def _private():
     """Is the turn in flight Ryan's own? These tools answer about him and
     about her history with him; a stream-chat turn gets nothing, even if
     a model names a tool it wasn't offered."""
-    try:
-        import llm
+    import turnctx
 
-        return bool(llm.turn.get("private", True))
-    except Exception:
-        return True
+    return turnctx.current().private
 
 
 _NOT_HERE = "Not available on a stream-chat turn."
@@ -319,10 +316,10 @@ MAX_NOTED_PER_SESSION = 3
 
 def _approve(text):
     import config
-    import state
+    import turnctx
     import ui
 
-    if state.turn_source != "typed":
+    if turnctx.current().source == "voice":
         try:
             from speech import speak
 
@@ -449,7 +446,7 @@ def _skills_on():
 
 def _approve_skill(name, when, steps, warn=""):
     import config
-    import state
+    import turnctx
     import ui
 
     body = [f"name: {name}", f"use when: {when}", ""] + [f"{i}. {s}" for i, s in enumerate(steps, 1)]
@@ -457,12 +454,12 @@ def _approve_skill(name, when, steps, warn=""):
     if warn:
         body += ["", warn]
 
-    approver = getattr(getattr(state, "remote", None), "approver", None)
+    approver = turnctx.current().approver
 
     if approver is not None:
         return bool(approver("skill", name, body, bool(warn)))
 
-    if state.turn_source != "typed":
+    if turnctx.current().source == "voice":
         try:
             from speech import speak
 
@@ -674,13 +671,10 @@ def _project_notes(project):
 # ---------------------------------------------------------------------------
 def _game_project():
     """The project of the game turn in flight, or None outside one. Set
-    only by assistant.respond_to_job for a game plugin, on this thread."""
-    try:
-        import state
+    only by assistant.respond_to_job for a game plugin, on its turn."""
+    import turnctx
 
-        return getattr(state.job, "project_id", None)
-    except Exception:
-        return None
+    return turnctx.current().project_id
 
 
 @tool(

@@ -1,32 +1,16 @@
 import os
-import threading
-import state
 import ui
 
 from pynput import keyboard
-from assistant import assistant_task
+from ptt import toggle
+
 
 def on_press(key, model):
     try:
         if key == keyboard.Key.home:
-            # Stop current assistant action
-            if state.assistant_busy:
-                ui.set_status("Stopped")
-                state.stop_speaking = True
-                state.stop_listening = True
-                return
-
-            state.assistant_busy = True
-            state.stop_speaking = False
-            state.stop_listening = False
-
-            thread = threading.Thread(
-                target=assistant_task,
-                args=(model,),
-                daemon=True
-            )
-
-            thread.start()
+            # The same HOME as every other input path (ptt.py): start,
+            # finish a manual recording, or stop - and hands-free in open mode.
+            toggle(model)
 
         elif key == keyboard.Key.esc:
             os._exit(0)

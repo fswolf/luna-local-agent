@@ -182,7 +182,7 @@ def _connect(name, spec, timeout=None):
 # Registering their tools as hers
 # ---------------------------------------------------------------------------
 def _approve(server, tool, arguments, reason=""):
-    import state
+    import turnctx
     import ui
 
     body = [f"{k}: {json.dumps(v, ensure_ascii=False)[:300]}" for k, v in (arguments or {}).items()] \
@@ -193,12 +193,12 @@ def _approve(server, tool, arguments, reason=""):
 
     # A remote turn (Discord) is answered by that plugin: auto, a message
     # asking you, or the desk popup. A reason means "ask even in auto".
-    approver = getattr(getattr(state, "remote", None), "approver", None)
+    approver = turnctx.current().approver
 
     if approver is not None:
         return bool(approver("mcp", f"{server}: {tool}", body, bool(reason)))
 
-    if state.turn_source != "typed":
+    if turnctx.current().source == "voice":
         try:
             from speech import speak
 

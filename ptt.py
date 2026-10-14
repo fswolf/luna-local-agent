@@ -14,8 +14,8 @@ import threading
 import time
 
 import config
+import interrupts
 import speech
-import state
 import ui
 import wakeword
 
@@ -59,24 +59,25 @@ def hands_free_active():
 # Single turn (auto / manual)
 # ---------------------------------------------------------------------------
 def _start_turn(model):
-    state.assistant_busy = True
-    state.stop_speaking = False
-    state.stop_generating = False
-    state.stop_listening = False
-    state.recording = False
+    # You're about to talk: whatever she's saying (a reminder, a chat
+    # reply) goes quiet first, or the mic records her instead of you.
+    interrupts.stop_all(generating=False, listening=False)
 
-    threading.Thread(
-        target=assistant_task, args=(model, _mode), daemon=True
-    ).start()
+    # Opened here, at the press, not when the worker gets going: a second
+    # press a moment later has to find it.
+    stop = interrupts.open("voice")
+
+    def run():
+        with interrupts.using(stop):
+            assistant_task(model, _mode)
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def _interrupt():
     """Cancel the turn: shut up, stop listening, stop generating."""
     ui.set_status("Stopped")
-    state.stop_speaking = True
-    state.stop_generating = True
-    state.stop_listening = True
-    state.barged_in = False
+    interrupts.home()
 
     # Anything physical stops with her: a toy left running because you
     # cut her off mid-sentence is the wrong way round.
@@ -97,7 +98,7 @@ def _finish_recording():
     came back empty every time.
     """
     ui.set_status("Transcribing...")
-    state.stop_listening = True
+    interrupts.stop_all(speaking=False, generating=False, listening=True, kinds=("voice",))
 
 
 # ---------------------------------------------------------------------------
@@ -123,11 +124,6 @@ def _hands_free_loop(model):
     follow_up_until = 0.0
 
     while _hands_free:
-        state.stop_speaking = False
-        state.stop_generating = False
-        state.stop_listening = False
-        state.barged_in = False
-
         if wakeword.available() and time.monotonic() > follow_up_until:
             if not speech.wait_for_wake_word(lambda: not _hands_free):
                 break
@@ -137,20 +133,17 @@ def _hands_free_loop(model):
 
             time.sleep(wakeword.cooldown_seconds())
 
-        state.assistant_busy = True
-
         try:
             # Once the wake word has armed it, a silent turn should
             # time out rather than wait forever - it was probably the
             # television. Without a wake word, waiting is the point.
-            spoke = assistant_task(
-                model, "auto" if wakeword.available() else "open"
-            )
+            with interrupts.using(kind="voice") as stop:
+                spoke = assistant_task(
+                    model, "auto" if wakeword.available() else "open"
+                )
         except Exception as e:
             ui.add_message("system", f"Listening stopped: {e}")
             break
-        finally:
-            state.assistant_busy = False
 
         if not _hands_free:
             break
@@ -161,7 +154,7 @@ def _hands_free_loop(model):
             if spoke else 0.0
         )
 
-        if not state.barged_in:
+        if not stop.barged_in:
             time.sleep(config.STT_SETTLE_SECONDS)
 
     stop_hands_free()
@@ -191,9 +184,7 @@ def stop_hands_free():
     _hands_free = False
 
     # Breaks any recording currently in progress.
-    state.stop_listening = True
-    state.stop_speaking = True
-    state.stop_generating = True
+    interrupts.home()
 
     ui.set_status("Idle")
 
@@ -209,12 +200,12 @@ def toggle(model):
             start_hands_free(model)
         return
 
-    if state.assistant_busy:
+    if interrupts.busy():
         # The same key, two meanings, decided by whether the mic is open.
         # In manual mode you press to start and press to finish, so a
         # press while recording is "I'm done, go" - not "forget it".
         # Once she's thinking or talking, it's "forget it".
-        if _mode == "manual" and state.recording:
+        if _mode == "manual" and interrupts.recording():
             _finish_recording()
         else:
             _interrupt()
@@ -225,10 +216,12 @@ def toggle(model):
 
 
 def stop(model=None):
-    """Interrupt only - never starts a turn."""
+    """Interrupt only - never starts a turn. Unlike HOME it has only the
+    one meaning, so it stops whatever she's doing that can be stopped,
+    not just your own turn."""
     if _mode == "open":
         stop_hands_free()
         return
 
-    if state.assistant_busy:
+    if interrupts.busy(kinds=None):
         _interrupt()

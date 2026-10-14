@@ -11,9 +11,10 @@ from config import AGENT_NAME
 from llm import ask
 from speech import record_audio, transcribe
 
+import interrupts
 import logbook
 import speech
-import state
+import turnctx
 import ui
 
 # One turn at a time. Every Enter spawns its own worker, so without
@@ -22,6 +23,15 @@ import ui
 # same audio device, and history written in whatever order they
 # happened to finish.
 _turn = threading.Lock()
+
+# The Stop of whichever turn holds _turn: a new message from you cuts its
+# reply short (and only its).
+_holder = {"stop": None}
+
+
+def _hold(stop):
+    """Inside `with _turn`: this turn is the one a new message cuts off."""
+    _holder["stop"] = stop
 
 
 def _plugins_hear(text):
@@ -75,7 +85,6 @@ def _say_away(said):
         ui.set_status(f"{AGENT_NAME} isn't talking right now")
         return
 
-    state.stop_speaking = False
     ui.begin_message(AGENT_NAME.lower())
     ui.extend_message(said)
     ui.end_message()
@@ -85,7 +94,7 @@ def _say_away(said):
     ui.set_status("Idle")
 
 
-def respond(text, model):
+def respond(text, model, source="typed"):
     """Send a turn to the model and speak the reply as it arrives.
 
     Nothing here waits for the whole answer. Text appears on screen as
@@ -98,21 +107,33 @@ def respond(text, model):
     spoken - but it is still allowed to finish generating and stays on
     screen, the same bargain barge-in makes. Interrupting should cost
     you the audio, never the answer.
+
+    source: "typed" or "voice". Runs as the caller's Stop (interrupts)
+    if it opened one - ptt does, at the key press - else its own, opened
+    now, before waiting: a HOME pressed while it waits still reaches it.
     """
     _plugins_hear(text)
 
-    if _turn.locked():
-        logbook.info("turn", "new message while speaking - cutting the last one short")
-        state.stop_speaking = True
+    with interrupts.ensure(source) as stop:
+        running = _holder["stop"]
 
-    with _turn:
-        said = _gone(text, model)
+        if _turn.locked() and running is not None:
+            logbook.info("turn", "new message while speaking - cutting the last one short")
+            running.stop(speaking=True)
 
-        if said is not None:
-            _say_away(said)
-            return said
+        with _turn:
+            _hold(stop)
 
-        return _respond(text, model)
+            try:
+                said = _gone(text, model)
+
+                if said is not None:
+                    _say_away(said)
+                    return said
+
+                return _respond(text, model, source, stop)
+            finally:
+                _hold(None)
 
 
 def busy():
@@ -139,21 +160,17 @@ def respond_to_chat(prompt, model, source, who, said,
     and nothing here is stored: remember=False keeps a stranger's words
     out of history and out of the transcript.
     """
-    with _turn:
+    # Its own Stop (interrupts), opened once it holds the lock, so HOME
+    # cancels the reply it was pressed during and nothing after it: one
+    # press used to leave a global flag set, and every stream-chat and IRC
+    # message after came back empty with "you interrupted it" - which
+    # looks exactly like the chat plugin having died.
+    with _turn, interrupts.using(kind="chat") as stop:
+        _hold(stop)
+
         if _gone() is not None:
+            _hold(None)
             return ""       # walked away: strangers get nothing either
-
-        state.stop_speaking = False
-
-        # Clear the interrupt too, and only here, holding the lock.
-        # Every other turn does this - _process for a typed one, ptt for
-        # a spoken one - and a chat turn is the one that didn't. HOME
-        # cancels the reply it was pressed during, not every reply
-        # after it; without this, one HOME press left the flag set and
-        # every stream-chat and IRC message came back empty with "you
-        # interrupted it" until Ryan happened to type something himself.
-        # Which looks exactly like the chat plugin having died.
-        state.stop_generating = False
 
         # Not constructed at all when silent. A Player opens an output
         # stream on the sound device; one made and never spoken to is a
@@ -169,7 +186,7 @@ def respond_to_chat(prompt, model, source, who, said,
         ui.begin_message(AGENT_NAME.lower())
 
         def on_sentence(sentence):
-            if not state.stop_speaking:
+            if not stop.speaking.is_set():
                 player.say(sentence)
 
         try:
@@ -193,6 +210,7 @@ def respond_to_chat(prompt, model, source, who, said,
             ui.end_message()
             raise
         finally:
+            _hold(None)
             ui.set_status("Idle")
 
 
@@ -201,34 +219,36 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
     """A scheduled job firing (plugins/cron.py).
 
     Waits its turn like chat does. Fresh context and nothing stored, so a
-    job's tool output never lands in history. state.job is set here and
-    only here, under the lock, on this thread - that's what lets files.py
-    tell a job's write from yours.
+    job's tool output never lands in history. The turn is begun here and
+    only here with the job's name (turnctx) - that's what lets files.py
+    tell a job's write from yours, and it ends with the turn.
     """
-    with _turn:
+    with _turn, interrupts.using(kind="job") as stop:
+        _hold(stop)
+
         if _gone() is not None:
+            _hold(None)
             return ""       # walked away: jobs and games wait
 
-        state.stop_speaking = False
-        state.stop_generating = False
         player = speech.Player() if speak else None
 
         ui.add_message("system", f"Job: {job}")
         ui.set_status(f"Job {job}...")
         ui.begin_message(AGENT_NAME.lower())
-        state.job.name = job
-        state.job.max_rounds = max_rounds    # None: the usual tools.max_rounds
-        state.job.project_id = project_id    # a game's notes, for game_note
 
         def on_sentence(sentence):
-            if not state.stop_speaking:
+            if not stop.speaking.is_set():
                 player.say(sentence)
 
         try:
-            answer = ask(prompt, model, on_text=ui.extend_message,
-                         on_sentence=on_sentence if speak else None,
-                         context=[], tools_allowed=tools_allowed,
-                         remember=False, source=f"job:{job}")
+            # max_rounds None: the usual tools.max_rounds; project_id: a
+            # game's notes, for game_note.
+            with turnctx.begin(source=f"job:{job}", private=False, job=job,
+                               max_rounds=max_rounds, project_id=project_id):
+                answer = ask(prompt, model, on_text=ui.extend_message,
+                             on_sentence=on_sentence if speak else None,
+                             context=[], tools_allowed=tools_allowed,
+                             remember=False, source=f"job:{job}")
             ui.replace_message(answer)
             ui.end_message()
 
@@ -240,9 +260,7 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
             ui.end_message()
             raise
         finally:
-            state.job.name = None
-            state.job.max_rounds = None
-            state.job.project_id = None
+            _hold(None)
             ui.set_status("Idle")
 
 
@@ -251,20 +269,20 @@ def respond_remote(text, model, source, who, tools_allowed=None,
     """The owner talking to her from somewhere else - Discord.
 
     A normal private turn (his history, his tools) that waits for the
-    lock rather than cutting you off. state.remote is set here, on this
-    thread, so files.py can apply files.auto_approve_sources to it and
-    to nothing else.
+    lock rather than cutting you off. Its turn is begun here with the
+    source and approver (turnctx), so files.py can apply
+    files.auto_approve_sources to it and to nothing else.
     """
     _plugins_hear(text)
 
-    with _turn:
+    with _turn, interrupts.using(kind="remote") as stop:
+        _hold(stop)
         said = _gone(text, model) if remember else _gone()
 
         if said is not None:
+            _hold(None)
             return said or "(She isn't talking right now.)"
 
-        state.stop_speaking = False
-        state.stop_generating = False
         player = speech.Player() if speak else None
 
         # As "user", tagged: ui.py labels any speaker it doesn't know
@@ -273,21 +291,20 @@ def respond_remote(text, model, source, who, tools_allowed=None,
         ui.add_message("user", f"[{source}] {text}")
         ui.set_status(f"{source.title()}...")
         ui.begin_message(AGENT_NAME.lower())
-        state.remote.source = source
-        # Who answers permission questions for this turn, if not the
-        # desk popup: approver(kind, title, body, guarded) -> bool.
-        state.remote.approver = approver
 
         def on_sentence(sentence):
-            if not state.stop_speaking:
+            if not stop.speaking.is_set():
                 player.say(sentence)
 
         try:
-            answer = ask(text, model, on_text=ui.extend_message,
-                         on_sentence=on_sentence if speak else None,
-                         context=None if remember else [],
-                         tools_allowed=tools_allowed, remember=remember,
-                         source=source)
+            # approver: who answers permission questions for this turn,
+            # if not the desk popup - approver(kind, title, body, guarded) -> bool.
+            with turnctx.begin(source=source, private=remember, remote=source, approver=approver):
+                answer = ask(text, model, on_text=ui.extend_message,
+                             on_sentence=on_sentence if speak else None,
+                             context=None if remember else [],
+                             tools_allowed=tools_allowed, remember=remember,
+                             source=source)
             ui.replace_message(answer)
             ui.end_message()
 
@@ -299,16 +316,11 @@ def respond_remote(text, model, source, who, tools_allowed=None,
             ui.end_message()
             raise
         finally:
-            state.remote.source = None
-            state.remote.approver = None
+            _hold(None)
             ui.set_status("Idle")
 
 
-def _respond(text, model):
-    # Only now, holding the lock: resetting this any earlier would
-    # clear the stop we just set on the turn we're waiting for.
-    state.stop_speaking = False
-
+def _respond(text, model, source, stop):
     player = speech.Player()
 
     ui.set_status("Thinking...")
@@ -317,13 +329,17 @@ def _respond(text, model):
     def on_sentence(sentence):
         # HOME during generation means "don't bother speaking this" -
         # the reply still finishes and stays on screen.
-        if not state.stop_speaking:
+        if not stop.speaking.is_set():
             player.say(sentence)
 
     try:
-        answer = ask(
-            text, model, on_text=ui.extend_message, on_sentence=on_sentence
-        )
+        # Your own turn, typed or spoken: ask() leaves source None for
+        # those (it's what turns on the second-look checks), so how it
+        # reached her is set on the turn itself.
+        with turnctx.begin(source=source):
+            answer = ask(
+                text, model, on_text=ui.extend_message, on_sentence=on_sentence
+            )
 
         ui.replace_message(answer)
         ui.end_message()
@@ -344,27 +360,33 @@ def assistant_task(model, mode=None):
     Returns True if there was actually something to answer, which is
     how the hands-free loop knows whether to hold the follow-up window
     open or go back to waiting for the wake word.
+
+    Runs as the caller's Stop (ptt opens one at the key press), or its own.
     """
+    with interrupts.ensure("voice") as stop:
+        return _spoken_turn(model, mode, stop)
+
+
+def _spoken_turn(model, mode, stop):
     if not speech.ready():
         ui.add_message("system", "Still loading the speech models - one moment.")
         ui.set_status("Loading...")
 
         return False
 
-    state.assistant_busy = True
     ui.set_status("Listening..." if mode != "manual" else "Recording...")
 
     try:
-        state.recording = True
+        stop.recording = True
 
         try:
             filename = record_audio(mode)
         finally:
-            state.recording = False
+            stop.recording = False
 
         # Cancelled rather than finished - throw the audio away instead
         # of transcribing it and then refusing to answer.
-        if state.stop_generating:
+        if stop.generating.is_set():
             ui.set_status("Idle")
             return False
 
@@ -383,8 +405,7 @@ def assistant_task(model, mode=None):
 
         logbook.info("turn", "heard: %s", text[:200])
         ui.add_message("user", text)
-        state.turn_source = "voice"
-        respond(text, model)
+        respond(text, model, source="voice")
         ui.set_status("Idle")
 
         return True
@@ -393,5 +414,3 @@ def assistant_task(model, mode=None):
         ui.set_status(f"Error: {e}")
 
         return False
-    finally:
-        state.assistant_busy = False

@@ -35,7 +35,7 @@ import time
 
 import config
 import logbook
-import state
+import turnctx
 
 from . import tool
 from .files import HOME, Refused, _display, resolve
@@ -206,14 +206,14 @@ def _run_command(command, folder="~", why="", background=False):
     if why:
         body += [f"why:     {str(why).strip()[:200]}"]
 
-    remote = getattr(getattr(state, "remote", None), "source", None)
-    approver = getattr(getattr(state, "remote", None), "approver", None)
+    turn = turnctx.current()
+    remote, approver = turn.remote, turn.approver
 
     # "guarded" to an approver means: ask even when set to auto-approve.
     # For a command that's when the turn has read outside content - a web
     # page or an MCP result can write a command as easily as you can, and
     # auto-approve was set with your own messages in mind.
-    outside = getattr(getattr(state, "untrusted", None), "seen", None)
+    outside = turn.seen
 
     if outside:
         body += ["", f"note:    this turn read outside content ({outside})"]
@@ -239,7 +239,7 @@ def _run_command(command, folder="~", why="", background=False):
         except Exception:
             pass
     else:
-        if state.turn_source != "typed":
+        if turnctx.current().source == "voice":
             try:
                 from speech import speak
 

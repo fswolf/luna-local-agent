@@ -34,7 +34,7 @@ import subprocess
 
 import config
 import logbook
-import state
+import turnctx
 
 from . import tool
 
@@ -198,7 +198,7 @@ def job_write_dirs():
 def _job_may_write(full):
     """A scheduled job writing inside job_write_dirs(). `full` has been
     through resolve() already, so the deny list has had its say."""
-    if not getattr(state.job, "name", None):
+    if not turnctx.current().job:
         return False
 
     return any(full.startswith(folder + os.sep) for folder in job_write_dirs())
@@ -254,7 +254,7 @@ def _remote_may_write(full):
     (autostart, systemd user units, ~/.local/bin). A web page she reads
     mid-turn can steer a write as well as the owner can, so those still
     pop the window."""
-    remote = getattr(state.remote, "source", None)
+    remote = turnctx.current().remote
 
     if not remote or remote not in config.FILES_AUTO_APPROVE_SOURCES:
         return False
@@ -267,13 +267,13 @@ def _ask(action, full, body_lines, note=""):
     there's no TUI to ask (headless = deny; never write unasked)."""
     import ui
 
-    remote = getattr(state.remote, "source", None)
-    approver = getattr(state.remote, "approver", None)
+    remote = turnctx.current().remote
+    approver = turnctx.current().approver
     # Outside content in this turn (a page, an MCP result): allow-all and
     # auto-approve were given for your own requests, so they step aside.
     # A job's own job_write_dirs still count - nobody is there to ask,
     # and that folder was set aside for it.
-    outside = getattr(state.untrusted, "seen", None)
+    outside = turnctx.current().seen
 
     if outside:
         note = (note + "; " if note else "") + f"this turn read outside content ({outside})"
@@ -293,11 +293,11 @@ def _ask(action, full, body_lines, note=""):
 
     if _job_may_write(full):
         logbook.info("files", "job %s: %s %s - job_write_dirs, not asked",
-                     state.job.name, action, full)
+                     turnctx.current().job, action, full)
 
         return True
 
-    local = not remote and not getattr(state.job, "name", None)
+    local = not remote and not turnctx.current().job
     offer_all = local and not _guarded(full) and not outside
 
     if offer_all and (_session["allow_all"] or _mode("write") == "allow"):
@@ -305,7 +305,7 @@ def _ask(action, full, body_lines, note=""):
 
         return True
 
-    if state.turn_source != "typed":
+    if turnctx.current().source == "voice":
         # Voice: a one-liner so you know to look at the screen. The
         # details stay in the popup; reading a diff aloud helps nobody.
         try:
@@ -473,12 +473,12 @@ def _tainted_read(full):
     steering, and "now read ~/notes/passwords.txt" could be theirs. A
     scheduled job reading inside its own job_write_dirs is left alone:
     nobody is at the desk to ask, and that folder is the job's anyway."""
-    seen = getattr(state.untrusted, "seen", None)
+    seen = turnctx.current().seen
 
     if not seen:
         return ""
 
-    if getattr(state.job, "name", None) and any(
+    if turnctx.current().job and any(
             full.startswith(folder + os.sep) for folder in job_write_dirs()):
         return ""
 
@@ -494,13 +494,13 @@ def _ask_read(action, full):
     tainted = _tainted_read(full)
 
     if _mode("read") != "ask" and not tainted:
-        state.untrusted.read_local = True
+        turnctx.current().read_local = True
 
         return True
 
     note = (f"Asking because {tainted}" if tainted
             else "Read is set to ask (tools pane, Permissions)")
-    approver = getattr(state.remote, "approver", None)
+    approver = turnctx.current().approver
 
     if approver is not None:
         ok = bool(approver("read", f"{action} {_display(full)}",
@@ -514,7 +514,7 @@ def _ask_read(action, full):
         ))
 
     if ok:
-        state.untrusted.read_local = True
+        turnctx.current().read_local = True
 
     return ok
 

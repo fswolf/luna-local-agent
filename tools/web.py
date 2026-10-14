@@ -7,8 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 import config
+import turnctx
 import logbook
-import state
 import webpage
 import websearch
 
@@ -22,9 +22,9 @@ def _may_send(action, where):
     text can ask for "https://evil.example/?q=<what you just read>" -
     so from then on, each one asks first. Neither alone asks: plain
     research, or plain file reading, never sees this popup."""
-    seen = getattr(state.untrusted, "seen", None)
+    seen = turnctx.current().seen
 
-    if not seen or not getattr(state.untrusted, "read_local", False):
+    if not seen or not turnctx.current().read_local:
         return True
 
     import ui
@@ -32,7 +32,7 @@ def _may_send(action, where):
     lines = [f"{action}: {where[:400]}",
              f"This turn has read your files and outside content ({seen}).",
              "Say no if you didn't ask for this."]
-    approver = getattr(state.remote, "approver", None)
+    approver = turnctx.current().approver
 
     if approver is not None:
         ok = bool(approver("web", f"{action} {where[:200]}", lines, True))

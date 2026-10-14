@@ -25,15 +25,20 @@ calling replaced.
 
 tools.routing false sends everything, as before.
 """
-import threading
+from types import SimpleNamespace
 
 import config
 import logbook
+import turnctx
 
 from . import tool
 
 _state = {"turn": 0, "used": {}}           # group -> turn it was last used
-_turn = threading.local()                 # this turn: pool, chosen, extra
+
+
+def _t():
+    """This turn's routing state: pool, chosen, hidden, extra, track."""
+    return turnctx.current().routing
 
 
 def enabled():
@@ -41,28 +46,23 @@ def enabled():
 
 
 def begin_turn(track=True):
-    """A new turn on this thread. Everything the last one decided goes:
-    a stale pool must never let a later turn attach a tool it wasn't
-    allowed. track=False for turns that aren't the user's own (stream
-    chat, jobs): they don't advance or set the sticky groups."""
+    """A new turn: its routing state starts empty (it lives on the
+    turnctx turn, so nothing can carry over from the last one). track=False
+    for turns that aren't the user's own (stream chat, jobs): they don't
+    advance or set the sticky groups."""
     if track:
         _state["turn"] += 1
 
-    for key in ("pool", "chosen", "hidden", "group_of"):
-        if hasattr(_turn, key):
-            delattr(_turn, key)
-
-    _turn.extra = set()
-    _turn.track = track
+    turnctx.current().routing = SimpleNamespace(extra=set(), track=track)
 
 
 def start(pool, group_of):
     """Record what this turn may use, routed or not, so attach() and
     current() answer for this turn and no other."""
-    _turn.pool = pool
-    _turn.group_of = group_of
-    _turn.chosen = {group_of(n) for n in pool}
-    _turn.hidden = {}
+    _t().pool = pool
+    _t().group_of = group_of
+    _t().chosen = {group_of(n) for n in pool}
+    _t().hidden = {}
 
 
 _DOC_CHARS = 600   # the embedding server's context is short; a 20-tool MCP server isn't
@@ -104,7 +104,7 @@ def choose(query, pool, group_of, previous="", quiet=False):
     core = set(getattr(config, "TOOLS_CORE", ["Time", "Reminders", "Memory", "Shell"]))
     top = max(1, int(getattr(config, "TOOLS_ROUTE_GROUPS", 3)))
     sticky = max(0, int(getattr(config, "TOOLS_STICKY_TURNS", 3)))
-    extra = getattr(_turn, "extra", set())
+    extra = getattr(_t(), "extra", set())
 
     start(pool, group_of)
 
@@ -130,32 +130,32 @@ def choose(query, pool, group_of, previous="", quiet=False):
         before = _meaning(previous, docs)    # usually cached: it was last turn's query
         keep |= best(before, 1) if before else set()
 
-    _turn.chosen = keep
-    _turn.hidden = {g: e for g, e in groups.items() if g not in keep}
+    _t().chosen = keep
+    _t().hidden = {g: e for g, e in groups.items() if g not in keep}
 
     if not quiet:
         logbook.info("tools", "routed: %s (hidden: %s)", ", ".join(sorted(keep)),
-                     ", ".join(sorted(_turn.hidden)) or "none")
+                     ", ".join(sorted(_t().hidden)) or "none")
 
     return {n for n in pool if group_of(n) in keep}
 
 
 def hidden():
     """{group: [entries]} not sent this turn."""
-    return getattr(_turn, "hidden", {}) or {}
+    return getattr(_t(), "hidden", {}) or {}
 
 
 def allowed(name):
     """Was this tool in the turn's pool (on, available, inside the ceiling)?"""
-    return name in (getattr(_turn, "pool", None) or {})
+    return name in (getattr(_t(), "pool", None) or {})
 
 
 def attach(group):
     """Load a hidden group for the rest of this turn."""
     if group in hidden():
-        _turn.extra = getattr(_turn, "extra", set()) | {group}
-        _turn.chosen = getattr(_turn, "chosen", set()) | {group}
-        _turn.hidden = {g: e for g, e in hidden().items() if g != group}
+        _t().extra = getattr(_t(), "extra", set()) | {group}
+        _t().chosen = getattr(_t(), "chosen", set()) | {group}
+        _t().hidden = {g: e for g, e in hidden().items() if g != group}
         logbook.info("tools", "attached %s mid-turn", group)
         return True
 
@@ -167,23 +167,23 @@ def attach_tool(name):
     if not allowed(name):
         return False
 
-    attach(_turn.group_of(name))
+    attach(_t().group_of(name))
     return True
 
 
 def current():
     """The names to send now, after anything attached mid-turn, or None
     when this turn wasn't routed."""
-    pool = getattr(_turn, "pool", None)
+    pool = getattr(_t(), "pool", None)
 
-    if pool is None or not hasattr(_turn, "chosen") or not hasattr(_turn, "group_of"):
+    if pool is None or not hasattr(_t(), "chosen") or not hasattr(_t(), "group_of"):
         return None
 
-    return {n for n in pool if _turn.group_of(n) in _turn.chosen}
+    return {n for n in pool if _t().group_of(n) in _t().chosen}
 
 
 def note_used(name, group_of):
-    if getattr(_turn, "track", True):
+    if getattr(_t(), "track", True):
         _state["used"][group_of(name)] = _state["turn"]
 
 
@@ -220,7 +220,7 @@ def _more_tools(group):
     match = next((g for g in hidden() if g.lower() == group.lower()), None)
 
     if match is None:
-        on = sorted(getattr(_turn, "chosen", ()) or ())
+        on = sorted(getattr(_t(), "chosen", ()) or ())
         return f"No hidden group called {group!r}. Already attached: {', '.join(on) or 'none'}."
 
     names = [e["spec"]["function"]["name"] for e in hidden()[match]]

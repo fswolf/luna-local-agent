@@ -644,7 +644,41 @@ def _apply_exchange(said, answer, model):
     if feeling:
         _feel(feeling)
 
+    _compliment(rating, feeling)
     _count_hostility(rating, warmth)
+
+
+def _emote(name, sulking=False):
+    """An emote name the portrait may show, or "" when emotes are off.
+    While she's walked away only the sulk's own (walk_away.emote) shows:
+    no hearts or question marks mid-sulk."""
+    if not (config.MOOD_ENABLED and getattr(config, "MOOD_EMOTES", True)) or _intensity() <= 0:
+        return ""
+
+    if away() and not sulking:
+        return ""
+
+    return str(name or "")
+
+
+def _compliment(rating, feeling):
+    """A clear compliment (moods.json "compliment": its rating and up)
+    shows its emote, unless the feeling it raised already shows one."""
+    spec = moods().get("compliment") or {}
+    name = _emote(spec.get("emote"))
+
+    if not name or rating < int(spec.get("rating", 2)):
+        return
+
+    if feeling and ((moods().get("feelings") or {}).get(feeling) or {}).get("emote"):
+        return
+
+    try:
+        import livefeed
+
+        livefeed.emit("emote", name=name)
+    except Exception:
+        pass
 
 
 def _feel(feeling):
@@ -671,7 +705,7 @@ def _feel(feeling):
             if getattr(config, "MOOD_FACE", True) else {}
         gesture = spec.get("gesture") if getattr(config, "MOOD_GESTURES", True) else None
         livefeed.emit("feeling", name=feeling, face=face, gesture=gesture or "",
-                      seconds=float(spec.get("seconds", 6)))
+                      emote=_emote(spec.get("emote")), seconds=float(spec.get("seconds", 6)))
     except Exception:
         pass
 
@@ -879,6 +913,14 @@ def idle():
     return [str(g) for g in (_state(name).get("idle") or [])]
 
 
+def emote():
+    """An emote this mood shows now and then (loving, flirty: hearts)."""
+    with _lock:
+        name = _cell()[0]
+
+    return _emote(_state(name).get("emote"))
+
+
 def state():
     """(label, energy, warmth, [recent reasons]) for /mood."""
     with _lock:
@@ -943,13 +985,14 @@ def reset():
         _clean_run = 0
         _recent.clear()
 
-    _away.update(until=0.0, said=False, hostile=0)
+    with _away_lock:
+        _away.update(until=0.0, said=False, hostile=0)
     _save()
     _announce()
 
 
 # ---------------------------------------------------------------------------
-# Walking away (mood.walk_away, off by default)
+# Walking away (mood.walk_away, on by default)
 #
 # Treated badly enough for long enough, she stops talking for a while:
 # one short line the next time she's spoken to, then nothing. While
@@ -966,25 +1009,33 @@ def reset():
 # ---------------------------------------------------------------------------
 _away = {"until": 0.0, "said": False, "hostile": 0, "last": 0.0}
 
+# Its own lock: it's touched from the appraisal worker (one per turn, so
+# two can finish together), the come-back timer and the turn itself.
+# Nothing slow or re-entrant (logging, _announce) runs while it's held.
+_away_lock = threading.Lock()
+
 
 def _walk():
     return moods().get("walk_away") or {}
 
 
 def walk_away_on():
-    return bool(config.MOOD_ENABLED and getattr(config, "MOOD_WALK_AWAY", False))
+    return bool(config.MOOD_ENABLED and getattr(config, "MOOD_WALK_AWAY", True))
 
 
 def away():
     """Seconds until she's talking again, or 0."""
-    if not _away["until"]:
+    with _away_lock:
+        until = _away["until"]
+
+    if not until:
         return 0
 
     if not walk_away_on():          # switched off mid-sulk: she's back
         _back("walking away was switched off")
         return 0
 
-    left = _away["until"] - time.time()
+    left = until - time.time()
 
     if left <= 0:
         _back("enough time passed")
@@ -994,39 +1045,58 @@ def away():
 
 
 def _count_hostility(rating, warmth):
-    if not walk_away_on() or _away["until"]:
+    if not walk_away_on():
         return
 
     now = time.time()
-
-    if now - _away["last"] > 30 * 60:
-        _away["hostile"] = 0
-
-    if warmth < 0:
-        _away.update(hostile=_away["hostile"] + 1, last=now)
-    elif warmth > 0 or rating >= 1:
-        _away["hostile"] = 0
-
-    if _away["hostile"] >= max(1, int(getattr(config, "MOOD_WALK_AWAY_AFTER", 3))):
-        _withdraw()
-
-
-def _withdraw():
-    global _warmth
-
     minutes = max(1.0, float(getattr(config, "MOOD_WALK_AWAY_MINUTES", 10)))
-    _away.update(until=time.time() + minutes * 60, said=False, hostile=0)
+
+    with _away_lock:
+        if _away["until"]:
+            return
+
+        if now - _away["last"] > 30 * 60:
+            _away["hostile"] = 0
+
+        if warmth < 0:
+            _away.update(hostile=_away["hostile"] + 1, last=now)
+        elif warmth > 0 or rating >= 1:
+            _away["hostile"] = 0
+
+        # Decided and claimed in one step, so two appraisals finishing
+        # together can't both walk her out (two timers, two log lines).
+        leaving = _away["hostile"] >= max(1, int(getattr(config, "MOOD_WALK_AWAY_AFTER", 3)))
+
+        if leaving:
+            _away.update(until=now + minutes * 60, said=False, hostile=0)
+
+    if leaving:
+        _withdraw(minutes)
+
+
+def _withdraw(minutes):
+    global _warmth
 
     with _lock:
         _warmth = min(_warmth, -0.35)    # and cool with you when she's back
 
     logbook.info("mood", "walked away for %.0f min", minutes)
     _nudge(why="walked away")
-    _announce()
+
+    # Come back on the minute, not whenever something next asks: the
+    # portrait shouldn't sulk on for an hour because nobody spoke.
+    timer = threading.Timer(minutes * 60 + 1, away)
+    timer.daemon = True
+    timer.start()
 
 
 def _back(why):
-    _away.update(until=0.0, said=False, hostile=0)
+    with _away_lock:
+        if not _away["until"]:
+            return              # already back (the timer and a turn can both notice)
+
+        _away.update(until=0.0, said=False, hostile=0)
+
     logbook.info("mood", "back: %s", why)
     _announce()
 
@@ -1034,10 +1104,12 @@ def _back(why):
 def leaving_line():
     """The one thing she says on her way out - the first time she's
     spoken to after walking away - then "" until she's back."""
-    if _away["said"]:
-        return ""
+    with _away_lock:
+        if _away["said"]:
+            return ""
 
-    _away["said"] = True
+        _away["said"] = True
+
     lines = [str(x) for x in (_walk().get("lines") or []) if str(x).strip()]
 
     return random.choice(lines) if lines else "I'm done talking for now."
@@ -1113,12 +1185,16 @@ def portrait_state():
 
     if away():
         spec = _walk()
+        moves = config.MOOD_GESTURES and _intensity() > 0
         return {"label": str(spec.get("label") or "withdrawn"), "energy": energy if show else 0.0,
                 "warmth": warmth if show else 0.0,
-                "face": dict(spec.get("face") or {}) if show else {}, "idle": []}
+                "face": dict(spec.get("face") or {}) if show else {}, "idle": [],
+                "hold": str(spec.get("hold") or "") if moves else "",
+                "emote": _emote(spec.get("emote"), sulking=True)}
 
     return {"label": name, "energy": energy if show else 0.0,
-            "warmth": warmth if show else 0.0, "face": face() if show else {}, "idle": idle()}
+            "warmth": warmth if show else 0.0, "face": face() if show else {}, "idle": idle(),
+            "hold": "", "emote": emote()}
 
 
 def _announce():

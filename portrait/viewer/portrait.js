@@ -16,6 +16,7 @@ import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils,
          VRMAnimationLoaderPlugin, createVRMAnimationClip } from './vendor/luna-three.js';
 import { createLook } from './look.js';
 import { createHologram3D } from './hologram3d.js';
+import { createEmotes } from './emotes.js';
 import { createGestures, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
@@ -50,6 +51,7 @@ scene.add(key);
 const rim = new THREE.DirectionalLight(0xd070ff, 1.4);  // the wallpaper's magenta back-light
 rim.position.set(0.8, 0.6, -1.2);
 scene.add(rim);
+const emotes = createEmotes(THREE, scene);   // hearts, sweat drop... beside her head
 
 // The hologram look: config.json "hologram": {"enabled": true}, or ?holo=1.
 // The URL sets how it starts; /holo and the tools pane switch it live.
@@ -173,6 +175,8 @@ const mind = {
   energy: 0, warmth: 0,       // mood dials, about -1..1
   face: null,                 // the mood's face from agent/moods.json (null: work it out from the dials)
   idle: [],                   // gestures this mood drifts into
+  hold: '',                   // a pose held for as long as the mood says (walked away: 'sulk')
+  emote: '',                  // an emote this mood shows now and then (loving: 'hearts')
   voice: [],                  // queued {env, zcr, fps, start}
   lastEvent: 0,
 };
@@ -234,19 +238,31 @@ function handle(ev) {
       break;
     case 'mood': {
       const w = +ev.warmth || 0;
-      if (w - mind.warmth > 0.2) moves?.wag(0.8), setTimeout(() => moves?.wag(0), 4000);
       if (w > 0.85 && mind.warmth <= 0.85 || w - mind.warmth > 0.3) blush.fluster = 1;   // that landed
       mind.energy = +ev.energy || 0;
       mind.warmth = w;
       mind.face = ev.face && typeof ev.face === 'object' ? ev.face : null;
       mind.idle = Array.isArray(ev.idle) ? ev.idle : [];
+      // A held pose (walked away: "sulk"). Let go of it when the mood
+      // stops asking - she turns back.
+      const hold = typeof ev.hold === 'string' ? ev.hold : '';
+      if (mind.hold && hold !== mind.hold && moves?.playing().includes(mind.hold)) moves.stop();
+      mind.hold = hold;
+      // a mood that shows an emote now and then (loving, flirty: hearts)
+      const em = typeof ev.emote === 'string' ? ev.emote : '';
+      if (em !== mind.emote) emoteNext = clock.elapsedTime + rand(10, 40);
+      mind.emote = em;
       break;
     }
+    case 'emote':      // a compliment landed (moods.json "compliment")
+      emote(ev.name);
+      break;
     case 'feeling':    // a quick one from reading the exchange: laughing, embarrassed...
       feel.face = ev.face || {};
       feel.start = clock.elapsedTime;
       feel.seconds = +ev.seconds || 6;
       if (ev.gesture && moves && !moves.busy()) gesture(ev.gesture);
+      if (ev.emote) emote(ev.emote);
       break;
     case 'tool':
       twitch(Math.random() < 0.5 ? 1 : -1, 0.8);
@@ -270,6 +286,22 @@ function handle(ev) {
       tilt.target = 0;
       break;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Emotes: one burst at a time, 30 s apart at least, and rare enough in a
+// mood that they still mean something
+// ---------------------------------------------------------------------------
+let emoteNext = 0, emoteLast = -99;
+function emote(name) {
+  if (!name || emotes.busy() || clock.elapsedTime - emoteLast < 30) return;
+  emoteLast = clock.elapsedTime;
+  emotes.show(name);
+}
+function moodEmote(now) {
+  if (!mind.emote || now < emoteNext || mind.stage === 'listening') return;
+  emoteNext = now + rand(180, 360);
+  emote(mind.emote);
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +400,12 @@ function actOut(text) {
 // talks, now and then a hand comes up.
 const idle = { next: 25, last: '', talkNext: 0 };
 function idleMoves(now, talking) {
+  // Holding a pose: nothing else on her own, and back into it as soon as
+  // anything that interrupted it has finished.
+  if (moves && mind.hold && (moves.names.includes(mind.hold) || moves.hasClip(mind.hold))) {
+    if (!moves.busy()) moves.play(mind.hold);
+    return;
+  }
   if (!moves || moves.busy()) return;
   if (mind.stage === 'idle' && now > idle.next) {
     let pick;
@@ -524,6 +562,9 @@ const gestureOwned = new Set();
 
 // Moods: gentle, never a full grin from the dials alone.
 const moodNow = { happy: 0, sad: 0, angry: 0, relaxed: 0, surprised: 0 };
+// Heavy lids: the eyes rest this far closed (flirty: half), and blinks go
+// from there. Its own value, not a mood expression - it's the blink's floor.
+const lids = { now: 0, target: 0 };
 
 // A quick feeling: in fast, held, out over the last second and a half.
 const feel = { face: {}, start: -99, seconds: 6 };
@@ -536,7 +577,12 @@ function feelWeight(now) {
 function updateMood(dt, talking) {
   const w = mind.warmth, e = mind.energy;
   const fw = feelWeight(clock.elapsedTime);
-  const over = k => Math.min(1, (feel.face[k] || 0) * fw);
+  // A quick feeling, or a gesture's sad/cross face (a sulk): on a model
+  // with separate brow/eye/mouth shapes those two only show through here,
+  // since the whole-face presets are kept at 0 for them.
+  const gx = moves?.expr() || {};
+  const fromGesture = k => (k === 'sad' || k === 'angry') && moodParts() ? (gx[k] || 0) : 0;
+  const over = k => Math.min(1, Math.max((feel.face[k] || 0) * fw, fromGesture(k)));
   if (mind.face) {
     // the mood's own face, from agent/moods.json; a model without separate
     // brow/eye/mouth shapes shows sad and cross at half, or the presets take over
@@ -549,9 +595,11 @@ function updateMood(dt, talking) {
       surprised: Math.max(mind.stage === 'waking' ? 0.35 : 0, f.surprised || 0, over('surprised')),
     };
     blush.mood = Math.max(f.blush || 0, over('blush'));
+    lids.target = Math.max(f.lids || 0, over('lids'));
     return applyMood(target, dt);
   }
   blush.mood = over('blush');
+  lids.target = over('lids');
   const target = {
     happy: Math.max(0, Math.min(0.55, w * 0.45 + e * 0.15 + (talking ? 0.08 : 0))),
     relaxed: Math.max(0, Math.min(0.4, w * 0.3 - e * 0.2)),
@@ -607,7 +655,8 @@ function animate() {
 
     const talking = updateMouth(dt);
     updateMood(dt, talking > 0.05);
-    setExpr('blink', mind.stage === 'waking' ? 0 : blinkValue(now, dt));
+    lids.now = damp(lids.now, mind.stage === 'waking' ? 0 : Math.min(0.7, lids.target), 2, dt);
+    setExpr('blink', mind.stage === 'waking' ? 0 : Math.max(lids.now, blinkValue(now, dt)));
 
     // Head: follows the gaze part of the way, breathes, nods with her voice.
     tilt.v = damp(tilt.v, tilt.target + L.tilt * LOOK_TILT, 3, dt);
@@ -664,6 +713,7 @@ function animate() {
       if (k === 'blush') blush.gesture = v;
       else if (k === 'tears') tears.gesture = v;
       else if (!has.has(k)) continue;
+      else if ((k === 'sad' || k === 'angry') && moodParts()) continue;   // through updateMood's parts
       else if (PORTRAIT_SETS.has(k)) vrm.expressionManager.setValue(k, Math.max(vrm.expressionManager.getValue(k) || 0, v));
       else { vrm.expressionManager.setValue(k, v); gestureOwned.add(k); }
     }
@@ -672,6 +722,8 @@ function animate() {
     updateBlush(dt);
     updateBrows();
     updateTears(dt, now);
+    moodEmote(now);
+    emotes.update(dt, bone('head'), camera);
 
     vrm.update(dt);
     closeMouth(talking);
@@ -968,6 +1020,10 @@ function debugPanel() {
     sad: () => handle({ t: 'mood', energy: -0.8, warmth: -0.1 }),
     cross: () => handle({ t: 'mood', energy: 0.2, warmth: -0.9 }),
     neutral: () => handle({ t: 'mood', energy: 0, warmth: 0 }),
+    // as agent/moods.json has them: the flirty mood, and the playful feeling
+    flirty: () => { handle({ t: 'mood', energy: 0.5, warmth: 1, face: { happy: 0.3, blush: 0.4, lids: 0.45 }, emote: 'hearts' });
+                    emoteLast = -99; emote('hearts'); },
+    playful: () => handle({ t: 'feeling', face: { happy: 0.4, blush: 0.4, lids: 0.5 }, gesture: 'wink', seconds: 6 }),
     'you: left': () => handle({ t: 'gaze', x: -0.8, y: -0.1 }),
     'you: right': () => handle({ t: 'gaze', x: 0.8, y: -0.1 }),
     'you: ahead': () => handle({ t: 'gaze', none: true }),
@@ -979,6 +1035,10 @@ function debugPanel() {
     cry: () => gesture('cry'), 'tears on/off': () => { tears.test = tears.test ? null : 1; },
     'wag tail': () => { moves.wag(1); setTimeout(() => moves.wag(0), 3000); },
     'holo on/off': () => setHolo(!(holo && holo.isOn())),
+    hearts: () => { emoteLast = -99; emote('hearts'); },
+    'sweat drop': () => { emoteLast = -99; emote('sweat'); },
+    anger: () => { emoteLast = -99; emote('anger'); },
+    question: () => { emoteLast = -99; emote('question'); },
   };
   const tune = document.getElementById('dtune');
   if (tune) {
@@ -1010,10 +1070,11 @@ function debugPanel() {
   // grouped, each group alphabetical; anything not listed is a gesture
   const GROUPS = [
     ['her state', ['idle', 'listen', 'talk', 'think']],
-    ['face and mood', ['blink', 'cross', 'fluster', 'happy', 'neutral', 'sad', 'tears on/off']],
+    ['face and mood', ['blink', 'cross', 'flirty', 'fluster', 'happy', 'neutral', 'playful', 'sad', 'tears on/off']],
     ['looking', ['you: ahead', 'you: left', 'you: right']],
     ['body', ['left ear', 'twitch', 'wag tail']],
     ['effects', ['glitch', 'holo on/off']],
+    ['emotes', ['anger', 'hearts', 'question', 'sweat drop']],
   ];
   const grouped = new Set(GROUPS.flatMap(([, l]) => l));
   GROUPS.splice(1, 0, ['gestures', Object.keys(buttons).filter(l => !grouped.has(l))]);
@@ -1113,7 +1174,7 @@ try {
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
   say('');
-  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, mouthShut, blush, tears, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
+  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
   if (params.get('debug')) debugPanel();
   buildActs();
   loadClips().then(buildActs);

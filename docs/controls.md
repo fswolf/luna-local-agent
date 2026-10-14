@@ -134,6 +134,11 @@ you do want to abandon one, press again once she's thinking. A cancel
 during recording throws the audio away rather than transcribing it and
 then refusing to answer.
 
+Pressing HOME to talk also quiets anything she's saying at the time (a
+reminder, a stream-chat reply), so the mic hears you and not her. And a
+HOME pressed right after you hit Enter, while she's still finishing the
+last reply, cancels the message you just sent too.
+
 Open mode only records *between* turns, never while Luna is speaking,
 and waits `settle_seconds` after she finishes before re-arming:
 otherwise her own voice out of the speakers retriggers the mic and she
@@ -313,7 +318,9 @@ hl.bind("SUPER + HOME", hl.dsp.exec_cmd("python3 ~/ai-voice/ai-voice-ctl.py ptt"
 
 `ai-voice-ctl.py` is stdlib-only and needs no virtualenv, which matters
 because `exec` runs outside it. It takes `ptt`, `stop` or `quit`, so any
-script or panel button can drive the assistant.
+script or panel button can drive the assistant. `stop` never starts a
+turn: it stops whatever she's doing, a reminder or a chat reply as well
+as your own turn.
 
 > Keep a modifier. A bare `HOME` bind is swallowed compositor-wide, so
 > `Home` stops working in your terminal, editor and browser, including

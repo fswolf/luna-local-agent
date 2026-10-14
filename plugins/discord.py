@@ -44,8 +44,8 @@ import os
 import threading
 
 import config
+import interrupts
 import logbook
-import state
 
 NAME = "discord"
 SUMMARY = "remote access - the owner talks to her from Discord"
@@ -379,7 +379,7 @@ def _run(token, owners):
             return
 
         if text == "!stop":
-            state.stop_generating = state.stop_speaking = True
+            interrupts.stop_all(listening=False)
             await message.add_reaction("🛑")
             return
 

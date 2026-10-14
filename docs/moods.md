@@ -152,11 +152,16 @@ and the next turn picks it up; a typo keeps the last good version and
 - **lines** are what she's told, rotated so she doesn't hear the same
   sentence twice running.
 - **face** is what the portrait shows: `happy`, `relaxed`, `sad`,
-  `angry`, `surprised`, `blush`, each 0-1.
+  `angry`, `surprised`, `blush`, each 0-1, and `lids`: how far her eyes
+  rest closed (0.45 is the half-lidded flirty look; blinks still happen
+  on top, capped at 0.7 so her eyes never just shut).
 - **voice** is a speed multiplier and a pitch shift in semitones, still
   capped at ±7% and ±0.45.
 - **idle** is gestures she drifts into now and then in that mood, half
   the time instead of the usual idle ones.
+- **emote** pops up beside her head now and then in that mood (every
+  3-6 minutes): `"hearts"` for loving and flirty, `"anger"` for annoyed
+  and mad. See Emotes.
 - **private** keeps a mood out of stream chat and Discord turns: there
   she gets the nearest mood in the same row that isn't private.
 
@@ -231,13 +236,55 @@ states in which she's drier about it. That's in the prompt line itself,
 and it's the difference between a companion with a bad evening and
 software you have to coax.
 
+## Emotes
+
+Little pictures that pop up beside her head, the anime way, all kept
+rare on purpose so they still mean something:
+
+- **hearts** when a compliment really lands, when she's touched, and now
+  and then while she's loving or flirty
+- **sweat** (the big sweat drop) when she's embarrassed
+- **anger** (the popping vein mark) when she's annoyed, now and then
+  while she's annoyed or mad, and while she's walked away
+- **question** when she's curious or confused All set in
+`agent/moods.json`:
+
+```json
+"compliment": { "rating": 3, "emote": "hearts" },
+"feelings": { "touched": { ..., "emote": "hearts" } },
+"states":   { "loving":  { ..., "emote": "hearts" } }
+```
+
+- **compliment**: an exchange that reads as warm at `rating` or more
+  (0-3, see "Being nice to her") shows it once, unless the feeling it
+  raised already has its own emote.
+- One at a time, at least 30 seconds apart. A mood's own ones come
+  every 3-6 minutes. While she's walked away, only `walk_away.emote`
+  shows (the anger mark).
+
+The portrait draws hearts itself. To use your own art, put a sprite
+sheet in `portrait/emotes/hearts.png`: the frames in one row, square
+unless `portrait/emotes/hearts.json` says otherwise:
+
+```json
+{ "frames": 8, "fps": 12, "size": 0.05, "count": 3 }
+```
+
+`size` is how big each one is beside her head in metres, `count` how
+many in a burst, and `motion` how it moves: `float` (drifts up, like
+the hearts), `slide` (slips down, like the sweat drop), `throb` (pulses
+in place, like the anger mark) or `bob` (pops up and bobs, like the
+question mark). A new name (`"emote": "stars"`) only needs its PNG,
+and floats unless its JSON says otherwise. The debug page
+(`./viewer.sh`) has a button for each under **emotes**.
+`/set mood.emotes false` turns them off.
+
 ## Walking away
 
-Off by default, and the one deliberate exception to "tone, never
-capability" above: with `"walk_away": true` in the `mood` settings,
-real hostility a few exchanges running makes her stop talking for a
-while, the way a person would leave the room. It's for companion and
-roleplay setups; leave it off where she's a tool first.
+On by default, and the one deliberate exception to "tone, never
+capability" above: real hostility a few exchanges running makes her
+stop talking for a while, the way a person would leave the room. Where
+she's a tool first, `/set mood.walk_away false` turns it off.
 
 - **What counts:** the exchange reading's own "hostile" mark, which it
   gives for being hurtful to her, not for bluntness or swearing.
@@ -245,8 +292,10 @@ roleplay setups; leave it off where she's a tool first.
   clears the count, and half an hour without another wipes it.
 - **Leaving:** the next time you speak to her she says one short line
   from `walk_away.lines` in `agent/moods.json`. After that, nothing: no
-  reply, and no model call for it. The portrait holds the
-  `walk_away.face` and drops her idle moves.
+  reply, and no model call for it. On the portrait she
+  crosses her arms and turns her head away (`walk_away.hold`, the
+  `sulk` gesture) with `walk_away.face`, and holds it, no idle moves,
+  until she's back; then she turns back round.
 - **While she's away:** stream chat and jobs (games included) get
   nothing. Discord gets "(She isn't talking right now.)" so it doesn't
   look broken. Stop words still stop toys, since they never go

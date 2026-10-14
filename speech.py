@@ -13,8 +13,8 @@ import unicodedata
 import requests
 import sounddevice as sd
 import numpy as np
+import interrupts
 import logbook
-import state
 import ui
 
 from concurrent.futures import ThreadPoolExecutor
@@ -215,10 +215,7 @@ def _record_energy(mode):
     give_up_after = config.STT_NO_SPEECH_TIMEOUT if mode == "auto" else None
     max_seconds = config.STT_MANUAL_MAX_SECONDS if mode == "manual" else config.STT_MAX_SECONDS
 
-    stream = sd.InputStream(
-        samplerate=SAMPLE_RATE, channels=1, blocksize=BLOCK_SIZE, dtype="float32"
-    )
-    stream.start()
+    stream = _open_mic(BLOCK_SIZE)
 
     try:
         noise = min(_calibrate(stream), NOISE_CEILING)
@@ -290,14 +287,13 @@ def _record_energy(mode):
                     if silence >= config.STT_SILENCE_SECONDS:
                         break
 
-            if state.stop_listening:
+            if interrupts.current().listening.is_set():     # HOME, or manual's second press
                 break
 
             if elapsed >= max_seconds:
                 break
     finally:
-        stream.stop()
-        stream.close()
+        _close_mic(stream)
 
     if not started or not chunks:
         return None
@@ -355,11 +351,7 @@ def _record_silero(mode):
         "backend": "silero",
     })
 
-    stream = sd.InputStream(
-        samplerate=SAMPLE_RATE, channels=1, blocksize=VAD_BLOCK_SIZE,
-        dtype="float32",
-    )
-    stream.start()
+    stream = _open_mic(VAD_BLOCK_SIZE)
 
     pre_roll = deque(maxlen=max(1, int(PRE_ROLL_SECONDS / block_seconds)))
     chunks = []
@@ -396,14 +388,13 @@ def _record_silero(mode):
                 if event and "end" in event:
                     break
 
-            if state.stop_listening:
+            if interrupts.current().listening.is_set():     # HOME, or manual's second press
                 break
 
             if elapsed >= config.STT_MAX_SECONDS:
                 break
     finally:
-        stream.stop()
-        stream.close()
+        _close_mic(stream)
 
     if not started or not chunks:
         return None
@@ -714,18 +705,50 @@ _audio_warned = [0.0]
 
 def _reset_portaudio():
     """Make PortAudio forget and re-read the audio devices. Only when no
-    microphone stream is open: restarting it under one breaks that stream."""
-    try:
+    microphone stream is open: restarting it under one breaks that stream.
+    Holding _mic_lock, so none can open while it restarts."""
+    with _mic_lock:
         if _mic_streams[0] > 0:
             return
-        sd._terminate()
-        sd._initialize()
-        logbook.info("speech", "restarted PortAudio to re-read the audio devices")
-    except Exception as e:
-        logbook.warn("speech", "couldn't restart PortAudio: %s", e)
+
+        try:
+            sd._terminate()
+            sd._initialize()
+            logbook.info("speech", "restarted PortAudio to re-read the audio devices")
+        except Exception as e:
+            logbook.warn("speech", "couldn't restart PortAudio: %s", e)
 
 
-_mic_streams = [0]      # open microphone streams (barge-in, recording)
+# Every microphone stream (recording, barge-in, the wake word) opens and
+# closes through these, so _reset_portaudio knows when one is open.
+_mic_lock = threading.Lock()
+_mic_streams = [0]
+
+
+def _open_mic(blocksize):
+    """A started mono float32 input stream at SAMPLE_RATE, counted."""
+    with _mic_lock:
+        stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1,
+                                blocksize=blocksize, dtype="float32")
+        try:
+            stream.start()
+        except Exception:
+            stream.close()
+            raise
+        _mic_streams[0] += 1
+
+    return stream
+
+
+def _close_mic(stream):
+    try:
+        stream.stop()
+        stream.close()
+    except Exception:
+        pass    # already gone with the device; the count still has to drop
+    finally:
+        with _mic_lock:
+            _mic_streams[0] -= 1
 
 
 _native_rate = [False]   # set once CoreAudio has refused the voice's own rate
@@ -841,8 +864,8 @@ def _use_afplay():
     return player == "afplay" or sys.platform == "darwin" or _afplay[1]
 
 
-def _play_afplay(samples, rate):
-    """Play one chunk with afplay; False if interrupted.
+def _play_afplay(samples, rate, stop):
+    """Play one chunk with afplay; False if interrupted (`stop`, interrupts.Stop).
 
     Bluetooth headphones on macOS can refuse the voice's own rate
     outright ("AudioQueueStart failed ('what')" for Kokoro's 24 kHz), so
@@ -857,12 +880,10 @@ def _play_afplay(samples, rate):
     # after the mic closed. llama-server answers before it switches back,
     # so back off and retry for ~3s instead of giving up in 0.3s.
     for n, wait in enumerate((0, 0.5)):
-        if wait:
-            time.sleep(wait)
-            if state.stop_speaking:
-                return False
+        if wait and stop.speaking.wait(wait):
+            return False
         for attempt, target in enumerate(dict.fromkeys(rates)):
-            played, outcome = _afplay_once(*_resample(samples, rate, target))
+            played, outcome = _afplay_once(*_resample(samples, rate, target), stop)
 
             if played is None:           # interrupted
                 return False
@@ -888,7 +909,7 @@ def _play_afplay(samples, rate):
     return "refused"
 
 
-def _afplay_once(samples, rate):
+def _afplay_once(samples, rate, stop):
     """(played, message): played is True, False (refused), or None (interrupted)."""
     fd, path = tempfile.mkstemp(prefix="luna-", suffix=".wav")
     os.close(fd)
@@ -909,11 +930,10 @@ def _afplay_once(samples, rate):
 
     try:
         while proc.poll() is None:
-            if state.stop_speaking:
+            if stop.speaking.wait(0.05):    # wakes the moment it's set
                 proc.kill()
                 _lip_stop()
                 return None, "interrupted"
-            time.sleep(0.05)
 
         err = (proc.stderr.read() or b"").decode("utf-8", "replace").strip()
         took = time.monotonic() - started
@@ -931,12 +951,12 @@ def _afplay_once(samples, rate):
             pass
 
 
-def _play(samples, rate):
-    """Play one chunk; return False if HOME interrupted it."""
+def _play(samples, rate, stop):
+    """Play one chunk; return False if it was stopped (`stop`, interrupts.Stop)."""
     _lip_sync(samples, rate)
 
     if _use_afplay():
-        result = _play_afplay(samples, rate)
+        result = _play_afplay(samples, rate, stop)
         if result != "refused":
             return result
         # afplay can't get the speakers; try PortAudio in-process instead,
@@ -958,7 +978,7 @@ def _play(samples, rate):
                 logbook.info("speech", "PortAudio won't open the speakers - playing with afplay from now on")
                 ui.add_message("system", "Playing her voice through macOS's own player (afplay) - "
                                          "PortAudio wouldn't open the speakers.")
-            return _play_afplay(samples, rate) is not False
+            return _play_afplay(samples, rate, stop) is not False
         return True     # skipped, not interrupted: carry on with the rest
 
     while True:
@@ -967,12 +987,10 @@ def _play(samples, rate):
         if stream is None or not stream.active:
             return True
 
-        if state.stop_speaking:
+        if stop.speaking.wait(0.05):        # wakes the moment it's set
             sd.stop()
             _lip_stop()
             return False
-
-        sd.sleep(50)
 
 
 def speak(text):
@@ -983,8 +1001,6 @@ def speak(text):
     if not pieces:
         return
 
-    state.stop_speaking = False
-
     inbox = queue.Queue()
 
     for piece in pieces:
@@ -992,10 +1008,14 @@ def speak(text):
 
     inbox.put(None)
 
-    speak_queue(inbox, reset=False)
+    # Inside a turn (an approval question) it's the turn's to stop; on
+    # its own (a reminder, the greeting) it gets a Stop of its own, so
+    # HOME stops it and nothing it does touches anyone else's.
+    with interrupts.ensure("speak") as stop:
+        speak_queue(inbox, stop)
 
 
-def speak_queue(inbox, reset=True):
+def speak_queue(inbox, stop=None):
     """Speak sentences as they arrive on a queue, terminated by None.
 
     This is the streaming path. The producer is the model itself, still
@@ -1006,10 +1026,10 @@ def speak_queue(inbox, reset=True):
 
     Synthesis runs on the pool while the previous chunk is still
     playing, so the gap between sentences stays inaudible.
-    """
-    if reset:
-        state.stop_speaking = False
 
+    stop: the interrupts.Stop that silences it (default: this thread's).
+    """
+    stop = stop or interrupts.current()
     pending = deque()
     done = False
 
@@ -1031,7 +1051,7 @@ def speak_queue(inbox, reset=True):
                     if _speakable(piece):
                         pending.append(_pool.submit(_synthesize, piece))
 
-            if state.stop_speaking:
+            if stop.speaking.is_set():
                 return
 
             if not pending:
@@ -1053,7 +1073,7 @@ def speak_queue(inbox, reset=True):
                 logbook.warn("tts", "a chunk couldn't be made or decoded, skipped: %s", e)
                 continue
 
-            if state.stop_speaking or not _play(samples, rate):
+            if stop.speaking.is_set() or not _play(samples, rate, stop):
                 return
     finally:
         for future in pending:
@@ -1109,8 +1129,9 @@ def _speech_probability(block):
         return float(_vad_model(torch.from_numpy(block), SAMPLE_RATE).item())
 
 
-def _watch_for_barge_in(stop):
-    """Set state.stop_speaking if the user starts talking over Luna.
+def _watch_for_barge_in(done, stop):
+    """Stop the reply's speaking (`stop`, its interrupts.Stop) if the user
+    starts talking over Luna. `done`: playback finished, stop watching.
 
     Runs for as long as playback does. Bails out quietly on any audio
     error - failing to offer barge-in is a missing nicety, but crashing
@@ -1136,19 +1157,14 @@ def _watch_for_barge_in(stop):
         pass
 
     try:
-        stream = sd.InputStream(
-            samplerate=SAMPLE_RATE, channels=1,
-            blocksize=VAD_BLOCK_SIZE, dtype="float32",
-        )
-        stream.start()
+        stream = _open_mic(VAD_BLOCK_SIZE)
     except Exception:
         return
 
-    _mic_streams[0] += 1
     waited = 0.0
 
     try:
-        while not stop.is_set() and not state.stop_speaking:
+        while not done.is_set() and not stop.speaking.is_set():
             audio, _overflow = stream.read(VAD_BLOCK_SIZE)
             block = audio[:, 0].copy()
             level = _rms(block)
@@ -1216,8 +1232,8 @@ def _watch_for_barge_in(stop):
                     level, baseline, baseline * config.STT_BARGE_IN_MARGIN,
                     probability, threshold, streak * block_seconds,
                 )
-                state.stop_speaking = True
-                state.barged_in = True
+                stop.barged_in = True
+                stop.stop(speaking=True)
 
                 try:
                     import mood
@@ -1230,12 +1246,7 @@ def _watch_for_barge_in(stop):
     except Exception:
         return
     finally:
-        _mic_streams[0] -= 1
-        try:
-            stream.stop()
-            stream.close()
-        except Exception:
-            pass
+        _close_mic(stream)
 
 
 def barge_in_available():
@@ -1261,11 +1272,7 @@ def wait_for_wake_word(should_stop):
     wakeword.reset()
 
     try:
-        stream = sd.InputStream(
-            samplerate=SAMPLE_RATE, channels=1,
-            blocksize=wakeword.FRAME_SIZE, dtype="float32",
-        )
-        stream.start()
+        stream = _open_mic(wakeword.FRAME_SIZE)
     except Exception as e:
         ui.add_message("system", f"Wake word listener couldn't open the mic: {e}")
         return True
@@ -1276,18 +1283,11 @@ def wait_for_wake_word(should_stop):
 
             if wakeword.heard(audio[:, 0].copy()):
                 return True
-
-            if state.stop_listening:
-                return False
     except Exception as e:
         ui.add_message("system", f"Wake word listener stopped: {e}")
         return True
     finally:
-        try:
-            stream.stop()
-            stream.close()
-        except Exception:
-            pass
+        _close_mic(stream)
 
     return False
 
@@ -1300,7 +1300,10 @@ class Player:
     on its own thread so the model can keep generating into it.
     """
 
-    def __init__(self, barge_in=True):
+    def __init__(self, barge_in=True, stop=None):
+        # Whose stop silences it: the turn's (interrupts.Stop). Barge-in
+        # sets this one, and only this one.
+        self._stop = stop or interrupts.current()
         self._inbox = queue.Queue()
         self._thread = None
         self._listener = None
@@ -1308,20 +1311,19 @@ class Player:
         self._barge_in = barge_in
 
     def say(self, sentence):
-        if state.stop_speaking:
+        if self._stop.speaking.is_set():
             return
 
         if self._thread is None:
             ui.set_status("Speaking...")
             self._thread = threading.Thread(
-                target=speak_queue, args=(self._inbox,),
-                kwargs={"reset": False}, daemon=True,
+                target=speak_queue, args=(self._inbox, self._stop), daemon=True,
             )
             self._thread.start()
 
             if self._barge_in and barge_in_available():
                 self._listener = threading.Thread(
-                    target=_watch_for_barge_in, args=(self._stop_listener,),
+                    target=_watch_for_barge_in, args=(self._stop_listener, self._stop),
                     daemon=True,
                 )
                 self._listener.start()

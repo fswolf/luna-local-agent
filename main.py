@@ -15,6 +15,7 @@ from input import start_keyboard
 import assistant
 import control
 import history
+import interrupts
 import lmstudio
 import logbook
 import mood
@@ -22,7 +23,6 @@ import plugins
 import ptt
 import reminders
 import speech
-import state
 import timeutil
 import transcript
 import ui
@@ -171,7 +171,7 @@ livefeed.start()
 # past turns are visible right away instead of starting on a blank screen.
 for msg in history.get_messages():
     speaker = "user" if msg["role"] == "user" else AGENT_NAME.lower()
-    ui.conversation.append((speaker, msg["content"]))
+    ui.add_message(speaker, msg["content"])
 
 # Whatever was chosen last time - the setting exists so the preference
 # survives a restart, not just the session.
@@ -232,20 +232,15 @@ reflect.start(MODEL, show=lambda line: ui.add_message("system", line))
 # -------------------------
 # Turn handling
 # -------------------------
-def _process(text):
+def _process(text, stop):
     """One typed turn. Runs on a worker so the TUI stays responsive
-    while the model thinks and Luna speaks."""
-    ui.add_message("user", text)
-
-    state.assistant_busy = True
-    state.stop_generating = False
-    state.turn_source = "typed"
-    # stop_speaking is deliberately not reset here - assistant.respond()
-    # sets it to interrupt whatever is still talking, and clears it once
-    # it actually holds the turn.
-
+    while the model thinks and Luna speaks. `stop` was opened when you
+    pressed Enter (interrupts), so a HOME pressed while it waits for the
+    last reply to finish still cancels it."""
     try:
-        assistant.respond(text, MODEL)
+        with interrupts.using(stop):        # closed however this ends
+            ui.add_message("user", text)
+            assistant.respond(text, MODEL, source="typed")
         ui.set_status("Idle")
         mood.note_turn()
     except Exception as e:
@@ -256,8 +251,6 @@ def _process(text):
         ui.add_message("system", f"Error: {e}")
         ui.set_status("Idle")
         mood.note_error()
-    finally:
-        state.assistant_busy = False
 
 
 _portrait = {"proc": None}
@@ -332,7 +325,7 @@ def handle_input(text):
         return
 
     if text == "/clear":
-        ui.conversation.clear()
+        ui.clear()
         history.clear()
         ui.render()
         return
@@ -595,7 +588,7 @@ def handle_input(text):
         # stt.mode has a live switch of its own - flipping the constant
         # isn't enough, the hands-free loop has to be told.
         if path == "stt.mode":
-            ptt.set_mode(applied, save=False)
+            ptt.set_mode(applied)
 
         ui.add_message(
             "system",
@@ -1478,7 +1471,7 @@ def handle_input(text):
         )
         return
 
-    threading.Thread(target=_process, args=(text,), daemon=True).start()
+    threading.Thread(target=_process, args=(text, interrupts.open("typed")), daemon=True).start()
 
 
 ui.run(on_submit=handle_input, on_hotkey=lambda: ptt.toggle(MODEL))
