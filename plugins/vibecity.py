@@ -35,6 +35,7 @@ Builds cost in-game money only, so nothing here asks for approval.
         "max_steps": 60,
         "max_rounds": 12,          # tool calls she may make in one turn
         "speak": true,             # narrate each turn out loud
+        "web": true,               # she may look things up (web_search, research)
         "goal": "",
         "skip_tools": [],              # e.g. ["screenshot"] for a model that can't see
         "pause_game": true             # pause the game when she stops playing
@@ -60,7 +61,11 @@ DEFAULT_GOAL = ("grow the town: roads, homes, shops and industry, with power and
                 "without running out of money")
 
 DEFAULTS = {"url": "http://127.0.0.1:47823/mcp", "step_seconds": 10, "max_steps": 60, "max_rounds": 12,
-            "speak": True, "goal": "", "skip_tools": [], "pause_game": True}
+            "speak": True, "web": True, "goal": "", "skip_tools": [], "pause_game": True}
+
+# When "web" is on: stuck on a puzzle or a recipe, she can look it up.
+# If that means she reads a walkthrough and wins, she wins.
+WEB_TOOLS = ["web_search", "research"]
 
 _state = {"model": None, "tools": [], "goal": "", "notes": [], "steps": 0, "playing": False,
           "busy": False, "error": "", "briefed": False}
@@ -301,7 +306,7 @@ def _step():
     notes = "\n".join(f"- {n}" for n in _state["notes"][-12:]) or "- nothing yet"
     prompt = STEP_PROMPT.format(goal=_goal(), brief="" if _state["briefed"] else BRIEF, notes=notes,
                                 project="{project}")
-    allowed = list(_state["tools"]) + ["play_vibe_city", "game_note"]
+    allowed = list(_state["tools"]) + ["play_vibe_city", "game_note"] + (WEB_TOOLS if s["web"] else [])
 
     import projects
 

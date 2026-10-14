@@ -36,6 +36,7 @@ games/zork/. dfrotz has to be installed:
         "step_seconds": 8,      # quiet needed before her next move
         "max_steps": 200,       # moves per /zork play, then she pauses
         "speak": true,          # narrate each turn out loud
+        "web": true,            # she may look things up (web_search, research)
         "interpreter": "",      # path to dfrotz if it's somewhere odd
         "watch": false,         # open the watch window with /zork play
         "terminal": ""          # e.g. "kitty" or "gnome-terminal --"; "" = find one
@@ -67,8 +68,12 @@ SERVER_SCRIPT = os.path.join(HERE, "games", "zork", "zork_server.py")
 WATCH_SCRIPT = os.path.join(HERE, "games", "zork", "watch.py")
 SAVES = os.path.join(HERE, "agent", "zork")      # gitignored, like her other state
 
-DEFAULTS = {"step_seconds": 8, "max_steps": 200, "speak": True, "interpreter": "",
+DEFAULTS = {"step_seconds": 8, "max_steps": 200, "speak": True, "web": True, "interpreter": "",
             "watch": False, "terminal": ""}
+
+# When "web" is on: stuck on a puzzle or a recipe, she can look it up.
+# If that means she reads a walkthrough and wins, she wins.
+WEB_TOOLS = ["web_search", "research"]
 
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "playing": False,
           "busy": False, "error": ""}
@@ -451,7 +456,7 @@ def _step():
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-20:]) or "- nothing yet: a new game"
-    allowed = list(_state["tools"]) + ["play_zork", "game_note"]
+    allowed = list(_state["tools"]) + ["play_zork", "game_note"] + (WEB_TOOLS if s["web"] else [])
 
     import projects
 
@@ -466,7 +471,7 @@ def _step():
         answer = assistant.respond_to_job(
             STEP_PROMPT.format(notes=notes, screen=_screen(), project=projects.game_block(pid)),
             _state["model"], "zork", allowed, speak=bool(s["speak"]), project_id=pid,
-            max_rounds=3) or ""
+            max_rounds=4 if s["web"] else 3) or ""
     finally:
         _turn["active"] = False
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]

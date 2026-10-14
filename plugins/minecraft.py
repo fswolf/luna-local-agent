@@ -36,7 +36,8 @@ Setup:
         "username": "Luna",
         "step_seconds": 20,     # quiet needed before she takes the next step
         "max_steps": 60,        # per goal, then she pauses and asks
-        "speak": true           # say each step out loud
+        "speak": true,          # say each step out loud
+        "web": true             # she may look things up (web_search, research)
     }
 """
 import json
@@ -65,7 +66,11 @@ CORE_TOOLS = ["get-position", "move-to-position", "look-at", "find-blocks", "dig
               "get-block-info", "get-recipe", "detect-gamemode"]
 
 DEFAULTS = {"host": "localhost", "port": 25565, "username": "Luna", "step_seconds": 20,
-            "max_steps": 60, "speak": True, "mc_tools": CORE_TOOLS, "command": ""}
+            "max_steps": 60, "speak": True, "web": True, "mc_tools": CORE_TOOLS, "command": ""}
+
+# When "web" is on: stuck on a puzzle or a recipe, she can look it up.
+# If that means she reads a walkthrough and wins, she wins.
+WEB_TOOLS = ["web_search", "research"]
 
 # Places she pinned with remember_minecraft_spot - kept across restarts,
 # per world, because "the base" is the same place tomorrow.
@@ -252,7 +257,8 @@ def _step():
     notes = "\n".join(f"- {n}" for n in _state["notes"][-6:]) or "- nothing yet, you just arrived"
     spots = "; ".join(f"{k} at {v['x']}, {v['y']}, {v['z']}" + (f" ({v['note']})" if v.get("note") else "")
                       for k, v in _spots().items()) or "none yet"
-    allowed = list(_state["tools"]) + ["set_minecraft_goal", "remember_minecraft_spot", "game_note"]
+    allowed = (list(_state["tools"]) + ["set_minecraft_goal", "remember_minecraft_spot", "game_note"]
+               + (WEB_TOOLS if s["web"] else []))
 
     import projects
 

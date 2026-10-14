@@ -278,6 +278,20 @@ Your own memory (facts about you, your conversations) still stays out
 of game turns. It doesn't help her play, and it would cost tokens on
 every move.
 
+## Looking things up
+
+Stuck on a puzzle, a recipe or a mechanic, she can search the web
+mid-game: `web_search` and `research` are in every game's tool list.
+If that means she finds a walkthrough and wins, she wins. Each game has
+the switch, on by default:
+
+```json
+"zork": { "web": false }
+```
+
+Only the web tools join a game's list. Files, the shell, email and
+your memory stay out of game turns either way.
+
 ## Reading a game back
 
 Every game (Minecraft, Zork, Vibe City) writes what she says on each of
