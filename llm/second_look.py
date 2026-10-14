@@ -62,9 +62,13 @@ def _same_answer(a, b):
 # tool called. Small models announce the step instead of taking it, and
 # from the outside that looks like she stalled. Only the closing stretch
 # of the reply is checked: a promise in the middle that she went on to
-# keep in words isn't one.
+# keep in words isn't one. And only a sentence that starts with it
+# ("Let me check the log." / "Okay, I'll fix it."): "maybe you'll let me
+# test it" is asking, not promising.
 _PROMISE = re.compile(
-    r"\b(let me|lemme|i'll|i will|i'm going to|gonna|going to)\s+"
+    r"(?:^|[.!?~\u2026\n][\W_]*)"                      # a sentence starts (emoji and all)
+    r"(?:(?:ok(?:ay)?|alright|right|so|now|oh|hm+|mm+)\W+)?"   # "Okay, ..."
+    r"(let me|lemme|i'll|i will|i'm going to|i'm gonna|gonna|going to)\s+"
     r"(?:just\s+|quickly\s+|actually\s+|now\s+)?"
     r"(read|check(?!\s+(?:back|in)\b)|look(?!\s+forward)|open|search|find|list|fix|edit|rewrite|update|write|"
     r"run|test|grab|pull up|see what|take a look)\b",
@@ -72,9 +76,24 @@ _PROMISE = re.compile(
 
 
 def _promised_action(answer):
-    tail = str(answer or "")[-240:]
+    """What she said she'd do ("let me check the log"), if the reply ends
+    on a promise she didn't keep; otherwise ""."""
+    text = str(answer or "")
 
-    return bool(_PROMISE.search(tail)) and not tail.rstrip().endswith("?")
+    if text.rstrip().endswith("?"):
+        return ""
+
+    # Matched in the whole reply, so a sentence start is a real one, not
+    # wherever the closing stretch happens to begin.
+    found = [m for m in _PROMISE.finditer(text) if m.end() > len(text) - 240]
+
+    if not found:
+        return ""
+
+    start = found[-1].start(1)
+    end = re.search(r"[.!?~\u2026\n]|$", text[start:]).start() + start
+
+    return text[start:end].strip()[:120]
 
 
 def _follow_through(payload, base_messages, answer, model, on_text, on_sentence,

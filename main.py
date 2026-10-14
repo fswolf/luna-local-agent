@@ -856,7 +856,9 @@ def handle_input(text):
             if argument in ("on", "start"):
                 ok, message = plugin.start(MODEL)
             elif argument in ("off", "stop"):
-                ok, message = plugin.stop()
+                from ui.tools_pane import _plugin_off
+
+                ok, message = _plugin_off(plugin)   # saved off even if it never connected
             else:
                 # Anything else is the plugin's own command, if it has any
                 # ("/minecraft goal build a hut"); otherwise its status.

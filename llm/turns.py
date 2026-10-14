@@ -339,13 +339,17 @@ def _ask(text, model, on_text=None, on_sentence=None,
     if (remember and payload.get("tools") and not _last_raw.get("exchanges")
             and getattr(config, "FOLLOW_THROUGH", True) and _promised_action(answer)):
         # She said she'd do it and stopped. Do it - no prefix, the reply
-        # already said what's coming.
-        _log_tool_call("follow-through", "said she'd do it but called nothing - doing it now")
+        # already said what's coming. Unless nothing she has does it: then
+        # one honest line, not some other tool for the sake of calling one.
+        promise = _promised_action(answer)
+        _log_tool_call("follow-through", f"said \u201c{promise}\u201d but called nothing - doing it now")
         livefeed.emit("rethink", step="done", outcome="follow-through: promised a step, taking it")
         answer = _follow_through(
             payload, base_messages, answer, model, on_text, on_sentence, "",
-            "(Not from Ryan: you said what you'd do next but didn't call a "
-            "tool. Do it now with your tools, then finish the job.)")
+            f"(Not from Ryan, and he hasn't said anything new: your reply ended with "
+            f"\u201c{promise}\u201d but you didn't call a tool. If one of your tools does that, "
+            "call it now and finish the job. If none of them does, don't reach for a different "
+            "tool - just say in a sentence that you can't do that from here.)")
         kept_promise = True
 
     if (adaptive and not kept_promise and not _last_raw.get("exchanges")

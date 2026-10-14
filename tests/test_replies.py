@@ -53,5 +53,25 @@ class Reasoning(unittest.TestCase):
         self.assertEqual(answer, "Hello there. How was your day today?")
 
 
+class Promises(unittest.TestCase):
+    """A reply that ends on "let me check..." with no tool called gets a
+    follow-through turn. Only a real promise does."""
+
+    def test_a_sentence_that_starts_with_it(self):
+        from llm.second_look import _promised_action
+        self.assertEqual(_promised_action("Sure. Let me check the log and see what broke."),
+                         "Let me check the log and see what broke")
+        self.assertEqual(_promised_action("Okay, I'll fix it now."), "I'll fix it now")
+        self.assertEqual(_promised_action("Ooh~ \U0001f495 Let me read the file~"), "Let me read the file")
+
+    def test_asking_or_musing_isnt_promising(self):
+        from llm.second_look import _promised_action
+        for reply in ("I'm ready~ Maybe even let me test my voice pipeline in there~ Ready~",
+                      "You could let me look at it later.",
+                      "Let me check the log, ok?",
+                      "I think I'll just relax."):
+            self.assertEqual(_promised_action(reply), "", reply)
+
+
 if __name__ == "__main__":
     unittest.main()

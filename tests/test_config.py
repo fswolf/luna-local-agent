@@ -76,6 +76,25 @@ class SetAtRunTime(unittest.TestCase):
         with open(self.file) as f:
             self.assertTrue(json.load(f)["plugins"]["example_test"]["enabled"])
 
+    def test_a_plugin_thats_on_but_never_connected_can_be_switched_off(self):
+        # On at launch, the game wasn't open: the switch still shows on,
+        # and off is saved without a connection to stop.
+        import types
+
+        import plugins
+        from ui import tools_pane
+        config.set_plugin_enabled("offtest", True)
+        module = types.SimpleNamespace(__name__="plugins.offtest", NAME="offtest", SERVER="offtest",
+                                       running=lambda: False,
+                                       stop=mock.Mock(), start=mock.Mock(return_value=(False, "no game")))
+        plugin = plugins.Plugin(module)
+        with mock.patch.dict(plugins._loaded, {"offtest": plugin}):
+            row = tools_pane._with_plugin_switches([])[-1][1][0]
+            self.assertTrue(row[1])                                  # shown on
+            ok, _message = tools_pane._plugin_off(plugin)
+        self.assertTrue(ok)
+        module.stop.assert_not_called()
+
     def test_unknown_or_wrong_shape_is_refused(self):
         with self.assertRaises(ValueError):
             config.save_setting("no.such.setting", "1")

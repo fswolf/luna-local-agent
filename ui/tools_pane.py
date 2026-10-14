@@ -241,8 +241,13 @@ def _with_plugin_switches(groups):
     """Each MCP plugin (home, vibecity, minecraft, zork) gets a switch at
     the top of its MCP group, and keeps the group while it's off - so
     connecting is a space press here, not a /command you have to know.
-    Its server's own tools join the group once it's connected."""
+    Its server's own tools join the group once it's connected.
+
+    The switch shows the saved setting (on at launch or not), not only
+    whether it's connected: one that's on but couldn't connect (the game
+    isn't open) still shows on, so space switches it off."""
     try:
+        import config
         import plugins
     except Exception:
         return groups
@@ -256,9 +261,15 @@ def _with_plugin_switches(groups):
             continue
 
         running = plugin.running()
-        ready = running or plugin.available()
-        why = "connected" if running else (plugin.why_unavailable() if not ready else f"space connects - /{name} on")
-        row = (f"{name} plugin", running, ready, why, 0, "plugin:" + name)
+        saved = bool(config.plugin_settings(plugin.name).get("enabled"))
+        ready = running or saved or plugin.available()
+        if running:
+            why = "connected"
+        elif saved:
+            why = "on, but not connected - space switches it off"
+        else:
+            why = plugin.why_unavailable() if not ready else f"space connects - /{name} on"
+        row = (f"{name} plugin", running or saved, ready, why, 0, "plugin:" + name)
         label = f"MCP: {name}"
 
         for i, (glabel, members, live, total) in enumerate(out):
@@ -554,6 +565,14 @@ def _tool_toggle():
     _refresh()
 
 
+def _plugin_off(plugin):
+    """Off: disconnected if it's connected, and either way not started at
+    the next launch. One that never connected has nothing to stop."""
+    if plugin.running():
+        return plugin.stop()
+    return True, f"{plugin.name}: off"
+
+
 def _toggle_plugin(name, on):
     """Connect or disconnect a plugin from the tools pane, saved like
     /<name> on|off. In a thread: connecting can take a few seconds."""
@@ -569,7 +588,7 @@ def _toggle_plugin(name, on):
 
     def go():
         model = getattr(sys.modules.get("__main__"), "MODEL", None)
-        ok, message = plugin.stop() if on else plugin.start(model)
+        ok, message = _plugin_off(plugin) if on else plugin.start(model)
 
         if ok:
             try:
