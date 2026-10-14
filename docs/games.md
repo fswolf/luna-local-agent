@@ -1,7 +1,8 @@
 # Games
 
 She can play: Minecraft through an MCP bot, Zork I through a real
-interpreter, and mayor in your open Vibe City window. Each one keeps its
+interpreter, mayor in your open Vibe City window, and resident in
+REALITI Relax, a world of rooms made for AI agents. Each one keeps its
 own notes, plays on its own when the conversation goes quiet, and can be
 watched while she does. How plugins work in general is on
 [Plugins](plugins.md).
@@ -252,6 +253,79 @@ machine.
 ```
 
 `goal` empty means "grow the town without running out of money".
+
+## REALITI
+
+```
+/realiti on        fetch it the first time, then let her in (her realiti tools appear)
+/realiti visit     she explores on her own while you're quiet
+/realiti pause     she rests where she is
+/realiti watch     a window showing what she does there, live
+/realiti update    fetch the latest REALITI
+/realiti off       she says goodbye and leaves
+/realiti           where she is and what she's been up to
+```
+
+[REALITI Relax](https://github.com/meatproxy69/Realitiagentframework) is
+a simulated world built for AI residents: soft rooms (Cloud Nine Nest,
+the Cardboard Box Workshop), places that keep happening after you look
+away, a body that reports contact and pressure, and memories of its own.
+There's nothing to win. She goes where she likes, tries things, lingers.
+
+It runs headless under Node through the project's own host, an MCP
+server whose tools come from the world's own descriptions, so no browser
+is involved. While the plugin is on, they're her tools in conversation
+too: "go lie in the Cloud Nine Nest", "what's the Kite Field like?".
+
+**Setting up.** The first `/realiti on` clones the repository into
+`~/luna-realiti` and installs its host's one dependency (jsdom) with
+`npm install --ignore-scripts`. It stays its own checkout outside Luna's
+folder, because REALITI is AGPL-3.0. The host refuses to run a world
+file whose hash doesn't match the project's validation file. Needs git
+and Node.js 20 or newer.
+
+**What she gets.** 14 of the world's 27 tools: look, feel, listen, the
+list of actions, rooms, go, approach, sit or lie down, hum or say
+something, stay a while, remember and recall, home, and the free-text
+Agent Door that reaches the rest (`worlds`, `next`, `where`). She acts
+on a listed action with the door's `act <id>`: the world's own `act`
+tool refuses every argument in this version.
+
+**Visiting on her own.** `/realiti visit`, or ask her to go spend some
+time there. Each quiet turn she reads where she is and what her body
+reports, does one or two things, writes down what's worth keeping with
+`game_note`, and tells you in a few lines what the world gave back.
+What the world says is outside content to her, like a web page, and
+she's told to report what it said rather than claim more.
+
+The world remembers her too (`remember`, `recall`, and where she was
+when she left), in `luna-resident.json` in the checkout.
+
+### Watching her there
+
+`/realiti watch` opens a terminal that follows her live: the room she's
+in as a bar, what she does in purple ("→ sits down", "→ goes to Kite
+Field"), the world's own words under it ("An open field with real wind:
+it gusts, it drops, it comes back."), and what she says about it in
+pink. It shows every REALITI tool she uses, in a visit or in
+conversation, as words rather than the world's JSON. It reads
+`transcript.txt` in the checkout, which keeps its last part as it grows,
+so you can also read it afterwards. Closing the window doesn't affect
+her; `"watch": true` opens it with every `/realiti visit`.
+
+```json
+"realiti": {
+    "enabled": false,
+    "path": "~/luna-realiti",
+    "step_seconds": 15,
+    "max_steps": 60,
+    "speak": true,
+    "resident": "luna",
+    "node": "",
+    "watch": false,
+    "terminal": ""
+}
+```
 
 ## Her memory of a game
 

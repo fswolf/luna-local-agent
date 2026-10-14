@@ -98,7 +98,7 @@ credential; that stays in `config.json` with the rest of the behaviour.
 | Page | What's on it |
 |------|--------------|
 | [Stream chat](chat.md) | pomf.tv, Twitch, YouTube and IRC: answering your stream's chat, flood defences, what viewers can reach |
-| [Games](games.md) | Minecraft, Zork, Vibe City: playing on her own, her notes, watching her play |
+| [Games](games.md) | Minecraft, Zork, Vibe City, REALITI: playing on her own, her notes, watching her play |
 | [Home and devices](devices.md) | Home Assistant, Lovense, Buttplug.io toys |
 | [Cron and Discord](#sysadmin-cron-and-discord) | scheduled jobs, and the same Luna from your phone (below) |
 

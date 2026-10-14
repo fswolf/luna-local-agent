@@ -283,7 +283,7 @@ def prompt_block(query=""):
 # Games: one project per game, her memory of the playthrough
 # ---------------------------------------------------------------------------
 GAME_TITLES = {"zork": "Zork playthrough", "vibecity": "Vibe City as mayor",
-               "minecraft": "Minecraft world"}
+               "minecraft": "Minecraft world", "realiti": "REALITI visits"}
 
 
 def game_project(game, goal=""):

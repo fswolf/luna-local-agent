@@ -50,9 +50,7 @@ wezterm, konsole, gnome-terminal or xterm (Terminal.app on a Mac);
 """
 import os
 import re
-import shlex
 import shutil
-import subprocess
 import sys
 import threading
 
@@ -245,51 +243,13 @@ def _new_game():
 TITLE = "Luna plays Zork"
 
 
-def _terminal_command(inner):
-    """argv that opens a terminal window running `inner`, or None."""
-    chosen = str(settings()["terminal"] or "").strip()
-
-    if chosen:
-        return shlex.split(chosen) + inner
-
-    if sys.platform == "darwin":
-        kitty = shutil.which("kitty") or "/Applications/kitty.app/Contents/MacOS/kitty"
-        if os.path.exists(kitty):
-            return [kitty, "--title", TITLE] + inner
-        script = " ".join(shlex.quote(a) for a in inner)
-        return ["osascript", "-e", f'tell application "Terminal" to do script "{script}"',
-                "-e", 'tell application "Terminal" to activate']
-
-    styles = [("kitty", ["--title", TITLE]), ("foot", ["--title", TITLE]),
-              ("alacritty", ["--title", TITLE, "-e"]), ("wezterm", ["start", "--"]),
-              ("konsole", ["-e"]), ("gnome-terminal", ["--title", TITLE, "--"]),
-              ("xterm", ["-T", TITLE, "-e"])]
-
-    for name, flags in styles:
-        path = shutil.which(name)
-        if path:
-            return [path] + flags + inner
-
-    return None
-
-
 def _open_watch():
-    inner = [sys.executable, WATCH_SCRIPT, SAVES]
-    argv = _terminal_command(inner)
+    from plugins import _terminal
 
-    if argv is None:
-        return ("zork: no terminal found to open - run it yourself:\n  "
-                + " ".join(shlex.quote(a) for a in inner)
-                + '\n  (or set "terminal" under plugins.zork in config.json)')
+    os.makedirs(SAVES, exist_ok=True)
 
-    try:
-        os.makedirs(SAVES, exist_ok=True)
-        subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, start_new_session=True)
-    except OSError as e:
-        return f"zork: couldn't open a terminal ({e})"
-
-    return f"zork: opened a window to watch in ({os.path.basename(argv[0])})"
+    return _terminal.open_window([sys.executable, WATCH_SCRIPT, SAVES], TITLE,
+                                 settings()["terminal"], NAME)
 
 
 def _set_playing(on):
