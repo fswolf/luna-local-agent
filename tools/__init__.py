@@ -85,7 +85,7 @@ OUTSIDE = {"web_search", "read_page", "research"}
 _INTERNAL = {"more_tools"}
 
 
-def specs(only=None, query=None):
+def specs(only=None, query=None, previous="", quiet=False):
     """The tool list sent to the model.
 
     A tool that can't work is left out rather than offered and failed.
@@ -110,10 +110,14 @@ def specs(only=None, query=None):
         and (allowed is None or name in allowed)
     }
 
-    if query is None or not routing.enabled():
+    if query is None:
         return [entry["spec"] for entry in pool.values()]
 
-    return _send(routing.choose(query, pool, group_of))
+    if not routing.enabled():
+        routing.start(pool, group_of)
+        return [entry["spec"] for entry in pool.values()]
+
+    return _send(routing.choose(query, pool, group_of, previous=previous, quiet=quiet))
 
 
 def _send(chosen):
@@ -138,8 +142,8 @@ def attach(name):
     return routing.attach_tool(name)
 
 
-def begin_turn():
-    routing.begin_turn()
+def begin_turn(track=True):
+    routing.begin_turn(track)
 
 
 def names():

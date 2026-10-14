@@ -217,14 +217,26 @@ and the user finds out later that it didn't.
   If the result says denied, say so and stop - never retry a denied
   write.
 
-{_ROUTING_NUDGE if getattr(config, "TOOLS_ROUTING", True) else ""}
 Chat normally when no tool is needed.
 """
 
 
-_ROUTING_NUDGE = """- Not every tool is attached every turn. If the one you need isn't in
-  your list, call more_tools with its group, then call it. Never tell
-  the user you can't do something before checking more_tools."""
+def _previous_user_text(history):
+    """The last user message in the replayed history (not this turn's,
+    not the tool demonstration's), as plain text, for routing a
+    follow-up like "yes, do it"."""
+    for m in reversed(history):
+        if m.get("role") != "user":
+            continue
+
+        content = m.get("content")
+
+        if isinstance(content, list):
+            content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+
+        return str(content or "")[:500]
+
+    return ""
 
 
 def _plugin_lines(private):
@@ -1980,7 +1992,7 @@ def prompt_budget(text="hello"):
         replayed.extend(_replay(m))
 
     demo = _demonstration() if _tools_supported and not _has_tool_example(replayed) else []
-    specs = tools.specs(query=text) if _tools_supported else []
+    specs = tools.specs(query=text, quiet=True) if _tools_supported else []
     every = len(tools.specs()) if _tools_supported else 0
     memory_block = build_memory_prompt(text)
     tools_block = build_tools_prompt()
@@ -2141,8 +2153,12 @@ def ask(text, model, on_text=None, on_sentence=None,
         pass
 
     if _tools_supported:
-        tools.begin_turn()
-        payload["tools"] = tools.specs(only=tools_allowed, query=text)
+        # Sticky groups follow your conversation: a turn counts when it
+        # joins your history (typed, spoken, Discord, a reminder firing),
+        # not stream chat, jobs or the greeting.
+        tools.begin_turn(track=context is None and remember)
+        payload["tools"] = tools.specs(only=tools_allowed, query=text,
+                                       previous=_previous_user_text(replayed))
 
         try:
             answer = _tool_rounds(payload, model, on_text, on_sentence)

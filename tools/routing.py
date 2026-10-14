@@ -40,16 +40,39 @@ def enabled():
     return bool(getattr(config, "TOOLS_ROUTING", True))
 
 
-def begin_turn():
-    _state["turn"] += 1
+def begin_turn(track=True):
+    """A new turn on this thread. Everything the last one decided goes:
+    a stale pool must never let a later turn attach a tool it wasn't
+    allowed. track=False for turns that aren't the user's own (stream
+    chat, jobs): they don't advance or set the sticky groups."""
+    if track:
+        _state["turn"] += 1
+
+    for key in ("pool", "chosen", "hidden", "group_of"):
+        if hasattr(_turn, key):
+            delattr(_turn, key)
+
     _turn.extra = set()
+    _turn.track = track
+
+
+def start(pool, group_of):
+    """Record what this turn may use, routed or not, so attach() and
+    current() answer for this turn and no other."""
+    _turn.pool = pool
+    _turn.group_of = group_of
+    _turn.chosen = {group_of(n) for n in pool}
+    _turn.hidden = {}
+
+
+_DOC_CHARS = 600   # the embedding server's context is short; a 20-tool MCP server isn't
 
 
 def _doc(group, entries):
     """What a group is about, for matching: its name and the first
     sentence of each of its tools' descriptions."""
     first = [(e["spec"]["function"]["description"] or "").split(". ")[0] for e in entries]
-    return f"{group}. " + " ".join(first)
+    return (f"{group}. " + " ".join(first))[:_DOC_CHARS]
 
 
 def _meaning(query, docs):
@@ -69,8 +92,10 @@ def _meaning(query, docs):
     return {by_doc[d]: s for s, d in ranked if d in by_doc}
 
 
-def choose(query, pool, group_of):
-    """The tool names to send this turn, out of pool {name: entry}."""
+def choose(query, pool, group_of, previous="", quiet=False):
+    """The tool names to send this turn, out of pool {name: entry}.
+    previous is the user's message before this one: "yes, do it" means
+    nothing alone, so the best group for what came before goes too."""
     groups = {}
 
     for name, entry in pool.items():
@@ -81,32 +106,36 @@ def choose(query, pool, group_of):
     sticky = max(0, int(getattr(config, "TOOLS_STICKY_TURNS", 3)))
     extra = getattr(_turn, "extra", set())
 
-    _turn.pool = pool
-    _turn.group_of = group_of
+    start(pool, group_of)
 
     # Few enough groups that routing would save nothing: send them all.
-    if len(groups) <= top + len(core & set(groups)):
-        _turn.chosen = set(groups)
-        _turn.hidden = {}
+    if len(groups) <= top + len(core & set(groups)) or not str(query or "").strip():
         return set(pool)
 
-    scores = _meaning(query, {g: _doc(g, e) for g, e in groups.items()})
+    docs = {g: _doc(g, e) for g, e in groups.items()}
+    scores = _meaning(query, docs)
 
-    # No embedding server (or nothing to compare): every tool, as before.
-    if scores is None or not str(query or "").strip():
-        _turn.chosen = set(groups)
-        _turn.hidden = {}
+    # No embedding server: every tool, as before.
+    if scores is None:
         return set(pool)
+
+    def best(by, n):
+        return {g for _s, g in sorted((s, g) for g, s in by.items())[-n:]}
 
     keep = (core | extra) & set(groups)
     keep |= {g for g, t in _state["used"].items() if g in groups and _state["turn"] - t < sticky}
-    keep |= {g for _s, g in sorted((s, g) for g, s in scores.items())[-top:]}
+    keep |= best(scores, top)
+
+    if str(previous or "").strip():
+        before = _meaning(previous, docs)    # usually cached: it was last turn's query
+        keep |= best(before, 1) if before else set()
 
     _turn.chosen = keep
     _turn.hidden = {g: e for g, e in groups.items() if g not in keep}
 
-    logbook.info("tools", "routed: %s (hidden: %s)", ", ".join(sorted(keep)),
-                 ", ".join(sorted(_turn.hidden)) or "none")
+    if not quiet:
+        logbook.info("tools", "routed: %s (hidden: %s)", ", ".join(sorted(keep)),
+                     ", ".join(sorted(_turn.hidden)) or "none")
 
     return {n for n in pool if group_of(n) in keep}
 
@@ -147,14 +176,15 @@ def current():
     when this turn wasn't routed."""
     pool = getattr(_turn, "pool", None)
 
-    if pool is None or not hasattr(_turn, "chosen"):
+    if pool is None or not hasattr(_turn, "chosen") or not hasattr(_turn, "group_of"):
         return None
 
     return {n for n in pool if _turn.group_of(n) in _turn.chosen}
 
 
 def note_used(name, group_of):
-    _state["used"][group_of(name)] = _state["turn"]
+    if getattr(_turn, "track", True):
+        _state["used"][group_of(name)] = _state["turn"]
 
 
 def more_tools_spec():
@@ -172,7 +202,8 @@ def more_tools_spec():
         "function": {
             "name": "more_tools",
             "description": ("Not every tool is attached every turn. If you need one that isn't in your "
-                            "list, load its group here and then call it. Available: " + listing),
+                            "list, attach its group here, then call it. Check here before telling the "
+                            "user you can't do something. Groups not attached now: " + listing),
             "parameters": {
                 "type": "object",
                 "properties": {"group": {"type": "string", "enum": sorted(groups)}},
