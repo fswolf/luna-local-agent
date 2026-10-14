@@ -562,9 +562,19 @@ const gestureOwned = new Set();
 
 // Moods: gentle, never a full grin from the dials alone.
 const moodNow = { happy: 0, sad: 0, angry: 0, relaxed: 0, surprised: 0 };
-// Heavy lids: the eyes rest this far closed (flirty: half), and blinks go
-// from there. Its own value, not a mood expression - it's the blink's floor.
-const lids = { now: 0, target: 0 };
+// Heavy lids. A feeling's lids (playful) hold for its few seconds. A
+// mood's (flirty) come as moments - held all the time they read as sleepy,
+// not sultry - so her eyes stay mostly open and every so often she gives
+// a half-lidded glance for a few seconds. Blinks go from wherever they are.
+const lids = { now: 0, mood: 0, feel: 0, glance: 0, next: 0 };
+const LIDS_AT_REST = 0.25;      // of the mood's lids, between glances
+function lidsTarget(now) {
+  if (!lids.mood) { lids.glance = 0; lids.next = now + rand(3, 8); }
+  else if (now >= lids.next) { lids.glance = now; lids.next = now + rand(8, 20); }
+  const t = now - lids.glance;                        // a glance: ease in, hold, ease out over ~3 s
+  const g = lids.glance && t < 3.2 ? Math.min(1, t / 0.6, (3.2 - t) / 0.8) : 0;
+  return Math.max(lids.feel, lids.mood * (LIDS_AT_REST + (1 - LIDS_AT_REST) * g));
+}
 
 // A quick feeling: in fast, held, out over the last second and a half.
 const feel = { face: {}, start: -99, seconds: 6 };
@@ -595,11 +605,13 @@ function updateMood(dt, talking) {
       surprised: Math.max(mind.stage === 'waking' ? 0.35 : 0, f.surprised || 0, over('surprised')),
     };
     blush.mood = Math.max(f.blush || 0, over('blush'));
-    lids.target = Math.max(f.lids || 0, over('lids'));
+    lids.mood = f.lids || 0;
+    lids.feel = over('lids');
     return applyMood(target, dt);
   }
   blush.mood = over('blush');
-  lids.target = over('lids');
+  lids.mood = 0;
+  lids.feel = over('lids');
   const target = {
     happy: Math.max(0, Math.min(0.55, w * 0.45 + e * 0.15 + (talking ? 0.08 : 0))),
     relaxed: Math.max(0, Math.min(0.4, w * 0.3 - e * 0.2)),
@@ -655,7 +667,7 @@ function animate() {
 
     const talking = updateMouth(dt);
     updateMood(dt, talking > 0.05);
-    lids.now = damp(lids.now, mind.stage === 'waking' ? 0 : Math.min(0.7, lids.target), 2, dt);
+    lids.now = damp(lids.now, mind.stage === 'waking' ? 0 : Math.min(0.7, lidsTarget(now)), 2.5, dt);
     setExpr('blink', mind.stage === 'waking' ? 0 : Math.max(lids.now, blinkValue(now, dt)));
 
     // Head: follows the gaze part of the way, breathes, nods with her voice.

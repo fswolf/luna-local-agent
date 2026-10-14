@@ -159,6 +159,11 @@ def stop():
     _stop.set()
     _state["playing"] = False
     mcpclient.disconnect_server(SERVER)      # the server autosaves on its way out
+
+    if not _state["busy"]:
+        from plugins import _playlog
+
+        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
     _connected = False
 
     return True, "zork: put away (saved for next time)"
@@ -265,6 +270,11 @@ def _set_playing(on):
             extra = "\n" + _open_watch()
         return ("zork: she's playing - she takes a turn whenever you're quiet. "
                 "/zork pause stops, /zork watch shows the game." + extra)
+
+    if not _state["busy"]:
+        from plugins import _playlog
+
+        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
 
     return "zork: paused."
 
@@ -424,6 +434,7 @@ def _step():
 
     _one_move_per_turn()
     _turn.update(active=True, moves=0)
+    exchanges = []
 
     try:
         # A move, a note, maybe a status check - more rounds than that is
@@ -431,7 +442,7 @@ def _step():
         answer = assistant.respond_to_job(
             STEP_PROMPT.format(notes=notes, screen=_screen(), project=projects.game_block(pid)),
             _state["model"], "zork", allowed, speak=bool(s["speak"]), project_id=pid,
-            max_rounds=4 if s["web"] else 3) or ""
+            max_rounds=4 if s["web"] else 3, exchanges=exchanges) or ""
     finally:
         _turn["active"] = False
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
@@ -443,6 +454,7 @@ def _step():
 
     _playlog.write(NAME, _state["steps"], answer, block=_pretty_turn(_state["steps"], answer),
                    also=[os.path.join(SAVES, "transcript.txt")])
+    _playlog.remember(NAME, "Zork I", answer, exchanges)
 
     if _state["steps"] >= int(s["max_steps"]):
         _state["playing"] = False
@@ -479,6 +491,11 @@ def _play():
             _stop.wait(30)
         finally:
             _state["busy"] = False
+
+            if _stop.is_set() or not _state["playing"]:
+                from plugins import _playlog
+
+                _playlog.finished(NAME)   # she stopped: the session is over
 
 
 # ---------------------------------------------------------------------------

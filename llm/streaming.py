@@ -90,6 +90,25 @@ _CALL_BLOCK = re.compile(r"<tool_call>.*?</tool_call>|<function=[^>]*>.*?</funct
 _CALL_OPEN = re.compile(r"<tool_call>|<function=", re.IGNORECASE)
 _THINK_INNER = re.compile(r"<think>(.*?)</think>", re.IGNORECASE | re.DOTALL)
 _THINK_OPEN = re.compile(r"<think>", re.IGNORECASE)
+_THINK_CLOSE = re.compile(r"</think>", re.IGNORECASE)
+
+
+def _stray_close(text):
+    """(reasoning, reply) when the text has a </think> with no <think>
+    before it, else (None, text). Complete blocks already removed.
+
+    The server's reasoning parser only catches thinking that opens with
+    <think>. A model sometimes reasons without the opening tag - after a
+    tool result, mostly - and closes it anyway: everything before that
+    </think> was its scratchpad, not her reply."""
+    opened = _THINK_OPEN.search(text)
+    closes = [m for m in _THINK_CLOSE.finditer(text) if not opened or m.start() < opened.start()]
+
+    if not closes:
+        return None, text
+
+    last = closes[-1]
+    return text[:last.start()], text[last.end():]
 
 
 def _note_tokens(tokens, delta):
@@ -156,6 +175,11 @@ def _note_thinking(content, reasoning_field=""):
     parts = [m.strip() for m in _THINK_INNER.findall(content) if m.strip()]
 
     rest = _THINK_BLOCK.sub("", content)
+    stray, rest = _stray_close(rest)
+
+    if stray and stray.strip():
+        parts.append(stray.strip())
+
     opened = _THINK_OPEN.split(rest, maxsplit=1)
 
     if len(opened) > 1 and opened[1].strip():
@@ -236,6 +260,7 @@ def _visible(raw):
     the next token may finish the tag.
     """
     text = _THINK_BLOCK.sub("", raw)
+    text = _stray_close(text)[1]       # reasoning that never opened with <think>
 
     if "<think>" in text.lower():
         text = re.split(r"<think>", text, maxsplit=1, flags=re.IGNORECASE)[0]
@@ -314,6 +339,7 @@ class _Narrator:
         self._shown = 0
         self._spoken = 0
         self._prefix_len = None
+        self._strays = 0
 
     def _presentable(self, final=False):
         """Visible text, minus a timestamp the model copied off its input.
@@ -354,6 +380,16 @@ class _Narrator:
             return
 
         self.raw += piece
+
+        # A </think> with no <think>: what came before was her reasoning,
+        # and the visible text starts again after it. What was already
+        # shown is put right by the final replace_message; what was
+        # already spoken can't be taken back, but nothing more of it is.
+        strays = len(_THINK_CLOSE.findall(_THINK_BLOCK.sub("", self.raw)))
+        if strays != self._strays:
+            self._strays = strays
+            self._shown = self._spoken = 0
+            self._prefix_len = None
 
         if "]" in piece:
             answer = _THINK_BLOCK.sub("", self.raw)
@@ -627,6 +663,7 @@ def _content(message):
 
     content = content or ""
     content = _THINK_BLOCK.sub("", content)
+    content = _stray_close(content)[1]   # reasoning that never opened with <think>
 
     # Unclosed block: keep whatever came before it, drop the rest.
     if "<think>" in content:

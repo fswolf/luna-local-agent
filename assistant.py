@@ -215,7 +215,7 @@ def respond_to_chat(prompt, model, source, who, said,
 
 
 def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=None,
-                   project_id=None):
+                   project_id=None, exchanges=None):
     """A scheduled job firing (plugins/cron.py).
 
     Waits its turn like chat does. Fresh context and nothing stored, so a
@@ -243,8 +243,11 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
         try:
             # max_rounds None: the usual tools.max_rounds; project_id: a
             # game's notes, for game_note.
+            # exchanges: a list the caller keeps, filled with this turn's tool
+            # calls - a game's record of what it did, whatever runs next.
             with turnctx.begin(source=f"job:{job}", private=False, job=job,
-                               max_rounds=max_rounds, project_id=project_id):
+                               max_rounds=max_rounds, project_id=project_id,
+                               exchanges=exchanges if exchanges is not None else []):
                 answer = ask(prompt, model, on_text=ui.extend_message,
                              on_sentence=on_sentence if speak else None,
                              context=[], tools_allowed=tools_allowed,

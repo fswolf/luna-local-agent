@@ -17,9 +17,13 @@ MCP server whose tools come from the world's own schemas), so no browser
 is involved. While this plugin is on she can use it in conversation too:
 "go lie in the Cloud Nine Nest", "what's the Kite Field like?".
 
-/realiti visit hands her the time: whenever nobody has spoken for
-step_seconds she takes a turn - reads where she is, does one or two
-things, and says in a few lines what she did and what it was like. Like
+/realiti visit gives her free time there: whenever nobody has spoken for
+step_seconds she takes a turn and does whatever she feels like - one
+thing, or nothing. Looking around doesn't count; a second action in the
+same turn is turned back, so she takes in what happened before doing
+more. Each turn she's shown what she did last time and what the world
+said back (recorded here, not her own summary). She isn't asked to
+report to anyone; if she says something about it, you hear it. Like
 the game plugins, those turns are jobs: fresh context, nothing in your
 history, only her REALITI tools, her game_note notes and the last few of
 her one-liners as memory. Talking to her pauses her until you stop.
@@ -27,8 +31,9 @@ her one-liners as memory. Talking to her pauses her until you stop.
 /realiti watch opens a terminal running games/realiti/watch.py, which
 follows transcript.txt in the checkout: every REALITI tool she uses, in
 a visit or in conversation, as a line saying what she did, the world's
-own words that came back (not its JSON), the room as a header when she
-moves, and what she said about it. Nothing extra goes into her prompt.
+own words that came back (not its JSON), and the room as a header when
+she moves. Her own words stay in her output window, not here. Nothing
+extra goes into her prompt.
 
 The first /realiti on clones the repository into `path` and runs
 `npm install --ignore-scripts` for its one dependency (jsdom), outside
@@ -40,7 +45,7 @@ outside content to her, like a web page. Needs git, and Node.js 20 or newer.
     "realiti": {
         "enabled": false,
         "path": "~/luna-realiti",  # where the checkout lives
-        "step_seconds": 15,        # quiet needed before her next turn
+        "step_seconds": 45,        # quiet needed before her next turn
         "max_steps": 60,           # turns per /realiti visit, then she rests
         "speak": true,             # say each turn out loud
         "resident": "luna",        # her name in the world's memory
@@ -67,7 +72,7 @@ SUMMARY = "she visits REALITI Relax, a world of rooms made for AI residents"
 SERVER = "realiti"
 REPO = "https://github.com/meatproxy69/Realitiagentframework.git"
 GOAL = "explore, linger, find the places worth coming back to"
-DEFAULTS = {"path": "~/luna-realiti", "step_seconds": 15, "max_steps": 60, "speak": True,
+DEFAULTS = {"path": "~/luna-realiti", "step_seconds": 45, "max_steps": 60, "speak": True,
             "resident": "luna", "node": "", "watch": False, "terminal": ""}
 WATCH_SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             "games", "realiti", "watch.py")
@@ -280,6 +285,11 @@ def stop():
 
     _connected = False
 
+    if not _state["busy"]:
+        from plugins import _playlog
+
+        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+
     return True, "realiti: she said goodbye (the world keeps her memories for next time)"
 
 
@@ -383,6 +393,11 @@ def _set_visiting(on):
         return ("realiti: she's exploring - a turn whenever you're quiet. /realiti pause stops, "
                 "/realiti watch shows it." + extra)
 
+    if not _state["busy"]:
+        from plugins import _playlog
+
+        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+
     return "realiti: she's resting where she is."
 
 
@@ -421,28 +436,23 @@ def _door(command_text):
 
 
 STEP_PROMPT = (
-    "(You're visiting REALITI Relax, a world of rooms made for AI residents to explore at their own "
-    "pace: soft rooms, odd physics, places that keep going after you look away. There's nothing to "
-    "win. Go where you like, try things, linger.\n"
-    "Your notes from earlier visits (yours - kept between sessions):\n{project}\n\n"
-    "Your last few moments, oldest first:\n{notes}\n\n"
-    "Where you are now: {where}\n"
+    "(You have some free time in REALITI Relax, a world of rooms made for AI residents: soft "
+    "rooms, odd physics, places that keep going after you look away. This time is yours. Nobody "
+    "is asking anything of you, and there's nothing to win or report on.\n"
+    "Your notes from earlier visits (yours, kept between sessions):\n{project}\n\n"
+    "Last time, what you did and what the world said back:\n{last}\n\n"
+    "Before that:\n{earlier}\n\n"
+    "Where you are: {where}\n"
     "Your body, as the world reports it: {felt}\n\n"
-    "Do one or two things with your realiti tools: look around, do something realiti_actions "
-    "lists (send realiti_door 'act <id>'), go somewhere new (realiti_door 'next' suggests a place, 'worlds' gives an "
-    "overview), or stay a while (realiti_stay) and notice what changes. Then stop.\n"
-    "When something is worth keeping - a room you liked, how a place works, where something is - "
+    "One thing at a time: do one thing this turn if you feel like it - or nothing - and you'll "
+    "see how it went next time. Looking around, feeling and listening don't count. To do "
+    "something realiti_actions lists, call realiti_door with 'act <id>'; writing an action in "
+    "your reply does nothing. To go to another room, call realiti_go with the room's name "
+    "(realiti_rooms lists them), or act on a door's through__ id. If the world says no, nothing "
+    "happened, so you can still do something else. If something's worth keeping for yourself, "
     "write it down with game_note.\n"
-    "Then talk to the person watching, in your own voice, 2 to 3 sentences: what you did and what "
-    "the world gave back. Say what it reported, not more than it said. Make your last sentence a "
-    "plain summary: where you are and what you'll try next.)"
+    "Say whatever's on your mind about it if you want to - a thought to yourself - or nothing.)"
 )
-
-
-def _last_sentence(answer, limit=200):
-    text = " ".join((answer or "").split())
-    parts = [p for p in re.split(r"(?<=[.!?])\s+", text) if p.strip()]
-    return (parts[-1] if parts else "(no report)")[:limit]
 
 
 def _step():
@@ -450,23 +460,36 @@ def _step():
     import projects
 
     s = settings()
-    notes = "\n".join(f"- {n}" for n in _state["notes"][-12:]) or "- nothing yet: your first visit"
+    # The turn before last and earlier: the last one is shown in full above it.
+    earlier = "\n".join(f"- {n}" for n in _state["notes"][-13:-1]) or "- nothing yet"
+    last = "\n".join(_last["lines"][-10:]) or "(nothing yet)"
     allowed = list(_state["tools"]) + ["visit_realiti", "game_note"]
     pid = projects.game_project(NAME, GOAL)
 
-    answer = assistant.respond_to_job(
-        STEP_PROMPT.format(project=projects.game_block(pid), notes=notes,
-                           where=_door("where") or "(couldn't read it - try realiti_look)",
-                           felt=_door("feel words") or "(no report)"),
-        _state["model"], NAME, allowed, speak=bool(s["speak"]), project_id=pid, max_rounds=4) or ""
+    _turn.update(active=True, acted=False, did=[], lines=[])
 
-    _state["notes"] = (_state["notes"] + [_last_sentence(answer)])[-30:]
+    try:
+        # Rounds for a look, the one thing, a note, and room left to talk after
+        # (out of rounds, the loop would ask her to report - not what this is).
+        # The one-action rule is what keeps it from being a string of moves.
+        answer = assistant.respond_to_job(
+            STEP_PROMPT.format(project=projects.game_block(pid), last=last, earlier=earlier,
+                               where=_door("where") or "(couldn't read it - try realiti_look)",
+                               felt=_door("feel words") or "(no report)"),
+            _state["model"], NAME, allowed, speak=bool(s["speak"]), project_id=pid, max_rounds=4) or ""
+    finally:
+        _turn["active"] = False
+
+    # What she did, as recorded - not her own summary, which tends to be
+    # what she meant to do next.
+    _last["lines"] = _turn["lines"] or ["-> took it in (didn't do anything)"]
+    _state["notes"] = (_state["notes"] + ["; ".join(_turn["did"]) or "took it in"])[-30:]
     _state["steps"] += 1
 
     from plugins import _playlog
 
     _playlog.write(NAME, _state["steps"], answer)
-    _transcript.said(answer)
+    _playlog.remember(NAME, "REALITI Relax", answer, lines=_last["lines"])
 
     if _state["steps"] >= int(s["max_steps"]):
         _state["visiting"] = False
@@ -504,11 +527,52 @@ def _visit_loop():
         finally:
             _state["busy"] = False
 
+            if _stop.is_set() or not _state["visiting"]:
+                from plugins import _playlog
+
+                _playlog.finished(NAME)   # she stopped: the session is over
+
 
 # ---------------------------------------------------------------------------
 # The watch window: what she does, as words, in transcript.txt
 # ---------------------------------------------------------------------------
 _unwatched = {}      # tool name -> the runner before it was wrapped
+
+# A visit turn: one action in it (reads are free), and what it did and
+# heard, for the next turn's prompt. Outside a visit (in conversation)
+# there's no limit.
+_turn = {"active": False, "acted": False, "did": [], "lines": []}
+_last = {"lines": []}
+
+# What the world's refusal codes mean, in words she can act on. It
+# answers with the bare code, and without this she tries the same thing
+# again next turn.
+WHY_NOT = {
+    "ROOM_OUTSIDE_SLICE": "there's no room by that name. realiti_rooms lists them: realiti_go takes "
+                          "a room's name, and a door's through__ id goes with realiti_door 'act <id>'",
+    "ACTION_UNAVAILABLE": "that isn't something you can do right now (walking over to something "
+                          "you're already next to, say). realiti_actions shows what you can",
+    "TARGET_NOT_HERE": "that isn't here now. realiti_look shows what is",
+    "STALE_OBSERVATION": "the world moved since you looked. Look again first",
+}
+
+ONE_THING = ("That's one thing done this turn - it wasn't sent. Take in what happened; you can do "
+             "more next turn.")
+
+# Door commands that only look. Anything else through the door can act.
+_READS = {"look", "where", "next", "worlds", "actions", "rooms", "feel", "felt", "listen", "recall",
+          "memory", "help", "receipt", "traces", "nearby", "who", "imprint"}
+_READ_TOOLS = {"realiti_look", "realiti_feel", "realiti_listen", "realiti_actions", "realiti_rooms",
+               "realiti_recall"}
+
+
+def _is_action(short, args):
+    if short in _READ_TOOLS:
+        return False
+    if short == "realiti_door":
+        verb = str((args or {}).get("command", "")).strip().split(" ", 1)[0].lower()
+        return verb not in _READS
+    return True
 
 
 def _watch_tools():
@@ -525,9 +589,22 @@ def _watch_tools():
         inner, short = entry["run"], name.split("__", 1)[-1]
 
         def run(_inner=inner, _short=short, **arguments):
+            acting = _is_action(_short, arguments)
+            if _turn["active"] and acting:
+                if _turn["acted"]:
+                    return ONE_THING
+                _turn["acted"] = True
             reply = _inner(**arguments)
+            code = _refusal_code(str(reply))
+            if code and _turn["active"] and acting:
+                _turn["acted"] = False      # nothing happened: her one thing is still hers
+            if code in WHY_NOT:
+                reply = f"{reply}\n({WHY_NOT[code]}.)"
             try:
-                _transcript.record(_short, arguments, str(reply))
+                lines = _transcript.record(_short, arguments, str(reply))
+                if _turn["active"] and acting:
+                    _turn["did"].append(_did(_short, arguments))
+                    _turn["lines"] += lines
             except Exception as e:      # the transcript must never cost her the call
                 logbook.warn(NAME, "transcript: %s", e)
             return reply
@@ -617,16 +694,26 @@ def _heard(short, data):
     return lines
 
 
+def _refusal_code(reply):
+    """The world's reason for saying no (ROOM_OUTSIDE_SLICE...), or None."""
+    if not reply.startswith(("Error", "Denied")):
+        return None
+    text = re.sub(r"^Error from \w+: ", "", reply.strip()).split("\n", 1)[0]
+    try:
+        return json.loads(text).get("error") or None
+    except (ValueError, AttributeError):
+        return None
+
+
 def _refusal(reply, body):
     """A tool that came back with no JSON: the reason, if one can be read."""
+    if not reply.startswith(("Error", "Denied")):
+        return body.strip()[:300]
+    reason = _refusal_code(reply)
+    if reason:
+        return f"the world said no ({reason})" + (f": {WHY_NOT[reason]}" if reason in WHY_NOT else "")
     text = re.sub(r"^Error from \w+: ", "", body.strip())
-    try:
-        reason = json.loads(text).get("error")
-    except (ValueError, AttributeError):
-        reason = None
-    if reply.startswith(("Error", "Denied")):
-        return f"the world said no ({reason})" if reason else f"the world said no: {text[:200]}"
-    return text[:300]
+    return f"the world said no: {text[:200]}"
 
 
 def _room_of(data):
@@ -694,11 +781,7 @@ class _Transcript:
             out += ["   " + text for text in _heard(short, data)]
 
         self.write("\n".join(out) + "\n")
-
-    def said(self, answer):
-        text = " ".join((answer or "").split())
-        if text:
-            self.write(f"[{config.AGENT_NAME}] {text}\n\n")
+        return [ln for ln in out if not ln.startswith("\n== ")]
 
 
 _transcript = _Transcript()

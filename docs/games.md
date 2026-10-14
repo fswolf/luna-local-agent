@@ -291,12 +291,18 @@ Agent Door that reaches the rest (`worlds`, `next`, `where`). She acts
 on a listed action with the door's `act <id>`: the world's own `act`
 tool refuses every argument in this version.
 
-**Visiting on her own.** `/realiti visit`, or ask her to go spend some
-time there. Each quiet turn she reads where she is and what her body
-reports, does one or two things, writes down what's worth keeping with
-`game_note`, and tells you in a few lines what the world gave back.
-What the world says is outside content to her, like a web page, and
-she's told to report what it said rather than claim more.
+**Free time.** `/realiti visit`, or ask her to go spend some time
+there. It's her time: after 45 quiet seconds she takes a turn, told
+where she is, what her body reports, what she did last turn and what the
+world said back, and that nobody is asking anything of her. She does one
+thing if she feels like it, or nothing: looking around is free, but a
+second action in the same turn is turned back, so she takes in what
+happened before doing more. When the world says no (no room by that
+name, nothing like that to do here, the world moved since she looked),
+she's told what the refusal means rather than just its code, and since
+nothing happened, it doesn't use up her one thing. She keeps notes with `game_note` if she
+wants to, and says something about it only if she wants to (you'll hear
+it). What the world says is outside content to her, like a web page.
 
 The world remembers her too (`remember`, `recall`, and where she was
 when she left), in `luna-resident.json` in the checkout.
@@ -305,9 +311,9 @@ when she left), in `luna-resident.json` in the checkout.
 
 `/realiti watch` opens a terminal that follows her live: the room she's
 in as a bar, what she does in purple ("→ sits down", "→ goes to Kite
-Field"), the world's own words under it ("An open field with real wind:
-it gusts, it drops, it comes back."), and what she says about it in
-pink. It shows every REALITI tool she uses, in a visit or in
+Field"), and the world's own words under it ("An open field with real
+wind: it gusts, it drops, it comes back."). What she says stays in her
+own output window. It shows every REALITI tool she uses, in a visit or in
 conversation, as words rather than the world's JSON. It reads
 `transcript.txt` in the checkout, which keeps its last part as it grows,
 so you can also read it afterwards. Closing the window doesn't affect
@@ -317,7 +323,7 @@ her; `"watch": true` opens it with every `/realiti visit`.
 "realiti": {
     "enabled": false,
     "path": "~/luna-realiti",
-    "step_seconds": 15,
+    "step_seconds": 45,
     "max_steps": 60,
     "speak": true,
     "resident": "luna",
@@ -347,6 +353,13 @@ what happened in the last few. Each game she plays also has a
   an answer without her checking.
 - `/zork new` marks the old playthrough done and starts a fresh
   project. The old one is retired, not deleted: `/projects restore <n>`.
+
+She also remembers having played, outside the game: each session
+(from when she starts until she stops, or 20 minutes without a turn)
+is written up afterwards as one of her episodes, a few sentences in her
+own words, the way a conversation is. Those are what she draws on when
+you ask her what she got up to. See
+[episodic memory](learning.md#episodic-memory-and-continuity).
 
 Your own memory (facts about you, your conversations) still stays out
 of game turns. It doesn't help her play, and it would cost tokens on

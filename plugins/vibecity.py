@@ -150,6 +150,11 @@ def stop():
 
     _state["playing"] = False
     mcpclient.disconnect_server(SERVER)
+
+    if not _state["busy"]:
+        from plugins import _playlog
+
+        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
     _connected = False
 
     return True, "vibecity: disconnected (the city is yours again)"
@@ -207,6 +212,11 @@ def _set_playing(on, goal=""):
     if on:
         _state["steps"] = 0
         return f"vibecity: she's the mayor now - goal: {_goal()}. /vibecity pause stops."
+
+    if not _state["busy"]:
+        from plugins import _playlog
+
+        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
 
     if was and _state["busy"] and settings()["pause_game"]:
         _state["pause_after_turn"] = True
@@ -313,10 +323,11 @@ def _step():
     pid = projects.game_project(NAME, _goal())
 
     prompt = prompt.replace("{project}", projects.game_block(pid))
+    exchanges = []
     answer = assistant.respond_to_job(prompt, _state["model"], "vibecity", allowed,
                                       speak=bool(s["speak"]),
                                       max_rounds=int(s["max_rounds"] or 12),
-                                      project_id=pid) or ""
+                                      project_id=pid, exchanges=exchanges) or ""
     _state["briefed"] = True
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
     line = _last_sentence(answer) if lines else "(no report)"
@@ -326,6 +337,7 @@ def _step():
     from plugins import _playlog
 
     _playlog.write(NAME, _state["steps"], answer)
+    _playlog.remember(NAME, "Vibe City", answer, exchanges)
 
     if "PAUSED" in line.upper() or "took over" in answer.lower():
         _state["playing"] = False
@@ -371,6 +383,11 @@ def _play():
 
             if _state.pop("pause_after_turn", False) and not _state["playing"]:
                 _pause_game()
+
+            if _stop.is_set() or not _state["playing"]:
+                from plugins import _playlog
+
+                _playlog.finished(NAME)   # she stopped: the session is over
 
 
 # ---------------------------------------------------------------------------

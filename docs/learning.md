@@ -8,7 +8,7 @@ or switch it off.
 | Part | What it does | Where to look |
 |---|---|---|
 | Lessons (the dream pass) | reads back her own turns that went wrong and writes one-line lessons she follows from then on; she can also note one herself, with your OK | `/lessons` |
-| Episodic memory | a few sentences of her own notes on each conversation | `/episodes` |
+| Episodic memory | a few sentences of her own notes on each conversation, and on each time she played a game | `/episodes` |
 | Fact cleanup | merges facts that say the same thing twice, retires the losing side of a contradiction | `/facts retired` |
 | Calibration | says so out loud when her token probabilities say she didn't know | the thought log's **overconfident** flag |
 | Startup greeting | after a break, opens by picking up where you left off | the first thing she says |
@@ -86,6 +86,19 @@ been more than `self.idle_minutes` since you last talked, she opens
 the session herself: a line or two that picks up anything left
 unfinished. The notes also show on screen as **Last time (…)**. Turn the
 greeting off with `/set self.greet false` and you keep the notes.
+
+Time she spends playing on her own (Zork, Minecraft, Vibe City,
+REALITI) becomes an episode too. Each of her game turns adds a line to
+the session: the tools she used and what came back (for REALITI, the
+recorded actions), and anything she said. When she stops (you pause
+the game, put it away, or she runs out of turns), or after 20 minutes
+with no turn, the session is finished, and the next quiet stretch
+writes it up in her own words like a conversation: "I spent the
+evening in REALITI Relax, mostly in the felt hat...". So "what did you
+get up to while I was out?" has an answer, and so does "how was Zork
+last night?" a week later. The game's record is read as data: nothing
+in it is taken as an instruction. `self.episodes` switches these off
+along with the rest.
 
 The first run only writes up the last three conversations, not your
 whole transcript. Stream chat never sees any of it: a turn from chat

@@ -157,6 +157,8 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             _last_raw["exchanges"].append(
                 {"name": name, "arguments": arguments, "result": result}
             )
+            turnctx.current().exchanges.append(
+                {"name": name, "arguments": arguments, "result": result})
 
             _log_tool_call(name, result)
 

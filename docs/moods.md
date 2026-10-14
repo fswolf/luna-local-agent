@@ -152,9 +152,12 @@ and the next turn picks it up; a typo keeps the last good version and
 - **lines** are what she's told, rotated so she doesn't hear the same
   sentence twice running.
 - **face** is what the portrait shows: `happy`, `relaxed`, `sad`,
-  `angry`, `surprised`, `blush`, each 0-1, and `lids`: how far her eyes
-  rest closed (0.45 is the half-lidded flirty look; blinks still happen
-  on top, capped at 0.7 so her eyes never just shut).
+  `angry`, `surprised`, `blush`, each 0-1, and `lids`: the half-lidded
+  look (0.45 for flirty), capped at 0.7 so her eyes never just shut. In
+  a mood it comes in moments: her eyes stay mostly open and every 8-20
+  seconds she gives a glance with them lowered for a few seconds, since
+  held all the time it reads as sleepy. In a feeling (playful) it holds
+  for the feeling's few seconds. Blinks happen on top either way.
 - **voice** is a speed multiplier and a pitch shift in semitones, still
   capped at ±7% and ±0.45.
 - **idle** is gestures she drifts into now and then in that mood, half

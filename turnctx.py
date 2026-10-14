@@ -8,7 +8,8 @@ tool router's thread-local:
     standing passes    job (job_write_dirs), remote + approver (Discord)
     what it has seen   seen (outside content), read_local (one of his files)
     bookkeeping        lessons and skills shown, max_rounds, project_id,
-                       the tool router's choices for this turn
+                       the tool router's choices for this turn, the tool
+                       calls it made (a game's turn record reads these)
 
 It lives in a contextvars.ContextVar, so it belongs to the turn that set
 it and nothing else: it ends when the turn ends, and a thread started
@@ -42,6 +43,7 @@ class Turn:
     lessons: list = field(default_factory=list)  # lesson ids shown, credited after
     skills: list = field(default_factory=list)   # skill ids shown, credited after
     routing: SimpleNamespace = field(default_factory=SimpleNamespace)  # tools/routing.py
+    exchanges: list = field(default_factory=list)  # {name, arguments, result} per tool call, in order
 
 
 _current = contextvars.ContextVar("luna_turn", default=None)

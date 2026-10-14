@@ -12,6 +12,13 @@ read back into her prompt by llm.py:
             knows what happened last time; older ones come back when
             they're relevant to what's being said now.
 
+And play sessions: while she plays a game on her own (Zork, Minecraft,
+Vibe City, REALITI), each turn adds what she did and what came back to
+the open session. When it ends - the game stops, or nothing happens for
+a while - reflect.py writes it up as an episode like any conversation,
+so "what did you get up to?" has an answer. The turns themselves never
+go into her conversation history; a few sentences about them do.
+
 agent/notebook.db, gitignored. Nothing here is ever deleted by the app:
 a retired lesson stays in the table, hidden from her, and /lessons
 restore brings it back.
@@ -49,6 +56,17 @@ CREATE TABLE IF NOT EXISTS episodes (
     summary  TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS play (
+    id       INTEGER PRIMARY KEY,
+    game     TEXT NOT NULL,
+    title    TEXT NOT NULL,
+    started  TEXT NOT NULL,
+    last     TEXT NOT NULL,
+    ended    TEXT,
+    turns    INTEGER NOT NULL DEFAULT 0,
+    record   TEXT NOT NULL DEFAULT '',
+    episode  INTEGER
+);
 """
 
 
@@ -332,6 +350,69 @@ def search_episodes(query, limit=3, floor=0.35, min_words=1):
 def delete_episode(episode_id):
     return _run(lambda c: c.execute("DELETE FROM episodes WHERE id=?",
                                     (int(episode_id),)).rowcount, 0) > 0
+
+
+# ---------------------------------------------------------------------------
+# Play sessions - a game she plays on her own, turn by turn, until it ends
+# ---------------------------------------------------------------------------
+PLAY_RECORD_MAX = 20000      # characters kept per session: its start and its latest
+
+
+def play_turn(game, title, text):
+    """One turn of a game she's playing on her own: what she did and what
+    came back. Opens a session if none is open for this game."""
+    text = str(text or "").strip()
+
+    if not text:
+        return
+
+    def go(c):
+        now = _now()
+        row = c.execute("SELECT id, record FROM play WHERE game=? AND ended IS NULL "
+                        "ORDER BY id DESC LIMIT 1", (game,)).fetchone()
+
+        if row is None:
+            c.execute("INSERT INTO play (game, title, started, last, turns, record) VALUES (?,?,?,?,1,?)",
+                      (game, title, now, now, f"[{now[11:16]}] {text}"))
+            return
+
+        record = f"{row[1]}\n\n[{now[11:16]}] {text}"
+
+        if len(record) > PLAY_RECORD_MAX:        # keep how it started and how it's going
+            record = record[:PLAY_RECORD_MAX // 4] + "\n\n[...]\n\n" + record[-PLAY_RECORD_MAX * 3 // 4:]
+
+        c.execute("UPDATE play SET last=?, turns=turns+1, record=? WHERE id=?", (now, record, row[0]))
+
+    _run(go)
+
+
+def play_end(game):
+    """She stopped playing (paused, put away, out of turns): the session is
+    finished and waits to be written up."""
+    _run(lambda c: c.execute("UPDATE play SET ended=? WHERE game=? AND ended IS NULL",
+                             (_now(), game)))
+
+
+def play_to_write(quiet_minutes):
+    """Finished sessions not yet written up. One nothing has happened in for
+    quiet_minutes counts as finished too - the app may have been closed
+    mid-game, and the notes shouldn't wait for the next time she plays."""
+    def go(c):
+        cutoff = datetime.fromtimestamp(datetime.now().timestamp() - quiet_minutes * 60)
+        c.execute("UPDATE play SET ended=last WHERE ended IS NULL AND last < ?",
+                  (cutoff.isoformat(timespec="seconds"),))
+        rows = c.execute("SELECT id, game, title, started, ended, turns, record FROM play "
+                         "WHERE ended IS NOT NULL AND episode IS NULL ORDER BY ended").fetchall()
+        return [{"id": r[0], "game": r[1], "title": r[2], "started": r[3], "ended": r[4],
+                 "turns": r[5], "record": r[6]} for r in rows]
+
+    return _run(go, [])
+
+
+def play_written(session_id, episode_id):
+    """Written up as an episode (0: nothing worth an episode)."""
+    _run(lambda c: c.execute("UPDATE play SET episode=? WHERE id=?",
+                             (int(episode_id or 0), int(session_id))))
 
 
 def counts():

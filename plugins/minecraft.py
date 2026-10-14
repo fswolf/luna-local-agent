@@ -167,6 +167,11 @@ def stop():
     mcpclient.disconnect_server(SERVER)
     _connected = False
 
+    if not _state["busy"]:
+        from plugins import _playlog
+
+        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+
     return True, "minecraft: left the world (the goal is kept for next time)"
 
 
@@ -203,6 +208,11 @@ def command(text):
 
     if word == "pause":
         _state["paused"] = True
+
+        if not _state["busy"]:
+            from plugins import _playlog
+
+            _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
         return "minecraft: paused - she'll stay put. /minecraft resume carries on."
 
     if word == "resume":
@@ -266,8 +276,9 @@ def _step():
     prompt = STEP_PROMPT.format(username=s["username"], goal=_state["goal"], notes=notes, spots=spots,
                                 project=projects.game_block(pid))
 
+    exchanges = []
     answer = assistant.respond_to_job(prompt, _state["model"], "minecraft", allowed,
-                                      speak=bool(s["speak"]), project_id=pid) or ""
+                                      speak=bool(s["speak"]), project_id=pid, exchanges=exchanges) or ""
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
     line = lines[-1][:200] if lines else "(no report)"
     _state["notes"] = (_state["notes"] + [line])[-12:]
@@ -276,6 +287,7 @@ def _step():
     from plugins import _playlog
 
     _playlog.write(NAME, _state["steps"], answer)
+    _playlog.remember(NAME, "Minecraft", answer, exchanges)
     _state["last"] = line
 
     if line.upper().startswith("DONE"):
@@ -320,6 +332,11 @@ def _play():
             _stop.wait(30)  # don't spin on a broken connection
         finally:
             _state["busy"] = False
+
+            if _stop.is_set() or not _state["goal"] or _state["paused"]:
+                from plugins import _playlog
+
+                _playlog.finished(NAME)   # she stopped: the session is over
 
 
 # ---------------------------------------------------------------------------
