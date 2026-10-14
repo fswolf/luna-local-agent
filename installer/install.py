@@ -49,6 +49,7 @@ EXTRAS = {
     "embeddings": ([], "recall by meaning: a 600 MB embedding model (llama.cpp backend)"),
     "reranker": ([], "sharper recall: a 640 MB reranker beside the embedding model (skip on 16 GB machines)"),
     "chat": (["websocket-client"], "the pomf.tv stream-chat plugin"),
+    "toys": (["websocket-client"], "the Buttplug plugin: toys of most brands through Intiface Central"),
     "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
 }
 

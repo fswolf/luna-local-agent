@@ -32,13 +32,8 @@ def mode():
     return _mode
 
 
-def set_mode(new_mode, save=True):
-    """Switch modes. Returns the mode actually in effect, or None.
-
-    Saves to config.json by default, because a mode you picked and then
-    lost on restart is just an annoyance - you only ever change it
-    because you want it changed.
-    """
+def set_mode(new_mode):
+    """Switch modes at runtime. Returns the mode actually in effect."""
     global _mode
 
     new_mode = str(new_mode).strip().lower()
@@ -52,12 +47,6 @@ def set_mode(new_mode, save=True):
 
     _mode = new_mode
     ui.set_mode(_mode)
-
-    if save:
-        try:
-            config.save_setting("stt.mode", new_mode)
-        except Exception as e:
-            ui.add_message("system", f"Mode changed, but not saved: {e}")
 
     return _mode
 
@@ -88,6 +77,15 @@ def _interrupt():
     state.stop_generating = True
     state.stop_listening = True
     state.barged_in = False
+
+    # Anything physical stops with her: a toy left running because you
+    # cut her off mid-sentence is the wrong way round.
+    try:
+        import plugins
+
+        plugins.panic()
+    except Exception:
+        pass
 
 
 def _finish_recording():

@@ -203,7 +203,7 @@ def _ask_in_discord(kind, title, body, guarded):
         shown = shown[:1200] + "\n... (cut here - the whole request is in the attached file)"
 
     what = {"command": "run a command", "write": "change a file", "read": "read a file",
-            "web": "reach the web", "mcp": "use", "skill": "save a recipe"}.get(kind, kind)
+            "web": "reach the web", "email": "send an email", "mcp": "use", "skill": "save a recipe"}.get(kind, kind)
 
     if not guarded:
         warn = ""

@@ -207,6 +207,16 @@ Chat normally when no tool is needed.
 """
 
 
+def _plugin_lines(private):
+    """Running plugins' notes for the prompt (a toy is connected...)."""
+    try:
+        import plugins
+
+        return plugins.prompt_lines(private)
+    except Exception:
+        return ""
+
+
 def build_system_prompt(query="", timing="", private=True):
     # Ryan's history summary, his facts and her notes are his business -
     # a turn from stream chat gets the persona and the clock, not them.
@@ -248,7 +258,7 @@ Traits:
 
 Rules:
 {', '.join(RULES)}
-{gestures.prompt_line(private)}{build_tools_prompt(private)}
+{gestures.prompt_line(private)}{build_tools_prompt(private)}{_plugin_lines(private)}
 {build_memory_prompt(query) if private else ""}
 {build_self_prompt(query) if private else ""}
 {summary_block}

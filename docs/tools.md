@@ -22,6 +22,8 @@ check the time, then schedule something.
 | `list_files` / `read_file` | Look around and read, anywhere under `~` minus the deny list |
 | `write_file` / `edit_file` | Create or change a file: **you approve each one on screen** |
 | `run_command` | Run a shell command: **you approve every one, no allow-all** |
+| `check_email` / `read_email` / `search_email` | Your inbox, read-only: nothing gets marked read ([Email](email.md)) |
+| `send_email` | Send or reply as you: **off until you switch it on, then you approve every one** |
 | `read_page` | Open a link and read it, not just the search snippet |
 | `research` | Search, read the top pages at once, keep the parts that answer the question |
 | `search_history` | Look through past conversations for something |

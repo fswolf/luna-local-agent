@@ -539,6 +539,15 @@ MOOD_PROMPT = bool(_mood_cfg.get("prompt", True))      # the line in her system 
 MOOD_FACE = bool(_mood_cfg.get("face", True))          # the portrait's face and quick feelings
 MOOD_GESTURES = bool(_mood_cfg.get("gestures", True))  # idle moves and feeling gestures
 
+# Email (tools/mail.py). The login is in ~/.config/ai-voice/email.json,
+# never here. Reading is on whenever there's a login; sending is off
+# until you say so, and even then every message asks.
+#   "email": { "enabled": true, "send": false, "max": 20 }
+_email_cfg = setting("email", {})
+EMAIL_ENABLED = bool(_email_cfg.get("enabled", True))
+EMAIL_SEND = bool(_email_cfg.get("send", False))
+EMAIL_MAX = int(_email_cfg.get("max", 20))   # most messages one check or search returns
+
 _files_cfg = setting("files", {})
 FILES_ENABLED = bool(_files_cfg.get("enabled", True))
 FILES_APPROVAL_TIMEOUT = float(_files_cfg.get("approval_timeout", 120))
@@ -926,6 +935,10 @@ SETTINGS = {
     "mood.prompt":                ("MOOD_PROMPT",                  True),
     "mood.face":                  ("MOOD_FACE",                    True),
     "mood.gestures":              ("MOOD_GESTURES",                True),
+
+    "email.enabled":              ("EMAIL_ENABLED",                True),
+    "email.send":                 ("EMAIL_SEND",                   True),
+    "email.max":                  ("EMAIL_MAX",                    True),
 
     "files.enabled":              ("FILES_ENABLED",                True),
     "files.read":                 ("FILES_READ",                   True),

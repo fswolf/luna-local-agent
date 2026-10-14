@@ -1,11 +1,11 @@
-// hands_on_chest: both hands laid flat on her upper chest, one over the
-// other, a soft breath, head tipped a little. No about/keywords on
+// hands_on_chest: a hand laid flat on each side of her chest, elbows out
+// so the forearms clear her, a soft breath, head tipped a little. No about/keywords on
 // purpose: kept for the touch zones (a chest touch), not offered as a
 // tag or played from chat yet.
 import { both, open } from './_pose.js';
 
 const HANDS = {
-  ...both({ rightUpperArm: [0, 0.5, 1.42], rightLowerArm: [0, 2.35, -0.1, -0.8], rightHand: [0, 0.25, 0.9] }),
+  ...both({ rightUpperArm: [0.2, 0.4, 0.8], rightLowerArm: [0, 2, 0, -1.35], rightHand: [0, 0.4, 1.0] }),
   ...open('right'), ...open('left'),
 };
 

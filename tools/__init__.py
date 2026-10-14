@@ -141,6 +141,7 @@ _GROUPS = (
     ("Camera", ("look_at_camera",)),
     ("Web", ("web_search", "research", "read_page")),
     ("Shell", ("run_command",)),
+    ("Email", ("check_email", "read_email", "search_email", "send_email")),
     ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
               "reflect_now", "save_skill")),
     ("Projects", ("start_project", "update_project", "project_notes")),
@@ -331,3 +332,4 @@ from . import desktop    # noqa: E402,F401
 from . import web        # noqa: E402,F401
 from . import introspect  # noqa: E402,F401
 from . import shell      # noqa: E402,F401
+from . import mail       # noqa: E402,F401

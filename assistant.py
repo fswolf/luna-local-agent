@@ -24,6 +24,17 @@ import ui
 _turn = threading.Lock()
 
 
+def _plugins_hear(text):
+    """Your message reaches running plugins first - so a stop word stops a
+    toy now, not after she's finished thinking about it."""
+    try:
+        import plugins
+
+        plugins.user_text(text)
+    except Exception:
+        pass
+
+
 def _note_mood(text, answer, model):
     """Her mood hears what Ryan says and what she answered. Deliberately
     not wired into respond_to_chat: a stranger in stream chat being sweet
@@ -50,6 +61,8 @@ def respond(text, model):
     screen, the same bargain barge-in makes. Interrupting should cost
     you the audio, never the answer.
     """
+    _plugins_hear(text)
+
     if _turn.locked():
         logbook.info("turn", "new message while speaking - cutting the last one short")
         state.stop_speaking = True
@@ -192,6 +205,8 @@ def respond_remote(text, model, source, who, tools_allowed=None,
     thread, so files.py can apply files.auto_approve_sources to it and
     to nothing else.
     """
+    _plugins_hear(text)
+
     with _turn:
         state.stop_speaking = False
         state.stop_generating = False

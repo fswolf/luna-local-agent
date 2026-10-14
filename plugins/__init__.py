@@ -19,6 +19,11 @@ A plugin is a module with a NAME and whichever of these it needs:
     status()        str    the block /<name> prints with no argument
     command(text)   str    anything else after /<name> - "/minecraft goal
                            build a hut" calls command("goal build a hut")
+    prompt_line(private) str  a line for her system prompt while running
+                           ("a toy is connected"); private is False for
+                           stream chat and Discord without memory
+    on_user_text(text)     sees each of your messages before she does
+    panic()                you interrupted her (HOME): stop anything physical
 
 Only NAME is required; anything missing gets a sensible default, so a
 plugin that only needs start() is four lines long. `plugins/example.py`
@@ -79,6 +84,9 @@ class Plugin:
         self._running = _default(module, "running", lambda: False)
         self._status = _default(module, "status", None)
         self._command = _default(module, "command", None)
+        self._prompt_line = _default(module, "prompt_line", None)
+        self._on_user_text = _default(module, "on_user_text", None)
+        self._panic = _default(module, "panic", None)
 
     def available(self):
         try:
@@ -137,6 +145,45 @@ class Plugin:
         problem = self.why_unavailable()
 
         return f"{self.name}: off ({problem})" if problem else f"{self.name}: off"
+
+
+def _each_running(attribute):
+    for plugin in list(_loaded.values()):
+        hook = getattr(plugin, attribute)
+
+        if hook is not None and plugin.running():
+            yield plugin, hook
+
+
+def prompt_lines(private=True):
+    """What running plugins want in her system prompt."""
+    out = []
+
+    for plugin, hook in _each_running("_prompt_line"):
+        try:
+            out.append(str(hook(private) or ""))
+        except Exception as e:
+            logbook.warn("plugins", "%s prompt_line failed: %s", plugin.name, e)
+
+    return "".join(out)
+
+
+def user_text(text):
+    """Your message, to every running plugin that wants it, before the model."""
+    for plugin, hook in _each_running("_on_user_text"):
+        try:
+            hook(text)
+        except Exception as e:
+            logbook.warn("plugins", "%s on_user_text failed: %s", plugin.name, e)
+
+
+def panic():
+    """You interrupted her. Anything physical stops."""
+    for plugin, hook in _each_running("_panic"):
+        try:
+            hook()
+        except Exception as e:
+            logbook.warn("plugins", "%s panic failed: %s", plugin.name, e)
 
 
 def load():
