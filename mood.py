@@ -71,6 +71,7 @@ assistant than one that never had moods.
 """
 import json
 import os
+import random
 import re
 import threading
 import time
@@ -643,6 +644,8 @@ def _apply_exchange(said, answer, model):
     if feeling:
         _feel(feeling)
 
+    _count_hostility(rating, warmth)
+
 
 def _feel(feeling):
     """A quick feeling: on her face for a few seconds, a gesture if it has
@@ -767,6 +770,9 @@ def label():
     if not config.MOOD_ENABLED:
         return ""
 
+    if away():
+        return str(_walk().get("label") or "withdrawn")
+
     with _lock:
         return _cell()[0]
 
@@ -800,6 +806,14 @@ def line(private=True):
     """
     if not (config.MOOD_ENABLED and getattr(config, "MOOD_PROMPT", True)):
         return ""
+
+    # Walked away: the only turns that get here are the ones that ring on
+    # their own - an alarm, a reminder. She delivers them, in character.
+    if away():
+        said = str(_walk().get("prompt") or "").strip()
+
+        if said:
+            return f"\n{said}\n"
 
     with _lock:
         name, described = _cell()
@@ -929,8 +943,120 @@ def reset():
         _clean_run = 0
         _recent.clear()
 
+    _away.update(until=0.0, said=False, hostile=0)
     _save()
     _announce()
+
+
+# ---------------------------------------------------------------------------
+# Walking away (mood.walk_away, off by default)
+#
+# Treated badly enough for long enough, she stops talking for a while:
+# one short line the next time she's spoken to, then nothing. While
+# she's away no turn reaches the model - stop words still stop toys
+# (they're handled before any of this) and alarms and reminders still
+# ring (they don't come through here at all). She comes back when the
+# time is up, or sooner if what you say reads as making up, and she's
+# cool with you for a while after either way.
+#
+# What counts as "badly" is the appraisal's own warmth reading: "-",
+# which it gives only for real hostility, never for bluntness or
+# swearing. A warm exchange clears the count; a neutral one leaves it;
+# half an hour without another wipes it.
+# ---------------------------------------------------------------------------
+_away = {"until": 0.0, "said": False, "hostile": 0, "last": 0.0}
+
+
+def _walk():
+    return moods().get("walk_away") or {}
+
+
+def walk_away_on():
+    return bool(config.MOOD_ENABLED and getattr(config, "MOOD_WALK_AWAY", False))
+
+
+def away():
+    """Seconds until she's talking again, or 0."""
+    if not _away["until"]:
+        return 0
+
+    if not walk_away_on():          # switched off mid-sulk: she's back
+        _back("walking away was switched off")
+        return 0
+
+    left = _away["until"] - time.time()
+
+    if left <= 0:
+        _back("enough time passed")
+        return 0
+
+    return left
+
+
+def _count_hostility(rating, warmth):
+    if not walk_away_on() or _away["until"]:
+        return
+
+    now = time.time()
+
+    if now - _away["last"] > 30 * 60:
+        _away["hostile"] = 0
+
+    if warmth < 0:
+        _away.update(hostile=_away["hostile"] + 1, last=now)
+    elif warmth > 0 or rating >= 1:
+        _away["hostile"] = 0
+
+    if _away["hostile"] >= max(1, int(getattr(config, "MOOD_WALK_AWAY_AFTER", 3))):
+        _withdraw()
+
+
+def _withdraw():
+    global _warmth
+
+    minutes = max(1.0, float(getattr(config, "MOOD_WALK_AWAY_MINUTES", 10)))
+    _away.update(until=time.time() + minutes * 60, said=False, hostile=0)
+
+    with _lock:
+        _warmth = min(_warmth, -0.35)    # and cool with you when she's back
+
+    logbook.info("mood", "walked away for %.0f min", minutes)
+    _nudge(why="walked away")
+    _announce()
+
+
+def _back(why):
+    _away.update(until=0.0, said=False, hostile=0)
+    logbook.info("mood", "back: %s", why)
+    _announce()
+
+
+def leaving_line():
+    """The one thing she says on her way out - the first time she's
+    spoken to after walking away - then "" until she's back."""
+    if _away["said"]:
+        return ""
+
+    _away["said"] = True
+    lines = [str(x) for x in (_walk().get("lines") or []) if str(x).strip()]
+
+    return random.choice(lines) if lines else "I'm done talking for now."
+
+
+def heard_while_away(text, model):
+    """You spoke while she's away. If it reads as making up - warm, or
+    warming - she comes back now and answers it. One small appraisal
+    call, the same one every turn makes; no reply is generated."""
+    if not str(text or "").strip() or not model:
+        return False
+
+    rating, _energy_, warmth, _feeling = _appraise(text, "", model)
+
+    if warmth > 0 or rating >= 1:
+        _back("that sounded like making up")
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -984,6 +1110,12 @@ def portrait_state():
     dials go out as neutral so nothing else reads a mood off them."""
     name, energy, warmth, _why = state()
     show = config.MOOD_ENABLED and getattr(config, "MOOD_FACE", True) and _intensity() > 0
+
+    if away():
+        spec = _walk()
+        return {"label": str(spec.get("label") or "withdrawn"), "energy": energy if show else 0.0,
+                "warmth": warmth if show else 0.0,
+                "face": dict(spec.get("face") or {}) if show else {}, "idle": []}
 
     return {"label": name, "energy": energy if show else 0.0,
             "warmth": warmth if show else 0.0, "face": face() if show else {}, "idle": idle()}

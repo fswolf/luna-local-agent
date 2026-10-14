@@ -230,3 +230,34 @@ never capability.** There is no state in which she's less helpful, only
 states in which she's drier about it. That's in the prompt line itself,
 and it's the difference between a companion with a bad evening and
 software you have to coax.
+
+## Walking away
+
+Off by default, and the one deliberate exception to "tone, never
+capability" above: with `"walk_away": true` in the `mood` settings,
+real hostility a few exchanges running makes her stop talking for a
+while, the way a person would leave the room. It's for companion and
+roleplay setups; leave it off where she's a tool first.
+
+- **What counts:** the exchange reading's own "hostile" mark, which it
+  gives for being hurtful to her, not for bluntness or swearing.
+  `walk_away_after` of those (3) in a row tips it. A warm exchange
+  clears the count, and half an hour without another wipes it.
+- **Leaving:** the next time you speak to her she says one short line
+  from `walk_away.lines` in `agent/moods.json`. After that, nothing: no
+  reply, and no model call for it. The portrait holds the
+  `walk_away.face` and drops her idle moves.
+- **While she's away:** stream chat and jobs (games included) get
+  nothing. Discord gets "(She isn't talking right now.)" so it doesn't
+  look broken. Stop words still stop toys, since they never go
+  through her. Alarms and reminders still ring, in character: they get
+  `walk_away.prompt` in place of her usual mood line, so a reminder
+  comes out curt and sulky ("It's nine. Meds.") rather than sweet.
+- **Coming back:** after `walk_away_minutes` (10), or sooner if what
+  you say reads as making up. Then she answers that message. Either way
+  she's cool with you for a while and warms back up on her own.
+  `/mood reset` brings her back at once.
+
+```json
+"mood": { "walk_away": true, "walk_away_after": 3, "walk_away_minutes": 10 }
+```

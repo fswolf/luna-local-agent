@@ -47,6 +47,44 @@ def _note_mood(text, answer, model):
         pass  # decoration; never the reason a turn fails
 
 
+def _gone(text=None, model=None):
+    """mood.walk_away: has she walked away? None if she's here. Otherwise
+    what she says: her one leaving line the first time, then "".
+
+    By the time this runs, stop words have been heard (_plugins_hear
+    comes first), and alarms and reminders never come through here, so
+    those keep working. Your own message (text and model given) gets one
+    small check for making up, which brings her back to answer it."""
+    try:
+        import mood
+
+        if not mood.away():
+            return None
+
+        if text is not None and mood.heard_while_away(text, model):
+            return None
+
+        return mood.leaving_line()
+    except Exception:
+        return None     # a sulk is never the reason a turn breaks
+
+
+def _say_away(said):
+    """Her leaving line at the desk, shown and spoken; after that, quiet."""
+    if not said:
+        ui.set_status(f"{AGENT_NAME} isn't talking right now")
+        return
+
+    state.stop_speaking = False
+    ui.begin_message(AGENT_NAME.lower())
+    ui.extend_message(said)
+    ui.end_message()
+    player = speech.Player()
+    player.say(said)
+    player.wait()
+    ui.set_status("Idle")
+
+
 def respond(text, model):
     """Send a turn to the model and speak the reply as it arrives.
 
@@ -68,6 +106,12 @@ def respond(text, model):
         state.stop_speaking = True
 
     with _turn:
+        said = _gone(text, model)
+
+        if said is not None:
+            _say_away(said)
+            return said
+
         return _respond(text, model)
 
 
@@ -96,6 +140,9 @@ def respond_to_chat(prompt, model, source, who, said,
     out of history and out of the transcript.
     """
     with _turn:
+        if _gone() is not None:
+            return ""       # walked away: strangers get nothing either
+
         state.stop_speaking = False
 
         # Clear the interrupt too, and only here, holding the lock.
@@ -159,6 +206,9 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
     tell a job's write from yours.
     """
     with _turn:
+        if _gone() is not None:
+            return ""       # walked away: jobs and games wait
+
         state.stop_speaking = False
         state.stop_generating = False
         player = speech.Player() if speak else None
@@ -208,6 +258,11 @@ def respond_remote(text, model, source, who, tools_allowed=None,
     _plugins_hear(text)
 
     with _turn:
+        said = _gone(text, model) if remember else _gone()
+
+        if said is not None:
+            return said or "(She isn't talking right now.)"
+
         state.stop_speaking = False
         state.stop_generating = False
         player = speech.Player() if speak else None

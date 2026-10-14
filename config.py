@@ -567,6 +567,12 @@ MOOD_INTENSITY = max(0.0, min(2.0, float(_mood_cfg.get("intensity", 1.0))))
 MOOD_PROMPT = bool(_mood_cfg.get("prompt", True))      # the line in her system prompt
 MOOD_FACE = bool(_mood_cfg.get("face", True))          # the portrait's face and quick feelings
 MOOD_GESTURES = bool(_mood_cfg.get("gestures", True))  # idle moves and feeling gestures
+# Walking away: treated with real hostility a few exchanges running, she
+# stops talking for a while (alarms, reminders and stop words still
+# work). Off by default; agent/moods.json has her lines and face.
+MOOD_WALK_AWAY = bool(_mood_cfg.get("walk_away", False))
+MOOD_WALK_AWAY_AFTER = int(_mood_cfg.get("walk_away_after", 3))        # hostile exchanges
+MOOD_WALK_AWAY_MINUTES = float(_mood_cfg.get("walk_away_minutes", 10))
 
 # Email (tools/mail.py). The login is in ~/.config/ai-voice/email.json,
 # never here. Reading is on whenever there's a login; sending is off
@@ -972,6 +978,9 @@ SETTINGS = {
     "mood.prompt":                ("MOOD_PROMPT",                  True),
     "mood.face":                  ("MOOD_FACE",                    True),
     "mood.gestures":              ("MOOD_GESTURES",                True),
+    "mood.walk_away":             ("MOOD_WALK_AWAY",               True),
+    "mood.walk_away_after":       ("MOOD_WALK_AWAY_AFTER",         True),
+    "mood.walk_away_minutes":     ("MOOD_WALK_AWAY_MINUTES",       True),
 
     "email.enabled":              ("EMAIL_ENABLED",                True),
     "email.send":                 ("EMAIL_SEND",                   True),
