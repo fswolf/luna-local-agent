@@ -234,6 +234,7 @@ SETTINGS = {
 
     "adaptive.enabled":           ("ADAPTIVE_ENABLED",             True),
     "adaptive.first_budget":      ("ADAPTIVE_FIRST_BUDGET",        True),
+    "adaptive.job_budget":        ("ADAPTIVE_JOB_BUDGET",          True),
     "adaptive.deep_budget":       ("ADAPTIVE_DEEP_BUDGET",         True),
     "adaptive.rethink_below":     ("ADAPTIVE_RETHINK_BELOW",       True),
     "adaptive.min_gain":          ("ADAPTIVE_MIN_GAIN",            True),

@@ -215,7 +215,7 @@ def respond_to_chat(prompt, model, source, who, said,
 
 
 def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=None,
-                   project_id=None, exchanges=None):
+                   project_id=None, exchanges=None, time_limit=None):
     """A scheduled job firing (plugins/cron.py).
 
     Waits its turn like chat does. Fresh context and nothing stored, so a
@@ -240,6 +240,18 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
             if not stop.speaking.is_set():
                 player.say(sentence)
 
+        # time_limit (seconds): a game turn that runs past it is cut off,
+        # the way talking to her cuts one off, so the next turn can start.
+        # What she's already saying is left to finish.
+        def overtime():
+            logbook.warn("assistant", "job %s ran past %ss - cut short", job, time_limit)
+            stop.stop(speaking=False, generating=True)
+
+        timer = threading.Timer(float(time_limit), overtime) if time_limit else None
+        if timer:
+            timer.daemon = True
+            timer.start()
+
         try:
             # max_rounds None: the usual tools.max_rounds; project_id: a
             # game's notes, for game_note.
@@ -263,6 +275,8 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
             ui.end_message()
             raise
         finally:
+            if timer:
+                timer.cancel()
             _hold(None)
             ui.set_status("Idle")
 

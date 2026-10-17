@@ -34,14 +34,26 @@ def said_block(text, width=WIDTH):
     return "\n".join(lines)
 
 
+def said_marked(text):
+    """Her words for a game's own transcript, as one block a reader can
+    tell from the game: "[Luna] " on the first line, the rest indented,
+    no blank lines inside. A blank line ends it, so a second paragraph
+    or a "> down" in what she said is never read back as the game's.
+    The watch window and the turn's screen both rely on this."""
+    lines = [ln.strip() for ln in str(text or "").strip().splitlines() if ln.strip()]
+    if not lines:
+        return ""
+    return "\n".join([f"[{config.AGENT_NAME}] {lines[0]}"] + [f"  {ln}" for ln in lines[1:]])
+
+
 def write(game, turn, said, block=None, also=None):
     """Append one turn.
 
     said   what she said this turn
     block  the whole turn already laid out (optional); without it, her
            words under a "turn N  time" line
-    also   other files to copy her words into, as "[Luna] ..." (the Zork
-           transcript, so the watch window shows them too)
+    also   other files to copy her words into, marked as hers (said_marked:
+           the Zork transcript, so the watch window shows them too)
 
     Returns the playlog's path, or None.
     """
@@ -62,7 +74,7 @@ def write(game, turn, said, block=None, also=None):
         if said:
             for extra in also or []:
                 with open(extra, "a", encoding="utf-8") as f:
-                    f.write(f"\n[{config.AGENT_NAME}] {said}\n")
+                    f.write("\n" + said_marked(said) + "\n\n")
 
         return path
     except Exception:

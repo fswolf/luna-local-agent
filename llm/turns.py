@@ -258,6 +258,12 @@ def _ask(text, model, on_text=None, on_sentence=None,
 
     if adaptive and config.ADAPTIVE_FIRST_BUDGET >= 0:
         payload["reasoning_budget_tokens"] = int(config.ADAPTIVE_FIRST_BUDGET)
+    elif (turnctx.current().job and getattr(config, "LLM_BACKEND", "") == "llama"
+          and getattr(config, "ADAPTIVE_JOB_BUDGET", 1024) >= 0):
+        # A job or game turn gets no second look, so nothing else bounds
+        # its thinking - and minutes of silent thinking is what a stalled
+        # game turn looks like from outside.
+        payload["reasoning_budget_tokens"] = int(config.ADAPTIVE_JOB_BUDGET)
 
     # The live monitor's view of the turn's start. Chat turns pass a
     # context of their own, which is how they're told apart here.

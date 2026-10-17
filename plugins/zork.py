@@ -15,11 +15,11 @@ north", "how many points have you got?".
 
 /zork play hands her the controls: whenever nobody has spoken for
 step_seconds she takes a turn - one move: she reads the screen, types one
-command, and says in a line what she did and why - then waits to see
-what it did. Like Minecraft, those turns are jobs: fresh context,
-nothing stored in your history, only her Zork tools, and the last dozen
-of her one-liners as her memory of the game so far. Talking to her
-pauses play until you stop.
+command, and talks about what she did and why - then waits to see what
+it did. Like Minecraft, those turns are jobs: fresh context, nothing
+stored in your history, only her Zork tools, her notes, and her last
+moves with what the game said to each as her memory of the game so far.
+Talking to her pauses play until you stop.
 
 The game autosaves every few commands and when the plugin stops, so a
 playthrough survives restarts. /zork play again carries on; the
@@ -40,7 +40,8 @@ games/zork/. dfrotz has to be installed:
         "interpreter": "",      # path to dfrotz if it's somewhere odd
         "watch": false,         # open the watch window with /zork play
         "terminal": "",         # e.g. "kitty" or "gnome-terminal --"; "" = find one
-        "guide": true           # each turn, what luna-knowledge/zork/ says about her room
+        "guide": true,          # each turn, what luna-knowledge/zork/ says about her room
+        "turn_seconds": 150     # a turn that runs longer is cut short (0 = no limit)
     }
 
 With "guide" on, each turn also shows her what the notes in
@@ -53,6 +54,7 @@ player would see the screen. It looks for kitty, foot, alacritty,
 wezterm, konsole, gnome-terminal or xterm (Terminal.app on a Mac);
 "terminal" picks one. Closing it doesn't stop the game.
 """
+import json
 import os
 import re
 import shutil
@@ -72,7 +74,8 @@ WATCH_SCRIPT = os.path.join(HERE, "games", "zork", "watch.py")
 SAVES = os.path.join(HERE, "agent", "zork")      # gitignored, like her other state
 
 DEFAULTS = {"step_seconds": 8, "max_steps": 200, "speak": True, "web": True, "interpreter": "",
-            "watch": False, "terminal": "", "guide": True}
+            "watch": False, "terminal": "", "guide": True,
+            "turn_seconds": 150}
 
 # When "web" is on: stuck on a puzzle or a recipe, she can look it up.
 # If that means she reads a walkthrough and wins, she wins.
@@ -296,7 +299,7 @@ STEP_PROMPT = (
     "you find, and keep a light source once you go underground - the dark has a grue in it.\n"
     "Your notes on this playthrough (yours - kept between sessions):\n{project}\n\n"
     "{guide}"
-    "Your last moves, oldest first:\n{notes}\n\n"
+    "Your last moves and what the game said, oldest first:\n{notes}\n\n"
     "The game screen right now (your last command and what the game said):\n"
     "-----\n{screen}\n-----\n\n"
     "Read the screen, think about what it tells you, then make ONE move: a single zork_command, "
@@ -307,10 +310,12 @@ STEP_PROMPT = (
     "When you learn something worth remembering - a room and its exits, a puzzle, an item and "
     "what it's for, what killed you - write it down with game_note, and update your plan. "
     "Read your notes before moving; don't repeat what they say failed.\n"
+    "Only zork_command sends a move and only game_note keeps a note: writing a command or a "
+    "note in your reply does nothing. If the game didn't understand a command ('I don't know "
+    "the word...'), that didn't use up your move - say it another way.\n"
     "Then talk to the player watching, in your own voice, 2 to 4 sentences: what you see, what "
     "you make of it, why you chose this move, how you feel about it (grues are scary; treasure "
-    "is exciting). Make your last sentence a plain summary: what you did and what you'll try "
-    "next.)"
+    "is exciting). Just talk - no commands, no game text, no headings.)"
 )
 
 
@@ -376,12 +381,29 @@ def _pretty_turn(turn, said, width=78):
 
 
 
-def _last_sentence(answer, limit=200):
-    """Her turn's last sentence - the what-I-did-and-what's-next that goes
-    into her one-liner notes. The rest is commentary for the player."""
-    text = " ".join((answer or "").split())
-    parts = [p for p in re.split(r"(?<=[.!?])\s+", text) if p.strip()]
-    return (parts[-1] if parts else "(no report)")[:limit]
+def _moves_made(exchanges):
+    """This turn's commands that reached the game, as "north -> Forest Path",
+    or one line saying she didn't move."""
+    from plugins import _playlog
+
+    out = []
+    for x in exchanges:
+        if not str(x.get("name", "")).endswith("zork_command"):
+            continue
+        result = _playlog._FRAMING.sub("", str(x.get("result", ""))).strip()
+        if ONE_MOVE in result:
+            continue
+        args = x.get("arguments") or {}
+        if isinstance(args, str):
+            try:
+                args = json.loads(args or "{}")
+            except ValueError:
+                args = {}
+        said = next((ln.strip() for ln in result.splitlines()
+                     if ln.strip() and not _STATUS.match(ln) and not ln.startswith(">")), "")
+        out.append(f"{args.get('command', '?')} -> {said[:150] or '(no reply)'}")
+    return out or ["(no move this turn)"]
+
 
 def _screen(lines=30):
     """The tail of the game's transcript, without her own comments - what
@@ -395,10 +417,15 @@ def _screen(lines=30):
     except OSError:
         return "(nothing yet - a new game)"
 
+    # Only this game: from the last "[a new game]" or the game starting up.
+    starts = [m.end() for m in re.finditer(r"^(?:\[a new game\]|={20,}).*$", text, re.MULTILINE)]
+    if starts:
+        text = text[starts[-1]:]
+
     keep, skipping = [], False
     for line in text.splitlines():
         if line.startswith("[") and not line.startswith(("[saved", "[restored")):
-            skipping = True          # her comment: runs to the next blank line
+            skipping = True          # her words (_playlog.said_marked): run to the next blank line
             continue
         if skipping and line.strip():
             continue
@@ -424,6 +451,13 @@ ONE_MOVE = ("You've already made your move this turn - that command wasn't sent.
             "more: say what you did and why, write a game_note if you learned something, and "
             "stop. You'll see what your move did next turn.")
 
+# The game didn't understand the command, so nothing happened in it: that
+# doesn't use up her move, and she can say it another way this turn.
+_NOT_UNDERSTOOD = re.compile(
+    r"I don't know the word|That sentence isn't one I recognize|There was no verb in that "
+    r"sentence|There were too many nouns|You must tell me how to do that|I beg your pardon|"
+    r"I don't understand|You used the word .* in a way that I don't understand", re.IGNORECASE)
+
 
 def _one_move_per_turn():
     import tools
@@ -441,7 +475,10 @@ def _one_move_per_turn():
             if _turn["moves"] >= 1:
                 return ONE_MOVE
             _turn["moves"] += 1
-        return inner(**kwargs)
+        reply = inner(**kwargs)
+        if _turn["active"] and _NOT_UNDERSTOOD.search(str(reply)):
+            _turn["moves"] -= 1          # nothing happened: her move is still hers
+        return reply
 
     run._one_move = True
     entry["run"] = run
@@ -472,12 +509,14 @@ def _step():
             STEP_PROMPT.format(notes=notes, screen=screen, guide=_guide(here),
                                project=projects.game_block(pid, here=here)),
             _state["model"], "zork", allowed, speak=bool(s["speak"]), project_id=pid,
-            max_rounds=4 if s["web"] else 3, exchanges=exchanges) or ""
+            max_rounds=4 if s["web"] else 3, exchanges=exchanges,
+            time_limit=float(s["turn_seconds"] or 0) or None) or ""
     finally:
         _turn["active"] = False
-    lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
-    line = _last_sentence(answer) if lines else "(no report)"
-    _state["notes"] = (_state["notes"] + [line])[-30:]
+    # Her memory of the last moves is what she sent and what the game said,
+    # not her own words: fed back, those taught her to write "Move: north"
+    # instead of making the move.
+    _state["notes"] = (_state["notes"] + _moves_made(exchanges))[-30:]
     _state["steps"] += 1
 
     from plugins import _playlog

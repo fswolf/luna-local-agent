@@ -46,10 +46,14 @@ THOUGHTS_TOKEN_PROBS = bool(_thoughts_cfg.get("token_probs", True))
 # shaky by its own token probabilities. See llm._rethink.
 #   "adaptive": { "enabled": true, "first_budget": 1024, "deep_budget": -1,
 #                 "rethink_below": 0.75, "min_gain": 0.05,
-#                 "speak_corrections": true }
+#                 "speak_corrections": true, "job_budget": 1024 }
+# job_budget: the thinking budget for jobs and game turns (Zork, REALITI,
+# Vibe City...), which get no second look. Unbounded, a game turn can
+# think for minutes and look stalled. -1 = no limit.
 _adaptive_cfg = setting("adaptive", {})
 ADAPTIVE_ENABLED = bool(_adaptive_cfg.get("enabled", True))
 ADAPTIVE_FIRST_BUDGET = int(_adaptive_cfg.get("first_budget", 1024))
+ADAPTIVE_JOB_BUDGET = int(_adaptive_cfg.get("job_budget", 1024))
 ADAPTIVE_DEEP_BUDGET = int(_adaptive_cfg.get("deep_budget", -1))
 ADAPTIVE_RETHINK_BELOW = float(_adaptive_cfg.get("rethink_below", 0.75))
 ADAPTIVE_MIN_GAIN = float(_adaptive_cfg.get("min_gain", 0.05))

@@ -129,12 +129,20 @@ tools only exist while it's on.
 `/zork play` hands her the controls, one move at a time. Whenever
 nobody has spoken for `step_seconds` (8) she takes a turn: she reads the
 game screen (her last command and what the game answered), makes **one**
-move, and says in a line what she did and why. The next turn she sees
-what that move did before choosing another, the way a person plays.
+move, and talks about what she did and why. The next turn she sees what
+that move did before choosing another, the way a person plays. A command
+the game didn't understand ("I don't know the word...") doesn't use up
+her move: nothing happened, so she can say it another way.
 Like Minecraft, a turn is a job: fresh context, nothing in your history,
-only her Zork tools, the screen, and her last twenty one-liners as her
-memory of the game. Talking to her pauses play until you stop. After
-`max_steps` (200) moves she pauses and says so.
+only her Zork tools, the screen, her notes, and her last twenty moves
+with the game's answer to each as her memory of the game. Talking to her
+pauses play until you stop. After `max_steps` (200) moves she pauses and
+says so.
+
+Each turn's thinking is capped (`adaptive.job_budget`, 1024 tokens, for
+every job and game), and a turn that runs past `turn_seconds` (150) is
+cut short and the next one starts, so a turn where she thinks in
+circles doesn't stall the game.
 
 The game **autosaves** every five commands and when the plugin stops,
 and picks the autosave back up next time, so a playthrough survives
