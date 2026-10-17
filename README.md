@@ -6,8 +6,6 @@
 
 # luna-local-agent
 
-[![tests](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml)
-
 **A local voice companion you can see inside: reasoning, confidence and
 memory, all on your own machine.**
 
@@ -47,7 +45,7 @@ What she does:
 - **An animated portrait:** Live2D or VRM, lip-synced, blinking, gestures, blushes and tears ([details](docs/portrait.md#portrait))
 - **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
-- **Plays games:** Minecraft, Zork and Vibe City, on her own when you go quiet, and chess against you on a board you drag the pieces around on ([details](docs/games.md))
+- **Plays games:** Minecraft, Zork, Vibe City and REALITI, on her own when you go quiet ([details](docs/games.md))
 - **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
 - **Adult toys (18+):** Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
 - **From your phone:** Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
@@ -63,6 +61,14 @@ Everything runs locally. No cloud APIs required.
 Luna's own model, made in VRoid Studio, as she normally looks and in
 hologram mode. `/holo` switches between them live, in the portrait
 window and in OBS. Live2D and other VRM models work too ([details](docs/portrait.md#portrait)).
+
+## Watch her play
+
+[![Luna plays Zork for 72 minutes](https://img.youtube.com/vi/Cd8UUsFD_js/maxresdefault.jpg)](https://www.youtube.com/watch?v=Cd8UUsFD_js)
+
+Luna playing Zork I on her own for 72 minutes, all local, narrating as
+she goes (part 1). Minecraft, Vibe City and REALITI work the same way
+([details](docs/games.md)).
 
 ## See inside her
 
