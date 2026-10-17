@@ -22,6 +22,10 @@ git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
 
 (The folder is still `~/ai-voice`; every path below assumes it.)
 
+[![Luna plays Zork for 72 minutes](https://img.youtube.com/vi/Cd8UUsFD_js/maxresdefault.jpg)](https://www.youtube.com/watch?v=Cd8UUsFD_js)
+
+*Luna playing Zork I on her own for 72 minutes, all local, narrating as she goes (part 1).*
+
 Powered by:
 
 - [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper): speech to text

@@ -91,6 +91,9 @@ rest of the time. `speak: true` reads each step aloud.
 /zork           score and what she's been up to
 ```
 
+**Watch her play:** [Luna plays Zork for 72 minutes](https://www.youtube.com/watch?v=Cd8UUsFD_js)
+(part 1, until the PC froze).
+
 She plays [Zork I](https://en.wikipedia.org/wiki/Zork_I), the 1980
 Infocom text adventure. Microsoft released Zork I, II and III under the
 MIT licence in 2025, so the game ships with Luna in `games/zork/`
