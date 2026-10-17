@@ -45,6 +45,25 @@ The launcher starts her voice server too if the installer set one up,
 and stops it again when she exits. One you were already running is
 left alone.
 
+**Updating:** `./update.sh` gets the latest version. It saves a copy of
+your `config.json` in `agent/backups/` first, pulls the update while
+keeping any changes you made, installs any Python packages the update
+added, and then checks everything (below). If you and the update both
+changed `config.json`, your settings win.
+
+**Checking:** `./start.sh --check` says in plain words what's missing
+and how to fix it: Python packages, the model server, the voice server.
+`./start.sh` runs the package part on every start, and offers to install
+anything new before she starts instead of stopping with an error.
+
+```
+Luna's check:
+  ✓ Python packages
+  ✗ no model server answering (llama.cpp :8080 or LM Studio :1234)
+      → open LM Studio's Local Server, or build llama.cpp: bash llama/install.sh
+  ✓ her voice server is installed - ./start.sh starts it
+```
+
 Run the installer again any time to repair or update. It picks up
 where it left off and only does what's missing. `--yes` takes every
 default, and `--check` only runs the health check. Other options:

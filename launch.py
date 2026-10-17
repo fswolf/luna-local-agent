@@ -12,9 +12,17 @@ Any arguments are passed on to main.py. Before her:
 
 Each is started only if it isn't already answering, and stopped again
 when she exits - one that was already running before is left alone.
+
+First it checks that every package in installer/requirements.txt is
+installed - after a pull, a new one often isn't - and offers to install
+what's missing, instead of her stopping with a traceback.
+
+    ./start.sh --check    check packages and servers, say what's missing, exit
+    ./start.sh --update   install missing packages, then check (update.sh runs this)
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -153,6 +161,129 @@ def start_voice(v):
     return proc
 
 
+# ---------------------------------------------------------------------------
+# Packages: what installer/requirements.txt asks for, against what's installed
+# ---------------------------------------------------------------------------
+REQUIREMENTS = os.path.join(ROOT, "installer", "requirements.txt")
+
+
+def _marker_ok(marker):
+    """The one kind of environment marker requirements.txt uses:
+    sys_platform == / != "linux". Anything else counts as wanted."""
+    m = re.fullmatch(r"\s*sys_platform\s*(==|!=)\s*[\"']([^\"']+)[\"']\s*", marker)
+    return True if not m else (sys.platform == m.group(2)) == (m.group(1) == "==")
+
+
+def wanted_packages():
+    names = []
+    try:
+        with open(REQUIREMENTS, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return names
+    for line in lines:
+        spec, _, marker = line.split("#")[0].partition(";")
+        m = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9_.\-]*)", spec)
+        if m and (not marker.strip() or _marker_ok(marker)):
+            names.append(m.group(1))
+    return names
+
+
+def missing_packages(py):
+    """The wanted packages Luna's Python doesn't have (pip names), or
+    None if that Python couldn't be asked."""
+    names = wanted_packages()
+    probe = ("import json,sys\nfrom importlib import metadata\nout=[]\n"
+             "for n in sys.argv[1:]:\n    try: metadata.version(n)\n"
+             "    except metadata.PackageNotFoundError: out.append(n)\nprint(json.dumps(out))")
+    try:
+        r = subprocess.run([py, "-c", probe, *names], capture_output=True, text=True, timeout=30)
+        return json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        return None
+
+
+def install_packages(py):
+    """pip install -r installer/requirements.txt into Luna's Python."""
+    print("Installing what's missing...", flush=True)
+    return subprocess.call([py, "-m", "pip", "install", "-q", "--disable-pip-version-check",
+                            "-r", REQUIREMENTS]) == 0
+
+
+def ensure_packages(py, ask=True):
+    """Say plainly what's missing and offer to install it. True when
+    nothing is missing (any more)."""
+    missing = missing_packages(py)
+    seen = os.path.join(log_dir(), "packages-missing.txt")
+    if not missing:
+        if os.path.exists(seen):
+            os.remove(seen)
+        return True
+    key = ",".join(sorted(missing))
+    try:
+        with open(seen, encoding="utf-8") as f:
+            asked_before = f.read().strip() == key
+    except OSError:
+        asked_before = False
+    if ask and asked_before:
+        # Already offered (declined, or it wouldn't install): one line, not a question every start.
+        print(f"Still missing: {', '.join(missing)} - ./start.sh --check says more.")
+        return False
+    print(f"Luna needs Python packages that aren't installed (new in an update?): {', '.join(missing)}")
+    if ask and not (sys.stdin.isatty() and input("Install them now? [Y/n] ").strip().lower() in ("", "y", "yes")):
+        print(f"  To install them later: ./update.sh   (or: {py} -m pip install -r installer/requirements.txt)")
+    elif install_packages(py) and not missing_packages(py):
+        print("Installed.")
+        return ensure_packages(py, ask)          # clears the note
+    else:
+        print("Some didn't install - the lines above say why. The installer can repair it: ./installer/install.sh")
+    with open(seen, "w", encoding="utf-8") as f:
+        f.write(key)
+    return False
+
+
+# ---------------------------------------------------------------------------
+# --check: everything she needs, in plain words, with the fix for each
+# ---------------------------------------------------------------------------
+def check(py):
+    good, lines = True, []
+
+    def line(ok, text, fix=""):
+        nonlocal good
+        good = good and ok
+        lines.append(("  ✓ " if ok else "  ✗ ") + text + ("" if ok or not fix else f"\n      → {fix}"))
+
+    missing = missing_packages(py)
+    if missing is None:
+        line(False, f"Luna's Python ({py}) didn't answer", "run the installer: ./installer/install.sh")
+    else:
+        line(not missing, "Python packages" + (f": missing {', '.join(missing)}" if missing else ""),
+             "./update.sh  (or: ./start.sh --update)")
+
+    if model_up():
+        line(True, "a model server is answering")
+    elif os.access(os.path.join(LLAMA_DIR, "bin", "llama-server"), os.X_OK):
+        line(True, "no model server running yet - ./start.sh starts llama.cpp for her")
+    else:
+        line(False, "no model server answering (llama.cpp :8080 or LM Studio :1234)",
+             "open LM Studio's Local Server, or build llama.cpp: bash llama/install.sh")
+
+    v = state().get("voice", {})
+    if v.get("mode") == "managed":
+        ready = os.path.exists(v.get("python", "")) and os.path.exists(v.get("server", ""))
+        line(ready, "her voice server is installed - ./start.sh starts it" if ready else
+             "her voice server isn't where the installer left it", "run the installer again: ./installer/install.sh")
+    elif v.get("mode") == "none":
+        line(True, "no voice server set up - she'll be text-only")
+    else:
+        url = v.get("url", "http://127.0.0.1:8899")
+        line(up(url + "/health"), f"voice server at {url}", "start kokoro-reader, or run the installer to set one up")
+
+    print("Luna's check:\n" + "\n".join(lines))
+    print("All good - ./start.sh" if good else "Fix the ✗ lines above, then ./start.sh")
+    return good
+
+
 def python():
     """The venv's Python: the one the installer made, else whichever runs this."""
     s = state()
@@ -169,6 +300,16 @@ def python():
 
 
 def main():
+    args = sys.argv[1:]
+    py = python()
+    if "--check" in args:
+        sys.exit(0 if check(py) else 1)
+    if "--update" in args:
+        ensure_packages(py, ask=False)
+        print()
+        sys.exit(0 if check(py) else 1)
+
+    ensure_packages(py)
     s = state()
     llama = start_llama(s)
     voice = None
@@ -186,7 +327,7 @@ def main():
         print("Starting anyway:\n  " + "\n  ".join(warnings), file=sys.stderr)
 
     try:
-        code = subprocess.call([python(), os.path.join(ROOT, "main.py"), *sys.argv[1:]], cwd=ROOT)
+        code = subprocess.call([py, os.path.join(ROOT, "main.py"), *args], cwd=ROOT)
     except KeyboardInterrupt:
         code = 130
     finally:

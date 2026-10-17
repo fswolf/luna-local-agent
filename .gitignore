@@ -34,6 +34,7 @@ agent/minecraft.json
 agent/zork/
 # What she said on each game turn - see docs/plugins.md
 agent/playlogs/
+agent/backups/
 games/zork/saves/
 
 # llama.cpp is built in place by llama/install.sh; only the scripts and
