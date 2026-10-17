@@ -163,5 +163,32 @@ class ZorkRoom(unittest.TestCase):
         self.assertEqual(zork._room("(nothing yet - a new game)"), "")
 
 
+class MinecraftGuide(unittest.TestCase):
+    def setUp(self):
+        from plugins import minecraft
+        self.mc = minecraft
+
+    def guide(self, folder, found="Stone needs a pickaxe."):
+        with mock.patch.object(self.mc, "settings", return_value={"guide": folder}), \
+                mock.patch.object(knowledge, "guide", return_value=found) as look:
+            return self.mc._guide("get stone for a furnace"), look
+
+    def test_her_minecraft_notes_by_what_shes_doing(self):
+        text, look = self.guide("minecraft")
+        look.assert_called_once_with("minecraft", "get stone for a furnace")
+        self.assertIn("Stone needs a pickaxe.", text)
+
+    def test_off_or_nothing_found(self):
+        text, look = self.guide("")
+        self.assertEqual(text, "")
+        look.assert_not_called()
+        self.assertEqual(self.guide("minecraft", found="")[0], "")
+
+    def test_the_step_prompt_has_room_for_it(self):
+        self.assertIn("{guide}", self.mc.STEP_PROMPT)
+        self.assertIn("smelt-item", self.mc.CORE_TOOLS)
+        self.assertEqual(self.mc.DEFAULTS["guide"], "minecraft")
+
+
 if __name__ == "__main__":
     unittest.main()

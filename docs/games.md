@@ -71,13 +71,13 @@ when you open it) in config:
                "speak": true }
 ```
 
-She gets 16 of the server's 22 tools (`mc_tools` changes the list):
+She gets 17 of the server's 22 tools (`mc_tools` changes the list):
 moving, looking, finding and digging blocks, placing, inventory,
-equipping, crafting, finding mobs and players, game chat, plus three
-for when she's unsure (block info, recipe lookup, creative or
-survival). Every schema rides in every prompt, and a small model picks
-better from a short list, so the leftovers (flying, smelting, jumping,
-recipe browsing) stay off.
+equipping, crafting, smelting (food and ingots), finding mobs and
+players, game chat, plus three for when she's unsure (block info,
+recipe lookup, creative or survival). Every schema rides in every
+prompt, and a small model picks better from a short list, so the
+leftovers (flying, jumping, recipe browsing) stay off.
 The tools only exist while the plugin is on, so they cost nothing the
 rest of the time. `speak: true` reads each step aloud.
 
@@ -389,6 +389,15 @@ growth. It searches by meaning when the embedding server is running,
 by words otherwise, and only ever in that one folder. `"guide"` in the
 `vibecity` block names the folder (`"vibe-city"` by default), and `""`
 turns it off.
+
+Minecraft works the same way, from `luna-knowledge/minecraft/`: each
+step she's shown the passages that fit her goal and her last couple of
+steps. The notes there cover the first day, recipes with the exact item
+names `craft-item` wants, which pickaxe mines what and how deep each
+ore is (Java 1.18 and newer), building block by block, night and mobs,
+and how her own Minecraft tools behave and what their errors mean.
+`"guide"` in the `minecraft` block names the folder (`"minecraft"` by
+default), and `""` turns it off.
 
 She also remembers having played, outside the game: each session
 (from when she starts until she stops, or 20 minutes without a turn)

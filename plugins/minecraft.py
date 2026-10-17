@@ -37,8 +37,15 @@ Setup:
         "step_seconds": 20,     # quiet needed before she takes the next step
         "max_steps": 60,        # per goal, then she pauses and asks
         "speak": true,          # say each step out loud
-        "web": true             # she may look things up (web_search, research)
+        "web": true,            # she may look things up (web_search, research)
+        "guide": "minecraft"    # her guide: a folder in luna-knowledge ("" = none)
     }
+
+Her guide: each step she's shown the two passages in luna-knowledge/
+minecraft/ that best fit what she's working on: her goal and her last
+couple of steps. Recipes with exact item names, which pickaxe mines what,
+how deep the ores are, building block by block, night and mobs, and how
+her own tools behave. Only that folder is searched.
 """
 import json
 import os
@@ -63,10 +70,13 @@ CORE_TOOLS = ["get-position", "move-to-position", "look-at", "find-blocks", "dig
               "find-entity", "send-chat", "read-chat",
               # for when something's unclear: what is that block, what does
               # this recipe need, creative or survival?
-              "get-block-info", "get-recipe", "detect-gamemode"]
+              "get-block-info", "get-recipe", "detect-gamemode",
+              # cooking food and turning raw iron into ingots
+              "smelt-item"]
 
 DEFAULTS = {"host": "localhost", "port": 25565, "username": "Luna", "step_seconds": 20,
-            "max_steps": 60, "speak": True, "web": True, "mc_tools": CORE_TOOLS, "command": ""}
+            "max_steps": 60, "speak": True, "web": True, "mc_tools": CORE_TOOLS, "command": "",
+            "guide": "minecraft"}
 
 # When "web" is on: stuck on a puzzle or a recipe, she can look it up.
 # If that means she reads a walkthrough and wins, she wins.
@@ -244,6 +254,7 @@ STEP_PROMPT = (
     "Your goal: {goal}\n"
     "Places you pinned: {spots}\n"
     "Your notes on this world (yours - kept between sessions):\n{project}\n\n"
+    "{guide}"
     "What you've done so far, oldest first:\n{notes}\n\n"
     "Take the next step. Check your position or inventory if you need to, find what you "
     "need, then do one to three actions towards the goal with your Minecraft tools. If a "
@@ -274,7 +285,8 @@ def _step():
 
     pid = projects.game_project(NAME, _state["goal"])
     prompt = STEP_PROMPT.format(username=s["username"], goal=_state["goal"], notes=notes, spots=spots,
-                                project=projects.game_block(pid))
+                                project=projects.game_block(pid),
+                                guide=_guide(" ".join([_state["goal"]] + _state["notes"][-2:])))
 
     exchanges = []
     answer = assistant.respond_to_job(prompt, _state["model"], "minecraft", allowed,
@@ -300,6 +312,21 @@ def _step():
     elif _state["steps"] >= int(s["max_steps"]):
         _state["paused"] = True
         _say(f"Minecraft: {_state['steps']} steps on this goal - paused. /minecraft resume to keep going.")
+
+
+def _guide(query):
+    """The passages from her Minecraft notes that fit what she's working
+    on, for the step prompt; "" when there's no guide or nothing fits."""
+    folder = settings()["guide"]
+    if not folder or not query.strip():
+        return ""
+    try:
+        import knowledge
+
+        text = knowledge.guide(NAME if folder is True else str(folder), query)
+    except Exception:
+        return ""
+    return f"From your Minecraft notes, on what you're working on:\n{text}\n\n" if text else ""
 
 
 def _say(text):
