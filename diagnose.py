@@ -42,6 +42,9 @@ PROBES = (
     # will happily answer from thin air if it doesn't reach for a tool.
     ("turn the music down a bit", "control_audio"),
     ("how much VRAM have I got free?", "system_status"),
+    # ...and the crash question mustn't land on system_status or a shell
+    # command reading the journal by hand.
+    ("my PC froze last night, what happened?", "last_boot"),
     ("what's on my clipboard?", "clipboard"),
     # set_alarm and set_reminder describe near-identical jobs, so this
     # probe is really testing the pair: it passes only if "wake me" goes

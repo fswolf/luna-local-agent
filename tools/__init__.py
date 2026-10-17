@@ -180,7 +180,8 @@ _GROUPS = (
                 "update_fact", "search_history")),
     ("Files", ("list_files", "read_file", "write_file", "edit_file")),
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",
-                 "focus_window", "system_status")),
+                 "focus_window")),
+    ("System", ("system_status", "system_health", "last_boot")),
     ("Camera", ("look_at_camera",)),
     ("Web", ("web_search", "research", "read_page")),
     ("Shell", ("run_command",)),
@@ -383,6 +384,7 @@ def _mark_outside(name):
 # ---------------------------------------------------------------------------
 from . import time      # noqa: E402,F401
 from . import calc      # noqa: E402,F401
+from . import system    # noqa: E402,F401
 from . import reminders  # noqa: E402,F401
 from . import memory     # noqa: E402,F401
 from . import files      # noqa: E402,F401

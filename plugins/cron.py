@@ -36,7 +36,7 @@ NAME = "cron"
 SUMMARY = "scheduled jobs - she wakes up and does them"
 
 JOBS_FILE = os.path.join(config.BASE_DIR, "agent", "cron.json")
-DEFAULT_TOOLS = ["get_datetime", "time_until", "system_status", "web_search",
+DEFAULT_TOOLS = ["get_datetime", "time_until", "system_status", "system_health", "last_boot", "web_search",
                  "list_files", "read_file", "write_file", "edit_file"]
 OWN_TOOLS = {"schedule_job", "list_jobs", "cancel_job"}  # a job never schedules jobs
 

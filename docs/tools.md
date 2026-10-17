@@ -20,6 +20,8 @@ check the time, then schedule something.
 | `clipboard` | Read what you copied, or put something there to paste |
 | `focus_window` | Switch to a window, named the way you'd name it |
 | `system_status` | Free VRAM, GPU temp and load, RAM, disk, loaded model |
+| `system_health` | Is anything wrong: load, RAM and swap, every disk, temperatures, failed services, errors since boot ([Sysadmin](sysadmin.md#health-and-crashes)) |
+| `last_boot` | How the last session ended: normal shutdown or a freeze, and the likely cause from the log ([Sysadmin](sysadmin.md#health-and-crashes)) |
 | `list_files` / `read_file` | Look around and read, anywhere under `~` minus the deny list |
 | `write_file` / `edit_file` | Create or change a file: **you approve each one on screen** |
 | `run_command` | Run a shell command: **you approve every one, no allow-all** |

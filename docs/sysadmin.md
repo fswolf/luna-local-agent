@@ -7,6 +7,8 @@ a separate product. It's the tools she already has, put together:
 | Piece | What it gives her | Asks first? |
 |-------|-------------------|-------------|
 | `system_status` | VRAM, GPU temp and load, RAM, disk, the loaded model | no, it only reads |
+| `system_health` | load, RAM and swap, every disk, CPU and GPU temperatures, failed services, errors since boot by program | no, it only reads |
+| `last_boot` | how the previous session ended, and why | no, it only reads |
 | `find_device` / `scan_network` | the IP of a machine on your network, by name or MAC | no, it only looks |
 | `run_command` | a shell, as you | **every command** |
 | `read_file` / `list_files` | logs, configs, reports, anywhere under `~` minus the deny list | no (yours to change in the tools pane) |
@@ -18,12 +20,43 @@ a separate product. It's the tools she already has, put together:
 Things you can say at the desk:
 
 - "How's the machine doing?"
+- "My PC froze last night, what happened?"
 - "What's the Unraid server's address?"
 - "What's using port 8080?"
 - "Is the kokoro service running? Restart it if it isn't."
 - "Show me the last 30 lines of the llama log and tell me what went wrong."
 - "How much space is left on my home drive, and what's taking it?"
 - "Write me a script that backs up ~/notes to the server."
+
+## Health and crashes
+
+`system_health` answers "is anything wrong?" in one call. It starts
+with a verdict ("Nothing looks wrong." or "Needs a look: ..."), then
+the numbers: uptime and load, RAM and swap, free space on every real
+disk, CPU and GPU temperatures, services that failed (system and
+user), and the errors logged since boot, one line per program with a
+count and the latest message.
+
+`last_boot` is for after a freeze, crash or surprise reboot. It reads
+the previous boot from the journal and says whether it ended with a
+normal shutdown or just stopped, then the likeliest cause it can find
+in the log: the GPU hanging (an amdgpu ring timeout or reset), memory
+running out, a kernel panic, a CPU lockup, a hardware error,
+overheating or disk errors. It adds programs that crashed near the end
+(coredumpctl), the boot's errors by program, and its last fifteen log
+lines. A hard freeze often stops the logging before anything is
+written, and it says that too instead of guessing. `back: 2` looks one
+boot further.
+
+Neither needs root or a new package: just journalctl, systemctl and
+coredumpctl, which every systemd Linux has. The journal shows system
+messages to members of `wheel` or `systemd-journal` (Fedora's first
+user is in `wheel`). Otherwise it only shows your own session, and the
+report says how to fix that. Log lines come back as short plain lines
+and labelled as outside content, since any program can write anything
+to the log. Both tools are in a scheduled job's tools by default.
+
+## Running commands
 
 Each command shows up in the popup exactly as it will run, with the
 folder and her reason. Read it before you press `Y`: the command can
@@ -65,7 +98,7 @@ Each of these can be asked for out loud or pasted into
 
 ```json
 {"name": "morning-check", "schedule": "0 8 * * *",
- "task": "Check system_status. If disk or RAM is under 10% free, or the GPU is over 85C, say so in one sentence and add a dated line to ~/luna-jobs/health.md. Otherwise just say all good.",
+ "task": "Check system_health. If it says something needs a look, say what in one sentence and add a dated line to ~/luna-jobs/health.md. Otherwise just say all good.",
  "speak": true}
 ```
 

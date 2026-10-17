@@ -132,7 +132,8 @@ folder with someone, check those two keys (and
 ```json
 "cron": {
     "enabled": false,
-    "job_tools": ["get_datetime", "time_until", "system_status", "web_search",
+    "job_tools": ["get_datetime", "time_until", "system_status", "system_health",
+                  "last_boot", "web_search",
                   "read_page", "list_files", "read_file", "write_file",
                   "edit_file", "recall_facts"]
 }
