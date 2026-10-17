@@ -2,8 +2,9 @@
 
 She can play: Minecraft through an MCP bot, Zork I through a real
 interpreter, mayor in your open Vibe City window, and resident in
-REALITI Relax, a world of rooms made for AI agents. Each one keeps its
-own notes, plays on its own when the conversation goes quiet, and can be
+REALITI Relax, a world of rooms made for AI agents, and chess against
+you on a board you drag the pieces around on. Each one keeps its own
+notes, plays on its own when the conversation goes quiet, and can be
 watched while she does. How plugins work in general is on
 [Plugins](plugins.md).
 
@@ -344,6 +345,63 @@ her; `"watch": true` opens it with every `/realiti visit`.
     "terminal": ""
 }
 ```
+
+## Chess
+
+```
+/chess on          set up the board and open it in your browser
+/chess new black   a new game (you're white unless you say black, or random)
+/chess e4          your move, typed
+/chess undo        take back your last move and her reply
+/chess resign      give up this game
+/chess nudge       remind her it's her move, if she stalled
+/chess off         put it away (the game is saved)
+/chess             the position and the board's address
+```
+
+You play her on a board Luna serves herself, next to the live view, at
+`http://127.0.0.1:8792/chess/`. Drag a piece, or click it and then the
+square: where it can go lights up, and an illegal drop snaps back. Her
+moves slide in on their own, with what she said about each one beside
+the board. The page also has take back, flip, resign and a new game as
+white, black or random. Add the same address to OBS as a browser
+source and chat can watch.
+
+You can also move by voice: tell her "knight to f3", "pawn takes d5" or
+"castle kingside" and she plays it for you (`chess_user_move`).
+`/chess e4` does the same without her.
+
+[python-chess](https://python-chess.readthedocs.io/) keeps the game:
+whose move it is, what's legal, check, mate and draws. She never has to
+hold the board in her head, which is where a language model falls
+apart. Each of her moves is a job turn: she's shown the board from her
+side, the moves so far, her legal moves, which of her pieces are
+attacked and what she can capture, then plays one move with
+`chess_move` and says a sentence or two about it. A move that isn't
+legal comes back with the list and doesn't use up her turn. When the
+game ends she says something about it.
+
+Expect her to play like an enthusiastic beginner: a 9B model hangs
+pieces and misses mates. The fun is the commentary.
+
+Finished games are saved in `agent/chess/games/` as PGN files, which any
+chess program or lichess's analysis board can open.
+
+```json
+"chess": {
+    "enabled": false,
+    "side": "white",
+    "speak": true,
+    "open": true,
+    "think_seconds": 1.5,
+    "turn_seconds": 90
+}
+```
+
+`side` is your colour in a new game (white, black or random), `open`
+opens the board with `/chess on`, and `think_seconds` is a short pause
+before her move so it doesn't snap in. Needs `pip install chess` and the
+live monitor (`monitor.enabled`, on by default).
 
 ## Her memory of a game
 

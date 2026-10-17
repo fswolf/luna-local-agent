@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="piece/bN.svg">
+<title>Chess with Luna</title>
+<style>
+:root{--bg:#120d1c;--panel:#1b1429;--line:#3a2d55;--text:#e6dcff;--dim:#a99cc8;--accent:#c49dff;
+  --light:#e9def7;--dark:#8d6fbd;--last:rgba(255,214,102,.55);--check:rgba(255,70,110,.75);--dot:rgba(30,10,50,.35)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}
+main{display:flex;gap:22px;padding:18px;min-height:100%;align-items:flex-start;align-content:flex-start;justify-content:center;flex-wrap:wrap}
+#wrap{width:min(92vmin,640px);flex:0 0 auto}
+#board{position:relative;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);aspect-ratio:1;border-radius:8px;overflow:hidden;
+  box-shadow:0 0 0 2px var(--line),0 10px 40px #0008;touch-action:none;user-select:none}
+.sq{position:relative;min-width:0;min-height:0}
+.sq.l{background:var(--light)}.sq.d{background:var(--dark)}
+.sq.last::before{content:"";position:absolute;inset:0;background:var(--last)}
+.sq.check::before{content:"";position:absolute;inset:0;background:radial-gradient(circle,var(--check) 30%,transparent 72%)}
+.sq.sel::before{content:"";position:absolute;inset:0;background:rgba(196,157,255,.55)}
+.sq.to::after{content:"";position:absolute;left:35%;top:35%;width:30%;height:30%;border-radius:50%;background:var(--dot);pointer-events:none;z-index:2}
+.sq.to.cap::after{left:5%;top:5%;width:90%;height:90%;background:transparent;border:5px solid var(--dot);box-sizing:border-box}
+.sq img{position:absolute;left:4%;top:4%;width:92%;height:92%;pointer-events:none;transition:none}
+.sq.mine{cursor:grab}
+.coord{position:absolute;font-size:11px;font-weight:600;pointer-events:none;opacity:.75}
+.coord.f{right:3px;bottom:1px}.coord.r{left:3px;top:1px}
+.sq.l .coord{color:var(--dark)}.sq.d .coord{color:var(--light)}
+#float{position:fixed;pointer-events:none;z-index:50;display:none}
+#side{width:min(92vw,340px);display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+h1{font-size:18px;margin:0 0 2px}
+#status{font-weight:600;color:var(--accent)}
+#status.wait::after{content:"";display:inline-block;width:1.2em;animation:dots 1.2s steps(4) infinite;overflow:hidden;vertical-align:bottom}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+#said .now{font-size:16px;margin:0 0 6px}
+#said .old{color:var(--dim);font-size:13px;margin:4px 0;border-top:1px solid var(--line);padding-top:4px}
+#said .who{color:var(--accent);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+#moves{font:13px/1.6 ui-monospace,monospace;color:var(--dim);max-height:160px;overflow:auto;word-spacing:2px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+button,select{background:#2a2040;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 11px;font:inherit;cursor:pointer}
+button:hover{background:#3a2d55}button.warn{border-color:#ff6b8b}
+#toast{min-height:1.4em;color:#ffb3c4;font-size:13px}
+#promo{position:absolute;inset:0;background:#120d1ccc;display:none;align-items:center;justify-content:center;gap:10px;z-index:20}
+#promo img{width:16%;background:var(--light);border-radius:8px;cursor:pointer;padding:4px}
+#promo img:hover{background:var(--accent)}
+#off{display:none;text-align:center;padding:40px;color:var(--dim)}
+</style>
+</head>
+<body>
+<main>
+  <div id="wrap">
+    <div id="board"><div id="promo"></div></div>
+  </div>
+  <div id="side">
+    <div class="card">
+      <h1>Chess with <span id="name">Luna</span></h1>
+      <div id="status">Loading</div>
+      <div id="toast"></div>
+    </div>
+    <div class="card" id="said"><div class="who" id="who">Luna</div><p class="now">Your move first, if you're white.</p></div>
+    <div class="card"><div id="moves">No moves yet.</div></div>
+    <div class="card">
+      <div class="row">
+        <button id="undo">Take back</button>
+        <button id="flip">Flip board</button>
+        <button id="resign" class="warn">Resign</button>
+        <button id="nudge" hidden>Nudge her</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="side-pick"><option value="white">I play white</option><option value="black">I play black</option><option value="random">Random</option></select>
+        <button id="new">New game</button>
+      </div>
+    </div>
+  </div>
+</main>
+<div id="off">The chess plugin is off. Type <code>/chess on</code> in Luna.</div>
+<img id="float" alt="">
+<script>
+const B = document.getElementById("board"), FLOAT = document.getElementById("float");
+const $ = id => document.getElementById(id);
+let S = null, flipped = false, sel = null, drag = null, lastSeen = null, squares = {};
+const FILES = "abcdefgh";
+
+function pieceAt(fen) {                       // board_fen -> {e4: "wP"}
+  const out = {};
+  fen.split("/").forEach((row, i) => {
+    let f = 0;
+    for (const c of row) {
+      if (/\d/.test(c)) { f += +c; continue; }
+      out[FILES[f] + (8 - i)] = (c === c.toUpperCase() ? "w" : "b") + c.toUpperCase();
+      f++;
+    }
+  });
+  return out;
+}
+
+function build() {
+  B.querySelectorAll(".sq").forEach(e => e.remove());
+  squares = {};
+  const whiteDown = (S && S.you === "black") === flipped;
+  for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+    const file = whiteDown ? f : 7 - f, rank = whiteDown ? 7 - r : r;
+    const name = FILES[file] + (rank + 1), el = document.createElement("div");
+    el.className = "sq " + ((file + rank) % 2 ? "l" : "d");
+    el.dataset.sq = name;
+    if (r === 7) el.insertAdjacentHTML("beforeend", `<span class="coord f">${FILES[file]}</span>`);
+    if (f === 0) el.insertAdjacentHTML("beforeend", `<span class="coord r">${rank + 1}</span>`);
+    B.insertBefore(el, $("promo"));
+    squares[name] = el;
+  }
+}
+
+function targets(from) { return (S.legal[from] || []).map(t => t.slice(0, 2)); }
+
+function render() {
+  const pieces = pieceAt(S.fen), mine = S.you[0];
+  for (const [name, el] of Object.entries(squares)) {
+    el.querySelector("img")?.remove();
+    el.classList.remove("last", "check", "sel", "to", "cap", "mine");
+    const p = pieces[name];
+    if (p) {
+      const img = document.createElement("img");
+      img.src = `piece/${p}.svg`; img.alt = p;
+      el.appendChild(img);
+      if (S.yourTurn && p[0] === mine) el.classList.add("mine");
+    }
+    if (S.last && S.last.includes(name)) el.classList.add("last");
+    if (S.check === name) el.classList.add("check");
+  }
+  if (sel) {
+    squares[sel]?.classList.add("sel");
+    for (const t of targets(sel)) squares[t].classList.add("to", ...(pieces[t] ? ["cap"] : []));
+  }
+  $("name").textContent = S.luna;
+  document.title = `Chess with ${S.luna}`;
+  $("status").textContent = S.status;
+  $("status").classList.toggle("wait", /thinking/.test(S.status));
+  $("nudge").hidden = !/didn't move/.test(S.status);
+  $("moves").textContent = S.history || "No moves yet.";
+  $("moves").scrollTop = 1e9;
+  const said = S.said.slice().reverse();
+  $("said").innerHTML = `<div class="who">${esc(S.luna)}</div>` +
+    (said.length ? `<p class="now">${esc(said[0].text)}</p>` + said.slice(1, 4).map(s => `<p class="old">${esc(s.text)}</p>`).join("")
+                 : `<p class="now">${S.you === "white" ? "Your move first." : "She opens..."}</p>`);
+}
+
+function esc(t) { return String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+
+function slideIn() {                          // her move glides from where it came from
+  const key = S.last ? S.last.join("") : null;
+  if (key && key !== lastSeen && lastSeen !== null && S.yourTurn) {
+    const [from, to] = S.last, img = squares[to]?.querySelector("img");
+    if (img) {
+      const a = squares[from].getBoundingClientRect(), b = squares[to].getBoundingClientRect();
+      img.style.transform = `translate(${a.left - b.left}px,${a.top - b.top}px)`;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        img.style.transition = "transform .35s ease"; img.style.transform = "";
+      }));
+    }
+  }
+  lastSeen = key;
+}
+
+async function load() {
+  try {
+    const r = await fetch("state", {cache: "no-store"});
+    if (!r.ok) throw 0;
+    const next = await r.json();
+    if (!next.game) throw 0;
+    const sideChanged = !S || S.you !== next.you;
+    S = next;
+    $("off").style.display = "none"; document.querySelector("main").style.display = "";
+    if (sideChanged) build();
+    if (!S.yourTurn) sel = null;
+    render(); slideIn();
+  } catch (e) {
+    document.querySelector("main").style.display = "none"; $("off").style.display = "block";
+  }
+}
+
+async function post(path, body) {
+  const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const d = await r.json();
+  $("toast").textContent = d.ok ? "" : d.message;
+  if (d.state) { S = d.state; lastSeen = S.last ? S.last.join("") : null; render(); }
+  return d;
+}
+
+function move(from, to) {
+  sel = null;
+  const options = (S.legal[from] || []).filter(t => t.startsWith(to));
+  if (!options.length) { render(); return; }
+  if (options.length > 1 || options[0].length > 2) return promote(from, to);
+  post("move", {move: from + to});
+}
+
+function promote(from, to) {
+  const box = $("promo"), c = S.you[0];
+  box.innerHTML = ["q", "r", "b", "n"].map(p => `<img data-p="${p}" src="piece/${c}${p.toUpperCase()}.svg">`).join("");
+  box.style.display = "flex";
+  box.onclick = e => {
+    box.style.display = "none";
+    if (e.target.dataset.p) post("move", {move: from + to + e.target.dataset.p}); else render();
+  };
+}
+
+function squareAt(x, y) { return document.elementFromPoint(x, y)?.closest(".sq")?.dataset.sq; }
+
+B.addEventListener("pointerdown", e => {
+  if (!S || !S.yourTurn) return;
+  const sq = e.target.closest(".sq")?.dataset.sq;
+  if (!sq) return;
+  if (sel && targets(sel).includes(sq)) return move(sel, sq);     // click, click
+  if (!squares[sq].classList.contains("mine")) { sel = null; render(); return; }
+  sel = sq; render();
+  const img = squares[sq].querySelector("img"), r = img.getBoundingClientRect();
+  drag = {from: sq, img, w: r.width};
+  FLOAT.src = img.src; FLOAT.style.width = FLOAT.style.height = r.width + "px";
+  FLOAT.style.display = "block"; img.style.opacity = ".25";
+  place(e); B.setPointerCapture(e.pointerId);
+});
+
+function place(e) { FLOAT.style.left = e.clientX - drag.w / 2 + "px"; FLOAT.style.top = e.clientY - drag.w / 2 + "px"; }
+
+B.addEventListener("pointermove", e => { if (drag) place(e); });
+B.addEventListener("pointerup", e => {
+  if (!drag) return;
+  FLOAT.style.display = "none"; drag.img.style.opacity = "";
+  const to = squareAt(e.clientX, e.clientY), from = drag.from;
+  drag = null;
+  if (to && to !== from && targets(from).includes(to)) move(from, to);   // dropped on a legal square
+  else if (to !== from) { sel = null; render(); }                         // anywhere else: snaps back
+});
+
+$("flip").onclick = () => { flipped = !flipped; build(); render(); };
+$("undo").onclick = () => post("action", {action: "undo"});
+$("nudge").onclick = () => post("action", {action: "nudge"});
+$("new").onclick = () => { flipped = false; S = null; post("action", {action: "new", side: $("side-pick").value}).then(() => { build(); render(); }); };
+let sure = 0;
+$("resign").onclick = () => {
+  if (Date.now() - sure > 3000) { sure = Date.now(); $("resign").textContent = "Sure? Click again"; setTimeout(() => $("resign").textContent = "Resign", 3000); return; }
+  $("resign").textContent = "Resign"; post("action", {action: "resign"});
+};
+
+try {
+  const es = new EventSource("/events");
+  es.onmessage = m => { try { if (JSON.parse(m.data).t === "chess") load(); } catch (e) {} };
+} catch (e) {}
+setInterval(load, 5000);
+load();
+</script>
+</body>
+</html>

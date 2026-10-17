@@ -13,6 +13,7 @@ wcwidth>=0.2.13
 ddgs>=9.0
 pynput>=1.7
 pint>=0.24              # calculate: unit conversions
+chess>=1.10             # the chess plugin
 evdev>=1.7; sys_platform == "linux"
 
 # Extras (the installer asks):

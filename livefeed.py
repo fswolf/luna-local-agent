@@ -104,6 +104,8 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif self.path == "/events":
             self._stream()
+        elif self._page("GET"):
+            pass
         elif self._mounted("GET"):
             pass
         elif self.path.split("?")[0] == "/portrait":
@@ -117,9 +119,47 @@ class _Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        if not self._allowed() or not self._mounted("POST"):
-            self.send_response(403 if not self._allowed() else 404)
+        if not self._allowed():
+            self.send_response(403)
             self.end_headers()
+        elif not self._page("POST") and not self._mounted("POST"):
+            self.send_response(404)
+            self.end_headers()
+
+    def _page(self, method):
+        """A plugin's page (add_page): /<name>/... handed to its handler.
+        Returns False when the path isn't one of theirs."""
+        path = self.path.split("?", 1)[0]
+        for name, (_label, handler, _visible) in list(PAGES.items()):
+            prefix = "/" + name
+            if path == prefix:
+                self.send_response(301)
+                self.send_header("Location", prefix + "/")
+                self.end_headers()
+                return True
+            if not path.startswith(prefix + "/"):
+                continue
+            body = b""
+            if method == "POST":
+                try:
+                    body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 65536))
+                except (ValueError, OSError):
+                    body = b""
+            try:
+                code, kind, out = handler(method, path[len(prefix):], body)
+            except Exception as e:
+                logbook.warn("monitor", "the %s page failed: %s", name, e)
+                code, kind, out = 500, "text/plain; charset=utf-8", f"the {name} page failed: {e}"
+            if isinstance(out, str):
+                out = (with_switcher(out, name) if kind.startswith("text/html") else out).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(out)))
+            self.send_header("Cache-Control", "max-age=3600" if kind.startswith("image/") else "no-store")
+            self.end_headers()
+            self.wfile.write(out)
+            return True
+        return False
 
     def _mounted(self, method):
         """The thought viewer and the memory manager, served from here at
@@ -252,6 +292,17 @@ class _Handler(BaseHTTPRequestHandler):
 # serves them too, so one port and one process covers the monitor, the
 # portrait, her thoughts and her memory, with a small switcher on each.
 # ---------------------------------------------------------------------------
+# Pages a plugin serves while it's on (the chess board): name -> (label,
+# handler, visible). handler(method, path, body) -> (status, content type,
+# body); path is what follows /<name>. visible() decides whether the
+# switcher links it.
+PAGES = {}
+
+
+def add_page(name, label, handler, visible=lambda: True):
+    PAGES[name] = (label, handler, visible)
+
+
 MOUNTS = {"thoughts": ("thought-viewer", "viewer.py", "her thoughts"),
           "memory": ("memory-manager", "manager.py", "her memory")}
 _mount_classes = {}
@@ -280,6 +331,12 @@ def _mount_class(name):
 def with_switcher(html, here):
     """A small pill bottom-right linking the pages this server serves."""
     links = [("", "live"), ("portrait/", "portrait"), ("thoughts/", "thoughts"), ("memory/", "memory")]
+    for name, (label, _handler, visible) in list(PAGES.items()):
+        try:
+            if visible():
+                links.append((name + "/", label))
+        except Exception:
+            pass
     items = "".join(
         f'<a href="/{href}"{" class=on" if (href.rstrip("/") or "live") == here else ""}>{label}</a>'
         for href, label in links)

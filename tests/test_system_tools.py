@@ -108,6 +108,27 @@ class Health(unittest.TestCase):
         self.assertTrue(out.startswith("Nothing looks wrong."), out)
         self.assertIn("Errors since boot: none", out)
 
+    def test_away_from_linux(self):
+        with mock.patch.object(system, "_run", return_value=(None, "not here")), \
+                mock.patch.object(system, "_disks", return_value=[("home", 100, 500, 20)]), \
+                mock.patch.object(system.machine, "memory", return_value=(None, None)), \
+                mock.patch.object(system.machine, "uptime", return_value=""), \
+                mock.patch.object(system, "_load", return_value=""), \
+                mock.patch.object(system, "_cpu_temp", return_value=None), \
+                mock.patch.object(system.machine, "gpus", return_value=[]):
+            out = system.health()
+        self.assertTrue(out.startswith("Nothing looks wrong."))
+        self.assertIn("Disk home: 100 GB free", out)
+        self.assertIn("only checked on Linux", out)
+        self.assertNotIn("Up:", out)
+
+    def test_last_boot_only_where_theres_a_journal(self):
+        import tools
+        with mock.patch("shutil.which", return_value=None):
+            self.assertFalse(tools._REGISTRY["last_boot"]["available"]())
+        with mock.patch("shutil.which", return_value="/usr/bin/journalctl"):
+            self.assertTrue(tools._REGISTRY["last_boot"]["available"]())
+
     def test_in_the_system_group(self):
         import tools
         self.assertEqual(tools.group_of("last_boot"), "System")

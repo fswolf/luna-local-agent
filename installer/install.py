@@ -43,7 +43,7 @@ CUBISM_URL = "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.
 
 EXTRAS = {
     "wakeword": (["openwakeword"], "\"hey Luna\" instead of a key press"),
-    "mcp": (["mcp"], "tools from MCP servers (OBS, Home Assistant, ComfyUI...)"),
+    "mcp": (["mcp"], "tools from MCP servers (OBS, Home Assistant, ComfyUI...), and the Zork, Minecraft and REALITI games"),
     "portrait": (["pillow"], "portrait tools: Live2D import, textures"),
     "live2d": ([], "Live2D's runtime saved locally, so the portrait works offline"),
     "embeddings": ([], "recall by meaning: a 600 MB embedding model (llama.cpp backend)"),
@@ -266,7 +266,10 @@ PACKAGES = {
     "brew": {"portaudio": "audio", "espeak-ng": "the voice", "git": "fetching the voice server"},
 }
 OPTIONAL_LINUX = {"grim": "screenshots for vision (Wayland)", "slurp": "picking a screen region",
-                  "wl-clipboard": "the clipboard tool (Wayland)", "unrar": "importing .rar Live2D models"}
+                  "wl-clipboard": "the clipboard tool (Wayland)", "unrar": "importing .rar Live2D models",
+                  "frotz": "playing Zork (its dfrotz interpreter)"}
+# the command that shows an optional package is already there, when it isn't the package's name
+_PROVIDES = {"frotz": "dfrotz", "wl-clipboard": "wl-copy"}
 
 
 def installed(pm, pkg):
@@ -309,7 +312,8 @@ def system_packages():
         wanted.pop("python3-venv", None)
     missing = [p for p in wanted if not installed(pm, p)]
     if SYSTEM == "Linux":
-        optional = [p for p in OPTIONAL_LINUX if not installed(pm, p) and not shutil.which(p.split("-")[0])]
+        optional = [p for p in OPTIONAL_LINUX if not installed(pm, p)
+                    and not shutil.which(_PROVIDES.get(p, p)) and not shutil.which(f"/usr/games/{_PROVIDES.get(p, p)}")]
     else:
         optional = []
     for p in wanted:
@@ -337,6 +341,10 @@ def system_packages():
             warn("unrar is in RPM Fusion on Fedora - retrying without it")
             todo.remove("unrar")
             good = run(install + todo)
+        if not good and set(todo) - set(missing):
+            # an optional one this distro doesn't carry (frotz, unrar) mustn't cost the needed ones
+            warn("retrying with only the packages Luna needs")
+            good = run(install + missing) if missing else True
         note("system packages", good)
         return good
     note("system packages", not missing, "you said no")

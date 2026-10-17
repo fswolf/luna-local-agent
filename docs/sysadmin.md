@@ -56,6 +56,11 @@ report says how to fix that. Log lines come back as short plain lines
 and labelled as outside content, since any program can write anything
 to the log. Both tools are in a scheduled job's tools by default.
 
+On Windows and macOS, `system_health` still reports the home disk (and
+an NVIDIA GPU on Windows, the load on a Mac) and says services and the
+log are Linux-only. `last_boot` isn't offered there at all, since
+there's no journal for it to read.
+
 ## Running commands
 
 Each command shows up in the popup exactly as it will run, with the

@@ -14,8 +14,10 @@ Log lines are written by whatever program logged them, so they come back
 cut to plain short lines and labelled as outside content, like a page or
 a command's output.
 
-Away from Linux (or without systemd) the journal parts say they can't
-be read here; the rest still answers.
+Away from Linux, system_health reports what it can (the home disk, an
+NVIDIA GPU, load on macOS) and says the rest is Linux-only; last_boot
+isn't offered at all without systemd's journal, so she never reaches
+for a tool that can only say no.
 """
 import json
 import os
@@ -186,8 +188,8 @@ def _disks():
     try:
         with open("/proc/mounts") as f:
             mounts = [ln.split()[:3] for ln in f]
-    except OSError:
-        mounts = [["", os.path.expanduser("~"), "ext4"]]
+    except OSError:                               # not Linux: just the home folder's disk
+        mounts = [["home", os.path.expanduser("~"), "ext4"]]
     for dev, mount, fs in mounts:
         mount = mount.replace("\\040", " ")
         if fs not in _REAL_FS or dev in seen or mount.startswith(_SKIP_MOUNTS):
@@ -199,7 +201,7 @@ def _disks():
         if u.total < 1e9:                         # tiny helper mounts aren't disks worth reporting
             continue
         seen.add(dev)
-        out.append((mount, u.free / 1e9, u.total / 1e9, 100 * u.free / u.total))
+        out.append(("home" if dev == "home" else mount, u.free / 1e9, u.total / 1e9, 100 * u.free / u.total))
     return out
 
 
@@ -263,7 +265,9 @@ def health():
 
     up = machine.uptime()
     load = _load()
-    lines.append(" | ".join(x for x in (f"Up {up}" if up else "", load) if x) or "Up: unknown")
+    first = " | ".join(x for x in (f"Up {up}" if up else "", load) if x)
+    if first:
+        lines.append(first)
     if load.endswith("busy"):
         warn.append("the CPU is busier than it has threads")
 
@@ -281,7 +285,7 @@ def health():
     for mount, free, size, pct in _disks():
         lines.append(f"Disk {mount}: {free:.0f} GB free of {size:.0f} GB ({pct:.0f}%)")
         if (pct < DISK_LOW and free < 100) or free < 5:
-            warn.append(f"{mount} is low on space ({pct:.0f}% free)")
+            warn.append(f"{'the home disk' if mount == 'home' else mount} is low on space ({pct:.0f}% free)")
 
     cpu = _cpu_temp()
     if cpu is not None:
@@ -301,7 +305,10 @@ def health():
         lines.append("GPU: " + ", ".join(bits))
 
     failed = _failed_units()
-    if failed is None:
+    errors = _journal("-b", "-p", "err", "-n", "400")
+    if failed is None and errors is None:
+        lines.append("Services and the system log: only checked on Linux with systemd")
+    elif failed is None:
         lines.append("Services: can't check here (no systemctl)")
     elif failed:
         lines.append("Failed services: " + ", ".join(failed[:10]))
@@ -309,10 +316,10 @@ def health():
     else:
         lines.append("Failed services: none")
 
-    errors = _journal("-b", "-p", "err", "-n", "400")
     logs = []
     if errors is None:
-        lines.append("Errors since boot: the journal can't be read here")
+        if failed is not None:
+            lines.append("Errors since boot: the journal can't be read here")
     elif errors:
         lines.append(f"Errors since boot: {len(errors)}{'+' if len(errors) >= 400 else ''}, by program:")
         logs = _grouped(errors)
@@ -453,6 +460,8 @@ def _system_health():
     "freeze, crash or unexpected reboot. It only reads.",
     {"back": {"type": "integer",
               "description": "Which boot: 1 is the one before this (default), 2 the one before that."}},
+    available=lambda: bool(shutil.which("journalctl")),
+    why=lambda: "needs systemd's journal (journalctl), which Linux has and Windows and macOS don't",
 )
 def _last_boot(back=1):
     return last_boot(back)
