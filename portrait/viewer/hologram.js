@@ -9,7 +9,7 @@
 //   see-through brightness becomes opacity; dark parts nearly vanish
 //   scanlines  fine lines rolling up, and a slow brighter band
 //   split      a little red/blue fringe at the edges
-//   flicker    a constant faint shimmer
+//   flicker    a slow faint breath (nothing fast: kind to the eyes)
 //   glitch     now and then (and on a failed tool) rows tear sideways
 //
 // Plus a projector: a soft glow under her and a faint beam up.
@@ -17,6 +17,7 @@
 // config.json, under "portrait":
 //   "hologram": { "enabled": true, "tint": "#c37bff", "mix": 0.8,
 //                 "intensity": 1.0, "glitch": 1.0, "base": true }
+//   "glitch": 0 turns the tearing off altogether.
 // ?holo=1 / ?holo=0 on the page URL overrides "enabled".
 
 const FRAG = `
@@ -40,14 +41,14 @@ void main() {
 
   // glitch: some rows jump sideways for a moment
   float row = floor(px.y / 5.0);
-  float tick = floor(uTime * 24.0);
-  float tear = step(1.0 - 0.22 * uGlitch, rand(vec2(row, tick))) * uGlitch;
-  uv.x += (rand(vec2(tick, row * 1.7)) - 0.5) * 0.06 * tear;
+  float tick = floor(uTime * 10.0);                  // tears change 10 times a second, not 24
+  float tear = step(1.0 - 0.12 * uGlitch, rand(vec2(row, tick))) * uGlitch;
+  uv.x += (rand(vec2(tick, row * 1.7)) - 0.5) * 0.025 * tear;
 
   vec2 one = inputSize.zw;                            // one pixel in uv
   vec4 c = texture2D(uSampler, uv);
-  float r = texture2D(uSampler, uv + vec2(one.x * (1.5 + 6.0 * tear), 0.0)).r;
-  float b = texture2D(uSampler, uv - vec2(one.x * (1.5 + 6.0 * tear), 0.0)).b;
+  float r = texture2D(uSampler, uv + vec2(one.x * (1.5 + 3.0 * tear), 0.0)).r;
+  float b = texture2D(uSampler, uv - vec2(one.x * (1.5 + 3.0 * tear), 0.0)).b;
 
   // rim: where the opacity falls away around her
   float aMin = min(min(texture2D(uSampler, uv + vec2(one.x * 3.0, 0.0)).a,
@@ -61,9 +62,10 @@ void main() {
   vec3 holo = mix(col, uTint * (0.35 + 1.25 * lum), uMix);
   holo += uTint * rim * 1.4;
 
-  float scan = 0.80 + 0.20 * sin(px.y * 1.7 - uTime * 9.0);
-  float sweep = exp(-pow((fract(px.y / uScreenH * 0.6 + uTime * 0.12) - 0.5) * 9.0, 2.0)) * 0.35;
-  float flicker = 0.94 + 0.06 * sin(uTime * 41.0) * sin(uTime * 17.3);
+  float scan = 0.92 + 0.08 * sin(px.y * 1.7 - uTime * 3.0);
+  float sweep = exp(-pow((fract(px.y / uScreenH * 0.6 + uTime * 0.12) - 0.5) * 9.0, 2.0)) * 0.18;
+  // a slow breath, well under 1 Hz: flicker at 3-30 Hz is what bothers eyes
+  float flicker = 0.97 + 0.03 * sin(uTime * 1.3);
 
   float a = c.a * (0.36 + 0.42 * lum) * scan * flicker + rim * 0.5;
   a = clamp(a * uIntensity, 0.0, 1.0);
@@ -118,10 +120,10 @@ export function createHologram(PIXI, app, model, opts = {}) {
   addEventListener('resize', layout);
 
   // glitch now and then, louder when something went wrong
-  const state = { pulse: 0, next: performance.now() / 1000 + 4 + Math.random() * 8, bright: 1 };
+  const state = { pulse: 0, next: performance.now() / 1000 + 10 + Math.random() * 10, bright: 1 };
   app.ticker.add(() => {
     const now = performance.now() / 1000;
-    if (now > state.next) { state.pulse = Math.max(state.pulse, 0.6 * o.glitch); state.next = now + 6 + Math.random() * 10; }
+    if (now > state.next) { state.pulse = Math.max(state.pulse, 0.4 * o.glitch); state.next = now + 15 + Math.random() * 20; }
     state.pulse *= 0.86;
     filter.uniforms.uTime = now % 1000;
     filter.uniforms.uGlitch = state.pulse > 0.02 ? state.pulse : 0;

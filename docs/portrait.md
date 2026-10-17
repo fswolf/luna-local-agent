@@ -186,10 +186,12 @@ before putting it on stream.
 ### Hologram
 
 Any model, Live2D or VRM, can be shown as a hologram: tinted towards one colour,
-see-through, a glowing edge, scanlines rolling up, a faint flicker and
-a projector glow under her. Now and then the picture tears sideways for
-a moment, and it always does when a tool fails or you talk over her.
-She brightens a little while she talks.
+see-through, a glowing edge, faint scanlines rolling slowly up, a slow
+breathing glow and a projector glow under her. Every 15 to 35 seconds
+the picture tears sideways for a moment, and it always does when a tool
+fails or you talk over her. She brightens a little while she talks.
+Nothing in it flashes fast: the effects are kept slow and faint so it's
+easy on the eyes, and `"glitch": 0` turns the tearing off altogether.
 
 It's a filter over the finished picture (`portrait/viewer/hologram.js` for
 Live2D, `portrait/viewer/hologram3d.js` for VRM), so blinking, talking, the
