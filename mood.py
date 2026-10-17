@@ -538,14 +538,14 @@ _RATING = {1: 0.08, 2: 0.18, 3: 0.30}
 # Still one call, still off the turn's path, still off with
 # mood.affection false.
 _APPRAISE_PROMPT = (
-    "Read this moment from a conversation between a user and his assistant, {name}.\n\n"
+    "Read this moment from a conversation between {user} and {their} assistant, {name}.\n\n"
     "User: {said}\n{name}: {answer}\n\n"
     "Answer with one line of four fields separated by spaces, nothing else:\n"
     "1. how warm or affectionate the USER's message is toward her: 0 neutral, businesslike "
     "or blunt (swearing is not unfriendly by itself), 1 polite warmth (thanks, a friendly "
     "greeting), 2 clear affection or praise of her, 3 strong affection\n"
     "2. how the exchange leaves her energy: - (draining), = (no change), + (lively, fun)\n"
-    "3. how it leaves her warmth toward him: - (only if he was clearly hostile or hurtful "
+    "3. how it leaves her warmth toward {them}: - (only if the user was clearly hostile or hurtful "
     "to her), =, +\n"
     "4. the one feeling she shows right now, from: none {feelings}\n"
     "When unsure: 0 = = none\n"
@@ -571,6 +571,9 @@ def _appraise(said, answer, model):
 
         name = getattr(config, "AGENT_NAME", "the assistant")
         prompt = _APPRAISE_PROMPT.format(name=name, said=str(said)[:600],
+                                         user=getattr(config, "USER", "the user"),
+                                         them=getattr(config, "USER_THEM", "them"),
+                                         their=getattr(config, "USER_THEIR", "their"),
                                          answer=str(answer or "(no answer)")[:600],
                                          feelings=" ".join(feelings))
         response = requests.post(LM_URL, headers=LLM_HEADERS, json=lmstudio.chore({
@@ -859,7 +862,7 @@ def line(private=True):
     return (
         f"\nRight now you feel {described}. Let that colour how you "
         "sound - length, warmth, how playful you are - and nothing "
-        "else. Don't announce it or explain it unasked; if he asks how "
+        f"else. Don't announce it or explain it unasked; if {getattr(config, 'USER', 'the user')} asks how "
         "you are, answer honestly and briefly. Never let it make you "
         "less helpful or less careful.\n"
     )

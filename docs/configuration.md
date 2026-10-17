@@ -4,7 +4,7 @@ Two files, two jobs.
 
 | File | Holds | You edit it when |
 |------|-------|------------------|
-| `agent/agent.json` | Who she is: name, personality, tone, traits, rules | You want her to behave differently |
+| `agent/agent.json` | Who she is (name, personality, tone, traits, rules) and who you are | You want her to behave differently |
 | `config.json` | How the machine runs: voice, models, thresholds, timeouts, theme | You want it to work differently |
 
 They used to be one file, which meant tuning a VAD threshold and
@@ -14,6 +14,27 @@ either one without handing over the other.
 Where both define a key, `config.json` wins. `agent.json` is still read
 as a fallback, so an older install that never split them keeps working
 untouched.
+
+## Who she's talking to
+
+`agent.json` has a `user` block, so her prompts say "when she asks" or
+"tell him instead" correctly rather than assuming:
+
+```json
+"user": {"name": "Shannon", "pronouns": "she/her"}
+```
+
+- `pronouns`: `he`, `she` or `they` (anything after the first slash is
+  just for reading: `she/her` is `she`). Your own set works as three
+  words, subject/object/possessive: `xe/xem/xyr`.
+- `name`: what she calls you in her own notes ("Shannon asked...").
+  Leave it out and she says "the user".
+- No `user` block at all: "the user" and they/them everywhere, and no
+  line about you in her system prompt.
+
+It changes the wording of her instructions, not her personality: if
+the personality text itself says "him", edit that too. Restart after
+changing it.
 
 Every block in `config.json` is optional and every value has a default
 in the `config/` package (one file per area: `voice.py`, `listening.py`,

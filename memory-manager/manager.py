@@ -366,7 +366,7 @@ PAGE = r"""<!DOCTYPE html>
 
 <h2>Add a fact</h2>
 <div id="addrow">
-  <input id="newfact" placeholder="Ryan has ..." >
+  <input id="newfact" placeholder="one short fact, e.g. works nights" >
   <input id="newsubject" class="short" placeholder="subject (optional)">
   <button onclick="addFact()">add</button>
 </div>

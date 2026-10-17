@@ -216,7 +216,7 @@ def credit(ids):
 # ---------------------------------------------------------------------------
 _WORD = re.compile(r"[a-z0-9']+")
 _STOP = {"the", "a", "an", "to", "of", "and", "or", "i", "you", "he", "it", "is", "in",
-         "on", "for", "when", "that", "this", "be", "with", "my", "your", "his", "do",
+         "on", "for", "when", "that", "this", "be", "with", "my", "your", "his", "she", "her", "they", "them", "their", "do",
          "can", "me", "what", "how", "please", "could", "would", "luna", "hey", "just",
          "check", "make", "get", "set", "up"}
 

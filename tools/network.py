@@ -243,6 +243,16 @@ def _remembered(words):
     return hits
 
 
+def _owner():
+    """'Shannon's' for the example fact, or 'The user's'."""
+    try:
+        import config
+
+        return f"{config.USER_NAME}'s" if config.USER_NAME else "The user's"
+    except Exception:
+        return "The user's"
+
+
 def _row(ip, info):
     name = info.get("name") or "no name"
     mac = info.get("mac") or ""
@@ -306,7 +316,7 @@ def _find_device(name):
 
     remember = "" if want_macs else (
         " If the user confirms which one it is, offer to remember it with remember_fact, including its "
-        "MAC address (e.g. \"Ryan's Unraid server has MAC aa:bb:cc:dd:ee:ff\"), so it's found even after "
+        f"MAC address (e.g. \"{_owner()} Unraid server has MAC aa:bb:cc:dd:ee:ff\"), so it's found even after "
         "its IP changes.")
 
     return "\n".join(lines) + ("\n" + remember.strip() if remember else "")

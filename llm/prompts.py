@@ -249,7 +249,7 @@ def build_system_prompt(query="", timing="", private=True):
 
     return f"""
 You are {AGENT_NAME}.
-
+{config.user_line() if private else ""}
 Right now:
 {timeutil.describe_now()}
 {situation_block}

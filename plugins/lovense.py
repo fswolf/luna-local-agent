@@ -5,6 +5,7 @@
     /lovense                     status: connected toys, battery
     /lovense stop                stop every toy now, without asking her
     /lovense toys                refresh the list
+    /lovense find                look for the Remote app (Game Mode) on your network
 
 How it works: the Lovense Remote app (mobile or PC) exposes a local HTTP API
 when Game Mode is on. This plugin posts commands to it. While the plugin is
@@ -34,17 +35,27 @@ Setup:
             "port": 20010,
             "use_https": false,
             "max_strength": 20,
-            "max_seconds": 60
+            "max_seconds": 60,
+            "max_motion": 10,
+            "ramp_seconds": 3
         }
     }
 
     max_strength (0-20) and max_seconds cap whatever she asks for.
 
+    Machines (the Mini Sex Machine, the Solace, Gravity's thrusting) move
+    with lovense_move, which has its own lower cap, max_motion (0-20,
+    default 10), and always builds up from slow over ramp_seconds (default
+    3) instead of starting at full speed. A toy that vibrates and thrusts
+    can do both at once, and each stops on its own time.
+
     No developer token needed for local control. The app and this machine
     must be on the same network.
 """
 import json
+import math
 import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -57,12 +68,25 @@ NAME = "lovense"
 SUMMARY = "control Lovense toys via the Remote app on the LAN"
 
 DEFAULTS = {"host": "127.0.0.1", "port": 20010, "use_https": False,
-            "max_strength": 20, "max_seconds": 60}
+            "max_strength": 20, "max_seconds": 60, "max_motion": 10, "ramp_seconds": 3}
+
+# What machines do, in the Remote app's words (each 0-20). Vibration is
+# "Vibrate"; anything here goes through lovense_move instead.
+MOTION = ("Thrusting", "Oscillate", "Fingering")
 
 # Lovense's built-in patterns, by the names the Remote app knows.
 PRESETS = ("pulse", "wave", "fireworks", "earthquake")
 
 _state = {"model": None, "toys": {}, "error": "", "connected": False}
+
+# What each target is doing: toy id ("" = every toy) -> {"vibe": (level,
+# end), "move": (top, end, start, ramp)}. One Function command carries
+# both, so vibration and thrusting run together; the driver re-sends it
+# as a ramp climbs or one of them runs out, and its timeSec is the
+# longest time left, so the app stops the toy itself if Luna goes away.
+_plan = {}
+_plan_lock = threading.Lock()
+_sent = {}
 _stop = threading.Event()
 _thread = None
 
@@ -83,8 +107,19 @@ def _caps():
         return 20, 60
 
 
+def _motion_caps():
+    """(max motion 0-20, ramp seconds) for machines."""
+    s = settings()
+    try:
+        return max(0, min(20, int(s["max_motion"]))), max(0.0, min(30.0, float(s["ramp_seconds"])))
+    except (TypeError, ValueError):
+        return 10, 3.0
+
+
 def stop_all_toys():
     """Stop everything now. No model involved, never blocked."""
+    with _plan_lock:
+        _plan.clear()
     try:
         _post({"command": "Function", "action": "Stop", "apiVer": 1})
         return True, "lovense: stopped all toys"
@@ -119,7 +154,8 @@ def start(model):
     if not ok:
         hint = (" (with use_https the host is usually the app's lovense.club name, not a bare IP)"
                 if s["use_https"] and s["host"].replace(".", "").isdigit() else "")
-        return False, f"lovense: couldn't reach the Remote app at {s['host']}:{s['port']} - {msg}{hint}"
+        return False, (f"lovense: couldn't reach the Remote app at {s['host']}:{s['port']} - {msg}{hint}. "
+                       "/lovense find looks for it.")
 
     _state["connected"] = True
     _register_tools()
@@ -127,6 +163,7 @@ def start(model):
     _stop.clear()
     _thread = threading.Thread(target=_watch, daemon=True, name="lovense")
     _thread.start()
+    threading.Thread(target=_drive, daemon=True, name="lovense-drive").start()
 
     return True, f"lovense: connected to {s['host']}:{s['port']} - {msg}"
 
@@ -143,6 +180,8 @@ def stop():
 
     _stop.set()
     _state["connected"] = False
+    with _plan_lock:
+        _plan.clear()
 
     return True, "lovense: stopped"
 
@@ -170,7 +209,7 @@ def prompt_line(private=True):
     names = [t.get("nickName") or t.get("name") or tid for tid, t in _state["toys"].items()]
 
     return _toys.prompt_line(", ".join(names) or "Lovense (no toy paired in the app yet)",
-                             "lovense_vibrate, lovense_pattern and lovense_stop")
+                             "lovense_vibrate, lovense_move (machines), lovense_pattern and lovense_stop")
 
 
 def on_user_text(text):
@@ -192,7 +231,40 @@ def command(text):
     if word == "toys":
         ok, msg = _refresh_toys()
         return msg if ok else f"couldn't list toys: {msg}"
-    return "lovense: on | off | stop | toys"
+    if word in ("find", "scan"):
+        return _find()
+    if word == "use":
+        return _use(rest)
+    return "lovense: on | off | stop | toys | find"
+
+
+_found = []
+
+
+def _find():
+    """Look for Lovense Remote in Game Mode on the network; save the one found."""
+    from plugins import _toyscan
+
+    _found[:] = _toyscan.find_lovense()
+    if not _found:
+        return ("lovense: no Remote app found. Is Game Mode on, the app open on screen, and the "
+                "phone or tablet on the same Wi-Fi?")
+    if len(_found) == 1:
+        return _use("1")
+    return ("lovense: found " + "; ".join(
+        f"{i}. {h}:{p} ({', '.join(t) or 'no toys yet'})" for i, (h, p, _s, t) in enumerate(_found, 1))
+        + " - /lovense use <number> picks one.")
+
+
+def _use(which):
+    try:
+        host, port, https, toys = _found[int(str(which).strip()) - 1]
+    except (ValueError, IndexError):
+        return "lovense: /lovense find first, then /lovense use <number>"
+    for key, value in (("host", host), ("port", port), ("use_https", https)):
+        config._store(f"plugins.{NAME}.{key}", value)
+    return (f"lovense: found the Remote app at {host}:{port} ({', '.join(toys) or 'no toys yet'}) "
+            "and saved it. /lovense on connects.")
 
 
 # ---------------------------------------------------------------------------
@@ -253,8 +325,72 @@ def _refresh_toys():
     _state["error"] = ""
     if not toys:
         return True, "no toys connected right now"
-    names = [t.get("nickName") or t.get("name") or tid for tid, t in toys.items()]
-    return True, "toys: " + ", ".join(names)
+    names = [f"{t.get('nickName') or t.get('name') or tid} [{tid}]: {', '.join(sorted(_functions(tid))).lower()}"
+             for tid, t in toys.items()]
+    return True, "toys: " + "; ".join(names)
+
+
+def _functions(toy_id):
+    """What a toy can do, by the app's names; for "" (every toy), what any
+    of them can."""
+    toys = _state["toys"] if not toy_id else {toy_id: _state["toys"].get(toy_id) or {}}
+    found = set()
+    for t in toys.values():
+        names = t.get("fullFunctionNames") or []
+        if isinstance(names, str):
+            names = [n for n in names.replace(",", " ").split() if n]
+        found.update(str(n).strip().capitalize() for n in names)
+    return found or {"Vibrate"}
+
+
+def _action(key, now):
+    """(action, seconds left) for what this target should be doing now, or
+    (None, 0) when nothing is."""
+    plan = _plan.get(key) or {}
+    parts, left = [], 0.0
+    vibe = plan.get("vibe")
+    if vibe and vibe[1] > now:
+        parts.append(f"Vibrate:{vibe[0]}")
+        left = max(left, vibe[1] - now)
+    move = plan.get("move")
+    if move and move[1] > now:
+        top, end, start, ramp = move
+        level = top if ramp <= 0 else max(1, round(top * min(1.0, max(0.15, (now - start) / ramp))))
+        parts += [f"{f}:{level}" for f in MOTION if f in _functions(key)]
+        left = max(left, end - now)
+    return (",".join(parts), left) if parts else (None, 0.0)
+
+
+def _apply(key):
+    """Send this target's current action (or Stop) if it changed."""
+    now = time.monotonic()
+    with _plan_lock:
+        action, left = _action(key, now)
+        if action is None:
+            _plan.pop(key, None)
+    if action == _sent.get(key):
+        return
+    payload = ({"command": "Function", "action": action, "timeSec": max(1, math.ceil(left)), "apiVer": 1}
+               if action else {"command": "Function", "action": "Stop", "apiVer": 1})
+    if key:
+        payload["toy"] = key
+    _post(payload)
+    if action:
+        _sent[key] = action
+    else:
+        _sent.pop(key, None)
+
+
+def _drive():
+    """Keep each target's command current: a ramp climbing, or vibration
+    or motion running out while the other carries on."""
+    while not _stop.is_set():
+        _stop.wait(0.25)
+        for key in list(_plan) + [k for k in list(_sent) if k not in _plan]:
+            try:
+                _apply(key)
+            except Exception as e:
+                logbook.warn(NAME, "couldn't update a toy: %s", e)
 
 
 def _watch():
@@ -289,22 +425,49 @@ def _register_tools():
             seconds = max(1, min(longest, int(seconds)))
         except (TypeError, ValueError):
             return "strength and seconds must be numbers"
-        payload = {
-            "command": "Function",
-            "action": f"Vibrate:{strength}",
-            "timeSec": seconds,
-            "apiVer": 1,
-        }
-        if toy:
-            payload["toy"] = toy
+        key = str(toy or "")
+        with _plan_lock:
+            _plan.setdefault(key, {})["vibe"] = (strength, time.monotonic() + seconds)
         try:
-            _post(payload)
+            _apply(key)
             who = f"toy {toy}" if toy else "all toys"
             return f"vibrating {who} at {strength}/20 for {seconds}s"
         except Exception as e:
             return f"couldn't vibrate: {e}"
 
+    def move(speed=5, seconds=10, toy=None):
+        why = _toys.blocked()
+        if why:
+            logbook.info(NAME, "move refused: %s", why)
+            return why
+
+        key = str(toy or "")
+        if not _functions(key) & set(MOTION):
+            return ("No connected toy thrusts or strokes (lovense_toys lists what each can do) - "
+                    "lovense_vibrate is for vibrating.")
+        top, ramp = _motion_caps()
+        try:
+            speed = max(0, min(top, int(speed)))
+            seconds = max(1, min(_caps()[1], int(seconds)))
+        except (TypeError, ValueError):
+            return "speed and seconds must be numbers"
+        now = time.monotonic()
+        with _plan_lock:
+            _plan.setdefault(key, {})["move"] = (speed, now + seconds, now, ramp)
+        try:
+            _apply(key)
+            who = f"toy {toy}" if toy else "all toys"
+            return (f"moving {who} at {speed}/20 for {seconds}s"
+                    + (f", building up over {ramp:g}s" if ramp else ""))
+        except Exception as e:
+            return f"couldn't move: {e}"
+
     def stop_toys(toy=None):
+        with _plan_lock:
+            if toy:
+                _plan.pop(str(toy), None)
+            else:
+                _plan.clear()
         payload = {"command": "Function", "action": "Stop", "apiVer": 1}
         if toy:
             payload["toy"] = toy
@@ -329,6 +492,9 @@ def _register_tools():
         except (TypeError, ValueError):
             return "seconds must be a number"
 
+        with _plan_lock:
+            _plan.pop(str(toy or ""), None)      # a preset replaces whatever the toy was doing
+        _sent.pop(str(toy or ""), None)
         payload = {"command": "Preset", "name": name, "timeSec": seconds, "apiVer": 1}
         if toy:
             payload["toy"] = toy
@@ -353,6 +519,17 @@ def _register_tools():
         available=running, why=lambda: "lovense plugin is off - /lovense on",
     )
     tools.register_external(
+        "lovense_move",
+        "Thrust or stroke with a Lovense machine (Mini Sex Machine, Solace, Gravity...), building up "
+        "from slow. speed is 0-20 and capped lower than vibration. Runs alongside vibration on toys "
+        "that do both.",
+        {"speed": {"type": "integer", "description": "0-20"},
+         "seconds": {"type": "integer", "description": "how long"},
+         "toy": {"type": "string", "description": "toy id, or omit for all"}},
+        required=("speed",), run=move, group="Lovense",
+        available=running, why=lambda: "lovense plugin is off - /lovense on",
+    )
+    tools.register_external(
         "lovense_pattern",
         "Run one of the Lovense app's built-in patterns instead of a steady level: "
         "pulse, wave, fireworks or earthquake.",
@@ -364,7 +541,7 @@ def _register_tools():
     )
     tools.register_external(
         "lovense_stop",
-        "Stop vibration on a Lovense toy (or all of them).",
+        "Stop a Lovense toy, vibration and motion (or all of them).",
         {"toy": {"type": "string", "description": "toy id, or omit for all"}},
         required=(), run=stop_toys, group="Lovense",
         available=running, why=lambda: "lovense plugin is off - /lovense on",

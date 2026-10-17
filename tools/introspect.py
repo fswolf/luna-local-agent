@@ -341,7 +341,7 @@ def _approve(text):
     "on - when the user corrects how you did something, or you notice a "
     "mistake you keep making. The user approves it on screen first. One "
     "line, an instruction to yourself, specific "
-    "enough to act on: \"When he asks for a time in another timezone, call "
+    "enough to act on: \"When asked for a time in another timezone, call "
     "get_datetime first.\" Not for facts about the user - remember_fact is "
     "for those.",
     {
@@ -397,7 +397,7 @@ def _note_lesson(lesson):
     # her into it - a page she read three turns ago, a viewer - this is
     # the step it can't skip.
     if not _approve(text):
-        return ("He didn't approve it, so it wasn't saved. Don't ask again "
+        return ("That wasn't approved, so it wasn't saved. Don't ask again "
                 "this turn.")
 
     new = notebook.add_lesson(text, origin="self")
@@ -525,7 +525,7 @@ def _save_skill(name, when, steps):
     same = skills.find_same(name, when)
 
     if not _approve_skill(name, when, clean, warn):
-        return "He didn't approve it, so it wasn't saved. Don't ask again this turn."
+        return "That wasn't approved, so it wasn't saved. Don't ask again this turn."
 
     new = skills.add(name, when, clean, tools=called - {"save_skill"})
     _saved_skills["n"] += 1

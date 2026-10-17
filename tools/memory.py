@@ -23,7 +23,7 @@ from . import tool
         "fact": {
             "type": "string",
             "description": "The fact, written as a short third-person "
-                           "statement, e.g. 'Ryan streams as a VTuber'.",
+                           f"statement, e.g. '{config.USER_NAME or 'The user'} streams as a VTuber'.",
         },
     },
     required=("fact",),
@@ -41,7 +41,7 @@ def _remember_fact(fact):
 @tool(
     "recall_facts",
     "Search what has been remembered about the user. Pass `about` to "
-    "look something up ('his gpu', 'streaming'); omit it for the most "
+    "look something up ('gpu', 'streaming'); omit it for the most "
     "recently learned facts.",
     {
         "about": {
@@ -74,8 +74,8 @@ def _recall_facts(about=""):
     {
         "about": {
             "type": "string",
-            "description": "Roughly what the fact says, e.g. 'that he "
-                           "works at the bakery'.",
+            "description": "Roughly what the fact says, e.g. 'works at "
+                           "the bakery'.",
         },
     },
     required=("about",),

@@ -49,7 +49,10 @@ left alone.
 your `config.json` in `agent/backups/` first, pulls the update while
 keeping any changes you made, installs any Python packages the update
 added, and then checks everything (below). If you and the update both
-changed `config.json`, your settings win.
+changed `config.json`, your settings win. On Windows it's `update.cmd`,
+which does the same except that last part: if the pull clashes, it stops
+and tells you where your saved `config.json` is. (It hasn't been tested
+on Windows yet.)
 
 **Checking:** `./start.sh --check` says in plain words what's missing
 and how to fix it: Python packages, the model server, the voice server.

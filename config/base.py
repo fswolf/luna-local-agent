@@ -78,5 +78,47 @@ PERSONALITY = agent.get("personality", "")
 TONE = agent.get("tone", "")
 TRAITS = agent.get("traits", [])
 RULES = agent.get("rules", [])
+
+# Who she's talking to, from agent.json's "user" block:
+#
+#     "user": {"name": "Shannon", "pronouns": "she/her"}
+#
+# Every prompt that talks about you ("when she asks", "Tell her instead")
+# reads these rather than assuming. pronouns: "he", "she" or "they"
+# (anything after a slash is ignored: "she/her" is "she"), or three
+# words of your own, "xe/xem/xyr" - subject, object, possessive. No name
+# means "the user"; no pronouns or ones it can't read mean they/them.
+_PRONOUNS = {"he": ("he", "him", "his"), "she": ("she", "her", "her"), "they": ("they", "them", "their")}
+
+
+def _who(block):
+    """(name, (they, them, their)) from the user block; ("", they/them/their) for nothing."""
+    block = block if isinstance(block, dict) else {}
+    name = " ".join(str(block.get("name") or "").split())[:40]
+    words = [w.strip().lower() for w in str(block.get("pronouns") or "").split("/") if w.strip()]
+    if len(words) >= 3 and all(w.isalpha() and len(w) <= 12 for w in words[:3]):
+        forms = tuple(words[:3])
+    else:
+        forms = _PRONOUNS.get(words[0] if words else "", _PRONOUNS["they"])
+    return name, forms
+
+
+USER_NAME, (USER_THEY, USER_THEM, USER_THEIR) = _who(agent.get("user"))
+USER = USER_NAME or "the user"          # the subject of a prompt line: "when {USER} asks"
+# Only pronouns you actually gave are stated to her as yours; they/them
+# as a fallback is just how the prompts word things.
+_USER_GAVE_PRONOUNS = bool(str((agent.get("user") or {}).get("pronouns") or "").strip()
+                           if isinstance(agent.get("user"), dict) else False)
+
+
+def user_line():
+    """The system prompt's line on who she's talking to, or '' when
+    agent.json says nothing about them."""
+    if not USER_NAME and not _USER_GAVE_PRONOUNS:
+        return ""
+    who = USER_NAME or "the user"
+    if not _USER_GAVE_PRONOUNS:
+        return f"You're talking with {who}.\n"
+    return f"You're talking with {who} ({USER_THEY}/{USER_THEM}/{USER_THEIR}).\n"
 GENERATION = setting("generation", {})
 

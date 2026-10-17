@@ -5,6 +5,7 @@
     /buttplug           status: what's connected and what each can do
     /buttplug stop      stop every device now, without asking her
     /buttplug scan      look for devices (turn the toy on first)
+    /buttplug find      look for Intiface Central on this PC and your network
 
 Credit where it's due: this plugin is a thin client. The hard part, the
 protocols of hundreds of devices, is the work of the Buttplug.io
@@ -30,11 +31,20 @@ Setup:
             "url": "ws://127.0.0.1:12345",
             "max_intensity": 100,
             "max_seconds": 60,
+            "max_motion": 50,
+            "ramp_seconds": 3,
             "scan_on_start": true
         }
     }
 
     max_intensity (0-100) and max_seconds cap whatever she asks for.
+    Machines and strokers (thrusting machines, the Solace, The Handy) have
+    their own lower cap, max_motion (default 50), and always build up from
+    slow over ramp_seconds (default 3) instead of starting at full speed.
+
+A toy that vibrates and strokes can do both at once: vibration (and
+rotation or oscillation) and stroking each run on their own, and each
+turns off only its own motor when its time is up.
 
 Needs websocket-client (installer extra "toys", or pip install
 websocket-client).
@@ -63,16 +73,27 @@ NAME = "buttplug"
 SUMMARY = "toys of almost any brand through Intiface Central (buttplug.io)"
 
 DEFAULTS = {"url": "ws://127.0.0.1:12345", "max_intensity": 100, "max_seconds": 60,
-            "scan_on_start": True}
+            "max_motion": 50, "ramp_seconds": 3, "scan_on_start": True}
 
 PATTERNS = ("pulse", "wave", "escalate", "heartbeat", "tease")
-SPIN = ("Vibrate", "Oscillate", "Rotate", "Constrict", "Inflate")   # ScalarCmd kinds an intensity drives
+SPIN = ("Vibrate", "Rotate", "Constrict", "Inflate")   # ScalarCmd kinds toy_vibrate drives
+# Motion: what machines and strokers do (a thrusting machine, the Solace and
+# their kind report "Oscillate"). These go through toy_stroke, with their own,
+# lower cap (max_motion) and a ramp up from slow (ramp_seconds), never
+# through a vibration command at a vibration's intensity.
+MOTION = ("Oscillate",)
 
 _ids = itertools.count(1)
 _state = {"ws": None, "connected": False, "error": "", "devices": {}, "server": "", "ping": 0}
 _send_lock = threading.Lock()
 _waiting = {}          # message id -> [Event, reply]
-_run = {"token": 0}    # bumped by every new command: a running pattern or timer sees it and quits
+# What's running, per channel: "spin" (vibrate, oscillate, rotate - toy_vibrate
+# and toy_pattern) and "stroke" (toy_stroke). Each has its own job, so a
+# toy that does both can vibrate and stroke at once, and one finishing
+# turns off only its own motor. token: bumped when a job is replaced or
+# stopped, so its worker quits. devs: the device indexes it's driving.
+_jobs = {"spin": {"token": 0, "devs": set()}, "stroke": {"token": 0, "devs": set()}}
+_jobs_lock = threading.Lock()
 
 
 def settings():
@@ -89,6 +110,21 @@ def _caps():
         return max(0.0, min(1.0, float(s["max_intensity"]) / 100.0)), max(1, min(600, int(s["max_seconds"])))
     except (TypeError, ValueError):
         return 1.0, 60
+
+
+def _motion_caps():
+    """(max motion speed 0-1, ramp seconds) for machines and strokers."""
+    s = settings()
+
+    try:
+        return max(0.0, min(1.0, float(s["max_motion"]) / 100.0)), max(0.0, min(30.0, float(s["ramp_seconds"])))
+    except (TypeError, ValueError):
+        return 0.5, 3.0
+
+
+def _moves(dev):
+    """Can it thrust, stroke or oscillate?"""
+    return bool(dev["linear"]) or any(k in MOTION for _i, k in dev["scalar"])
 
 
 def _client():
@@ -218,8 +254,8 @@ def _abilities(dev):
     if dev["rotate"]:
         out.append("rotate")
 
-    if dev["linear"]:
-        out.append("stroke")
+    if dev["linear"] or any(k in MOTION for _i, k in dev["scalar"]):
+        out.append("stroke/thrust (toy_stroke)")
 
     return out or ["nothing Luna can drive"]
 
@@ -244,7 +280,7 @@ def start(model):
     except Exception as e:
         _state["error"] = str(e)
         return False, (f"buttplug: couldn't reach Intiface Central at {url} - is it running "
-                       f"with the server started? ({e})")
+                       f"with the server started? ({e}) /buttplug find looks for it.")
 
     _state.update(ws=ws, error="", devices={})
     threading.Thread(target=_reader, args=(ws,), daemon=True, name="buttplug").start()
@@ -296,7 +332,10 @@ def stop():
 
 def stop_all_devices():
     """Stop everything now. No model involved, never blocked."""
-    _run["token"] += 1
+    with _jobs_lock:
+        for job in _jobs.values():
+            job["token"] += 1
+            job["devs"].clear()
 
     try:
         _send("StopAllDevices")
@@ -360,7 +399,45 @@ def command(text):
     if word in ("devices", "list"):
         return status()
 
-    return "buttplug: on | off | stop | scan | devices"
+    if word == "find":
+        return _find()
+
+    if word == "use":
+        return _use(text.strip().split(" ", 1)[1] if " " in text.strip() else "")
+
+    return "buttplug: on | off | stop | scan | find | devices"
+
+
+_found = []
+
+
+def _find():
+    """Look for Buttplug servers here and on the network; save the one found."""
+    from plugins import _toyscan
+
+    if _client() is None:
+        return "buttplug: " + why_unavailable()
+    _found[:] = _toyscan.find_intiface()
+    note = (" (Luna is connected to one already, and Intiface takes one client at a time, "
+            "so that one may not show)") if _state["connected"] else ""
+    if not _found:
+        return ("buttplug: no Intiface server found. Is it running with the server started? On "
+                "another device (a phone), turn on 'listen on all interfaces' in its settings." + note)
+    if len(_found) == 1:
+        return _use("1")
+    return ("buttplug: found " + "; ".join(f"{i}. {u} ({n})" for i, (u, n) in enumerate(_found, 1))
+            + " - /buttplug use <number> picks one." + note)
+
+
+def _use(which):
+    try:
+        url, name = _found[int(which) - 1]
+    except (ValueError, IndexError):
+        return "buttplug: /buttplug find first, then /buttplug use <number>"
+    if url == settings()["url"]:
+        return f"buttplug: found {name} at {url}, already set. /buttplug on connects."
+    config._store(f"plugins.{NAME}.url", url)
+    return f"buttplug: found {name} at {url} and saved it. /buttplug on connects."
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +470,15 @@ def _set_level(devs, level):
                 wait=False)
 
 
+def _set_motion(devs, level):
+    """The oscillating motors (thrusting machines, the Solace...) at `level` (0-1)."""
+    for dev in devs:
+        scalars = [{"Index": i, "Scalar": round(level, 3), "ActuatorType": kind}
+                   for i, kind in dev["scalar"] if kind in MOTION]
+        if scalars:
+            _send("ScalarCmd", {"DeviceIndex": dev["index"], "Scalars": scalars}, wait=False)
+
+
 def _stop_devices(devs):
     for dev in devs:
         _send("StopDeviceCmd", {"DeviceIndex": dev["index"]}, wait=False)
@@ -415,66 +501,131 @@ def _shape(name, t, seconds):
     return 0.5
 
 
+def _quiet(indexes, channel):
+    """Turn off one channel's motor on these devices, leaving the other
+    channel running if it's busy with them; a device nothing else is
+    using gets a full stop."""
+    other = "stroke" if channel == "spin" else "spin"
+    for i in indexes:
+        dev = _state["devices"].get(i)
+        if dev is None:
+            continue
+        if i in _jobs[other]["devs"]:
+            if channel == "spin":
+                _set_level([dev], 0.0)       # the stroker keeps going
+            else:
+                _set_motion([dev], 0.0)      # a machine stops; the vibration keeps going
+        else:
+            _stop_devices([dev])
+
+
+def _begin(channel, devs):
+    """A new job on a channel: the devices the old job drove and this one
+    doesn't are turned off now (nothing else would), then the old job's
+    worker is told to quit. Returns the new job's token."""
+    new = {d["index"] for d in devs}
+    with _jobs_lock:
+        job = _jobs[channel]
+        left = job["devs"] - new
+        job["token"] += 1
+        job["devs"] = set(new)
+        token = job["token"]
+    try:
+        _quiet(left, channel)
+    except Exception as e:
+        logbook.warn(NAME, "couldn't stop a replaced job: %s", e)
+    return token
+
+
+def _still(channel, token, devs):
+    """This job's devices, while it's still the current job (a device
+    stopped on its own drops out); [] once it's been replaced."""
+    job = _jobs[channel]
+    if job["token"] != token or not _state["connected"]:
+        return []
+    return [d for d in devs if d["index"] in job["devs"]]
+
+
+def _end(channel, token):
+    """The job ran its time: turn off its motors, if it's still current."""
+    with _jobs_lock:
+        job = _jobs[channel]
+        if job["token"] != token:
+            return
+        mine, job["devs"] = set(job["devs"]), set()
+    try:
+        _quiet(mine, channel)
+    except Exception:
+        pass
+
+
 def _play(devs, seconds, level_at, every=0.15):
-    """Run on a worker: drive the devices until done or interrupted, then stop them."""
-    _run["token"] += 1
-    token = _run["token"]
+    """Run on a worker: drive the devices until done or interrupted, then
+    turn their vibration off (a stroke on the same toy carries on)."""
+    token = _begin("spin", devs)
 
     def run():
         start = time.monotonic()
         last = None
 
         try:
-            while _run["token"] == token and _state["connected"]:
+            while True:
+                now = _still("spin", token, devs)
                 t = time.monotonic() - start
-
-                if t >= seconds:
+                if not now or t >= seconds:
                     break
 
                 level = level_at(t)
 
                 if level != last:
-                    _set_level(devs, level)
+                    _set_level(now, level)
                     last = level
 
                 time.sleep(every)
         except Exception as e:
             logbook.warn(NAME, "pattern stopped: %s", e)
         finally:
-            if _run["token"] == token:
-                try:
-                    _stop_devices(devs)
-                except Exception:
-                    pass
+            _end("spin", token)
 
     threading.Thread(target=run, daemon=True, name="buttplug-play").start()
 
 
 def _stroke(devs, seconds, speed):
-    """Strokers: back and forth, faster with speed (0-1)."""
-    _run["token"] += 1
-    token = _run["token"]
-    stroke_ms = int(1500 - 1250 * speed)          # 1.5 s per stroke slow, 0.25 s fast
+    """Machines and strokers, at speed (0-1), building up from slow over
+    ramp_seconds rather than starting at full speed: strokers move back
+    and forth, oscillating machines get a speed. Vibration on the same toy
+    is left alone."""
+    token = _begin("stroke", devs)
+    ramp = _motion_caps()[1]
+
+    def pace(t):
+        return speed if ramp <= 0 else speed * min(1.0, max(0.15, t / ramp))
 
     def run():
-        start, up = time.monotonic(), True
+        start, up, last = time.monotonic(), True, None
 
         try:
-            while _run["token"] == token and _state["connected"] and time.monotonic() - start < seconds:
-                for dev in devs:
+            while True:
+                t = time.monotonic() - start
+                now = _still("stroke", token, devs)
+                if not now or t >= seconds:
+                    break
+                level = round(pace(t), 2)
+                if level != last:
+                    _set_motion(now, level)
+                    last = level
+                stroke_ms = int(1500 - 1250 * level)          # 1.5 s per stroke slow, 0.25 s fast
+                strokers = [d for d in now if d["linear"]]
+                for dev in strokers:
                     _send("LinearCmd", {"DeviceIndex": dev["index"], "Vectors": [
                         {"Index": i, "Duration": stroke_ms, "Position": 0.9 if up else 0.1}
                         for i in range(dev["linear"])]}, wait=False)
                 up = not up
-                time.sleep(stroke_ms / 1000.0)
+                time.sleep(stroke_ms / 1000.0 if strokers else 0.25)
         except Exception as e:
             logbook.warn(NAME, "stroke stopped: %s", e)
         finally:
-            if _run["token"] == token:
-                try:
-                    _stop_devices(devs)
-                except Exception:
-                    pass
+            _end("stroke", token)
 
     threading.Thread(target=run, daemon=True, name="buttplug-stroke").start()
 
@@ -545,20 +696,22 @@ def _register_tools():
             logbook.info(NAME, "stroke refused: %s", why)
             return why
 
-        devs = [d for d in _targets(device) if d["linear"]]
+        devs = [d for d in _targets(device) if _moves(d)]
         if not devs:
-            return "No connected device strokes - toy_vibrate is for vibrating ones."
+            return "No connected device strokes or thrusts - toy_vibrate is for vibrating ones."
 
         secs = _seconds(seconds)
         try:
-            pace = min(_caps()[0], max(0.0, float(speed) / 100.0))
+            pace = min(_motion_caps()[0], max(0.0, float(speed) / 100.0))
         except (TypeError, ValueError):
             secs = None
         if secs is None:
             return "speed and seconds must be numbers"
 
         _stroke(devs, secs, pace)
-        return f"{', '.join(d['name'] for d in devs)} stroking at {round(pace * 100)}% for {secs}s"
+        ramp = _motion_caps()[1]
+        return (f"{', '.join(d['name'] for d in devs)} moving at {round(pace * 100)}% for {secs}s"
+                + (f", building up over {ramp:g}s" if ramp else ""))
 
     def toy_stop(device=None):
         if device in (None, "", "all"):
@@ -568,13 +721,16 @@ def _register_tools():
         if not devs:
             return "No device by that name."
 
-        _run["token"] += 1
+        gone = {d["index"] for d in devs}
+        with _jobs_lock:
+            for job in _jobs.values():
+                job["devs"] -= gone           # a job driving others carries on with them
         _stop_devices(devs)
         return "stopped " + ", ".join(d["name"] for d in devs)
 
     def toy_list():
         if not _state["devices"]:
-            return "No devices connected. Ask him to turn one on - /buttplug scan looks for it."
+            return f"No devices connected. Ask {config.USER_THEM} to turn one on - /buttplug scan looks for it."
 
         return "\n".join(f"[{d['index']}] {d['name']}: {', '.join(_abilities(d))}"
                          for d in _state["devices"].values())
@@ -585,8 +741,8 @@ def _register_tools():
 
     tools.register_external(
         "toy_vibrate",
-        "Set a connected toy to a steady intensity for a while: vibration, and rotation or "
-        "oscillation on toys that do that. intensity is 0-100.",
+        "Set a connected toy to a steady intensity for a while: vibration, and rotation on toys "
+        "that do that. Machines and strokers use toy_stroke instead. intensity is 0-100.",
         {"intensity": {"type": "integer", "description": "0-100"}, "seconds": secs, "device": dev},
         required=("intensity",), run=toy_vibrate, group="Toys", available=running, why=off)
     tools.register_external(
@@ -598,7 +754,8 @@ def _register_tools():
         required=("name",), run=toy_pattern, group="Toys", available=running, why=off)
     tools.register_external(
         "toy_stroke",
-        "For stroker toys (The Handy and similar): move back and forth. speed is 0-100.",
+        "For strokers and machines (The Handy, the Solace, thrusting machines): move at a speed, "
+        "building up from slow. speed is 0-100; it's capped lower than vibration.",
         {"speed": {"type": "integer", "description": "0-100"}, "seconds": secs, "device": dev},
         required=("speed",), run=toy_stroke, group="Toys", available=running, why=off)
     tools.register_external(

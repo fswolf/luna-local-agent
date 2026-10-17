@@ -273,8 +273,8 @@ def prompt_block(query=""):
                      + "\n".join(render(p) for p in active))
 
     if paused:
-        parts.append("Paused projects (resume with update_project status active if he brings "
-                     "one up): " + "; ".join(f"#{p['id']} {p['title']}" for p in paused[:5]))
+        parts.append("Paused projects (resume with update_project status active if "
+                     f"{config.USER} brings one up): " + "; ".join(f"#{p['id']} {p['title']}" for p in paused[:5]))
 
     return "\n".join(parts)
 

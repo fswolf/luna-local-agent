@@ -1,0 +1,4 @@
+# Line endings that must survive any checkout: batch files need CRLF on
+# Windows, shell scripts break with it.
+*.cmd text eol=crlf
+*.sh text eol=lf

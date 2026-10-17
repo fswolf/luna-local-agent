@@ -525,7 +525,7 @@ def _ground(answer, first_answer, second, payload, base_messages, model, on_text
         answer = _follow_through(
             payload, base_messages, answer, model, on_text, on_sentence,
             "Actually, let me double-check that.",
-            f"(Not from Ryan - your own grounding check: you stated {shown} but nothing "
+            f"(Not from {config.USER} - your own grounding check: you stated {shown} but nothing "
             "you were given says so. Check them with your tools now, or say plainly that "
             "you're not sure. Don't repeat them as fact.)")
 

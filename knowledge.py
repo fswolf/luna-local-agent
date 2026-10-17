@@ -724,7 +724,7 @@ def prompt_block(query):
                  len(keep), keep[0][0], how)
 
     return ("\nFrom the user's own notes and documents (use them if they answer what "
-            "he asked, say which file; search_docs finds more):\n"
+            f"{config.USER} asked, say which file; search_docs finds more):\n"
             + "\n".join(f"[{_where(i)}]\n{i['text'][:900]}" for _s, i in keep) + "\n")
 
 

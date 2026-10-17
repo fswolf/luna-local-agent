@@ -626,7 +626,9 @@ _DATE_MATH = re.compile(
 )
 _DATE_TOOLS = {"get_datetime", "time_until"}
 _SCRATCH_OPENING = re.compile(
-    r"^\s*(okay|ok|alright|hmm|so),?\s+(the user|he|ryan|let me|i need to|i should)\b",
+    r"^\s*(okay|ok|alright|hmm|so),?\s+(the user|he|she|they|ryan|let me|i need to|i should"
+    + "".join("|" + re.escape(n) for n in [str(getattr(config, "USER_NAME", "") or "").lower()] if n)
+    + r")\b",
     re.IGNORECASE,
 )
 _TOOL_ERROR = re.compile(

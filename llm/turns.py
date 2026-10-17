@@ -352,7 +352,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
         livefeed.emit("rethink", step="done", outcome="follow-through: promised a step, taking it")
         answer = _follow_through(
             payload, base_messages, answer, model, on_text, on_sentence, "",
-            f"(Not from Ryan, and he hasn't said anything new: your reply ended with "
+            f"(Not from {config.USER}, and nothing new has been said: your reply ended with "
             f"\u201c{promise}\u201d but you didn't call a tool. If one of your tools does that, "
             "call it now and finish the job. If none of them does, don't reach for a different "
             "tool - just say in a sentence that you can't do that from here.)")
@@ -372,7 +372,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
         answer = _follow_through(
             payload, base_messages, answer, model, on_text, on_sentence,
             "Hang on, let me check.",
-            "(Not from Ryan - your own second look: you can check this "
+            f"(Not from {config.USER} - your own second look: you can check this "
             "yourself with your tools instead of asking. Do it now, then "
             "give the corrected answer.)")
 
