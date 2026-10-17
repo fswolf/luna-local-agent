@@ -308,8 +308,18 @@ def new_game(game, goal=""):
     return game_project(game, goal)
 
 
-def game_block(project_id, recent=15):
-    """What a game turn shows her: the goal, her recent notes, the plan."""
+HERE_NOTES = 8      # older notes about the place she's in, on top of the recent ones
+
+
+def _mentions(text, place):
+    return bool(re.search(rf"(?<!\w){re.escape(place)}(?!\w)", text, re.IGNORECASE))
+
+
+def game_block(project_id, recent=15, here=""):
+    """What a game turn shows her: the goal, her recent notes, the plan.
+    here: where she is (a room's name). Older notes that mention it come
+    back too, so a note written forty moves ago is there again when she
+    returns to that room, not lost off the end of the list."""
     project = get(project_id)
 
     if not project:
@@ -317,9 +327,15 @@ def game_block(project_id, recent=15):
 
     lines = [f"{project['title']}" + (f" - goal: {project['goal']}" if project["goal"] else "")]
     notes = [e for e in entries(project_id) if e["kind"] != "next"]
+    older = notes[:-recent] if len(notes) > recent else []
+    about = [e for e in older if here and _mentions(e["text"], here)][-HERE_NOTES:]
 
-    if len(notes) > recent:
-        lines.append(f"   ({len(notes) - recent} older notes - the most recent are below)")
+    if about:
+        lines.append(f"   earlier, about {here}:")
+        lines += [f"   {e['kind']}: {e['text']}" for e in about]
+
+    if len(older) > len(about):
+        lines.append(f"   ({len(older) - len(about)} older notes - the most recent are below)")
 
     for e in notes[-recent:]:
         lines.append(f"   {e['kind']}: {e['text']}")

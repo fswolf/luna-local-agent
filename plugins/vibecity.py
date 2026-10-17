@@ -38,8 +38,14 @@ Builds cost in-game money only, so nothing here asks for approval.
         "web": true,               # she may look things up (web_search, research)
         "goal": "",
         "skip_tools": [],              # e.g. ["screenshot"] for a model that can't see
-        "pause_game": true             # pause the game when she stops playing
+        "pause_game": true,            # pause the game when she stops playing
+        "guide": "vibe-city"           # her guide: a folder in luna-knowledge ("" = none)
     }
+
+Her guide: each turn she's shown the two passages in luna-knowledge/
+vibe-city/ (your Vibe City manual) that best fit what she's working on:
+her goal, her plan and what she did last turn. Only that folder is
+searched, and files marked "Spoilers: yes" are skipped.
 
 screenshot returns a picture of the game window. It reaches her the
 same way look_at_screen does - attached to the next message - so a
@@ -61,7 +67,8 @@ DEFAULT_GOAL = ("grow the town: roads, homes, shops and industry, with power and
                 "without running out of money")
 
 DEFAULTS = {"url": "http://127.0.0.1:47823/mcp", "step_seconds": 10, "max_steps": 60, "max_rounds": 12,
-            "speak": True, "web": True, "goal": "", "skip_tools": [], "pause_game": True}
+            "speak": True, "web": True, "goal": "", "skip_tools": [], "pause_game": True,
+            "guide": "vibe-city"}
 
 # When "web" is on: stuck on a puzzle or a recipe, she can look it up.
 # If that means she reads a walkthrough and wins, she wins.
@@ -272,6 +279,7 @@ STEP_PROMPT = (
     "Your goal: {goal}\n"
     "{brief}"
     "Your notes on this city (yours - kept between sessions):\n{project}\n\n"
+    "{guide}"
     "What you've done so far, oldest first:\n{notes}\n\n"
     "Take your next turn, two to six moves:\n"
     "1. get_city first. If a window is waiting for an answer (a milestone, a neighbour link, the "
@@ -302,6 +310,21 @@ BRIEF = ("This is your first turn this session: call how_to_play first, then lis
 
 
 
+def _guide(query):
+    """The manual passages that fit what she's working on, for the turn
+    prompt; "" when there's no guide or nothing fits."""
+    folder = settings()["guide"]
+    if not folder:
+        return ""
+    try:
+        import knowledge
+
+        text = knowledge.guide(NAME if folder is True else str(folder), query)
+    except Exception:
+        return ""
+    return f"From your guide (the game's manual) on what you're working on:\n{text}\n\n" if text else ""
+
+
 def _last_sentence(answer, limit=200):
     """Her turn's last sentence - the what-I-did-and-what's-next that goes
     into her one-liner notes. The rest is commentary for the player."""
@@ -315,14 +338,16 @@ def _step():
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-12:]) or "- nothing yet"
     prompt = STEP_PROMPT.format(goal=_goal(), brief="" if _state["briefed"] else BRIEF, notes=notes,
-                                project="{project}")
+                                project="{project}", guide="{guide}")
     allowed = list(_state["tools"]) + ["play_vibe_city", "game_note"] + (WEB_TOOLS if s["web"] else [])
 
     import projects
 
     pid = projects.game_project(NAME, _goal())
 
-    prompt = prompt.replace("{project}", projects.game_block(pid))
+    plan = (projects.get(pid) or {}).get("next") or ""
+    prompt = prompt.replace("{project}", projects.game_block(pid)).replace(
+        "{guide}", _guide(" ".join([_goal(), plan] + _state["notes"][-1:])))
     exchanges = []
     answer = assistant.respond_to_job(prompt, _state["model"], "vibecity", allowed,
                                       speak=bool(s["speak"]),

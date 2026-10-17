@@ -39,8 +39,13 @@ games/zork/. dfrotz has to be installed:
         "web": true,            # she may look things up (web_search, research)
         "interpreter": "",      # path to dfrotz if it's somewhere odd
         "watch": false,         # open the watch window with /zork play
-        "terminal": ""          # e.g. "kitty" or "gnome-terminal --"; "" = find one
+        "terminal": "",         # e.g. "kitty" or "gnome-terminal --"; "" = find one
+        "guide": true           # each turn, what luna-knowledge/zork/ says about her room
     }
+
+With "guide" on, each turn also shows her what the notes in
+luna-knowledge/zork/ say about the room she's in (from the status line),
+found by the room's name. Files marked "Spoilers: yes" are never used.
 
 /zork watch opens a terminal running games/zork/watch.py, which follows
 the game's transcript: her commands and the game's replies, the way a
@@ -67,7 +72,7 @@ WATCH_SCRIPT = os.path.join(HERE, "games", "zork", "watch.py")
 SAVES = os.path.join(HERE, "agent", "zork")      # gitignored, like her other state
 
 DEFAULTS = {"step_seconds": 8, "max_steps": 200, "speak": True, "web": True, "interpreter": "",
-            "watch": False, "terminal": ""}
+            "watch": False, "terminal": "", "guide": True}
 
 # When "web" is on: stuck on a puzzle or a recipe, she can look it up.
 # If that means she reads a walkthrough and wins, she wins.
@@ -290,6 +295,7 @@ STEP_PROMPT = (
     "treasure and points: 350 is a perfect score. Explore, pick up anything useful, read what "
     "you find, and keep a light source once you go underground - the dark has a grue in it.\n"
     "Your notes on this playthrough (yours - kept between sessions):\n{project}\n\n"
+    "{guide}"
     "Your last moves, oldest first:\n{notes}\n\n"
     "The game screen right now (your last command and what the game said):\n"
     "-----\n{screen}\n-----\n\n"
@@ -309,6 +315,26 @@ STEP_PROMPT = (
 
 
 _STATUS = re.compile(r"^\s*(\S.*?)\s{2,}Score:\s*(-?\d+)\s+Moves:\s*(\d+)\s*$")
+
+
+def _room(screen):
+    """The room she's in: the last status line on the screen, or ""."""
+    rooms = [m.group(1).strip() for m in map(_STATUS.match, screen.splitlines()) if m]
+    return rooms[-1] if rooms else ""
+
+
+def _guide(here):
+    """The lines her knowledge folder (luna-knowledge/zork/) has about
+    where she is, for the turn prompt; "" when off, unknown or nothing."""
+    if not here or not settings()["guide"]:
+        return ""
+    try:
+        import knowledge
+
+        text = knowledge.about(NAME, here)
+    except Exception:
+        return ""
+    return f"What your guide (notes on the game you were given) says about {here}:\n{text}\n\n" if text else ""
 
 
 def _pretty_turn(turn, said, width=78):
@@ -432,6 +458,9 @@ def _step():
 
     pid = projects.game_project(NAME, GOAL)
 
+    screen = _screen()
+    here = _room(screen)
+
     _one_move_per_turn()
     _turn.update(active=True, moves=0)
     exchanges = []
@@ -440,7 +469,8 @@ def _step():
         # A move, a note, maybe a status check - more rounds than that is
         # her trying to play several moves blind.
         answer = assistant.respond_to_job(
-            STEP_PROMPT.format(notes=notes, screen=_screen(), project=projects.game_block(pid)),
+            STEP_PROMPT.format(notes=notes, screen=screen, guide=_guide(here),
+                               project=projects.game_block(pid, here=here)),
             _state["model"], "zork", allowed, speak=bool(s["speak"]), project_id=pid,
             max_rounds=4 if s["web"] else 3, exchanges=exchanges) or ""
     finally:

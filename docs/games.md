@@ -353,6 +353,31 @@ what happened in the last few. Each game she plays also has a
   an answer without her checking.
 - `/zork new` marks the old playthrough done and starts a fresh
   project. The old one is retired, not deleted: `/projects restore <n>`.
+- In Zork and REALITI, which have rooms, she also gets back her older
+  notes about the room she's in. A note from forty moves ago about the
+  Troll Room shows up again when she walks back into the Troll Room,
+  even though it has dropped off her latest notes.
+
+**Her guide.** Notes you give her about a game go in
+`luna-knowledge/<game>/`: `luna-knowledge/zork/` for Zork,
+`luna-knowledge/realiti/` for REALITI. Each turn she sees what they say
+about the room she's in, found by the room's name: a heading with that
+name and what's under it, or list items that start with it ("- Troll
+Room: south to the Cellar..."). It needs no search server, and it's
+only that game's folder, never the rest of your knowledge base. A file
+with `Spoilers: yes` near its top is never shown this way, so a
+solutions file can sit next to the map without giving the game away.
+`"guide": false` in the plugin's block turns it off.
+
+Vibe City has no rooms, so its guide works by topic instead: each turn
+she's shown the two passages from `luna-knowledge/vibe-city/` (the Vibe
+City manual) that best fit what she's working on, her goal, her plan
+and what she did last turn. "Add power to the new zone" brings up the
+power lines section; "the houses aren't growing" brings up water and
+growth. It searches by meaning when the embedding server is running,
+by words otherwise, and only ever in that one folder. `"guide"` in the
+`vibecity` block names the folder (`"vibe-city"` by default), and `""`
+turns it off.
 
 She also remembers having played, outside the game: each session
 (from when she starts until she stops, or 20 minutes without a turn)

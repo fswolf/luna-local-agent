@@ -227,6 +227,110 @@ def _walk():
 
 
 # ---------------------------------------------------------------------------
+# A game's guide: what <knowledge folder>/<game>/ says about one place
+# ---------------------------------------------------------------------------
+# For game turns, which don't get search_docs: the lines about the room
+# she's standing in, found by name, no index or embedding server needed.
+# A file that says "Spoilers: yes" near its top is never used this way.
+_SPOILERS = re.compile(r"^\s*spoilers?\s*:\s*yes\b", re.IGNORECASE | re.MULTILINE)
+GUIDE_CHARS = 700
+
+
+def _spoilers(path):
+    """Does this file say "Spoilers: yes" near its top?"""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return bool(_SPOILERS.search(f.read(800)))
+    except OSError:
+        return False
+
+
+def _guide_dirs(folder):
+    """<knowledge folder>/<folder> for each knowledge folder that has one.
+    Only a plain folder name: nothing outside the knowledge folders."""
+    folder = str(folder or "").strip()
+
+    if not folder or os.sep in folder or "/" in folder or folder.startswith("."):
+        return []
+
+    return [d for d in (os.path.join(root, folder) for root in folders()) if os.path.isdir(d)]
+
+
+def _about_in(text, name):
+    """A section headed with the name, or list items that start with it:
+    "## Cloud Nine Nest" (and what's under it), "- Troll Room: ...",
+    "- Living Room (trophy case, ...): ..."."""
+    lines, out, n = text.splitlines(), [], re.escape(name)
+    head = re.compile(rf"^\s{{0,3}}(#{{1,6}})\s+{n}\s*#*\s*$", re.IGNORECASE)
+    item = re.compile(rf"^\s*[-*]\s+(?:\*\*)?{n}(?:\*\*)?(?=\s*[(:]|\s*$)", re.IGNORECASE)
+
+    for i, line in enumerate(lines):
+        m = head.match(line)
+        if m:
+            body = []
+            for nxt in lines[i + 1:]:
+                h = _HEADING.match(nxt)
+                if h and len(h.group(1)) <= len(m.group(1)):
+                    break
+                if nxt.strip():
+                    body.append(nxt.strip())
+            out.append("\n".join(body))
+        elif item.match(line):
+            out.append(re.sub(r"^\s*[-*]\s+", "", line).strip())
+
+    return [o for o in out if o]
+
+
+def about(folder, name, limit=GUIDE_CHARS):
+    """What the notes in <knowledge folder>/<folder>/ say about name, or "".
+    Spoiler files are skipped."""
+    name = " ".join(str(name or "").split())
+
+    if not name:
+        return ""
+
+    found = []
+
+    for base in _guide_dirs(folder):
+        for file in sorted(os.listdir(base)):
+            if os.path.splitext(file)[1].lower() not in (".md", ".markdown", ".txt"):
+                continue
+
+            try:
+                with open(os.path.join(base, file), encoding="utf-8", errors="replace") as f:
+                    text = f.read(MAX_TEXT_BYTES)
+            except OSError:
+                continue
+
+            if not _SPOILERS.search(text[:800]):
+                found += _about_in(text, name)
+
+    out = "\n".join(dict.fromkeys(found))
+    return out if len(out) <= limit else out[:limit - 1].rstrip() + "…"
+
+
+def guide(folder, query, limit=2, chars=600):
+    """The passages in <knowledge folder>/<folder>/ that best match query,
+    for a game turn that has no room to look up by name (Vibe City: what
+    she's trying to do). By meaning when the embedding server is up, else
+    by words. Spoiler files are skipped. "" when there's nothing."""
+    dirs = _guide_dirs(folder)
+
+    if not dirs or not enabled() or not str(query or "").strip():
+        return ""
+
+    try:
+        found, _how = search(query, limit=limit, within=dirs)
+    except Exception as e:
+        logbook.warn("knowledge", "guide search failed: %s", e)
+        return ""
+
+    return "\n".join(f"[{i['heading'] or os.path.basename(i['path'])}]\n"
+                     + (i["text"] if len(i["text"]) <= chars else i["text"][:chars - 1].rstrip() + "…")
+                     for _s, i in found)
+
+
+# ---------------------------------------------------------------------------
 # Cutting into passages
 # ---------------------------------------------------------------------------
 _HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$")
@@ -550,11 +654,17 @@ def _cosines(qv, vecs):
         return [sum(a * b for a, b in zip(qv, v)) for v in vecs]
 
 
-def search(query, limit=5):
+def search(query, limit=5, within=None):
     """([(score, item)], how) best first. how is 'by meaning', 'by meaning,
-    reranked' or 'by words'."""
+    reranked' or 'by words'. within: only these folders (a game's guide),
+    and none of their spoiler files."""
     query = " ".join(str(query or "").split())[:500]
     items = _load()
+
+    if within:
+        roots = tuple(os.path.realpath(d) + os.sep for d in within)
+        items = [i for i in items if os.path.realpath(i["path"]).startswith(roots)]
+        items = [i for i in items if not _spoilers(i["path"])]
 
     if not query or not items:
         return [], ""

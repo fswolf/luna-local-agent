@@ -51,8 +51,13 @@ outside content to her, like a web page. Needs git, and Node.js 20 or newer.
         "resident": "luna",        # her name in the world's memory
         "node": "",                # path to node if it's somewhere odd
         "watch": false,            # open the watch window with /realiti visit
-        "terminal": ""             # e.g. "kitty" or "gnome-terminal --"; "" = find one
+        "terminal": "",            # e.g. "kitty" or "gnome-terminal --"; "" = find one
+        "guide": true              # each turn, what luna-knowledge/realiti/ says about her room
     }
+
+With "guide" on, each turn also shows her what the notes in
+luna-knowledge/realiti/ say about the room she's in, found by the
+room's name. Files marked "Spoilers: yes" are never used.
 """
 import json
 import os
@@ -73,7 +78,7 @@ SERVER = "realiti"
 REPO = "https://github.com/meatproxy69/Realitiagentframework.git"
 GOAL = "explore, linger, find the places worth coming back to"
 DEFAULTS = {"path": "~/luna-realiti", "step_seconds": 45, "max_steps": 60, "speak": True,
-            "resident": "luna", "node": "", "watch": False, "terminal": ""}
+            "resident": "luna", "node": "", "watch": False, "terminal": "", "guide": True}
 WATCH_SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             "games", "realiti", "watch.py")
 
@@ -440,6 +445,7 @@ STEP_PROMPT = (
     "rooms, odd physics, places that keep going after you look away. This time is yours. Nobody "
     "is asking anything of you, and there's nothing to win or report on.\n"
     "Your notes from earlier visits (yours, kept between sessions):\n{project}\n\n"
+    "{guide}"
     "Last time, what you did and what the world said back:\n{last}\n\n"
     "Before that:\n{earlier}\n\n"
     "Where you are: {where}\n"
@@ -466,6 +472,7 @@ def _step():
     allowed = list(_state["tools"]) + ["visit_realiti", "game_note"]
     pid = projects.game_project(NAME, GOAL)
 
+    here = _here()
     _turn.update(active=True, acted=False, did=[], lines=[])
 
     try:
@@ -473,7 +480,8 @@ def _step():
         # (out of rounds, the loop would ask her to report - not what this is).
         # The one-action rule is what keeps it from being a string of moves.
         answer = assistant.respond_to_job(
-            STEP_PROMPT.format(project=projects.game_block(pid), last=last, earlier=earlier,
+            STEP_PROMPT.format(project=projects.game_block(pid, here=here), guide=_guide(here),
+                               last=last, earlier=earlier,
                                where=_door("where") or "(couldn't read it - try realiti_look)",
                                felt=_door("feel words") or "(no report)"),
             _state["model"], NAME, allowed, speak=bool(s["speak"]), project_id=pid, max_rounds=4) or ""
@@ -714,6 +722,36 @@ def _refusal(reply, body):
         return f"the world said no ({reason})" + (f": {WHY_NOT[reason]}" if reason in WHY_NOT else "")
     text = re.sub(r"^Error from \w+: ", "", body.strip())
     return f"the world said no: {text[:200]}"
+
+
+def _here():
+    """The room she's in, by its title ("Cloud Nine Nest"), or "": a look
+    that goes around the watch transcript, like the plugin's other reads."""
+    import tools
+
+    name = _tool("realiti_look")
+    if not name:
+        return ""
+    try:
+        run = _unwatched.get(name)
+        reply = str(run() if run else tools.call(name, {}))
+        return _room_of(json.loads(reply.split("\n", 1)[1] if reply.startswith("Result from") else reply))
+    except Exception:
+        return ""
+
+
+def _guide(here):
+    """The lines her knowledge folder (luna-knowledge/realiti/) has about
+    where she is, for the turn prompt; "" when off, unknown or nothing."""
+    if not here or not settings()["guide"]:
+        return ""
+    try:
+        import knowledge
+
+        text = knowledge.about(NAME, here)
+    except Exception:
+        return ""
+    return f"What your guide (notes on the game you were given) says about {here}:\n{text}\n\n" if text else ""
 
 
 def _room_of(data):

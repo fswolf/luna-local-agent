@@ -173,6 +173,7 @@ def names():
 # so the drift announces itself the first time you open the pane.
 _GROUPS = (
     ("Time", ("get_datetime", "time_until")),
+    ("Math", ("calculate",)),
     ("Reminders", ("set_reminder", "set_alarm", "list_reminders",
                    "cancel_reminder")),
     ("Memory", ("remember_fact", "recall_facts", "forget_fact",
@@ -381,6 +382,7 @@ def _mark_outside(name):
 # so "what's in Desktop" has one answer rather than two that can drift.
 # ---------------------------------------------------------------------------
 from . import time      # noqa: E402,F401
+from . import calc      # noqa: E402,F401
 from . import reminders  # noqa: E402,F401
 from . import memory     # noqa: E402,F401
 from . import files      # noqa: E402,F401

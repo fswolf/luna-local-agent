@@ -110,6 +110,12 @@ things she should have known.
 Both only ever happen in your own turns: stream chat never sees your
 documents.
 
+**Game guides.** Game turns (Zork, REALITI) don't get `search_docs`.
+Instead, a folder named after the game, like `luna-knowledge/zork/`,
+is her guide to it: each turn she's shown what it says about the room
+she's in. Only that folder is read, and a file with `Spoilers: yes`
+near its top is skipped. See [Games](games.md#her-memory-of-a-game).
+
 ## Meaning, and words
 
 With the embedding server running (`llama/start.sh` starts it), she

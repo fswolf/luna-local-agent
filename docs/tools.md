@@ -8,6 +8,7 @@ check the time, then schedule something.
 |------|--------------|
 | `get_datetime` | Date, time, weekday and timezone, so it stops guessing |
 | `time_until` | How far away a date is, without counting days in its head |
+| `calculate` | Exact sums and unit conversions: "18% of 340", "340 + 15%", "160 F to C", "5 miles in km" |
 | `set_reminder` | Schedule anything: "tomorrow at 9", "every monday" |
 | `set_alarm` | A wake-up: rings and nags until dismissed |
 | `list_reminders` / `cancel_reminder` | Read and cancel what's pending |
@@ -37,6 +38,13 @@ check the time, then schedule something.
 | `note_lesson` | Write down a lesson about her own behaviour: **you approve it on screen** |
 | `reflect_now` | Run her reflection pass now instead of waiting for the daily one |
 
+`calculate` parses the sum rather than running it, so only numbers,
+operators, brackets and the usual math functions get through. Unit
+conversions use the `pint` package (in `installer/requirements.txt`);
+without it the math still works and a conversion says pint is missing
+instead of guessing. Something like grams to cups of flour is refused:
+that needs the ingredient's density.
+
 The last five are the *Self* group: see [Her reasoning](reasoning.md#her-reasoning)
 and [Learning from herself](learning.md#learning-from-herself). None of them are
 offered to stream chat.
@@ -48,7 +56,7 @@ model picks worse from forty tools than from ten. So with routing on
 (the default), you leave tools on and each turn is sent only the
 groups it seems to need:
 
-1. **Core groups, always:** Time, Reminders, Memory and Shell
+1. **Core groups, always:** Time, Math, Reminders, Memory and Shell
    (`tools.core`).
 2. **What you said:** groups that match your message, by meaning
    through the embedding server when it's running, plus plain keyword
