@@ -39,7 +39,12 @@ class Loop(unittest.TestCase):
             p.start()
 
     def tearDown(self):
+        # Wait for the loop's thread to finish before the next test: a turn
+        # still running when its test ends would end its session inside the
+        # next test's fake playlog (slow machines, like GitHub's, catch it).
         self.loop.stop()
+        if self.loop._thread:
+            self.loop._thread.join(5)
         for p in self.patches:
             p.stop()
 
