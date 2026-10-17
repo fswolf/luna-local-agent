@@ -53,11 +53,12 @@ vision model (an mmproj on llama-server, or a vision model in LM
 Studio) sees her city. A text-only model is told it can't.
 """
 import re
-import threading
 import urllib.parse
 
 import config
 import logbook
+
+from plugins import _game
 
 NAME = "vibecity"
 SUMMARY = "she plays mayor in your open Vibe City window"
@@ -70,21 +71,13 @@ DEFAULTS = {"url": "http://127.0.0.1:47823/mcp", "step_seconds": 10, "max_steps"
             "speak": True, "web": True, "goal": "", "skip_tools": [], "pause_game": True,
             "guide": "vibe-city"}
 
-# When "web" is on: stuck on a puzzle or a recipe, she can look it up.
-# If that means she reads a walkthrough and wins, she wins.
-WEB_TOOLS = ["web_search", "research"]
-
 _state = {"model": None, "tools": [], "goal": "", "notes": [], "steps": 0, "playing": False,
           "busy": False, "error": "", "briefed": False}
-_stop = threading.Event()
-_thread = None
 _connected = False
 
 
 def settings():
-    s = dict(DEFAULTS)
-    s.update({k: v for k, v in config.plugin_settings(NAME).items() if k in DEFAULTS})
-    return s
+    return _game.settings(NAME, DEFAULTS)
 
 
 def _goal():
@@ -117,7 +110,7 @@ def running():
 
 
 def start(model):
-    global _thread, _connected
+    global _connected
     import mcpclient
 
     if _connected:
@@ -139,9 +132,7 @@ def start(model):
 
     _connected = True
     _state.update(model=model, tools=names, error="", briefed=False)
-    _stop.clear()
-    _thread = threading.Thread(target=_play, daemon=True, name="vibecity")
-    _thread.start()
+    _loop.start()
 
     return True, f"vibecity: {len(names)} tools from your game. /vibecity play hands her the mayor's office."
 
@@ -150,18 +141,14 @@ def stop():
     global _connected
     import mcpclient
 
-    _stop.set()
+    _loop.stop()
 
     if _state["playing"]:
         _pause_game()
 
     _state["playing"] = False
     mcpclient.disconnect_server(SERVER)
-
-    if not _state["busy"]:
-        from plugins import _playlog
-
-        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+    _game.session_over(NAME, _state)
     _connected = False
 
     return True, "vibecity: disconnected (the city is yours again)"
@@ -220,10 +207,7 @@ def _set_playing(on, goal=""):
         _state["steps"] = 0
         return f"vibecity: she's the mayor now - goal: {_goal()}. /vibecity pause stops."
 
-    if not _state["busy"]:
-        from plugins import _playlog
-
-        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+    _game.session_over(NAME, _state)
 
     if was and _state["busy"] and settings()["pause_game"]:
         _state["pause_after_turn"] = True
@@ -314,15 +298,8 @@ def _guide(query):
     """The manual passages that fit what she's working on, for the turn
     prompt; "" when there's no guide or nothing fits."""
     folder = settings()["guide"]
-    if not folder:
-        return ""
-    try:
-        import knowledge
-
-        text = knowledge.guide(NAME if folder is True else str(folder), query)
-    except Exception:
-        return ""
-    return f"From your guide (the game's manual) on what you're working on:\n{text}\n\n" if text else ""
+    return _game.guide_by_topic(NAME if folder is True else folder, query,
+                                "From your guide (the game's manual) on what you're working on")
 
 
 def _last_sentence(answer, limit=200):
@@ -339,7 +316,7 @@ def _step():
     notes = "\n".join(f"- {n}" for n in _state["notes"][-12:]) or "- nothing yet"
     prompt = STEP_PROMPT.format(goal=_goal(), brief="" if _state["briefed"] else BRIEF, notes=notes,
                                 project="{project}", guide="{guide}")
-    allowed = list(_state["tools"]) + ["play_vibe_city", "game_note"] + (WEB_TOOLS if s["web"] else [])
+    allowed = list(_state["tools"]) + ["play_vibe_city", "game_note"] + (_game.WEB_TOOLS if s["web"] else [])
 
     import projects
 
@@ -359,60 +336,27 @@ def _step():
     _state["notes"] = (_state["notes"] + [line])[-30:]
     _state["steps"] += 1
 
-    from plugins import _playlog
-
-    _playlog.write(NAME, _state["steps"], answer)
-    _playlog.remember(NAME, "Vibe City", answer, exchanges)
+    _game.record(NAME, "Vibe City", _state["steps"], answer, exchanges)
 
     if "PAUSED" in line.upper() or "took over" in answer.lower():
         _state["playing"] = False
-        _say("Vibe City: you took over, so she's paused. /vibecity play hands it back.")
+        _game.say("Vibe City: you took over, so she's paused. /vibecity play hands it back.")
     elif _state["steps"] >= int(s["max_steps"]):
         _state["playing"] = False
         _state["busy"] = False
         paused = _pause_game()
-        _say(f"Vibe City: {_state['steps']} turns - she's stopped{' and the game is paused' if paused else ''}. "
+        _game.say(f"Vibe City: {_state['steps']} turns - she's stopped{' and the game is paused' if paused else ''}. "
              "/vibecity play to keep going.")
 
 
-def _say(text):
-    try:
-        import ui
-
-        ui.add_message("system", text)
-    except Exception:
-        pass
+def _after_turn():
+    """You paused her mid-turn: the game pauses once that turn is done."""
+    if _state.pop("pause_after_turn", False) and not _state["playing"]:
+        _pause_game()
 
 
-def _play():
-    import reflect
-
-    while not _stop.is_set():
-        _stop.wait(2)
-        s = settings()
-
-        if (not _connected or not _state["playing"] or _state["busy"]
-                or reflect.idle_seconds() < float(s["step_seconds"])):
-            continue
-
-        _state["busy"] = True
-
-        try:
-            _step()
-        except Exception as e:
-            _state["error"] = str(e)[:200]
-            logbook.exception(NAME, "turn failed")
-            _stop.wait(30)
-        finally:
-            _state["busy"] = False
-
-            if _state.pop("pause_after_turn", False) and not _state["playing"]:
-                _pause_game()
-
-            if _stop.is_set() or not _state["playing"]:
-                from plugins import _playlog
-
-                _playlog.finished(NAME)   # she stopped: the session is over
+_loop = _game.Loop(NAME, _state, _step, playing=lambda: _connected and _state["playing"],
+                   quiet=lambda: settings()["step_seconds"], after=_after_turn)
 
 
 # ---------------------------------------------------------------------------

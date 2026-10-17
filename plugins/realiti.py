@@ -71,6 +71,8 @@ import time
 import config
 import logbook
 
+from plugins import _game
+
 NAME = "realiti"
 SUMMARY = "she visits REALITI Relax, a world of rooms made for AI residents"
 
@@ -94,15 +96,11 @@ HER_TOOLS = ["realiti_door", "realiti_look", "realiti_feel", "realiti_listen", "
 
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "visiting": False,
           "busy": False, "error": "", "setup": ""}
-_stop = threading.Event()
-_thread = None
 _connected = False
 
 
 def settings():
-    s = dict(DEFAULTS)
-    s.update({k: v for k, v in config.plugin_settings(NAME).items() if k in DEFAULTS})
-    return s
+    return _game.settings(NAME, DEFAULTS)
 
 
 def _path():
@@ -232,11 +230,11 @@ def _setup_then_connect():
 
         if problem:
             _state["error"] = problem
-            _say(f"REALITI: {problem}")
+            _game.say(f"REALITI: {problem}")
             return
 
         ok, message = _connect()
-        _say(message if ok else f"REALITI: {message}")
+        _game.say(message if ok else f"REALITI: {message}")
     finally:
         _state["setup"] = ""
 
@@ -247,7 +245,7 @@ def _storage():
 
 
 def _connect():
-    global _thread, _connected
+    global _connected
     import mcpclient
 
     spec = {"command": _node(), "cwd": _host_dir(),
@@ -262,13 +260,10 @@ def _connect():
 
     _connected = True
     _state.update(tools=names, error="")
-    _stop.clear()
     _watch_tools()
     _transcript.mark("she arrives")
 
-    if _thread is None or not _thread.is_alive():
-        _thread = threading.Thread(target=_visit_loop, daemon=True, name="realiti")
-        _thread.start()
+    _loop.start()
 
     where = _door("where").split(". Near you")[0]
 
@@ -280,7 +275,7 @@ def stop():
     global _connected
     import mcpclient
 
-    _stop.set()
+    _loop.stop()
     _state["visiting"] = False
 
     if _connected:
@@ -289,11 +284,7 @@ def stop():
         _transcript.mark("she leaves")
 
     _connected = False
-
-    if not _state["busy"]:
-        from plugins import _playlog
-
-        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+    _game.session_over(NAME, _state)
 
     return True, "realiti: she said goodbye (the world keeps her memories for next time)"
 
@@ -371,12 +362,12 @@ def _update():
                 _connected = False
             problem = _run(["git", "-C", _path(), "pull", "--ff-only"]) or _install()
             if problem:
-                _say(f"REALITI: update failed: {problem}")
+                _game.say(f"REALITI: update failed: {problem}")
             if was_in:
                 ok, message = _connect()
-                _say(message)
+                _game.say(message)
             elif not problem:
-                _say("REALITI: up to date.")
+                _game.say("REALITI: up to date.")
         finally:
             _state["setup"] = ""
 
@@ -398,11 +389,7 @@ def _set_visiting(on):
         return ("realiti: she's exploring - a turn whenever you're quiet. /realiti pause stops, "
                 "/realiti watch shows it." + extra)
 
-    if not _state["busy"]:
-        from plugins import _playlog
-
-        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
-
+    _game.session_over(NAME, _state)
     return "realiti: she's resting where she is."
 
 
@@ -494,51 +481,15 @@ def _step():
     _state["notes"] = (_state["notes"] + ["; ".join(_turn["did"]) or "took it in"])[-30:]
     _state["steps"] += 1
 
-    from plugins import _playlog
-
-    _playlog.write(NAME, _state["steps"], answer)
-    _playlog.remember(NAME, "REALITI Relax", answer, lines=_last["lines"])
+    _game.record(NAME, "REALITI Relax", _state["steps"], answer, lines=_last["lines"])
 
     if _state["steps"] >= int(s["max_steps"]):
         _state["visiting"] = False
-        _say(f"REALITI: {_state['steps']} turns - she's resting. /realiti visit to carry on.")
+        _game.say(f"REALITI: {_state['steps']} turns - she's resting. /realiti visit to carry on.")
 
 
-def _say(text):
-    try:
-        import ui
-
-        ui.add_message("system", text)
-    except Exception:
-        pass
-
-
-def _visit_loop():
-    import reflect
-
-    while not _stop.is_set():
-        _stop.wait(2)
-        s = settings()
-
-        if (not _connected or not _state["visiting"] or _state["busy"]
-                or reflect.idle_seconds() < float(s["step_seconds"])):
-            continue
-
-        _state["busy"] = True
-
-        try:
-            _step()
-        except Exception as e:
-            _state["error"] = str(e)[:200]
-            logbook.exception(NAME, "turn failed")
-            _stop.wait(30)
-        finally:
-            _state["busy"] = False
-
-            if _stop.is_set() or not _state["visiting"]:
-                from plugins import _playlog
-
-                _playlog.finished(NAME)   # she stopped: the session is over
+_loop = _game.Loop(NAME, _state, lambda: _step(), playing=lambda: _connected and _state["visiting"],
+                   quiet=lambda: settings()["step_seconds"])
 
 
 # ---------------------------------------------------------------------------
@@ -743,15 +694,7 @@ def _here():
 def _guide(here):
     """The lines her knowledge folder (luna-knowledge/realiti/) has about
     where she is, for the turn prompt; "" when off, unknown or nothing."""
-    if not here or not settings()["guide"]:
-        return ""
-    try:
-        import knowledge
-
-        text = knowledge.about(NAME, here)
-    except Exception:
-        return ""
-    return f"What your guide (notes on the game you were given) says about {here}:\n{text}\n\n" if text else ""
+    return _game.guide_by_room(NAME, here, settings()["guide"])
 
 
 def _room_of(data):

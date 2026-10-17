@@ -55,6 +55,8 @@ import time
 import config
 import logbook
 
+from plugins import _game
+
 try:
     import chess
     import chess.pgn
@@ -74,9 +76,6 @@ DEFAULTS = {"side": "white", "speak": True, "open": True, "think_seconds": 1.5, 
 TOOLS = ["chess_board", "chess_move", "chess_user_move", "chess_new_game"]
 
 _lock = threading.RLock()
-_wake = threading.Event()
-_stop = threading.Event()
-_thread = None
 _on = False
 _g = {"board": None, "luna": None, "said": [], "result": "", "started": "", "reacted": True,
       "thinking": False, "fails": 0, "stalled": False, "model": None, "error": ""}
@@ -84,9 +83,7 @@ _turn = {"active": False, "moved": False}
 
 
 def settings():
-    s = dict(DEFAULTS)
-    s.update({k: v for k, v in config.plugin_settings(NAME).items() if k in DEFAULTS})
-    return s
+    return _game.settings(NAME, DEFAULTS)
 
 
 def _ended(for_luna=True):
@@ -119,15 +116,6 @@ def _emit():
         pass
 
 
-def _say(text):
-    try:
-        import ui
-
-        ui.add_message("system", text)
-    except Exception:
-        pass
-
-
 # ---------------------------------------------------------------------------
 # The game
 # ---------------------------------------------------------------------------
@@ -145,7 +133,7 @@ def _new(side=None):
                   fails=0, stalled=False)
         _save()
     _emit()
-    _wake.set()
+    _loop.wake()
     return side
 
 
@@ -241,7 +229,7 @@ def user_move(text):
         _finish_if_over()
         _save()
     _emit()
-    _wake.set()
+    _loop.wake()
     return True, f"You played {san}." + (f" {_ended(False)}." if _g["result"] else "")
 
 
@@ -347,7 +335,7 @@ def undo():
         _g.update(result=None, reacted=True, fails=0, stalled=False)
         _save()
     _emit()
-    _wake.set()
+    _loop.wake()
     return True, "Taken back - your move."
 
 
@@ -358,7 +346,7 @@ def resign():
         _g.update(result={"winner": "luna", "how": "resignation"}, reacted=False)
         _end_game()
     _emit()
-    _wake.set()
+    _loop.wake()
     return True, "You resigned. /chess new for another."
 
 
@@ -466,14 +454,15 @@ def _step():
 
     s = settings()
     react = bool(_g["result"]) and not _g["reacted"]
-    prompt = (REACT_PROMPT if react else STEP_PROMPT).format(
-        game=describe(), result=_ended())
     allowed = ["chess_board"] if react else ["chess_board", "chess_move"]
 
-    if not react:
-        _stop.wait(float(s["think_seconds"] or 0))
+    # Thinking from here, so a take-back can't slip in during the pause
+    # and leave her answering a position that's gone.
     _g["thinking"] = not react
     _emit()
+    if not react:
+        _loop.wait(float(s["think_seconds"] or 0))
+    prompt = (REACT_PROMPT if react else STEP_PROMPT).format(game=describe(), result=_ended())
     _turn.update(active=True, moved=False)
     exchanges = []
     try:
@@ -491,37 +480,31 @@ def _step():
             _g["fails"] += 1
             if _g["fails"] >= 2:
                 _g["stalled"] = True
-                _say("Chess: she didn't move twice in a row - /chess nudge to let her try again.")
+                _game.say("Chess: she didn't move twice in a row - /chess nudge to let her try again.")
         said = answer.strip()
         if said:
             _g["said"] = (_g["said"] + [{"ply": len(_g["board"].move_stack), "text": said[:600]}])[-60:]
         _save()
     _emit()
 
-    from plugins import _playlog
-
-    _playlog.write(NAME, len(_g["board"].move_stack), answer)
-    _playlog.remember(NAME, "chess", answer, exchanges)
+    _game.record(NAME, "chess", len(_g["board"].move_stack), answer, exchanges)
     if react:
-        _playlog.finished(NAME)
+        from plugins import _playlog
+
+        _playlog.finished(NAME)      # the game's over: that's the session
 
 
-def _play():
-    while not _stop.is_set():
-        _wake.wait(2)
-        _wake.clear()
-        with _lock:
-            board = _g["board"]
-            due = (_on and board is not None and not _g["stalled"] and
-                   ((not _g["result"] and board.turn == _g["luna"]) or (_g["result"] and not _g["reacted"])))
-        if not due:
-            continue
-        try:
-            _step()
-        except Exception as e:
-            _g["error"] = str(e)[:200]
-            logbook.exception(NAME, "turn failed")
-            _stop.wait(10)
+def _due():
+    """Her move to make, or a finished game to say something about."""
+    with _lock:
+        board = _g["board"]
+        return (_on and board is not None and not _g["stalled"] and
+                ((not _g["result"] and board.turn == _g["luna"]) or (bool(_g["result"]) and not _g["reacted"])))
+
+
+# No waiting for quiet: she moves as soon as you have. The session ends
+# when a game does (_step), not when she stops between moves.
+_loop = _game.Loop(NAME, _g, _step, playing=_due, ends_session=False)
 
 
 # ---------------------------------------------------------------------------
@@ -599,7 +582,7 @@ def page(method, path, body):
 def _nudge():
     with _lock:
         _g.update(stalled=False, fails=0)
-    _wake.set()
+    _loop.wake()
     return True, "Nudged - her move."
 
 
@@ -646,7 +629,7 @@ def _open_board():
 
 
 def start(model):
-    global _thread, _on
+    global _on
     problem = why_unavailable()
     if problem:
         return False, problem
@@ -658,10 +641,8 @@ def start(model):
         if not resumed:
             _new()
     _on = True
-    _stop.clear()
-    _thread = threading.Thread(target=_play, daemon=True, name="chess")
-    _thread.start()
-    _wake.set()
+    _loop.start()
+    _loop.wake()
     opened = _open_board() if settings()["open"] else f"The board: {board_url()}"
     return True, ("chess: " + ("carrying on the saved game. " if resumed else "new game - you're "
                                f"{_color_name(not _g['luna'])}. ") + opened)
@@ -670,8 +651,7 @@ def start(model):
 def stop():
     global _on
     _on = False
-    _stop.set()
-    _wake.set()
+    _loop.stop()
     with _lock:
         if _g["board"] is not None:
             _save()

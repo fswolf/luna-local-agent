@@ -228,7 +228,7 @@ _HELP_SECTIONS = [
         ("/context", "how big every prompt is vs the model's context"),
         ("/scroll", "why the wheel isn't scrolling, if it isn't"),
         "",
-        "in the tools pane: up/down or the wheel choose, space toggles, a the whole group.",
+        "in the tools pane: up/down or the wheel choose, space toggles, a the whole group, r tool routing.",
         "the Mood group at the bottom switches moods, her voice tint",
         "and warmth sensing from the same place; Thoughts switches the",
         "reasoning log; Learning switches lessons, episodes, fact cleanup,",

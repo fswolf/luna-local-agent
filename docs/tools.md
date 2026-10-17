@@ -60,10 +60,10 @@ groups it seems to need:
 
 1. **Core groups, always:** Time, Math, Reminders, Memory and Shell
    (`tools.core`).
-2. **What you said:** groups that match your message, by meaning
-   through the embedding server when it's running, plus plain keyword
-   hits. "Is the tower up?" brings Network; "check my inbox" brings
-   Email. The best `tools.route_groups` (3) by meaning go along.
+2. **What you said:** groups that match your message by meaning,
+   through the embedding server. "Is the tower up?" brings Network;
+   "check my inbox" brings Email. Without an embedding server nothing is
+   routed: every tool that's on goes, as before. The best `tools.route_groups` (3) by meaning go along.
 3. **What she just used:** a group used in the last
    `tools.sticky_turns` (3) turns stays, so "and restart it" doesn't
    lose the tool halfway through a job.
@@ -75,9 +75,23 @@ What it can't do is reach a tool you switched off, or one a turn isn't
 allowed (stream chat's narrow list holds). The tools pane is still the
 "never" switch; routing only chooses among what's on.
 
+The tools pane shows it working. Its top line says whether routing is
+on and the embedding server answering, and what your last turn sent:
+
+```
+ routing on · embedding server up · last turn sent 620 of 2140 tokens
+```
+
+or why nothing was routed (`routing off · no embedding server · every
+tool sent: 2140 tokens a turn`). Each tool group's header says what
+happened to it on that turn: `always` (a core group), `sent`, `held
+back`, or `pulled in` when she attached it mid-turn. Only your own
+turns count; stream chat, jobs and games don't change it. `r` in the
+pane turns routing on and off, the same as `/set tools.routing false`.
+
 `/context` shows how many tools went out with a turn ("12 of 31
 sent"), and the log says which groups were routed and which were
-hidden. `/set tools.routing false` sends everything, as before.
+hidden.
 
 ## Turning tools off
 

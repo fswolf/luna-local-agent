@@ -42,7 +42,7 @@ class Game(unittest.TestCase):
     def tearDown(self):
         for p in self.patches:
             p.stop()
-        cg._wake.clear()
+        cg._loop._wake.clear()
         shutil.rmtree(self.tmp)
 
     def board(self):

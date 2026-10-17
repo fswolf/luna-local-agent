@@ -315,44 +315,95 @@ def _tool_line_of(index):
 
 
 def _tool_header():
-    """The budget, pinned above the list.
+    """Routing and what it cost, pinned above the list.
 
     It used to be the first lines of the scrolling area, which meant
     selecting the top tool scrolled it off and nothing could bring it
     back - the one number the pane exists to show, unreachable.
     """
+    import config
+
     try:
         import tools
-        import lmstudio
 
-        live, possible = tools.budget()
-        window = lmstudio.context_length()
+        live, _possible = tools.budget()
+        groups = {label: g_live for label, _m, g_live, _t in tools.grouped()}
+        last, up = tools.routing.last(), tools.routing.server_up()
     except Exception:
-        live = possible = window = 0
+        live, groups, last, up = 0, {}, {}, None
 
-    saved = possible - live
-    line = f" {live} tokens of tool schemas in every prompt"
-
-    try:
-        import mood
-
-        extra = int(len(mood.line() or "") / 3.5)
-    except Exception:
-        extra = 0
-
-    if extra:
-        line = f" {live + extra} tokens of tools and mood in every prompt"
-
-    if saved:
-        line += f" ({saved} saved)"
-
-    if window:
-        line += f", of a {window}-token context"
+    if not getattr(config, "TOOLS_ROUTING", True):
+        line, style = f" routing off · every tool sent: {live} tokens a turn", "class:dim bold"
+    elif up is False or (last.get("why") == "server" and not up):
+        # checked first: a server that stopped answering since your last
+        # turn means the next one goes unrouted, whatever the last one did
+        line, style = (f" routing off · no embedding server · every tool sent: {live} tokens a turn",
+                       "class:warn bold")
+    elif last.get("routed"):
+        sent = sum(groups.get(g, 0) for g in last["sent"] | last.get("pulled", set()))
+        line, style = (f" routing on · embedding server up · last turn sent {sent} of {live} tokens",
+                       "class:label bold")
+    elif last.get("why") == "few":
+        line, style = f" routing on · few enough tools that all went: {live} tokens", "class:label bold"
+    else:
+        server = "embedding server up" if up else "embedding server not tried yet"
+        line, style = f" routing on · {server} · {live} tokens with every tool", "class:label bold"
 
     return [
-        ("class:label bold", line + "\n"),
-        ("class:footer", " (space) toggle  (a) whole group  (up/down or wheel) choose"),
+        (style, line + "\n"),
+        ("class:footer", " (space) toggle  (a) whole group  (r) routing  (up/down or wheel) choose"),
     ]
+
+
+def _route_mark(label):
+    """What routing did with this group on your last turn, or "" when it
+    wasn't routed (routing off, no embedding server) or the group isn't
+    one of the tools' (features, permissions)."""
+    try:
+        import config
+        import tools
+
+        last = tools.routing.last()
+    except Exception:
+        return ""
+    if (not getattr(config, "TOOLS_ROUTING", True) or not last.get("routed")
+            or tools.routing.server_up() is False):
+        return ""
+    if label in last.get("pulled", ()):
+        return "pulled in"
+    if label in last.get("core", ()):
+        return "always"
+    if label in last.get("sent", ()):
+        return "sent"
+    if label in last.get("held", ()):
+        return "held back"
+    return ""
+
+
+# Sent and pulled in are the news; always and held back are the usual.
+_MARK_STYLE = {"always": "class:dim", "sent": "class:ok", "pulled in": "class:ok bold",
+               "held back": "class:dim"}
+
+
+def _spent(label, live, total):
+    """A group header's cost: the subtotal is the point of grouping, it
+    turns "which of these 22 do I not need" into "do I need the desktop ones"."""
+    if label == "Permissions":
+        return "space cycles, saved"
+    if label == "Portrait":
+        return "space switches, saved, live"
+    return f"{live} tok" if live == total else f"{live} of {total} tok"
+
+
+def _routing_toggle():
+    """(r): routing on or off, saved like /set tools.routing."""
+    import config
+
+    on = bool(getattr(config, "TOOLS_ROUTING", True))
+    config.save_setting("tools.routing", "false" if on else "true")
+    add_message("system", "Tool routing off - every tool that's on goes with every turn." if on else
+                "Tool routing on - each turn gets the tool groups that fit it (needs the embedding server).")
+    _refresh()
 
 
 def _tool_fragments():
@@ -363,6 +414,10 @@ def _tool_fragments():
 
     index = 0
     groups = _tool_groups()
+    # The routing marks line up in one column, after the widest header.
+    marks = {label: _route_mark(label) for label, _m, _l, _t in groups}
+    column = max((len(f" {label}   {_spent(label, live, total)}")
+                  for label, _m, live, total in groups if marks[label]), default=0) + 3
 
     for position, (label, members, group_live, group_total) in enumerate(groups):
         # A blank line separates groups. Only between them: a trailing
@@ -373,16 +428,14 @@ def _tool_fragments():
 
         # The subtotal is the point of grouping: it turns "which of
         # these 22 do I not need" into "do I need the desktop ones".
-        spent = f"{group_live} tok" if group_live == group_total\
-            else f"{group_live} of {group_total} tok"
-
-        if label == "Permissions":
-            spent = "space cycles, saved"
-        elif label == "Portrait":
-            spent = "space switches, saved, live"
-
+        spent = _spent(label, group_live, group_total)
         fragments.append(("class:label bold", f" {label}"))
-        fragments.append(("class:dim", f"   {spent}\n"))
+        mark = marks[label]
+        if mark:
+            fragments.append(("class:dim", f"   {spent}".ljust(column - len(label) - 1)))
+            fragments.append((_MARK_STYLE[mark], f"{mark}\n"))
+        else:
+            fragments.append(("class:dim", f"   {spent}\n"))
 
         for name, on, ready, why, cost, setting in members:
             selected = index == view.tool_cursor

@@ -50,11 +50,12 @@ her own tools behave. Only that folder is searched.
 import json
 import os
 import shutil
-import threading
 import time
 
 import config
 import logbook
+
+from plugins import _game
 
 NAME = "minecraft"
 SUMMARY = "she joins your world and plays towards a goal"
@@ -78,25 +79,17 @@ DEFAULTS = {"host": "localhost", "port": 25565, "username": "Luna", "step_second
             "max_steps": 60, "speak": True, "web": True, "mc_tools": CORE_TOOLS, "command": "",
             "guide": "minecraft"}
 
-# When "web" is on: stuck on a puzzle or a recipe, she can look it up.
-# If that means she reads a walkthrough and wins, she wins.
-WEB_TOOLS = ["web_search", "research"]
-
 # Places she pinned with remember_minecraft_spot - kept across restarts,
 # per world, because "the base" is the same place tomorrow.
 SPOTS_FILE = os.path.join(config.BASE_DIR, "agent", "minecraft.json")
 
 _state = {"model": None, "tools": [], "goal": "", "notes": [], "steps": 0,
           "paused": False, "busy": False, "error": "", "last": ""}
-_stop = threading.Event()
-_thread = None
 _connected = False
 
 
 def settings():
-    s = dict(DEFAULTS)
-    s.update({k: v for k, v in config.plugin_settings(NAME).items() if k in DEFAULTS})
-    return s
+    return _game.settings(NAME, DEFAULTS)
 
 
 def _command_line(s):
@@ -136,7 +129,7 @@ def running():
 
 
 def start(model):
-    global _thread, _connected
+    global _connected
     import mcpclient
 
     if _connected:
@@ -159,9 +152,7 @@ def start(model):
 
     _connected = True
     _state.update(model=model, tools=names, error="")
-    _stop.clear()
-    _thread = threading.Thread(target=_play, daemon=True, name="minecraft")
-    _thread.start()
+    _loop.start()
 
     goal = f" Goal: {_state['goal']}" if _state["goal"] else " No goal yet - ask her, or /minecraft goal <what>."
 
@@ -173,14 +164,10 @@ def stop():
     global _connected
     import mcpclient
 
-    _stop.set()
+    _loop.stop()
     mcpclient.disconnect_server(SERVER)
     _connected = False
-
-    if not _state["busy"]:
-        from plugins import _playlog
-
-        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+    _game.session_over(NAME, _state)
 
     return True, "minecraft: left the world (the goal is kept for next time)"
 
@@ -218,11 +205,7 @@ def command(text):
 
     if word == "pause":
         _state["paused"] = True
-
-        if not _state["busy"]:
-            from plugins import _playlog
-
-            _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+        _game.session_over(NAME, _state)
         return "minecraft: paused - she'll stay put. /minecraft resume carries on."
 
     if word == "resume":
@@ -279,7 +262,7 @@ def _step():
     spots = "; ".join(f"{k} at {v['x']}, {v['y']}, {v['z']}" + (f" ({v['note']})" if v.get("note") else "")
                       for k, v in _spots().items()) or "none yet"
     allowed = (list(_state["tools"]) + ["set_minecraft_goal", "remember_minecraft_spot", "game_note"]
-               + (WEB_TOOLS if s["web"] else []))
+               + (_game.WEB_TOOLS if s["web"] else []))
 
     import projects
 
@@ -296,74 +279,32 @@ def _step():
     _state["notes"] = (_state["notes"] + [line])[-12:]
     _state["steps"] += 1
 
-    from plugins import _playlog
-
-    _playlog.write(NAME, _state["steps"], answer)
-    _playlog.remember(NAME, "Minecraft", answer, exchanges)
+    _game.record(NAME, "Minecraft", _state["steps"], answer, exchanges)
     _state["last"] = line
 
     if line.upper().startswith("DONE"):
         logbook.info(NAME, "goal done: %s", _state["goal"])
-        _say(f"Minecraft: done - {_state['goal']}")
+        _game.say(f"Minecraft: done - {_state['goal']}")
         _state.update(goal="", steps=0)
     elif line.upper().startswith("STUCK"):
         _state["paused"] = True
-        _say(f"Minecraft: she's stuck and paused - {line}. /minecraft resume to let her try again.")
+        _game.say(f"Minecraft: she's stuck and paused - {line}. /minecraft resume to let her try again.")
     elif _state["steps"] >= int(s["max_steps"]):
         _state["paused"] = True
-        _say(f"Minecraft: {_state['steps']} steps on this goal - paused. /minecraft resume to keep going.")
+        _game.say(f"Minecraft: {_state['steps']} steps on this goal - paused. /minecraft resume to keep going.")
 
 
 def _guide(query):
     """The passages from her Minecraft notes that fit what she's working
     on, for the step prompt; "" when there's no guide or nothing fits."""
     folder = settings()["guide"]
-    if not folder or not query.strip():
-        return ""
-    try:
-        import knowledge
-
-        text = knowledge.guide(NAME if folder is True else str(folder), query)
-    except Exception:
-        return ""
-    return f"From your Minecraft notes, on what you're working on:\n{text}\n\n" if text else ""
+    return _game.guide_by_topic(NAME if folder is True else folder, query,
+                                "From your Minecraft notes, on what you're working on")
 
 
-def _say(text):
-    try:
-        import ui
-
-        ui.add_message("system", text)
-    except Exception:
-        pass
-
-
-def _play():
-    import reflect
-
-    while not _stop.is_set():
-        _stop.wait(2)
-        s = settings()
-
-        if (not _connected or not _state["goal"] or _state["paused"] or _state["busy"]
-                or reflect.idle_seconds() < float(s["step_seconds"])):
-            continue
-
-        _state["busy"] = True
-
-        try:
-            _step()
-        except Exception as e:
-            _state["error"] = str(e)[:200]
-            logbook.exception(NAME, "step failed")
-            _stop.wait(30)  # don't spin on a broken connection
-        finally:
-            _state["busy"] = False
-
-            if _stop.is_set() or not _state["goal"] or _state["paused"]:
-                from plugins import _playlog
-
-                _playlog.finished(NAME)   # she stopped: the session is over
+_loop = _game.Loop(NAME, _state, _step,
+                   playing=lambda: _connected and bool(_state["goal"]) and not _state["paused"],
+                   quiet=lambda: settings()["step_seconds"])
 
 
 # ---------------------------------------------------------------------------

@@ -59,10 +59,11 @@ import os
 import re
 import shutil
 import sys
-import threading
 
 import config
 import logbook
+
+from plugins import _game
 
 NAME = "zork"
 SUMMARY = "she plays Zork I, the classic text adventure"
@@ -77,21 +78,13 @@ DEFAULTS = {"step_seconds": 8, "max_steps": 200, "speak": True, "web": True, "in
             "watch": False, "terminal": "", "guide": True,
             "turn_seconds": 150}
 
-# When "web" is on: stuck on a puzzle or a recipe, she can look it up.
-# If that means she reads a walkthrough and wins, she wins.
-WEB_TOOLS = ["web_search", "research"]
-
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "playing": False,
           "busy": False, "error": ""}
-_stop = threading.Event()
-_thread = None
 _connected = False
 
 
 def settings():
-    s = dict(DEFAULTS)
-    s.update({k: v for k, v in config.plugin_settings(NAME).items() if k in DEFAULTS})
-    return s
+    return _game.settings(NAME, DEFAULTS)
 
 
 def _dfrotz():
@@ -130,7 +123,7 @@ def running():
 
 
 def start(model):
-    global _thread, _connected
+    global _connected
     import mcpclient
 
     if _connected:
@@ -151,9 +144,7 @@ def start(model):
 
     _connected = True
     _state.update(model=model, tools=names, error="")
-    _stop.clear()
-    _thread = threading.Thread(target=_play, daemon=True, name="zork")
-    _thread.start()
+    _loop.start()
 
     resumed = " (a saved game is waiting)" if os.path.exists(os.path.join(SAVES, "autosave.qzl")) else ""
 
@@ -164,14 +155,10 @@ def stop():
     global _connected
     import mcpclient
 
-    _stop.set()
+    _loop.stop()
     _state["playing"] = False
     mcpclient.disconnect_server(SERVER)      # the server autosaves on its way out
-
-    if not _state["busy"]:
-        from plugins import _playlog
-
-        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
+    _game.session_over(NAME, _state)
     _connected = False
 
     return True, "zork: put away (saved for next time)"
@@ -279,11 +266,7 @@ def _set_playing(on):
         return ("zork: she's playing - she takes a turn whenever you're quiet. "
                 "/zork pause stops, /zork watch shows the game." + extra)
 
-    if not _state["busy"]:
-        from plugins import _playlog
-
-        _playlog.finished(NAME)   # mid-turn, the turn loop does it once the turn is recorded
-
+    _game.session_over(NAME, _state)
     return "zork: paused."
 
 
@@ -331,15 +314,7 @@ def _room(screen):
 def _guide(here):
     """The lines her knowledge folder (luna-knowledge/zork/) has about
     where she is, for the turn prompt; "" when off, unknown or nothing."""
-    if not here or not settings()["guide"]:
-        return ""
-    try:
-        import knowledge
-
-        text = knowledge.about(NAME, here)
-    except Exception:
-        return ""
-    return f"What your guide (notes on the game you were given) says about {here}:\n{text}\n\n" if text else ""
+    return _game.guide_by_room(NAME, here, settings()["guide"])
 
 
 def _pretty_turn(turn, said, width=78):
@@ -489,7 +464,7 @@ def _step():
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-20:]) or "- nothing yet: a new game"
-    allowed = list(_state["tools"]) + ["play_zork", "game_note"] + (WEB_TOOLS if s["web"] else [])
+    allowed = list(_state["tools"]) + ["play_zork", "game_note"] + (_game.WEB_TOOLS if s["web"] else [])
 
     import projects
 
@@ -519,52 +494,16 @@ def _step():
     _state["notes"] = (_state["notes"] + _moves_made(exchanges))[-30:]
     _state["steps"] += 1
 
-    from plugins import _playlog
-
-    _playlog.write(NAME, _state["steps"], answer, block=_pretty_turn(_state["steps"], answer),
-                   also=[os.path.join(SAVES, "transcript.txt")])
-    _playlog.remember(NAME, "Zork I", answer, exchanges)
+    _game.record(NAME, "Zork I", _state["steps"], answer, exchanges,
+                 block=_pretty_turn(_state["steps"], answer), also=[os.path.join(SAVES, "transcript.txt")])
 
     if _state["steps"] >= int(s["max_steps"]):
         _state["playing"] = False
-        _say(f"Zork: {_state['steps']} turns - paused. /zork play to keep going.")
+        _game.say(f"Zork: {_state['steps']} turns - paused. /zork play to keep going.")
 
 
-def _say(text):
-    try:
-        import ui
-
-        ui.add_message("system", text)
-    except Exception:
-        pass
-
-
-def _play():
-    import reflect
-
-    while not _stop.is_set():
-        _stop.wait(2)
-        s = settings()
-
-        if (not _connected or not _state["playing"] or _state["busy"]
-                or reflect.idle_seconds() < float(s["step_seconds"])):
-            continue
-
-        _state["busy"] = True
-
-        try:
-            _step()
-        except Exception as e:
-            _state["error"] = str(e)[:200]
-            logbook.exception(NAME, "turn failed")
-            _stop.wait(30)
-        finally:
-            _state["busy"] = False
-
-            if _stop.is_set() or not _state["playing"]:
-                from plugins import _playlog
-
-                _playlog.finished(NAME)   # she stopped: the session is over
+_loop = _game.Loop(NAME, _state, _step, playing=lambda: _connected and _state["playing"],
+                   quiet=lambda: settings()["step_seconds"])
 
 
 # ---------------------------------------------------------------------------

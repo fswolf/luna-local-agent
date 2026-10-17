@@ -1,0 +1,25 @@
+# Runs Luna's tests on GitHub's machines on every push and pull request:
+# a green tick or a red cross beside each commit. The tests never reach a
+# model or any server (tests/offline.py), and the audio and speech
+# packages that need hardware are stood in for, so only light packages
+# are installed here.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: installer/requirements.txt
+      - name: Packages the tests need
+        run: pip install requests numpy scipy pint chess prompt_toolkit wcwidth
+      - name: Tests
+        run: python -m unittest discover -v tests

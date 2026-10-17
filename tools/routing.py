@@ -35,6 +35,36 @@ from . import tool
 
 _state = {"turn": 0, "used": {}}           # group -> turn it was last used
 
+# What happened on your last turn, for the tools pane: whether it was
+# routed (or why not) and which groups went, stayed back or were pulled
+# in. Only your own turns write it; stream chat, jobs and games don't.
+_last = {}
+
+
+def _record(**what):
+    # Swapped whole rather than cleared and refilled: the pane reads it
+    # from another thread and must never catch it half-written.
+    global _last
+    if getattr(_t(), "track", True):
+        _last = dict(what)
+
+
+def last():
+    """The last turn of yours: {"routed": bool, "why": str, "core": set,
+    "sent": set, "held": set, "pulled": set} - {} before the first."""
+    return dict(_last)
+
+
+def server_up():
+    """Whether the embedding server answered last time anyone asked
+    (True/False), None before it's been tried. Never waits on it."""
+    try:
+        import embedmem
+
+        return embedmem._state.get("up")
+    except Exception:
+        return None
+
 
 def _t():
     """This turn's routing state: pool, chosen, hidden, extra, track."""
@@ -109,7 +139,10 @@ def choose(query, pool, group_of, previous="", quiet=False):
     start(pool, group_of)
 
     # Few enough groups that routing would save nothing: send them all.
-    if len(groups) <= top + len(core & set(groups)) or not str(query or "").strip():
+    if not str(query or "").strip():
+        return set(pool)
+    if len(groups) <= top + len(core & set(groups)):
+        _record(routed=False, why="few", sent=set(groups))
         return set(pool)
 
     docs = {g: _doc(g, e) for g, e in groups.items()}
@@ -117,6 +150,7 @@ def choose(query, pool, group_of, previous="", quiet=False):
 
     # No embedding server: every tool, as before.
     if scores is None:
+        _record(routed=False, why="server", sent=set(groups))
         return set(pool)
 
     def best(by, n):
@@ -132,6 +166,8 @@ def choose(query, pool, group_of, previous="", quiet=False):
 
     _t().chosen = keep
     _t().hidden = {g: e for g, e in groups.items() if g not in keep}
+    _record(routed=True, why="", core=core & set(groups), sent=set(keep),
+            held=set(_t().hidden), pulled=set())
 
     if not quiet:
         logbook.info("tools", "routed: %s (hidden: %s)", ", ".join(sorted(keep)),
@@ -156,6 +192,9 @@ def attach(group):
         _t().extra = getattr(_t(), "extra", set()) | {group}
         _t().chosen = getattr(_t(), "chosen", set()) | {group}
         _t().hidden = {g: e for g, e in hidden().items() if g != group}
+        if getattr(_t(), "track", True) and _last.get("routed"):
+            _record(**dict(_last, pulled=_last.get("pulled", set()) | {group},
+                           held=_last.get("held", set()) - {group}))
         logbook.info("tools", "attached %s mid-turn", group)
         return True
 

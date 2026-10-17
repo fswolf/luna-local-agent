@@ -36,7 +36,7 @@ from .messages import add_message, toggle_mouse
 from .text import _HORIZONTAL, _framed, _keyed, _rule
 from .tools_pane import (
     _ToolControl, _tool_cursor_point, _tool_fragments, _tool_group_toggle, _tool_header,
-    _tool_height, _tool_move, _tool_scroll_position, _tool_toggle,
+    _routing_toggle, _tool_height, _tool_move, _tool_scroll_position, _tool_toggle,
 )
 
 
@@ -189,6 +189,10 @@ def _build_keys():
     @keys.add("a", filter=Condition(lambda: view.pane == "tools" and not approving()))
     def _(event):
         _tool_group_toggle()
+
+    @keys.add("r", filter=Condition(lambda: view.pane == "tools" and not approving()))
+    def _(event):
+        _routing_toggle()
 
     @keys.add("tab")
     def _(event):
