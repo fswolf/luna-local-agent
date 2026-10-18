@@ -4,7 +4,10 @@
 
 opens a small page on http://127.0.0.1:8790 - view, search, add, edit,
 retire, restore and delete facts, and edit the user_preferences block
-of memory.json, whichever backend is in charge. It's a separate
+of memory.json, whichever backend is in charge. Below that, her own
+notebook (agent/notebook.db): how she feels about the games she's
+played, her notes on past conversations and game sessions, and the
+lessons she's learned - facts are about you, the notebook is about her. It's a separate
 process on purpose: memory is the one thing you occasionally want to
 inspect while suspecting the assistant of being wrong about it.
 
@@ -129,7 +132,36 @@ def state():
             _load_memory().get("user_preferences", {}), indent=2
         ),
         "warning": warning,
+        "notebook": notebook_state(),
     }
+
+
+def _notebook():
+    import notebook
+
+    return notebook
+
+
+def notebook_state():
+    """Her notebook for the page, or None if it can't be read."""
+    try:
+        nb = _notebook()
+        games = nb.play_episodes()
+        lesson = lambda l: {"id": l["id"], "text": l["text"], "created": str(l["created"])[:10],
+                            "hits": l["hits"], "origin": l["origin"]}
+        return {
+            "feelings": [{"game": g, "title": f.get("title", g), "feeling": f.get("feeling", ""),
+                          "at": str(f.get("at", ""))[:10]}
+                         for g, f in sorted(nb.game_feelings().items(),
+                                            key=lambda kv: str(kv[1].get("at", "")), reverse=True)],
+            "episodes": [{"id": e["id"], "ended": str(e["ended"])[:16].replace("T", " "),
+                          "turns": e["turns"], "summary": e["summary"], "game": games.get(e["id"], "")}
+                         for e in nb.episodes(100000)],
+            "lessons": [lesson(l) for l in nb.lessons()],
+            "retired_lessons": [lesson(l) for l in nb.lessons(retired=True)],
+        }
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +171,26 @@ def apply(action, body):
     which = backend()
     fact = str(body.get("fact", "")).strip()
     subject = str(body.get("subject", "")).strip()
+
+    if action.startswith("nb_"):
+        nb = _notebook()
+        if action == "nb_feeling":
+            game, feeling = str(body.get("game", "")), str(body.get("feeling", "")).strip()
+            title = nb.game_feelings().get(game, {}).get("title", game)
+            if not game or not feeling:
+                raise ValueError("empty feeling")
+            nb.set_game_feeling(game, title, feeling)
+        elif action == "nb_feeling_forget":
+            nb.forget_game_feeling(str(body.get("game", "")))
+        elif action == "nb_episode_forget":
+            nb.delete_episode(int(body.get("id", -1)))
+        elif action == "nb_lesson_retire":
+            nb.retire_lesson(int(body.get("id", -1)))
+        elif action == "nb_lesson_restore":
+            nb.restore_lesson(int(body.get("id", -1)))
+        else:
+            raise ValueError(f"unknown action {action!r}")
+        return
 
     if action == "prefs":
         prefs = json.loads(body.get("text", "{}"))  # invalid json -> error
@@ -358,6 +410,14 @@ PAGE = r"""<!DOCTYPE html>
   #status { position: fixed; bottom: 14px; right: 16px; font-size: 13px;
             color: var(--ok); opacity: 0; transition: opacity .3s; }
   .empty { color: var(--dim); font-size: 13px; padding: 8px 2px; }
+  .meta-note { color: var(--dim); font-size: 13px; }
+  #epsearch {
+    width: 100%; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel);
+    color: var(--text); font-size: 14px; outline: none;
+  }
+  .fact .game { color: var(--ok); font-size: 12px; border: 1px solid var(--line);
+                border-radius: 20px; padding: 1px 9px; white-space: nowrap; margin-top: 2px; }
 </style></head><body>
 
 <h1>Luna's memory</h1>
@@ -381,6 +441,23 @@ PAGE = r"""<!DOCTYPE html>
 <h2>Preferences (memory.json)</h2>
 <textarea id="prefs" spellcheck="false"></textarea>
 <div style="margin-top:8px"><button onclick="savePrefs()">save preferences</button></div>
+
+<div id="nb">
+<h1 style="margin-top:40px">Her notebook</h1>
+<div class="meta-note">What she remembers about herself: written by her while idle, in her own words. Facts above are about you; this is about her.</div>
+
+<h2>How she feels about games</h2>
+<div id="feelings"></div>
+
+<h2>Her notes on conversations and games</h2>
+<input id="epsearch" placeholder="filter..." oninput="renderNotebook()">
+<div id="episodes"></div>
+
+<h2>Lessons she's learned</h2>
+<div id="lessons"></div>
+<h2 id="rlessons-h">Retired lessons</h2>
+<div id="rlessons"></div>
+</div>
 
 <div id="status"></div>
 
@@ -417,6 +494,90 @@ async function refresh(keepPrefs) {
   warn.textContent = S.warning;
   if (!keepPrefs) document.getElementById("prefs").value = S.prefs;
   render();
+  renderNotebook();
+}
+
+// Her notebook: rows built with textContent, never innerHTML - it's text
+// a model wrote, some of it from games and web pages.
+function nbRow(text, chips, buttons, dim) {
+  const row = document.createElement("div");
+  row.className = "fact" + (dim ? " retired" : "");
+  const t = document.createElement("div");
+  t.className = "text"; t.textContent = text;
+  row.appendChild(t);
+  for (const [cls, label] of chips) {
+    if (!label) continue;
+    const c = document.createElement("div");
+    c.className = cls; c.textContent = label;
+    row.appendChild(c);
+  }
+  const box = document.createElement("div");
+  box.className = "row-buttons";
+  for (const [label, cls, fn] of buttons) {
+    const b = document.createElement("button");
+    b.textContent = label; if (cls) b.className = cls;
+    b.onclick = fn; box.appendChild(b);
+  }
+  row.appendChild(box);
+  return row;
+}
+
+function fill(id, rows, empty) {
+  const el = document.getElementById(id);
+  el.replaceChildren(...rows);
+  if (!rows.length) {
+    const d = document.createElement("div");
+    d.className = "empty"; d.textContent = empty;
+    el.appendChild(d);
+  }
+}
+
+function editFeeling(row, f) {
+  row.replaceChildren();
+  const input = document.createElement("input");
+  input.className = "inline"; input.value = f.feeling;
+  const save = document.createElement("button");
+  save.textContent = "save";
+  save.onclick = async () => { await api("nb_feeling", {game: f.game, feeling: input.value}); flash("saved"); refresh(true); };
+  const cancel = document.createElement("button");
+  cancel.textContent = "cancel"; cancel.onclick = () => refresh(true);
+  const box = document.createElement("div");
+  box.className = "row-buttons"; box.append(save, cancel);
+  row.append(input, box);
+  input.focus();
+  input.onkeydown = e => { if (e.key === "Enter") save.onclick(); };
+}
+
+function renderNotebook() {
+  const N = S.notebook;
+  document.getElementById("nb").style.display = N ? "" : "none";
+  if (!N) return;
+
+  fill("feelings", N.feelings.map(f => {
+    const row = nbRow(f.title + ": " + f.feeling, [["date", f.at]], [
+      ["edit", "", () => editFeeling(row, f)],
+      ["forget", "danger", async () => {
+        if (!confirm("Forget how she feels about " + f.title + "?")) return;
+        await api("nb_feeling_forget", {game: f.game}); refresh(true); }],
+    ]);
+    return row;
+  }), "nothing yet - she writes one after each game session");
+
+  const q = document.getElementById("epsearch").value.toLowerCase();
+  fill("episodes", N.episodes
+    .filter(e => !q || e.summary.toLowerCase().includes(q) || e.game.toLowerCase().includes(q))
+    .map(e => nbRow(e.summary, [["game", e.game], ["date", e.ended]], [
+      ["forget", "danger", async () => {
+        if (!confirm("Forget this?\n\n" + e.summary)) return;
+        await api("nb_episode_forget", {id: e.id}); refresh(true); }],
+    ])), "no notes yet");
+
+  fill("lessons", N.lessons.map(l => nbRow(l.text, [["date", l.created]], [
+    ["retire", "", async () => { await api("nb_lesson_retire", {id: l.id}); refresh(true); }],
+  ])), "no lessons yet");
+  fill("rlessons", N.retired_lessons.map(l => nbRow(l.text, [["date", l.created]], [
+    ["restore", "", async () => { await api("nb_lesson_restore", {id: l.id}); refresh(true); }],
+  ], true)), "none retired");
 }
 
 function factRow(f, retired) {

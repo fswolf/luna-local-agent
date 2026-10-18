@@ -415,9 +415,65 @@ def play_written(session_id, episode_id):
                              (int(episode_id or 0), int(session_id))))
 
 
+def play_episodes():
+    """{episode id: game title} for every episode that's a write-up of a
+    game session - so the memory manager can mark them."""
+    rows = _run(lambda c: c.execute("SELECT episode, title FROM play WHERE episode > 0").fetchall(), [])
+    return {r[0]: r[1] for r in rows}
+
+
+def played_without_feeling():
+    """Games with a written-up session but no feeling yet: (game, title,
+    that session's episode text), newest session per game."""
+    have = set(game_feelings()) | set(get("game_feelings_forgotten", []) or [])
+    rows = _run(lambda c: c.execute(
+        "SELECT p.game, p.title, e.summary FROM play p JOIN episodes e ON e.id = p.episode "
+        "WHERE p.episode > 0 ORDER BY p.ended").fetchall(), [])
+    latest = {}
+    for game, title, summary in rows:
+        latest[game] = (game, title, summary)
+    return [v for k, v in latest.items() if k not in have]
+
+
+# ---------------------------------------------------------------------------
+# How she feels about each game she's played: one line per game, rewritten
+# after each session (reflect.py), and always part of what she knows about
+# herself. Kept in meta: a handful of short lines.
+# ---------------------------------------------------------------------------
+def game_feelings():
+    """{game: {"title", "feeling", "at"}}"""
+    found = get("game_feelings", {})
+    return found if isinstance(found, dict) else {}
+
+
+def set_game_feeling(game, title, feeling):
+    # one short line: it rides in every prompt, and it was written from a
+    # game's text, so it stays a sentence, never a page of anything
+    feeling = " ".join(str(feeling or "").split())[:200]
+    if not feeling:
+        return
+    found = game_feelings()
+    found[str(game)] = {"title": str(title or game), "feeling": feeling, "at": _now()}
+    put("game_feelings", found)
+    gone = get("game_feelings_forgotten", []) or []
+    if str(game) in gone:                          # a new session: a new feeling, forgotten or not
+        put("game_feelings_forgotten", [g for g in gone if g != str(game)])
+
+
+def forget_game_feeling(game):
+    """Gone until she plays it again - her old notes don't bring it back."""
+    found = game_feelings()
+    if found.pop(str(game), None) is None:
+        return False
+    put("game_feelings", found)
+    put("game_feelings_forgotten", sorted(set(get("game_feelings_forgotten", []) or []) | {str(game)}))
+    return True
+
+
 def counts():
     return {
         "lessons": len(lessons()),
         "retired": len(lessons(retired=True)),
         "episodes": _run(lambda c: c.execute("SELECT COUNT(*) FROM episodes").fetchone()[0], 0),
+        "games": len(game_feelings()),
     }

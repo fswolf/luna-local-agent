@@ -222,9 +222,11 @@ def _self_status():
         import notebook
 
         n = notebook.counts()
-        lines.append(f"You remember {len(longterm.get_facts())} facts about the user, "
-                     f"{n['lessons']} lessons about yourself, and notes on "
-                     f"{n['episodes']} past conversations.")
+        known = [f"{len(longterm.get_facts())} facts about the user", f"{n['lessons']} lessons about yourself",
+                 f"notes on {n['episodes']} past conversations and game sessions"]
+        if n.get("games"):
+            known.append(f"how you feel about {n['games']} game{'s' if n['games'] != 1 else ''} you've played")
+        lines.append("You remember " + ", ".join(known[:-1]) + ", and " + known[-1] + ".")
         newest = notebook.lessons()[-1:]
 
         if newest:

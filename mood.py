@@ -749,6 +749,16 @@ def note_thanks():
     _nudge(warmth=0.12, why="you were kind about it")
 
 
+def note_play(verdict, title="a game"):
+    """A game session she's just finished, as she summed it up (reflect.py):
+    an enjoyed one lifts her a little, a frustrating one takes the shine
+    off, a mixed one leaves her as she was."""
+    if verdict == "enjoyed":
+        _nudge(energy=0.10, warmth=0.06, why=f"enjoyed {title}")
+    elif verdict == "frustrated":
+        _nudge(energy=-0.08, warmth=-0.04, why=f"frustrated by {title}")
+
+
 # ---------------------------------------------------------------------------
 # Reading it back
 # ---------------------------------------------------------------------------

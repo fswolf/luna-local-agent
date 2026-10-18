@@ -1148,6 +1148,20 @@ def handle_input(text):
                        f"Chat gestures {'on' if config.PORTRAIT_CHAT_GESTURES else 'off'}.")
         return
 
+    if text == "/portrait frame" or text.startswith("/portrait frame "):
+        import livefeed
+
+        want = text[len("/portrait frame"):].strip().lower()
+        if want in config.FRAMES or want == "face":
+            config.save_setting("portrait.frame", want)
+            livefeed.emit("frame", frame=want)
+        elif want:
+            ui.add_message("system", "Framing: bust (head and shoulders) or full (all of her).")
+            return
+        ui.add_message("system", f"Portrait framing: {config.PORTRAIT_FRAME} "
+                       "(bust: head and shoulders / full: all of her). The tools pane switches it too.")
+        return
+
     if text.startswith("/portrait meaning "):
         import gestures
 
@@ -1453,16 +1467,22 @@ def handle_input(text):
             return
 
         rows = notebook.episodes(8)
+        felt = notebook.game_feelings()
 
-        if not rows:
+        if not rows and not felt:
             ui.add_message("system", "No session notes yet - a conversation is "
                            f"written up after {config.SELF_IDLE_MINUTES} quiet "
                            "minutes, or at the next startup.")
             return
 
-        ui.add_message("system", "\n\n".join(
-            f"{e['id']}. {e['started'][:16].replace('T', ' ')} ({e['turns']} lines)\n{e['summary']}"
-            for e in rows) + "\n\n/episodes forget <n> deletes one.")
+        games = notebook.play_episodes()
+        head = ("How she feels about games:\n" + "\n".join(
+            f"  {f['title']}: {f['feeling']}" for f in felt.values()) + "\n\n") if felt else ""
+        ui.add_message("system", head + "\n\n".join(
+            f"{e['id']}. {e['started'][:16].replace('T', ' ')} "
+            f"({games[e['id']] + ', ' if e['id'] in games else ''}{e['turns']} "
+            f"{'turns' if e['id'] in games else 'lines'})\n{e['summary']}"
+            for e in rows) + "\n\n/episodes forget <n> deletes one; /memory edits it all.")
         return
 
     if text == "/help":

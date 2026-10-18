@@ -100,6 +100,23 @@ last night?" a week later. The game's record is read as data: nothing
 in it is taken as an instruction. `self.episodes` switches these off
 along with the rest.
 
+Each write-up also says how she feels about the game, looking back,
+and the moment that stuck with her:
+
+- **A feeling per game.** One line, rewritten after every session
+  ("REALITI Relax: it felt like a hug, I miss the nest"). These ride
+  in her prompt all the time, a line per game, so she can bring a game
+  up herself rather than only when you mention it. A game she played
+  before this existed gets one from her old notes the next time she's
+  idle.
+- **Her mood.** A session she enjoyed lifts her energy and warmth a
+  little; a frustrating one takes the shine off. Only for a session
+  that ended in the last three hours: writing up last week's game
+  doesn't move today's mood.
+
+Edit or forget a feeling on the memory manager page. A forgotten one
+stays gone until she plays that game again.
+
 The first run only writes up the last three conversations, not your
 whole transcript. Stream chat never sees any of it: a turn from chat
 gets no lessons, no episodes and no "last time".

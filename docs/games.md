@@ -428,6 +428,13 @@ what happened in the last few. Each game she plays also has a
   Troll Room shows up again when she walks back into the Troll Room,
   even though it has dropped off her latest notes.
 
+**After she stops playing**, the session is written up in her own
+notes like a conversation, with how she feels about the game looking
+back, and a good or bad session moves her mood a little. A line per
+game ("Zork I: I still want my rematch with the troll") stays with her
+in conversation, so she can bring a game up herself. `/episodes` and
+the memory manager show them ([details](learning.md#episodic-memory-and-continuity)).
+
 **Her guide.** Notes you give her about a game go in
 `luna-knowledge/<game>/`: `luna-knowledge/zork/` for Zork,
 `luna-knowledge/realiti/` for REALITI. Each turn she sees what they say

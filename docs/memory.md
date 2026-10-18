@@ -69,7 +69,11 @@ install. What changes:
 opens a local page (127.0.0.1:8792/memory/, and only 127.0.0.1) to view,
 search, add, edit, retire, restore and delete facts, plus edit the
 `user_preferences` block of `memory.json`, whichever backend is
-active. On sqlite it's safe to use while she's running; on json the
+active. Below the facts is **her notebook**: how she feels about each
+game she's played, her notes on past conversations and game sessions
+(game ones marked), and the lessons she's learned, each with a forget,
+retire or edit button. Facts are about you; the notebook is about her
+(see [learning](learning.md)). On sqlite it's safe to use while she's running; on json the
 page warns you that a running assistant can overwrite your edits when
 it next saves. The switch is
 live in both directions and loses nothing:

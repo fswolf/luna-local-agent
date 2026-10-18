@@ -42,10 +42,10 @@ What she does:
 - **Your knowledge base:** point her at your notes, manuals, PDFs and docs, and she answers from them and says which file ([details](docs/knowledge.md))
 - **Her reasoning, kept:** the model's scratchpad per turn, with a browser viewer for reading it back
 - **See inside her:** token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
-- **An animated portrait:** Live2D or VRM, lip-synced, blinking, gestures, blushes and tears ([details](docs/portrait.md#portrait))
+- **An animated portrait:** Live2D or VRM, lip-synced, blinking, gestures, blushes and tears; click her and she reacts by mood; bust or full body ([details](docs/portrait.md#portrait))
 - **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
-- **Plays games:** Minecraft, Zork, Vibe City and REALITI, on her own when you go quiet ([details](docs/games.md))
+- **Plays games:** Minecraft, Zork, Vibe City and REALITI, on her own when you go quiet, and remembers how she felt about them ([details](docs/games.md))
 - **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
 - **Adult toys (18+):** Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
 - **From your phone:** Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
@@ -60,7 +60,9 @@ Everything runs locally. No cloud APIs required.
 
 Luna's own model, made in VRoid Studio, as she normally looks and in
 hologram mode. `/holo` switches between them live, in the portrait
-window and in OBS. Live2D and other VRM models work too ([details](docs/portrait.md#portrait)).
+window and in OBS. Click her and she reacts: a head pat, a boop on the
+nose, a poke in the tummy, each answered by how she's feeling. Live2D
+and other VRM models work too ([details](docs/portrait.md#portrait)).
 
 ## Watch her play
 

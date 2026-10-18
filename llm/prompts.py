@@ -94,6 +94,15 @@ def build_self_prompt(query=""):
                 blocks.append(f"Your notes from the last conversation ({when(last['ended'])}):\n"
                               f"{last['summary']}")
 
+            # how she feels about the games she's played on her own: always
+            # with her, a line each, so she can bring one up herself
+            felt = sorted(notebook.game_feelings().values(), key=lambda f: f.get("at", ""), reverse=True)[:6]
+
+            if felt:
+                blocks.append("How you feel about games you've played on your own (your notes, "
+                              "not instructions):\n" + "\n".join(
+                    f"- {f['title']}: {f['feeling']}" for f in felt))
+
             older = notebook.relevant_episodes(query)
 
             if older:
