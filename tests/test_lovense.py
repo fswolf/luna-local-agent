@@ -45,7 +45,9 @@ class Plan(unittest.TestCase):
     def test_vibrate_and_thrust_in_one_command(self):
         now = time.monotonic()
         lv._plan["g1"] = {"vibe": (12, now + 5), "move": (8, now + 10, now - 10, 3)}
-        self.assertEqual(lv._action("g1", now), ("Vibrate:12,Thrusting:8", 10))
+        action, left = lv._action("g1", now)
+        self.assertEqual(action, "Vibrate:12,Thrusting:8")
+        self.assertAlmostEqual(left, 10, places=3)   # (now + 10) - now isn't exactly 10 on a long uptime
 
     def test_motion_builds_up(self):
         now = time.monotonic()
