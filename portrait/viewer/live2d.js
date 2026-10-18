@@ -21,6 +21,7 @@ if (params.get('debug')) document.body.classList.add('debug');
 
 const cfg = await fetch('config.json' + location.search).then(r => r.json()).catch(() => ({}));
 const L2 = cfg.live2d || {};
+let framing = params.get('frame') || cfg.frame || 'bust';   // bust, face or full
 
 const app = new PIXI.Application({ resizeTo: window, backgroundAlpha: 0, antialias: true,
                                    resolution: Math.min(devicePixelRatio, 2), autoDensity: true });
@@ -44,7 +45,15 @@ model.internalModel.focusController && (model.internalModel.focusController.focu
 // Framing: the model's own canvas, cropped to a bust (or a face).
 // ---------------------------------------------------------------------------
 function frame() {
-  const face = params.get('frame') === 'face';
+  const face = framing === 'face';
+  if (framing === 'full') {          // the whole canvas, fitted inside the window
+    const w0 = model.width / model.scale.x, h0 = model.height / model.scale.y;
+    const s = Math.min(innerHeight / h0, innerWidth / w0);
+    model.scale.set(s);
+    model.x = (innerWidth - w0 * s) / 2;
+    model.y = (innerHeight - h0 * s) / 2;
+    return;
+  }
   // fractions of the model's canvas: where the crop starts, how tall it is
   // (width: how much of the canvas must fit across). The defaults suit a
   // full-body canvas; a half-body model sets its own in its luna.json.
@@ -170,6 +179,9 @@ function handle(ev) {
       if (mind.voice.length > 3) mind.voice.shift();
       break;
     case 'done': tilt.target = 0; break;
+    case 'frame':
+      if (['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
+      break;
     case 'reload': location.reload(); break;     // /portrait use switched the model
   }
 }

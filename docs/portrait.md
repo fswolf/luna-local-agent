@@ -41,11 +41,66 @@ movements, her head follows further and wanders on its own, tilts
 towards the side she's looking, and her brow lifts a little. It's the
 same for the Live2D and the 3D portrait (`portrait/viewer/look.js`).
 
+**Framing**: how much of her shows, *bust* (head and shoulders, the
+default) or *full* (all of her). Switch it on the **framing** row of the
+tools pane's Portrait section; an open portrait reframes straight away,
+and it's saved as `portrait.frame` in config.json. It's set in metres on the model, not in pixels, so a 1080p,
+1440p or 4K screen of the same shape shows the same amount of her, only
+sharper. A tall, narrow window (a monitor in portrait) shows more of her
+than a wide one.
+
 Page options: `?bg=transparent` (OBS), `?frame=face` (closer crop),
-`?frame=full` (all of her, 3D models),
+`?frame=full` (all of her); a `?frame` on the URL wins over the
+setting when the page opens, so an OBS source can keep its own,
 `?debug=1` (test buttons for every reaction, including *you: left /
 right / ahead* to try the looking), `?demo=1` (acts out a conversation
 on its own).
+
+## Touching her
+
+Click a part of her and she reacts (3D models). The cursor turns into a
+pointing hand over anywhere that does something.
+
+| Zone | Where |
+|------|-------|
+| head | the top and sides of her head, her hair, her ears: a head pat |
+| nose | the middle of her face, between her eyes and her mouth |
+| mouth | her mouth and chin |
+| chest | from her collarbone down to her ribs |
+| tummy | below her ribs to her hips |
+| groin | between her hips and the top of her legs |
+| legs | the rest of her legs (full-body framing) |
+
+Her neck and arms are zones too, with nothing set for them yet.
+
+How it finds the spot: a ray goes from the camera through the cursor and
+stops at the first piece of her it meets, and the nearest bone says which
+part of her that is. So the zones go wherever she goes (leaning, jumping,
+in the middle of a gesture), at any framing and any screen size, and a
+part that's out of frame can't be touched (no legs in the bust view).
+
+What she does is `portrait/touch.json`: for each zone, a reaction per
+mood band, from how warm she's feeling:
+
+- `cool` (warmth below -0.2), `neutral`, `warm` (above 0.35), `loving`
+  (above 0.66), the same edges as `agent/moods.json`.
+- A zone can also name one of her moods (`"flirty": {...}`, `"mad"`),
+  and that wins over its band.
+- A reaction has `gestures` (one picked at random, any gesture from
+  `portrait/gestures/`), `face` (a quick expression for a few seconds:
+  `happy`, `relaxed`, `sad`, `angry`, `surprised`, `blush`, `lids`, 0 to
+  1), `emote` (`hearts`, `sweat`, `anger`, `question`) and `ears` (true
+  twitches them).
+- Leave a zone or a band out and that touch does nothing.
+
+`cooldown` is the seconds between reactions. Keep poking (`too_much`:
+5 touches in 8 seconds) and she does `too_much_reaction` instead. The
+file is read when the portrait opens, so reload it after an edit;
+`"enabled": false` turns touching off.
+
+On the debug page (`?debug=1`) the zone under the cursor and her mood
+band show beside it, with *(nothing set)* where the file has nothing.
+Live2D models don't have touching yet.
 
 ## Trying models without Luna
 

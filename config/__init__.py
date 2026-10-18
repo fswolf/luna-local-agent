@@ -268,6 +268,7 @@ SETTINGS = {
     "portrait.model":             ("PORTRAIT_MODEL",               True),
     "portrait.browser":           ("PORTRAIT_BROWSER",             True),
     "portrait.size":              ("PORTRAIT_SIZE",                True),
+    "portrait.frame":             ("PORTRAIT_FRAME",               True),
     "portrait.hologram.enabled":  ("PORTRAIT_HOLOGRAM_ENABLED",    True),
     "portrait.gestures":          ("PORTRAIT_GESTURES",            True),
     "portrait.chat_gestures":     ("PORTRAIT_CHAT_GESTURES",       True),
@@ -334,6 +335,11 @@ def _coerce(path, raw):
             return False
 
         raise ValueError(f"{path} is on/off - say true or false, not {raw!r}")
+
+    if path == "portrait.frame":
+        if text.lower() not in ("bust", "full", "face"):
+            raise ValueError(f"portrait.frame is bust, full or face, not {raw!r}")
+        return text.lower()
 
     if path == "camera.device":   # a number, a /dev path or a URL
         return int(text) if text.lstrip("-").isdigit() else text

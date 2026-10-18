@@ -480,6 +480,7 @@ def portrait_config(preview=None):
             "vrm": dict(sidecar.get("vrm") or {}),
             "gestures": _gesture_mode(),
             "chat_gestures": bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)),
+            "frame": str(getattr(config, "PORTRAIT_FRAME", "bust")),
             "clips": portrait_clips(),
             "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},
                              enabled=bool(getattr(config, "PORTRAIT_HOLOGRAM_ENABLED", False)))}

@@ -8,12 +8,15 @@ const BREAST = {
   rightShoulder: [0, 0, -0.08],
 };
 
-// Left hand between her legs — lower, still tucked inward
+// Left hand between her legs — based on shy.js left arm style, dropped lower
+// shy right: [0, 0.8, 1.15] / [0, 2.15, -0.15] / [0, 0.2, 0]
+// mirrored left base: [0, -0.8, -1.15] / [0, -2.15, 0.15] / [0, -0.2, 0]
+// then lowered the upper arm and reduced the fold so the hand lands lower
 const LEGS = {
-  leftUpperArm: [0.1, -0.5, -1.4],
-  leftLowerArm: [0, -1.5, 0.15, 0.5],
-  leftHand:     [0.35, -0.15, -0.18],
-  leftShoulder: [0, 0, 0.08],
+  leftUpperArm: [0.15, -0.4, -1.45],
+  leftLowerArm: [0, -1.6, 0.2, 0.4],
+  leftHand:     [0.3, -0.15, -0.1],
+  leftShoulder: [0, 0, 0.1],
 };
 
 // Panting loop

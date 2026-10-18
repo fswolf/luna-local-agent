@@ -7,7 +7,8 @@
 // here talks back to the assistant.
 //
 //   ?bg=transparent   for an OBS browser source
-//   ?frame=face       closer crop (default: bust); ?frame=full, all of her
+//   ?frame=face       closer crop (default: bust); ?frame=full, all of her.
+//                     Without it, config.json portrait.frame, switched live from the tools pane
 //   ?debug=1          bone list and test buttons
 //   ?demo=1           acts out a fake conversation, no assistant needed
 //   ?holo=1 / ?holo=0 the hologram look on or off (overrides config.json)
@@ -17,6 +18,7 @@ import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils,
 import { createLook } from './look.js';
 import { createHologram3D } from './hologram3d.js';
 import { createEmotes } from './emotes.js';
+import { createTouch } from './touch.js';
 import { createGestures, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
@@ -30,6 +32,7 @@ if (params.get('bg') === 'transparent') document.body.classList.add('transparent
 if (params.get('debug')) document.body.classList.add('debug');
 
 const cfg = await fetch('config.json' + location.search).then(r => r.json()).catch(() => ({}));
+let framing = params.get('frame') || cfg.frame || 'bust';   // bust, face or full
 
 // ---------------------------------------------------------------------------
 // Scene
@@ -129,7 +132,7 @@ function frame() {
   const head = vrm.humanoid.getNormalizedBoneNode('head');
   const p = new THREE.Vector3();
   head.getWorldPosition(p);
-  const face = params.get('frame') === 'face', full = params.get('frame') === 'full';
+  const face = framing === 'face', full = framing === 'full';
   const height = full ? p.y + 0.45 : face ? 0.30 : 0.46;   // metres that should fit top to bottom
   const width = full ? 1.0 : face ? 0.24 : 0.40;           // ...and side to side
   const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -172,6 +175,7 @@ if (params.get('debug')) {
 // ---------------------------------------------------------------------------
 const mind = {
   stage: 'idle',              // idle listening thinking speaking waking
+  label: '',                  // the mood's name (loving, mad...)
   energy: 0, warmth: 0,       // mood dials, about -1..1
   face: null,                 // the mood's face from agent/moods.json (null: work it out from the dials)
   idle: [],                   // gestures this mood drifts into
@@ -204,6 +208,9 @@ function handle(ev) {
       holo?.bright(next === 'speaking' ? 1.12 : next === 'thinking' ? 0.9 : 1);
       break;
     }
+    case 'frame':       // the tools pane: bust, face or full, while the page is open
+      if (['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
+      break;
     case 'holo': {      // /holo or the tools pane, while the page is open
       setHolo(!!ev.on);
       break;
@@ -241,6 +248,7 @@ function handle(ev) {
       if (w > 0.85 && mind.warmth <= 0.85 || w - mind.warmth > 0.3) blush.fluster = 1;   // that landed
       mind.energy = +ev.energy || 0;
       mind.warmth = w;
+      mind.label = typeof ev.label === 'string' ? ev.label : '';
       mind.face = ev.face && typeof ev.face === 'object' ? ev.face : null;
       mind.idle = Array.isArray(ev.idle) ? ev.idle : [];
       // A held pose (walked away: "sulk"). Let go of it when the mood
@@ -1179,6 +1187,71 @@ async function loadClips() {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Touching her: click a part of her and she reacts (3D models). touch.js
+// works out where (a ray from the cursor, the nearest bone); what she does
+// is portrait/touch.json, by zone and by how warm her mood is.
+// ---------------------------------------------------------------------------
+const touchCfg = await fetch('touch.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
+const toucher = createTouch(THREE, camera, renderer.domElement);
+const touched = { last: -99, recent: [] };
+
+function moodBand() {          // the same edges as moods.json's warmth
+  const w = mind.warmth;
+  return w < -0.2 ? 'cool' : w < 0.35 ? 'neutral' : w < 0.66 ? 'warm' : 'loving';
+}
+function pickReaction(table) {
+  return table ? table[mind.label] || table[moodBand()] || null : null;
+}
+function react(r) {
+  const gs = Array.isArray(r.gestures) ? r.gestures : [];
+  if (gs.length) gesture(gs[Math.floor(Math.random() * gs.length)]);
+  if (r.face && typeof r.face === 'object') {
+    feel.face = r.face; feel.start = clock.elapsedTime; feel.seconds = +r.seconds || 3.5;
+  }
+  if (r.emote) emote(r.emote);
+  if (r.ears) twitch(0, 1);
+}
+function touch(zone) {
+  const now = clock.elapsedTime;
+  if (now - touched.last < (+touchCfg.cooldown || 1.5)) return;
+  touched.last = now;
+  const lim = touchCfg.too_much || {};
+  touched.recent = touched.recent.filter(t => now - t < (+lim.seconds || 8)).concat(now);
+  const tooMuch = touched.recent.length >= (+lim.touches || 5);
+  const r = pickReaction(tooMuch ? touchCfg.too_much_reaction : touchCfg.zones?.[zone]);
+  if (tooMuch) touched.recent = [];
+  if (r) react(r);
+}
+
+if (touchCfg.enabled !== false) {
+  const el = renderer.domElement;
+  const tip = params.get('debug') ? Object.assign(document.body.appendChild(document.createElement('div')), { id: 'touchtip' }) : null;
+  let down = null, hoverAt = 0;
+  el.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  el.addEventListener('pointerup', e => {
+    // a click, not the end of a drag (the debug page turns her by dragging)
+    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 600) return;
+    down = null;
+    const hit = toucher.at(vrm, e.clientX, e.clientY);
+    if (hit) touch(hit.zone);
+  });
+  // over a part of her: a pointing hand, and on the debug page the zone's name
+  el.addEventListener('pointermove', e => {
+    const now = performance.now();
+    if (now - hoverAt < 100) return;
+    hoverAt = now;
+    const hit = toucher.at(vrm, e.clientX, e.clientY);
+    const live = hit && pickReaction(touchCfg.zones?.[hit.zone]);
+    if (!params.get('debug')) el.style.cursor = live ? 'pointer' : '';
+    if (tip) {
+      tip.textContent = hit ? `${hit.zone} · ${mind.label || moodBand()}${live ? '' : ' (nothing set)'}` : '';
+      tip.style.left = e.clientX + 14 + 'px';
+      tip.style.top = e.clientY + 10 + 'px';
+    }
+  });
+}
+
 try {
   vrm = await load(cfg.model);
   moves = createGestures(THREE, vrm);
@@ -1186,7 +1259,8 @@ try {
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
   say('');
-  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; } };
+  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
+                      touchAt: (x, y) => toucher.at(vrm, x, y), touch };
   if (params.get('debug')) debugPanel();
   buildActs();
   loadClips().then(buildActs);

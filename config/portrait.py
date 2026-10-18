@@ -23,6 +23,15 @@ PORTRAIT_MODEL = str(_portrait_cfg.get("model") or _DEFAULT_PORTRAIT)
 PORTRAIT_EAR_BONES = list(_portrait_cfg.get("ear_bones", []) or [])
 PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))
 PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
+# How much of her the camera fits: "bust" (head and shoulders, the
+# default) or "full" (all of her), switched from the tools pane; an open
+# portrait reframes at once. "face" (a close crop) is still accepted
+# here and as ?frame=face. ?frame= on the URL wins when the page opens,
+# so an OBS source can keep its own.
+FRAMES = ("bust", "full")
+PORTRAIT_FRAME = str(_portrait_cfg.get("frame", "bust")).lower()
+if PORTRAIT_FRAME not in FRAMES + ("face",):
+    PORTRAIT_FRAME = "bust"
 # Live2D only: which expression is which (portrait/add_live2d.py fills it
 # in), and which parameters are the ears if their names don't say so.
 # The hologram look (portrait/viewer/hologram.js): off unless "enabled": true, or

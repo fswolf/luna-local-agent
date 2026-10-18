@@ -161,6 +161,9 @@ def _model_name(path):
     return parts[1] if len(parts) > 2 else parts[-1].rsplit(".", 1)[0]
 
 
+_FRAME_NOTES = {"bust": "head and shoulders", "full": "all of her", "face": "close on her face"}   # face: /set only
+
+
 def _portrait_group():
     try:
         import config
@@ -179,6 +182,8 @@ def _portrait_group():
     where = f"{found.index(current) + 1} of {len(found)}" if current in found else f"{len(found)} found"
     members = [("model", True, bool(found), f"{where} in portrait/models - space: next" if found
                 else "drop a model into portrait/models", 0, "pick:portrait.model")]
+    members.append(("framing", True, True, _FRAME_NOTES.get(getattr(config, "PORTRAIT_FRAME", "bust"), "")
+                    + " - space: next", 0, "pick:portrait.frame"))
     try:
         _, note = _gesture_note()
         members.append(("gestures", True, True, f"{note} - space: next", 0, "pick:portrait.gestures"))
@@ -445,6 +450,7 @@ def _tool_fragments():
                 import config
 
                 mark = (_gesture_note()[0] if setting == "pick:portrait.gestures"
+                        else getattr(config, "PORTRAIT_FRAME", "bust") if setting == "pick:portrait.frame"
                         else _model_name(getattr(config, "PORTRAIT_MODEL", "")))[:12]
                 fragments.append(("class:key" if selected else "class:dim", pointer))
                 fragments.append(("class:ok", f" {mark:<12} "))
@@ -556,6 +562,16 @@ def _tool_toggle():
             config.save_setting("portrait.model", nxt)
             livefeed.emit("reload")
             add_message("system", f"Portrait model: {_model_name(nxt)} ({nxt}) - an open portrait reloads now.")
+        elif setting == "pick:portrait.frame":
+            import config
+            import livefeed
+
+            frames = config.FRAMES
+            now = getattr(config, "PORTRAIT_FRAME", "bust")
+            nxt = frames[(frames.index(now) + 1) % len(frames)] if now in frames else frames[0]
+            config.save_setting("portrait.frame", nxt)
+            livefeed.emit("frame", frame=nxt)
+            add_message("system", f"Portrait framing: {nxt} ({_FRAME_NOTES[nxt]}) - an open portrait reframes now.")
         elif setting == "pick:portrait.gestures":
             import config
             import gestures

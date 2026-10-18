@@ -1,0 +1,53 @@
+{
+    "_about": "What she does when you click on her portrait (3D models). Each zone has a reaction per mood band - cool, neutral, warm, loving, from her warmth - and can also name one of her moods (flirty, mad...) to override its band. A reaction: gestures (one is picked at random), face (a quick expression: happy, relaxed, sad, angry, surprised, blush, lids, 0..1), emote (hearts, sweat, anger, question), ears (twitch them). Leave a zone out, or a band, and that touch does nothing. too_much is what she does when you keep at it. docs/portrait.md explains it all.",
+
+    "enabled": true,
+    "cooldown": 1.5,
+    "too_much": { "touches": 5, "seconds": 8 },
+
+    "zones": {
+        "head": {
+            "cool":    { "gestures": ["shrug"], "face": { "angry": 0.3 }, "ears": true },
+            "neutral": { "gestures": ["bashful"], "face": { "happy": 0.3 }, "ears": true },
+            "warm":    { "gestures": ["bashful"], "face": { "happy": 0.5, "lids": 0.5, "blush": 0.3 }, "ears": true },
+            "loving":  { "gestures": ["bashful"], "face": { "happy": 0.6, "lids": 0.6, "blush": 0.5 }, "emote": "hearts", "ears": true }
+        },
+        "nose": {
+            "cool":    { "gestures": ["surprise"], "face": { "angry": 0.4 } },
+            "neutral": { "gestures": ["surprise"], "face": { "surprised": 0.5 } },
+            "warm":    { "gestures": ["wink"], "face": { "happy": 0.5 } },
+            "loving":  { "gestures": ["wink"], "face": { "happy": 0.6, "blush": 0.4 }, "emote": "hearts" }
+        },
+        "mouth": {
+            "cool":    { "gestures": ["shh"], "face": { "angry": 0.3 } },
+            "neutral": { "gestures": ["shy"], "face": { "blush": 0.3 } },
+            "warm":    { "gestures": ["kiss"], "face": { "happy": 0.4, "blush": 0.4 } },
+            "loving":  { "gestures": ["kiss"], "face": { "happy": 0.5, "blush": 0.6 }, "emote": "hearts" }
+        },
+        "chest": {
+            "cool":    { "gestures": ["hands_on_chest"], "face": { "angry": 0.5 }, "emote": "anger" },
+            "neutral": { "gestures": ["shy"], "face": { "surprised": 0.3, "blush": 0.5 } },
+            "warm":    { "gestures": ["bashful"], "face": { "blush": 0.7, "lids": 0.3 } },
+            "loving":  { "gestures": ["cup_breasts"], "face": { "blush": 0.8, "lids": 0.5 } }
+        },
+        "tummy": {
+            "cool":    { "gestures": ["shrug"], "face": { "angry": 0.3 } },
+            "neutral": { "gestures": ["surprise"], "face": { "happy": 0.3, "blush": 0.3 } },
+            "warm":    { "gestures": ["bounce"], "face": { "happy": 0.6, "blush": 0.3 } },
+            "loving":  { "gestures": ["bashful"], "face": { "happy": 0.6, "blush": 0.5 } }
+        },
+        "groin": {
+            "cool":    { "gestures": ["shy"], "face": { "angry": 0.6 }, "emote": "anger" },
+            "neutral": { "gestures": ["shy"], "face": { "surprised": 0.4, "blush": 0.7 } },
+            "warm":    { "gestures": ["bashful"], "face": { "blush": 0.8, "lids": 0.4 } },
+            "loving":  { "gestures": ["touch_self"], "face": { "blush": 0.9, "lids": 0.6 } }
+        }
+    },
+
+    "too_much_reaction": {
+        "cool":    { "gestures": ["hands_on_chest"], "face": { "angry": 0.8 }, "emote": "anger" },
+        "neutral": { "gestures": ["shrug"], "face": { "angry": 0.4 }, "emote": "sweat" },
+        "warm":    { "gestures": ["surprise"], "face": { "blush": 0.6 }, "emote": "sweat" },
+        "loving":  { "gestures": ["shy"], "face": { "blush": 0.9, "happy": 0.3 }, "emote": "sweat" }
+    }
+}
