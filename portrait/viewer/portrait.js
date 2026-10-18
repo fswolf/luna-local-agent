@@ -1249,6 +1249,15 @@ function touch(zone, side) {
   if (r) react(r, tooMuch ? '' : zone, side);
 }
 
+// ...and Luna hears about it (livefeed -> touches.py): with touch talk on
+// she answers out loud, a moment later, in one short line. Every click
+// goes, so "on the head, 3 times" is right; the cooldown is hers.
+function tell(zone) {
+  if (params.get('demo')) return;
+  fetch('touch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({ zone }) }).catch(() => {});
+}
+
 if (touchCfg.enabled !== false) {
   const el = renderer.domElement;
   const tip = params.get('debug') ? Object.assign(document.body.appendChild(document.createElement('div')), { id: 'touchtip' }) : null;
@@ -1259,7 +1268,9 @@ if (touchCfg.enabled !== false) {
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 600) return;
     down = null;
     const hit = toucher.at(vrm, e.clientX, e.clientY, true);
-    if (hit) touch(hit.zone, hit.side);
+    if (!hit) return;
+    touch(hit.zone, hit.side);
+    tell(hit.zone);
   });
   // over a part of her: a pointing hand, and on the debug page the zone's
   // name. Looked up once the cursor rests (a ray through a skinned model

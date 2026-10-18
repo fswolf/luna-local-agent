@@ -225,8 +225,10 @@ threading.Thread(target=_start_mcp, daemon=True, name="mcp-start").start()
 # Lessons, session notes and fact cleanup while she's idle - and first,
 # notes on the last session, so she can pick up where it left off.
 import reflect  # noqa: E402
+import touches  # noqa: E402
 
 reflect.start(MODEL, show=lambda line: ui.add_message("system", line))
+touches.start(MODEL)          # the portrait's touches, answered out loud (touches.py)
 
 
 # -------------------------

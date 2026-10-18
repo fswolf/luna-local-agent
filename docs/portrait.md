@@ -127,6 +127,27 @@ shot, so they aren't offered and cost no prompt tokens.
 file is read when the portrait opens, so reload it after an edit;
 `"enabled": false` turns touching off.
 
+**She answers, too.** With **touch talk** on (the tools pane's Portrait
+section, or `portrait.touch_talk` in config.json; on by default), Luna
+hears about each touch and answers it out loud a moment later, in one
+short line, in character: she knows her mood and what you were just
+talking about, so a poke mid-argument and one mid-scene play
+differently.
+
+- Pokes within a second and a half are one touch ("on the head, 3
+  times").
+- At most one answer every 12 seconds (`portrait.touch_talk_cooldown`);
+  touches in between get the portrait's reaction only.
+- Never while you're talking, while she's answering, or when she's
+  walked away.
+- It's small: about 40 tokens out at most, no tools, no thinking (on
+  llama.cpp the thinking budget is 0; on LM Studio a Qwen3 model gets
+  `/no_think`, other thinking models may take longer). Most of the
+  prompt is already cached, so it's about a second.
+- The touch and her line go into her history as one short exchange
+  ("*touches you on the head*"), so she remembers it, her mood reads it
+  like any exchange, and her idle notes pick it up.
+
 On the debug page (`?debug=1`) the zone under the cursor and her mood
 band show beside it, with *(nothing set)* where the file has nothing.
 Live2D models don't have touching yet.

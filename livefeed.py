@@ -122,6 +122,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._allowed():
             self.send_response(403)
             self.end_headers()
+        elif self.path == "/portrait/touch":
+            self._touch()
         elif not self._page("POST") and not self._mounted("POST"):
             self.send_response(404)
             self.end_headers()
@@ -160,6 +162,29 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(out)
             return True
         return False
+
+    def _touch(self):
+        """The portrait was clicked (touch.js): she may answer it out loud
+        (touches.py). JSON only - a plain form on some other page can't
+        send that - and the zone must be one she knows."""
+        kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        try:
+            length = min(int(self.headers.get("Content-Length", 0)), 1024)
+            zone = str(json.loads(self.rfile.read(length) or b"{}").get("zone", "")) if kind == "application/json" else ""
+        except (ValueError, AttributeError):
+            zone = ""
+        if not zone:
+            self.send_response(400)
+            self.end_headers()
+            return
+        try:
+            import touches
+
+            touches.note(zone)
+        except Exception:
+            pass
+        self.send_response(204)
+        self.end_headers()
 
     def _mounted(self, method):
         """The thought viewer and the memory manager, served from here at

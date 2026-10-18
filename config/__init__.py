@@ -269,6 +269,8 @@ SETTINGS = {
     "portrait.browser":           ("PORTRAIT_BROWSER",             True),
     "portrait.size":              ("PORTRAIT_SIZE",                True),
     "portrait.frame":             ("PORTRAIT_FRAME",               True),
+    "portrait.touch_talk":        ("PORTRAIT_TOUCH_TALK",          True),
+    "portrait.touch_talk_cooldown": ("PORTRAIT_TOUCH_TALK_COOLDOWN", True),
     "portrait.hologram.enabled":  ("PORTRAIT_HOLOGRAM_ENABLED",    True),
     "portrait.gestures":          ("PORTRAIT_GESTURES",            True),
     "portrait.chat_gestures":     ("PORTRAIT_CHAT_GESTURES",       True),

@@ -72,6 +72,16 @@ Luna playing Zork I on her own for 72 minutes, all local, narrating as
 she goes (part 1). Minecraft, Vibe City and REALITI work the same way
 ([details](docs/games.md)).
 
+## Watch her code
+
+<img width="1210" alt="Luna writing a backup script in the terminal: she reads the SSH config, writes the file with approval, catches her own syntax error, fixes it and schedules the job (placeholder mockup until a real screenshot)" src="assets/luna-coding.png" />
+
+Ask for a script and she writes it: she reads what she needs first,
+every write asks you before it lands, and what she wrote is checked
+straight away (Python, shell, JSON, TOML, YAML) but never run. Here she
+catches her own unclosed quote and fixes it in the same turn
+([files](docs/files.md), [checking her code](docs/learning.md#coding-checking-what-she-wrote)).
+
 ## See inside her
 
 Three local pages, served by Luna while she runs:

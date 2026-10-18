@@ -29,6 +29,11 @@ PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 # here and as ?frame=face. A page with ?frame= on its URL keeps that
 # framing whatever this says, so an OBS source can keep its own.
 FRAMES = ("bust", "full")
+# Touching her portrait (portrait/touch.json): she reacts there at once,
+# and with touch_talk on she also answers out loud in one short line
+# (touches.py), at most once every touch_talk_cooldown seconds.
+PORTRAIT_TOUCH_TALK = bool(_portrait_cfg.get("touch_talk", True))
+PORTRAIT_TOUCH_TALK_COOLDOWN = float(_portrait_cfg.get("touch_talk_cooldown", 12))
 PORTRAIT_FRAME = str(_portrait_cfg.get("frame", "bust")).lower()
 if PORTRAIT_FRAME not in FRAMES + ("face",):
     PORTRAIT_FRAME = "bust"

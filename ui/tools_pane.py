@@ -28,6 +28,7 @@ _FEATURES = (
 _PORTRAIT_FEATURES = (
     ("hologram look", "PORTRAIT_HOLOGRAM_ENABLED", "portrait.hologram.enabled", "/holo, live"),
     ("chat gestures", "PORTRAIT_CHAT_GESTURES", "portrait.chat_gestures", "!hug, hi, lol in chat"),
+    ("touch talk", "PORTRAIT_TOUCH_TALK", "portrait.touch_talk", "click her: she answers out loud, 1 short line"),
 )
 
 # How her replies set off gestures (gestures.py); space cycles.
