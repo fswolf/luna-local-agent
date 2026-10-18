@@ -251,7 +251,8 @@ Combine it with the hand's x for the rest of the turn.
 
 `hips: [x, y, z]` is a **position in metres**, not a rotation:
 `hips: [0, 0.15, 0]` lifts her 15 cm (the jump uses it), `[-0.025, 0, 0]`
-shifts her weight onto one leg.
+shifts her weight onto one leg. A `left: true` copy mirrors it too, so a
+sway to her right becomes a sway to her left.
 
 ## Anatomy of a gesture file
 
@@ -296,6 +297,9 @@ export default {
 | `idle: true` | One of the things she does on her own when nothing's happening |
 | `private: true` | Never triggered from stream chat, and only offered to her in your own conversations |
 | `left: true` | Also make a mirrored copy, `<name>_left` |
+| `full: true` | It only reads with all of her on screen (her legs): offered to her, and played as an idle move, only while the portrait is framed full body. In the bust view it would be a tag that shows nothing |
+| `touch: [...]` | Touch zones it answers when you click her: `['legs']`. See *Touching her* in [portrait](portrait.md) |
+| `moods: [...]` | With `touch`: the mood bands (`cool`, `neutral`, `warm`, `loving`) or mood names it suits. Leave it out for any mood |
 
 ### How keys fill in
 

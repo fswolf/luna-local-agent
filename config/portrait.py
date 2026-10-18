@@ -26,8 +26,8 @@ PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 # How much of her the camera fits: "bust" (head and shoulders, the
 # default) or "full" (all of her), switched from the tools pane; an open
 # portrait reframes at once. "face" (a close crop) is still accepted
-# here and as ?frame=face. ?frame= on the URL wins when the page opens,
-# so an OBS source can keep its own.
+# here and as ?frame=face. A page with ?frame= on its URL keeps that
+# framing whatever this says, so an OBS source can keep its own.
 FRAMES = ("bust", "full")
 PORTRAIT_FRAME = str(_portrait_cfg.get("frame", "bust")).lower()
 if PORTRAIT_FRAME not in FRAMES + ("face",):

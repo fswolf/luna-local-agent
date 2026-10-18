@@ -29,7 +29,7 @@ untouched.
   words, subject/object/possessive: `xe/xem/xyr`.
 - `name`: what she calls you in her own notes ("Shannon asked...").
   Leave it out and she says "the user".
-- No `user` block at all: "the user" and they/them everywhere, and no
+- No `user` block at all: "the user" and he/him everywhere, and no
   line about you in her system prompt.
 
 It changes the wording of her instructions, not her personality: if

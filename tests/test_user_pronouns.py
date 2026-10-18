@@ -13,15 +13,16 @@ from config import base  # noqa: E402
 
 class Who(unittest.TestCase):
     def test_pronoun_words(self):
-        self.assertEqual(base._who({"name": "Shannon", "pronouns": "she/her"}),
+        self.assertEqual(base._who({"name": "Shannon", "pronouns": "she/her"})[:2],
                          ("Shannon", ("she", "her", "her")))
-        self.assertEqual(base._who({"pronouns": "he"}), ("", ("he", "him", "his")))
+        self.assertEqual(base._who({"pronouns": "he"}), ("", ("he", "him", "his"), True))
         self.assertEqual(base._who({"pronouns": "They/Them"})[1], ("they", "them", "their"))
         self.assertEqual(base._who({"pronouns": "xe/xem/xyr"})[1], ("xe", "xem", "xyr"))
 
-    def test_missing_or_odd_is_they(self):
+    def test_missing_or_odd_is_he(self):
         for block in (None, {}, "she", {"pronouns": "??"}, {"pronouns": 5}):
-            self.assertEqual(base._who(block)[1], ("they", "them", "their"), block)
+            self.assertEqual(base._who(block)[1], ("he", "him", "his"), block)
+            self.assertFalse(base._who(block)[2], block)      # not stated to her as theirs
 
     def test_name_is_tidied(self):
         self.assertEqual(base._who({"name": "  Shan \n non "})[0], "Shan non")
@@ -61,6 +62,45 @@ class Prompts(unittest.TestCase):
             base.USER_NAME, base._USER_GAVE_PRONOUNS = saved
             base.USER_THEY, base.USER_THEM, base.USER_THEIR = (self.saved["USER_THEY"], self.saved["USER_THEM"],
                                                                 self.saved["USER_THEIR"])
+
+
+
+class FullBodyGestures(unittest.TestCase):
+    """A gesture marked full: true (her legs) is only offered to her while
+    the portrait shows all of her."""
+
+    def setUp(self):
+        import gestures
+
+        self.g = gestures
+        self.saved = (config.PORTRAIT_FRAME, dict(gestures._files))
+        gestures._files.update(at=1e18, found={
+            "wave": {"about": "hello", "private": False, "left": True, "full": False},
+            "knee_lift": {"about": "ticklish", "private": False, "left": True, "full": True}})
+
+    def tearDown(self):
+        config.PORTRAIT_FRAME = self.saved[0]
+        self.g._files.clear()
+        self.g._files.update(self.saved[1])
+
+    def offered(self):
+        from unittest import mock
+
+        with mock.patch.object(self.g, "mode", return_value="tags"), \
+             mock.patch.object(self.g, "_three_d", return_value=True), \
+             mock.patch.object(self.g, "clips", return_value=[]):
+            return self.g.prompt_line(), set(self.g._prototypes())
+
+    def test_only_in_full_body(self):
+        config.PORTRAIT_FRAME = "bust"
+        line, protos = self.offered()
+        self.assertIn("[wave]", line)
+        self.assertNotIn("knee_lift", line)
+        self.assertNotIn("knee_lift", protos)
+        config.PORTRAIT_FRAME = "full"
+        line, protos = self.offered()
+        self.assertIn("[knee_lift]", line)
+        self.assertIn("knee_lift", protos)
 
 
 if __name__ == "__main__":

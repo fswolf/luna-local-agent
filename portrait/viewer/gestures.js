@@ -27,6 +27,10 @@
 //   idle       one of the things she does on her own
 //   private    never from stream chat; only offered in your own turns
 //   left       also make a left-handed copy, <name>_left
+//   full       only reads with all of her on screen (her legs): offered to
+//              her and played on her own only in full-body framing
+//   touch      zones it answers when you click her: ['legs'] (touch.js)
+//   moods      ...in these mood bands or moods: ['warm', 'loving']; none: any
 //
 // Animation clips (.vrma, portrait/animations/) can stand in for any of
 // these or add new ones: addClip() below.

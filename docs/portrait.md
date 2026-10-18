@@ -50,8 +50,9 @@ sharper. A tall, narrow window (a monitor in portrait) shows more of her
 than a wide one.
 
 Page options: `?bg=transparent` (OBS), `?frame=face` (closer crop),
-`?frame=full` (all of her); a `?frame` on the URL wins over the
-setting when the page opens, so an OBS source can keep its own,
+`?frame=full` (all of her); a page with `?frame` on its URL keeps that
+framing and ignores the setting and the toggle, so an OBS source can
+keep its own,
 `?debug=1` (test buttons for every reaction, including *you: left /
 right / ahead* to try the looking), `?demo=1` (acts out a conversation
 on its own).
@@ -69,13 +70,17 @@ pointing hand over anywhere that does something.
 | chest | from her collarbone down to her ribs |
 | tummy | below her ribs to her hips |
 | groin | between her hips and the top of her legs |
-| legs | the rest of her legs (full-body framing) |
+| legs | the rest of her legs (full-body framing); the leg gestures below |
 
-Her neck and arms are zones too, with nothing set for them yet.
+Her neck, arms, back, butt and tail are zones too, with nothing set for
+them yet: add them to touch.json when you want them.
 
 How it finds the spot: a ray goes from the camera through the cursor and
-stops at the first piece of her it meets, and the nearest bone says which
-part of her that is. So the zones go wherever she goes (leaning, jumping,
+stops at the first piece of her it meets. Each spot on her skin is
+weighted to the bones it moves with, and the bone it follows most says
+which part of her that is: a hair strand counts as her head, her tail as
+her tail. Front and back are measured in her own frame, so they hold with
+her turned. A rigid accessory without skin weights uses the nearest bone. So the zones go wherever she goes (leaning, jumping,
 in the middle of a gesture), at any framing and any screen size, and a
 part that's out of frame can't be touched (no legs in the bust view).
 
@@ -89,9 +94,33 @@ mood band, from how warm she's feeling:
 - A reaction has `gestures` (one picked at random, any gesture from
   `portrait/gestures/`), `face` (a quick expression for a few seconds:
   `happy`, `relaxed`, `sad`, `angry`, `surprised`, `blush`, `lids`, 0 to
-  1), `emote` (`hearts`, `sweat`, `anger`, `question`) and `ears` (true
-  twitches them).
+  1), `seconds` (how long that face holds, default 3.5), `emote`
+  (`hearts`, `sweat`, `anger`, `question`; at most one every 30
+  seconds, so they stay special) and `ears` (true twitches them).
 - Leave a zone or a band out and that touch does nothing.
+
+Gesture files can join in on their own, with no edit to touch.json. Two
+lines in the gesture say which touches it answers:
+
+```js
+touch: ['legs'],             // the zones
+moods: ['warm', 'loving'],   // the bands (or mood names); leave it out for any mood
+```
+
+Those gestures are added to whatever the zone already lists, and one is
+picked at random. A gesture with a left-handed copy (`left: true`) plays
+on the side you touched. The leg gestures work this way:
+
+| Gesture | What she does | Moods |
+|---------|---------------|-------|
+| `knee_lift` | ticklish: the knee you touched jerks up, she leans over it laughing | neutral, warm |
+| `weight_shift` | pleased and posey: hips sway over, one knee bends in, head tilted | warm, loving |
+| `step_back` | "hey": a step back, leaning away, chin up | cool |
+
+They have an `about` line too, so in tags mode she can use them in
+conversation like any other gesture, but only while she's framed full
+body (`full: true` in the file): in the bust view her legs are out of
+shot, so they aren't offered and cost no prompt tokens.
 
 `cooldown` is the seconds between reactions. Keep poking (`too_much`:
 5 touches in 8 seconds) and she does `too_much_reaction` instead. The

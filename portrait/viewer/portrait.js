@@ -19,7 +19,7 @@ import { createLook } from './look.js';
 import { createHologram3D } from './hologram3d.js';
 import { createEmotes } from './emotes.js';
 import { createTouch } from './touch.js';
-import { createGestures, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
+import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
 const note = document.getElementById('note');
@@ -208,8 +208,8 @@ function handle(ev) {
       holo?.bright(next === 'speaking' ? 1.12 : next === 'thinking' ? 0.9 : 1);
       break;
     }
-    case 'frame':       // the tools pane: bust, face or full, while the page is open
-      if (['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
+    case 'frame':       // the tools pane: bust or full, while the page is open (a ?frame= page keeps its own)
+      if (!params.get('frame') && ['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
       break;
     case 'holo': {      // /holo or the tools pane, while the page is open
       setHolo(!!ev.on);
@@ -419,10 +419,13 @@ function idleMoves(now, talking) {
     let pick;
     // half the time, something that suits her mood (agent/moods.json "idle")
     const fits = mind.idle.filter(n => moves.names.includes(n) || moves.hasClip(n));
-    const pool = fits.length && Math.random() < 0.5 ? fits : IDLE.concat(moves.clipsWhere('idle'));   // clips marked "idle" join in
-    do { pick = pool[Math.floor(Math.random() * pool.length)]; } while (pick === idle.last && pool.length > 1);
-    idle.last = pick;
-    moves.play(pick);
+    const seen = n => !(GESTURES[n]?.full && framing !== 'full');   // legs-only moves wait for full body
+    const pool = (fits.length && Math.random() < 0.5 ? fits : IDLE.concat(moves.clipsWhere('idle'))).filter(seen);   // clips marked "idle" join in
+    if (pool.length) {
+      do { pick = pool[Math.floor(Math.random() * pool.length)]; } while (pick === idle.last && pool.length > 1);
+      idle.last = pick;
+      moves.play(pick);
+    }
     idle.next = now + rand(25, 55);
   }
   if (talking && now > idle.talkNext) {
@@ -1200,56 +1203,83 @@ function moodBand() {          // the same edges as moods.json's warmth
   const w = mind.warmth;
   return w < -0.2 ? 'cool' : w < 0.35 ? 'neutral' : w < 0.66 ? 'warm' : 'loving';
 }
-function pickReaction(table) {
-  return table ? table[mind.label] || table[moodBand()] || null : null;
+// which entry of a zone's table answers now: her mood by name, else its band
+function reactionKey(table) {
+  if (!table) return '';
+  return table[mind.label] ? mind.label : table[moodBand()] ? moodBand() : '';
 }
-function react(r) {
-  const gs = Array.isArray(r.gestures) ? r.gestures : [];
-  if (gs.length) gesture(gs[Math.floor(Math.random() * gs.length)]);
+function pickReaction(table) {
+  const key = reactionKey(table);
+  return key ? table[key] : null;
+}
+// Gesture files can say which touches they answer: touch: ['legs'],
+// moods: ['warm', 'loving'] (no moods: any). Drop one in and it joins.
+function taggedFor(zone) {
+  const band = moodBand();
+  return Object.keys(GESTURES).filter(n => {
+    const g = GESTURES[n];
+    if (n.endsWith('_left') || !Array.isArray(g.touch) || !g.touch.includes(zone)) return false;
+    return !Array.isArray(g.moods) || g.moods.includes(band) || g.moods.includes(mind.label);
+  });
+}
+function react(r, zone, side) {
+  const gs = [...new Set([...(Array.isArray(r.gestures) ? r.gestures : []), ...taggedFor(zone)])];
+  if (gs.length) {
+    let g = gs[Math.floor(Math.random() * gs.length)];
+    if (side === 'left' && GESTURES[g + '_left']) g += '_left';   // a one-sided gesture: the side you touched
+    gesture(g);
+  }
   if (r.face && typeof r.face === 'object') {
     feel.face = r.face; feel.start = clock.elapsedTime; feel.seconds = +r.seconds || 3.5;
   }
   if (r.emote) emote(r.emote);
   if (r.ears) twitch(0, 1);
 }
-function touch(zone) {
+function touch(zone, side) {
   const now = clock.elapsedTime;
-  if (now - touched.last < (+touchCfg.cooldown || 1.5)) return;
-  touched.last = now;
+  // every click counts toward "too much", even ones too quick to answer
   const lim = touchCfg.too_much || {};
   touched.recent = touched.recent.filter(t => now - t < (+lim.seconds || 8)).concat(now);
+  if (now - touched.last < (+touchCfg.cooldown || 1.5)) return;
+  touched.last = now;
   const tooMuch = touched.recent.length >= (+lim.touches || 5);
-  const r = pickReaction(tooMuch ? touchCfg.too_much_reaction : touchCfg.zones?.[zone]);
+  const r = pickReaction(tooMuch ? touchCfg.too_much_reaction : touchCfg.zones?.[zone])
+            || (!tooMuch && taggedFor(zone).length ? {} : null);
   if (tooMuch) touched.recent = [];
-  if (r) react(r);
+  if (r) react(r, tooMuch ? '' : zone, side);
 }
 
 if (touchCfg.enabled !== false) {
   const el = renderer.domElement;
   const tip = params.get('debug') ? Object.assign(document.body.appendChild(document.createElement('div')), { id: 'touchtip' }) : null;
-  let down = null, hoverAt = 0;
-  el.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  let down = null, hoverTimer = 0;
+  el.addEventListener('pointerdown', e => { down = e.button === 0 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null; });
   el.addEventListener('pointerup', e => {
     // a click, not the end of a drag (the debug page turns her by dragging)
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 600) return;
     down = null;
-    const hit = toucher.at(vrm, e.clientX, e.clientY);
-    if (hit) touch(hit.zone);
+    const hit = toucher.at(vrm, e.clientX, e.clientY, true);
+    if (hit) touch(hit.zone, hit.side);
   });
-  // over a part of her: a pointing hand, and on the debug page the zone's name
+  // over a part of her: a pointing hand, and on the debug page the zone's
+  // name. Looked up once the cursor rests (a ray through a skinned model
+  // isn't free), not on every move.
   el.addEventListener('pointermove', e => {
-    const now = performance.now();
-    if (now - hoverAt < 100) return;
-    hoverAt = now;
-    const hit = toucher.at(vrm, e.clientX, e.clientY);
-    const live = hit && pickReaction(touchCfg.zones?.[hit.zone]);
-    if (!params.get('debug')) el.style.cursor = live ? 'pointer' : '';
-    if (tip) {
-      tip.textContent = hit ? `${hit.zone} · ${mind.label || moodBand()}${live ? '' : ' (nothing set)'}` : '';
-      tip.style.left = e.clientX + 14 + 'px';
-      tip.style.top = e.clientY + 10 + 'px';
-    }
+    const x = e.clientX, y = e.clientY;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      const hit = toucher.at(vrm, x, y);
+      const table = hit && touchCfg.zones?.[hit.zone];
+      const key = reactionKey(table), tagged = hit ? taggedFor(hit.zone).length : 0;
+      if (!params.get('debug')) el.style.cursor = key || tagged ? 'pointer' : '';
+      if (tip) {
+        tip.textContent = !hit ? '' : `${hit.zone} · ${key || (tagged ? `gestures (${moodBand()})` : `nothing set (${mind.label || moodBand()})`)}`;
+        tip.style.left = x + 14 + 'px';
+        tip.style.top = y + 10 + 'px';
+      }
+    }, 120);
   });
+  el.addEventListener('pointerleave', () => { clearTimeout(hoverTimer); if (tip) tip.textContent = ''; });
 }
 
 try {

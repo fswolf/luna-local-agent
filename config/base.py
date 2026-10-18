@@ -87,28 +87,26 @@ RULES = agent.get("rules", [])
 # reads these rather than assuming. pronouns: "he", "she" or "they"
 # (anything after a slash is ignored: "she/her" is "she"), or three
 # words of your own, "xe/xem/xyr" - subject, object, possessive. No name
-# means "the user"; no pronouns or ones it can't read mean they/them.
+# means "the user"; no pronouns, or ones it can't read, mean he/him.
 _PRONOUNS = {"he": ("he", "him", "his"), "she": ("she", "her", "her"), "they": ("they", "them", "their")}
 
 
 def _who(block):
-    """(name, (they, them, their)) from the user block; ("", they/them/their) for nothing."""
+    """(name, (they, them, their), understood) from the user block. understood:
+    the pronouns were given and made sense - only then are they stated to her
+    as yours; he/him as a fallback is just how the prompts word things."""
     block = block if isinstance(block, dict) else {}
     name = " ".join(str(block.get("name") or "").split())[:40]
     words = [w.strip().lower() for w in str(block.get("pronouns") or "").split("/") if w.strip()]
     if len(words) >= 3 and all(w.isalpha() and len(w) <= 12 for w in words[:3]):
-        forms = tuple(words[:3])
-    else:
-        forms = _PRONOUNS.get(words[0] if words else "", _PRONOUNS["they"])
-    return name, forms
+        return name, tuple(words[:3]), True
+    if words and words[0] in _PRONOUNS:
+        return name, _PRONOUNS[words[0]], True
+    return name, _PRONOUNS["he"], False
 
 
-USER_NAME, (USER_THEY, USER_THEM, USER_THEIR) = _who(agent.get("user"))
+USER_NAME, (USER_THEY, USER_THEM, USER_THEIR), _USER_GAVE_PRONOUNS = _who(agent.get("user"))
 USER = USER_NAME or "the user"          # the subject of a prompt line: "when {USER} asks"
-# Only pronouns you actually gave are stated to her as yours; they/them
-# as a fallback is just how the prompts word things.
-_USER_GAVE_PRONOUNS = bool(str((agent.get("user") or {}).get("pronouns") or "").strip()
-                           if isinstance(agent.get("user"), dict) else False)
 
 
 def user_line():
@@ -120,5 +118,7 @@ def user_line():
     if not _USER_GAVE_PRONOUNS:
         return f"You're talking with {who}.\n"
     return f"You're talking with {who} ({USER_THEY}/{USER_THEM}/{USER_THEIR}).\n"
+
+
 GENERATION = setting("generation", {})
 

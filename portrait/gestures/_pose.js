@@ -15,7 +15,8 @@ export function mirrorName(n) {
 export function mirrorPose(p) {
   const out = {};
   for (const [k, v] of Object.entries(p)) {
-    if (k === 'hips' || k === 'expr') { out[k] = v; continue; }
+    if (k === 'expr') { out[k] = v; continue; }
+    if (k === 'hips') { out[k] = [-v[0], v[1], v[2]]; continue; }   // a sway to her right goes to her left
     out[mirrorName(k)] = v.length > 3 ? [v[0], -v[1], -v[2], v[3]] : [v[0], -v[1], -v[2]];
   }
   return out;

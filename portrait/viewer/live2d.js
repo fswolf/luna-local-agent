@@ -179,8 +179,8 @@ function handle(ev) {
       if (mind.voice.length > 3) mind.voice.shift();
       break;
     case 'done': tilt.target = 0; break;
-    case 'frame':
-      if (['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
+    case 'frame':       // the tools pane (a ?frame= page keeps its own)
+      if (!params.get('frame') && ['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
       break;
     case 'reload': location.reload(); break;     // /portrait use switched the model
   }
