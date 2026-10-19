@@ -48,6 +48,9 @@ _shell_cfg = setting("shell", {})
 SHELL_ENABLED = bool(_shell_cfg.get("enabled", True))
 SHELL_TIMEOUT = float(_shell_cfg.get("timeout", 60))
 SHELL_MAX_OUTPUT = int(_shell_cfg.get("max_output_chars", 6000))
+# sudo in her commands: off, or a password box on your screen for each one
+# (tools/askpass.sh). The password goes to sudo, never to her.
+SHELL_SUDO = bool(_shell_cfg.get("sudo", False))
 # Remote sources whose commands run without the popup - for automation
 # from Discord. Empty by default: opting in is yours, in core config.
 SHELL_AUTO_APPROVE_SOURCES = [str(s).strip().lower() for s in

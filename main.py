@@ -975,6 +975,11 @@ def handle_input(text):
         if why:
             lines.append("Lately: " + "; ".join(why))
 
+        extra = mood.layers()
+        lines.append(f"Desire {extra['desire']:.2f} (lewd from {mood._extra('lewd').get('enter', 0.6)} at very warm)"
+                     + (f" · holding a grudge, {extra['grudge'] / 60:.0f} min left" if extra["grudge"] else "")
+                     + (f" · lewd held back while {', '.join(mood.tame())} is live" if mood.tame() else ""))
+
         if config.MOOD_AFFECTION:
             rating = mood.last_rating()
             feeling = mood.last_feeling()

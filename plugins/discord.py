@@ -368,7 +368,8 @@ def _run(token, owners):
 
         # !hug, !wave... are for the portrait, not a question for her
         if text.lower().split()[0] in ("!wave", "!hug", "!jump", "!bounce", "!dance",
-                                       "!shrug", "!stretch"):
+                                       "!shrug", "!stretch", "!turn", "!side", "!front",
+                                       "!kiss", "!blowkiss", "!bashful", "!blush"):
             try:
                 import chatroom
 

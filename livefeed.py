@@ -224,7 +224,9 @@ class _Handler(BaseHTTPRequestHandler):
     _TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
               ".json": "application/json", ".vrm": "model/gltf-binary", ".glb": "model/gltf-binary",
               ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp",
-              ".moc3": "application/octet-stream", ".vrma": "model/gltf-binary"}
+              ".moc3": "application/octet-stream", ".vrma": "model/gltf-binary",
+              ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".wav": "audio/wav", ".m4a": "audio/mp4"}
+    _SOUNDS = (".mp3", ".ogg", ".wav", ".m4a")
 
     def _portrait(self, rel):
         """The portrait page and its files - and nothing outside portrait/,
@@ -249,6 +251,28 @@ class _Handler(BaseHTTPRequestHandler):
             except OSError:
                 names = []
             return self._body(json.dumps(names).encode(), "application/json")
+
+        if rel == "sounds/index.json":
+            # portrait/sounds/: {name: [files]} - a file by its name without the
+            # extension (touch-self.mp3 -> "touch-self"), a folder by its name
+            # (gasp/ -> every clip in it, one picked at random), and numbered files
+            # by their shared name (moan01.mp3, moan02.mp3 -> "moan")
+            sdir = os.path.join(config.BASE_DIR, "portrait", "sounds")
+            found = {}
+            for top, _dirs, files in os.walk(sdir):
+                for f in sorted(files):
+                    if os.path.splitext(f)[1].lower() not in self._SOUNDS:
+                        continue
+                    path = os.path.relpath(os.path.join(top, f), os.path.join(config.BASE_DIR, "portrait"))
+                    url = "/".join(path.split(os.sep))
+                    stem = os.path.splitext(f)[0].lower()
+                    found.setdefault(stem, []).append(url)
+                    base = re.sub(r"[_\- ]?\d+$", "", stem)      # moan-sexy01, moan-sexy02 -> also "moan-sexy"
+                    if base and base != stem:
+                        found.setdefault(base, []).append(url)
+                    if top != sdir:
+                        found.setdefault(os.path.relpath(top, sdir).replace(os.sep, "/").lower(), []).append(url)
+            return self._body(json.dumps(found).encode(), "application/json")
 
         if rel == "models.json":
             return self._body(json.dumps(portrait_models()).encode(), "application/json")
@@ -505,6 +529,8 @@ def portrait_config(preview=None):
             "vrm": dict(sidecar.get("vrm") or {}),
             "gestures": _gesture_mode(),
             "chat_gestures": bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)),
+            "sounds": bool(getattr(config, "PORTRAIT_SOUNDS", True)),
+            "sound_volume": float(getattr(config, "PORTRAIT_SOUND_VOLUME", 0.8)),
             "frame": str(getattr(config, "PORTRAIT_FRAME", "bust")),
             "clips": portrait_clips(),
             "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},

@@ -1,0 +1,321 @@
+{
+    "voice": "af_bella",
+    "generation": {
+        "max_tokens": 4800,
+        "reasoning": "low"
+    },
+    "stt": {
+        "mode": "manual",
+        "vad": "auto",
+        "vad_threshold": 0.4,
+        "model": "small",
+        "language": "en",
+        "sensitivity": 1.0,
+        "silence_seconds": 1.2,
+        "max_seconds": 60,
+        "manual_max_seconds": 300,
+        "no_speech_timeout": 8,
+        "settle_seconds": 0.6,
+        "barge_in": true,
+        "barge_in_seconds": 0.35,
+        "barge_in_margin": 2.5,
+        "barge_in_boost": 0.25
+    },
+    "tts": {
+        "url": "http://127.0.0.1:8899",
+        "speed": 1.0,
+        "volume": 1.0,
+        "pitch": 0.0
+    },
+    "vision": {
+        "enabled": true,
+        "scale": 0.5,
+        "max_kb": 4096
+    },
+    "desktop": {
+        "enabled": true,
+        "clipboard": true
+    },
+    "mood": {
+        "enabled": true,
+        "warmth": 0.45,
+        "recovery": 0.25,
+        "voice": true,
+        "affection": true
+    },
+    "files": {
+        "enabled": true,
+        "approval_timeout": 120,
+        "read": "allow",
+        "write": "ask",
+        "job_write_dirs": [
+            "~/luna-jobs"
+        ],
+        "auto_approve_sources": []
+    },
+    "plugins": {
+        "chat": {
+            "tools": [
+                "get_datetime",
+                "time_until",
+                "web_search"
+            ],
+            "cooldown_seconds": 8,
+            "user_cooldown_seconds": 30,
+            "max_message_chars": 300,
+            "context_lines": 12
+        },
+        "pomf": {
+            "enabled": false,
+            "channel": "",
+            "ignore": [
+                "PomfBot"
+            ]
+        },
+        "irc": {
+            "enabled": false,
+            "server": "irc.libera.chat",
+            "port": 6697,
+            "tls": true,
+            "channel": "",
+            "nick": "",
+            "post_replies": true,
+            "speak": false,
+            "max_reply_lines": 3,
+            "ignore": []
+        },
+        "twitch": {
+            "enabled": false,
+            "channel": "",
+            "speak": true,
+            "post_replies": false,
+            "max_reply_chars": 450,
+            "lewd": false,
+            "ignore": [
+                "Nightbot",
+                "StreamElements",
+                "Streamlabs",
+                "Moobot",
+                "Fossabot"
+            ]
+        },
+        "youtube": {
+            "enabled": false,
+            "video": "",
+            "channel": "",
+            "poll_seconds": 5,
+            "speak": true,
+            "lewd": false,
+            "ignore": [
+                "Nightbot",
+                "StreamElements",
+                "Streamlabs",
+                "Moobot",
+                "Fossabot"
+            ]
+        },
+        "cron": {
+            "enabled": false,
+            "job_tools": [
+                "get_datetime",
+                "time_until",
+                "system_status",
+                "system_health",
+                "last_boot",
+                "web_search",
+                "read_page",
+                "list_files",
+                "read_file",
+                "write_file",
+                "edit_file",
+                "recall_facts"
+            ]
+        },
+        "minecraft": {
+            "enabled": false,
+            "host": "localhost",
+            "port": 25565,
+            "username": "Luna",
+            "step_seconds": 20,
+            "max_steps": 60,
+            "speak": true
+        },
+        "zork": {
+            "enabled": false,
+            "step_seconds": 10,
+            "max_steps": 200,
+            "speak": true,
+            "interpreter": "",
+            "watch": false,
+            "terminal": ""
+        },
+        "vibecity": {
+            "enabled": false,
+            "url": "http://127.0.0.1:47823/mcp",
+            "step_seconds": 10,
+            "max_rounds": 12,
+            "max_steps": 60,
+            "speak": true,
+            "goal": "",
+            "skip_tools": []
+        },
+        "home": {
+            "enabled": false,
+            "url": "http://localhost:8123",
+            "ask_all": false,
+            "ask_domains": [
+                "lock",
+                "cover",
+                "alarm_control_panel",
+                "valve",
+                "siren"
+            ]
+        },
+        "discord": {
+            "enabled": false,
+            "channel": "",
+            "speak": false,
+            "remember": true,
+            "tools": null,
+            "approval": "discord",
+            "approval_timeout": 300
+        },
+        "lovense": {
+            "enabled": false,
+            "host": "127.0.0.1",
+            "port": 20010,
+            "use_https": false
+        }
+    },
+    "wake_word": {
+        "enabled": false,
+        "model": "hey_jarvis",
+        "threshold": 0.5,
+        "follow_up_seconds": 12,
+        "cooldown_seconds": 1.0
+    },
+    "tools": {
+        "enabled": true,
+        "max_rounds": 4,
+        "disabled": [
+            "cancel_reminder",
+            "clipboard",
+            "control_audio",
+            "edit_file",
+            "focus_window",
+            "list_files",
+            "list_reminders",
+            "project_notes",
+            "read_file",
+            "run_command",
+            "set_alarm",
+            "set_reminder",
+            "start_project",
+            "update_project",
+            "write_file"
+        ]
+    },
+    "shell": {
+        "enabled": true,
+        "timeout": 60,
+        "max_output_chars": 6000,
+        "auto_approve_sources": [],
+        "sudo": false
+    },
+    "web_search": {
+        "enabled": true,
+        "max_results": 3,
+        "fetch_pages": true,
+        "page_max_chars": 6000,
+        "page_timeout": 20,
+        "research_pages": 3,
+        "research_max_chars": 9000,
+        "allow_local": false
+    },
+    "reminders": {
+        "enabled": true,
+        "check_interval_minutes": 2
+    },
+    "alarms": {
+        "enabled": true,
+        "volume": 1.0,
+        "repeats": 5,
+        "gap_seconds": 25,
+        "snooze_minutes": 9,
+        "tone": ""
+    },
+    "history": {
+        "max_raw_messages": 15,
+        "summarize_chunk": 8,
+        "summary_max_chars": 2500,
+        "transcript": true,
+        "transcript_max_mb": 20
+    },
+    "long_term_memory": {
+        "enabled": true,
+        "backend": "sqlite",
+        "max_facts": 30,
+        "context_facts": 25
+    },
+    "logging": {
+        "enabled": true,
+        "level": "info",
+        "max_kb": 1024,
+        "keep": 3
+    },
+    "llm": {
+        "backend": "auto",
+        "lmstudio_url": "http://localhost:1234/v1/chat/completions",
+        "llama_url": "http://127.0.0.1:8080/v1/chat/completions"
+    },
+    "thoughts": {
+        "enabled": true,
+        "max_records": 2000
+    },
+    "monitor": {
+        "enabled": true,
+        "port": 8792
+    },
+    "adaptive": {
+        "enabled": true,
+        "first_budget": 1024,
+        "deep_budget": -1,
+        "rethink_below": 0.75,
+        "min_gain": 0.05,
+        "speak_corrections": true
+    },
+    "self": {
+        "lessons": true,
+        "lessons_in_prompt": 4,
+        "max_lessons": 40,
+        "reflect_every_hours": 20,
+        "episodes": true,
+        "episodes_in_prompt": 2,
+        "idle_minutes": 30,
+        "tidy_facts": true,
+        "calibration": true,
+        "hedge_below": 0.6,
+        "hedge_line": "I'm not totally sure about that one, though.",
+        "greet": true
+    },
+    "portrait": {
+        "model": "models/luna/robot_default.vrm",
+        "ear_bones": [],
+        "browser": "",
+        "size": "420x560",
+        "live2d": {
+            "expressions": {
+                "sad": "tears",
+                "flustered": "x_eyes",
+                "confused": "spiral_eyes"
+            }
+        },
+        "hologram": {
+            "enabled": false
+        }
+    },
+    "mcp": {
+        "enabled": true,
+        "servers": {}
+    }
+}

@@ -60,6 +60,9 @@ DEFAULTS = {
     "channel": "",
     "poll_seconds": 5,
     "speak": True,
+    # Lewd allowed on this stream? Off: while she's live here, her lewd
+    # mood row shows as the row below it and lewd-only moves never play.
+    "lewd": False,
     "ignore": ["Nightbot", "StreamElements", "Streamlabs", "Moobot", "Fossabot"],
 }
 
@@ -363,6 +366,9 @@ def start(model):
         _thread.start()
         _running = True
 
+    import mood
+    mood.set_tame(NAME, not settings().get("lewd", False))
+
     return True, (f"Reading YouTube chat for {stream}. She'll answer anything "
                   f"with \"{config.AGENT_NAME}\" in it, out loud.")
 
@@ -380,6 +386,9 @@ def stop():
             _room.stop()
 
         _running = False
+
+    import mood
+    mood.set_tame(NAME, False)
 
     return True, "Stopped reading YouTube chat."
 

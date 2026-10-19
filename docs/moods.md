@@ -14,10 +14,15 @@ bands and warmth four, giving twelve distinguishable states:
 
 |                | tired | even | wired |
 |----------------|-------|------|-------|
+| *lewd*         | teasing | frisky | heated |
 | **very warm**  | cuddly | loving | flirty |
 | **warm**       | sleepy | happy | excited |
 | **neutral**    | tired | calm | focused |
 | **cool**       | sad | annoyed | mad |
+| *grudge*       | sulky | hurt | furious |
+
+The two rows in italics sit outside the warmth dial, each with its own
+way in and out: see [Lewd and grudge](#lewd-and-grudge).
 
 Two dials rather than one, because a single dial can't tell "tired and
 happy" from "awake and fed up", which are the two that actually turn up
@@ -124,6 +129,69 @@ There's one mood system, not modes to pick from. A sysadmin who wants a
 dry, steady assistant sets `intensity` low and turns `face` and
 `gestures` off; someone who wants her visibly emotional turns
 `intensity` up. Same engine, same rules.
+
+## Lewd and grudge
+
+Two rows past the edges of the grid. Energy still picks the column.
+
+**Lewd** is above very warm. A third dial, **desire** (0 to 1), only
+moves while she's warm or very warm. The exchange reading gives each
+message a fifth score, how flirtatious or intimate it was, and that
+builds desire; a clearly affectionate message adds a little too. It
+fades a bit every turn and halves for every twenty minutes you're
+away. At very warm, with desire past `lewd.enter` (0.6), she's in the
+lewd row. Roughly 5 to 10 minutes of real flirting from warm gets
+there; repeating yourself counts for less each time.
+
+It's quick to kill: one hostile message wipes desire to 0 and takes a
+real bite out of warmth (about two "I love you"s' worth), and desire
+is also gone whenever warmth drops below warm. Below very warm, she's
+told that if you push for sex or intimate roleplay she isn't in the
+mood, and to say so in her own words with a hint of what would change
+that.
+
+**Grudge** is below cool. Real hostility while she's already cool
+starts it, for `grudge.minutes` (20); another insult restarts the
+clock. While it runs her warmth can't climb out of cool - not by
+drift, not by small kindnesses - and she's told she's holding a
+grudge: short and prickly, grumbling at requests, free to refuse
+what isn't urgent until you apologise, but alarms, reminders, safety
+and anything urgent always get done. A real apology or clear warmth
+ends it on the spot; otherwise the time does. Three strikes still
+walks her away, as before: the grudge is the step before that.
+
+Blunt isn't hostile: "fuck this bug" scores nothing. The exchange
+reading only marks hostility aimed at her.
+
+Her touch reactions follow too: `portrait/touch.json` has `lewd` and
+`grudge` entries per zone (see [Portrait](portrait.md)), and gesture
+files can tag `moods: ['lewd']` to join in.
+
+`/mood` shows desire and any grudge with the time left. Both survive a
+restart (desire faded by the time away).
+
+### Streams where lewd isn't allowed
+
+Twitch and YouTube each have a `"lewd"` setting, off by default. While
+either is live with it off, the lewd row shows as the row below it:
+teasing, frisky and heated show as cuddly, loving and flirty in her face,
+idles, voice, portrait and mood line, and gestures marked `lewd: true`
+never play. Desire keeps going underneath, so when the stream stops she's
+back where she was. Pomf, IRC and Discord don't hold anything back.
+`/mood` says when it's happening.
+
+```json
+"twitch": { "lewd": true }
+```
+
+```json
+"lewd":   { "row": ["teasing", "frisky", "heated"], "enter": 0.6 },
+"grudge": { "row": ["sulky", "hurt", "furious"], "minutes": 20 }
+```
+
+The weights (how much a flirty message, an insult or a turn is worth)
+are the `DESIRE_*` and `HOSTILE_HIT` numbers at the top of the
+exchange section in `mood.py`.
 
 ## The moods file
 

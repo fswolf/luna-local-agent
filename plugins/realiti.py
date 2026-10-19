@@ -52,8 +52,15 @@ outside content to her, like a web page. Needs git, and Node.js 20 or newer.
         "node": "",                # path to node if it's somewhere odd
         "watch": false,            # open the watch window with /realiti visit
         "terminal": "",            # e.g. "kitty" or "gnome-terminal --"; "" = find one
-        "guide": true              # each turn, what luna-knowledge/realiti/ says about her room
+        "guide": true,             # each turn, what luna-knowledge/realiti/ says about her room
+        "city": ""                 # a REALITI server to stay joined to, e.g. "http://127.0.0.1:8787"
     }
+
+With "city" set she stays joined to that server's shared city while
+she's in (games/realiti/city-mcp.cjs instead of mcp.cjs, same tools,
+same memories): whoever else is there can meet her in Meridian City.
+A private server's password comes from ~/.config/realiti/password or
+REALITI_PASSWORD. Unreachable, she plays in her own world as usual.
 
 With "guide" on, each turn also shows her what the notes in
 luna-knowledge/realiti/ say about the room she's in, found by the
@@ -80,9 +87,10 @@ SERVER = "realiti"
 REPO = "https://github.com/meatproxy69/Realitiagentframework.git"
 GOAL = "explore, linger, find the places worth coming back to"
 DEFAULTS = {"path": "~/luna-realiti", "step_seconds": 45, "max_steps": 60, "speak": True,
-            "resident": "luna", "node": "", "watch": False, "terminal": "", "guide": True}
+            "resident": "luna", "node": "", "watch": False, "terminal": "", "guide": True, "city": ""}
 WATCH_SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             "games", "realiti", "watch.py")
+CITY_HOST = os.path.join(os.path.dirname(WATCH_SCRIPT), "city-mcp.cjs")
 
 # Of the 27 tools the world offers, the ones she gets. The free-text door
 # reaches everything else (worlds, next, where, receipts...); the
@@ -239,6 +247,12 @@ def _setup_then_connect():
         _state["setup"] = ""
 
 
+def _city():
+    """The server she stays joined to, or "" for her own world."""
+    city = str(settings().get("city") or "").strip().rstrip("/")
+    return city if city.startswith(("http://", "https://")) and os.path.isfile(CITY_HOST) else ""
+
+
 def _storage():
     # In the checkout, not Luna's folder: the world's own memory of her.
     return os.path.join(_path(), f"{settings()['resident']}-resident.json")
@@ -248,10 +262,10 @@ def _connect():
     global _connected
     import mcpclient
 
-    spec = {"command": _node(), "cwd": _host_dir(),
-            "args": [os.path.join(_host_dir(), "mcp.cjs"), "--html", _html(),
-                     "--resident", str(settings()["resident"]), "--storage", _storage()],
-            "tools": HER_TOOLS}
+    who = ["--html", _html(), "--resident", str(settings()["resident"]), "--storage", _storage()]
+    city = _city()
+    host = [CITY_HOST, "--root", _path(), "--city", city] if city else [os.path.join(_host_dir(), "mcp.cjs")]
+    spec = {"command": _node(), "cwd": _host_dir(), "args": host + who, "tools": HER_TOOLS}
     ok, message, names = mcpclient.connect_server(SERVER, spec, timeout=60)
 
     if not ok:
@@ -295,7 +309,7 @@ def status():
     if _state["setup"]:
         return f"realiti: {_state['setup']}..."
 
-    lines = [f"realiti: {'in' if _connected else 'off'}"
+    lines = [f"realiti: {'in' if _connected else 'off'}" + (f" (city: {_city()})" if _city() else "")
              + (f" - visiting, turn {_state['steps']}/{s['max_steps']}" if _state["visiting"] else
                 " - resting" if _connected else "")]
 

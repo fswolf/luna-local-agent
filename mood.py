@@ -62,12 +62,28 @@ ship's-computer end; 1 = as designed; 2 = wears her heart on her
 sleeve) and mood.recovery (how fast she settles). mood.prompt,
 mood.voice, mood.face and mood.gestures say where it shows.
 
+## Past the edges of the grid
+
+Two rows sit outside the warmth bands, each with its own way in and out:
+
+    lewd     very warm AND desire past moods.json lewd.enter. Desire
+             (0..1) only builds while she's warm - flirting, intimacy,
+             touch - fades turn by turn and while you're away, and is
+             wiped by hostility or by warmth falling below warm.
+    grudge   real hostility while she's already cool. Holds for
+             grudge.minutes (another insult restarts it); warmth can't
+             climb out until you make up (an apology, clear warmth) or
+             the time runs out.
+
+Both are rows of three like the grid, picked by energy.
+
 ## What it never does
 
-Moods colour how she sounds, never how much she helps. There is no
-state in which she is less useful, only states in which she is drier
-about it - and an assistant you have to coax out of a sulk is a worse
-assistant than one that never had moods.
+Moods colour how she sounds, not whether things get done. Outside a
+grudge there is no state in which she is less useful. In a grudge she
+grumbles and may turn down what isn't urgent until you make up -
+never alarms, reminders, safety or anything urgent - and the walk-away
+(three strikes) is still the only thing that stops her talking.
 """
 import json
 import os
@@ -96,6 +112,8 @@ _chat_seen = 0     # chat messages counted at the last turn
 _label = ""        # the current label, kept sticky
 _phrasing = {}     # per state, which wording to use next time she's in it
 _clean_run = 0     # turns since the last thing went wrong
+_desire = 0.0      # 0..1, the lewd row's dial: builds only while she's warm
+_grudge_until = 0.0  # time.time() a grudge ends, or 0
 
 
 def _clamp(value):
@@ -121,6 +139,8 @@ _FALLBACK = {
     "warmth": {"edges": [-0.20, 0.35, 0.66], "words": ["cool", "neutral", "warm", "very warm"]},
     "grid": [["sad", "annoyed", "mad"], ["tired", "calm", "focused"],
              ["sleepy", "happy", "excited"], ["cuddly", "loving", "flirty"]],
+    "lewd": {"row": ["teasing", "frisky", "heated"], "enter": 0.6},
+    "grudge": {"row": ["sulky", "hurt", "furious"], "minutes": 20},
     "states": {},
     "feelings": {},
 }
@@ -144,6 +164,11 @@ def _check(data):
 
     if e_edges != sorted(e_edges) or w_edges != sorted(w_edges):
         raise ValueError("edges must go from low to high")
+
+    for extra in ("lewd", "grudge"):
+        row = (data.get(extra) or {}).get("row")
+        if row is not None and len(row) != len(e_edges) + 1:
+            raise ValueError(f"{extra}.row needs {len(e_edges) + 1} moods, one per energy band")
 
     data["energy"] = dict(energy, edges=e_edges)
     data["warmth"] = dict(warmth, edges=w_edges)
@@ -182,6 +207,37 @@ def moods():
 
 def _state(name):
     return (moods().get("states") or {}).get(name) or {}
+
+
+def _extra(name):
+    """moods.json lewd / grudge, falling back to the built-in names."""
+    spec = dict(_FALLBACK[name])
+    spec.update(moods().get(name) or {})
+    return spec
+
+
+def _grudging():
+    """Seconds of grudge left, or 0. Caller holds _lock or doesn't care."""
+    return max(0.0, _grudge_until - time.time()) if _grudge_until else 0.0
+
+
+def _ceiling():
+    """While she holds a grudge her warmth stays in the cool band."""
+    return moods()["warmth"]["edges"][0] - 0.05
+
+
+def _row_of(name):
+    """'lewd' or 'grudge' if the mood is in one of those rows, else ''."""
+    for row in ("lewd", "grudge"):
+        if name in _extra(row)["row"]:
+            return row
+    return ""
+
+
+def _warm_enough():
+    """Desire only lives at warm and above."""
+    edges = moods()["warmth"]["edges"]
+    return _warmth >= edges[-2] if len(edges) >= 2 else _warmth > 0
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +289,7 @@ def _nudge(energy=0.0, warmth=0.0, why=""):
     with _lock:
         _energy = _clamp(_energy + energy * k)
         _warmth = _clamp(_warmth + warmth * k)
+        _settle()
 
         if why:
             _recent.append((why, time.time()))
@@ -241,9 +298,24 @@ def _nudge(energy=0.0, warmth=0.0, why=""):
     _announce()
 
 
+def _settle():
+    """After any change: the grudge's ceiling, and desire dies below warm.
+    Caller holds _lock."""
+    global _warmth, _desire, _grudge_until
+
+    if _grudge_until and not _grudging():
+        _grudge_until = 0.0
+
+    if _grudge_until:
+        _warmth = min(_warmth, _ceiling())
+        _desire = 0.0
+    elif not _warm_enough():
+        _desire = 0.0
+
+
 def note_turn():
     """One exchange finished. Applies the drift, then reads the tempo."""
-    global _energy, _warmth, _last_turn, _clean_run
+    global _energy, _warmth, _last_turn, _clean_run, _desire
 
     if not config.MOOD_ENABLED:
         return
@@ -283,8 +355,14 @@ def note_turn():
         # earned is slow, because otherwise the pull eats every kind
         # word on the turn after it lands - which is exactly what it was
         # doing: +0.045 of affection against -0.045 of drift, net zero.
-        home = _warmth_baseline()
+        home = min(_warmth_baseline(), _ceiling()) if _grudging() else _warmth_baseline()
         _warmth += (home - _warmth) * (pull * 0.4 if _warmth > home else pull)
+
+        # Desire fades on its own: a little every turn, and halves for
+        # every twenty minutes you were gone.
+        _desire = max(0.0, _desire - DESIRE_FADE)
+        if gap:
+            _desire *= 0.5 ** (gap / 1200.0)
 
         # A long stretch where nothing broke is its own small signal.
         # Only counted in runs of ten so it can't outpace the drift.
@@ -301,6 +379,7 @@ def note_turn():
             if why:
                 _recent.append((why, time.time()))
 
+        _settle()
         del _recent[:-6]
 
     machine_energy, machine_warmth, machine_why = _machine_shape(gap)
@@ -548,9 +627,19 @@ _APPRAISE_PROMPT = (
     "3. how it leaves her warmth toward {them}: - (only if the user was clearly hostile or hurtful "
     "to her), =, +\n"
     "4. the one feeling she shows right now, from: none {feelings}\n"
-    "When unsure: 0 = = none\n"
-    "Example: 2 + + laughing"
+    "5. how flirtatious or intimate the USER's message is: 0 not at all, 1 flirting or "
+    "suggestive, 2 openly intimate or sexual\n"
+    "When unsure: 0 = = none 0\n"
+    "Example: 2 + + laughing 1"
 )
+
+# The lewd row's dial. Desire builds from flirting while she's warm,
+# fades a little every turn, and one hostile exchange wipes it: quick to
+# warm up, quicker to kill.
+DESIRE_FLIRT = {1: 0.12, 2: 0.22}   # per flirtatious message (field 5)
+DESIRE_AFFECTION = 0.04            # a clearly affectionate message adds a little
+DESIRE_FADE = 0.02                 # every turn
+HOSTILE_HIT = 0.27                 # warmth, on top of the exchange's own -0.08
 
 _affection_recent = 0.0
 _last_rating = None    # what the last message scored, for /mood
@@ -558,8 +647,8 @@ _last_feeling = None   # the last quick feeling, for /mood
 
 
 def _appraise(said, answer, model):
-    """(rating 0-3, energy -1/0/1, warmth -1/0/1, feeling or None).
-    (0, 0, 0, None) on anything unexpected - a mood is never worth an error."""
+    """(rating 0-3, energy -1/0/1, warmth -1/0/1, feeling or None, flirt 0-2).
+    (0, 0, 0, None, 0) on anything unexpected - a mood is never worth an error."""
     import requests
 
     from config import LM_URL, LLM_HEADERS
@@ -585,7 +674,7 @@ def _appraise(said, answer, model):
     except Exception as e:
         logbook.info("mood", "couldn't read the exchange: %s", e)
 
-        return 0, 0, 0, None
+        return 0, 0, 0, None, 0
 
     return _parse_appraisal(reply, feelings)
 
@@ -595,26 +684,26 @@ def _parse_appraisal(reply, feelings):
     # line that has the right shape, not the first thing it mentions.
     reply = re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL)
     signs = {"-": -1, "=": 0, "+": 1}
-    shape = re.compile(r"\b([0-3])\s+([-=+])\s+([-=+])\s+([A-Za-z_]+)")
+    shape = re.compile(r"\b([0-3])\s+([-=+])\s+([-=+])\s+([A-Za-z_]+)(?:\s+([0-2])\b)?")
     found = shape.findall(reply)
 
     if found:
-        rating, energy, warmth, feeling = found[-1]
+        rating, energy, warmth, feeling, flirt = found[-1]
         feeling = feeling.lower()
 
         return (int(rating), signs[energy], signs[warmth],
-                feeling if feeling in feelings else None)
+                feeling if feeling in feelings else None, int(flirt or 0))
 
     # A model that only managed the digit still gets its warmth counted.
     digits = re.findall(r"\b([0-3])\b", reply)
 
-    return (int(digits[-1]) if digits else 0), 0, 0, None
+    return (int(digits[-1]) if digits else 0), 0, 0, None, 0
 
 
 def _apply_exchange(said, answer, model):
     global _affection_recent, _last_rating, _last_feeling
 
-    rating, energy, warmth, feeling = _appraise(said, answer, model)
+    rating, energy, warmth, feeling, flirt = _appraise(said, answer, model)
 
     with _lock:
         # Repeats fade: the fifth kind word in a row shouldn't land like
@@ -647,8 +736,69 @@ def _apply_exchange(said, answer, model):
     if feeling:
         _feel(feeling)
 
+    _layers(rating, warmth, flirt)
     _compliment(rating, feeling)
     _count_hostility(rating, warmth)
+
+
+def _layers(rating, warmth, flirt):
+    """Desire and the grudge, from one appraised exchange."""
+    global _desire, _grudge_until
+
+    if warmth < 0:
+        # Hostile: desire gone at once, a real dent in warmth, and if
+        # that leaves her cool, a grudge (another insult restarts it).
+        with _lock:
+            _desire = 0.0
+        _nudge(warmth=-HOSTILE_HIT, why="that was hostile")
+
+        with _lock:
+            cool = _warmth < moods()["warmth"]["edges"][0]
+            if cool or _grudging():
+                minutes = float(_extra("grudge").get("minutes", 20))
+                started = not _grudging()
+                _grudge_until = time.time() + minutes * 60
+                _settle()
+            else:
+                started = None
+        if started is not None:
+            logbook.info("mood", "grudge %s (%.0f min)", "started" if started else "restarted", minutes)
+            _nudge(why="holding a grudge")
+        return
+
+    with _lock:
+        if _grudging():
+            # Making up: an apology or clear warmth ends it here and now.
+            if rating >= 2 or warmth > 0:
+                made_up = True          # _make_up clears it, outside the lock
+            else:
+                return
+        else:
+            made_up = False
+            gain = DESIRE_FLIRT.get(flirt, 0.0) + (DESIRE_AFFECTION if rating >= 2 else 0.0)
+
+            if gain and _warm_enough():
+                _desire = min(1.0, _desire + gain / (1.0 + _affection_recent * 0.2))
+            else:
+                gain = 0.0
+
+    if made_up:
+        _make_up("you made up")
+    elif gain:
+        _announce()
+
+
+def _make_up(why):
+    """An apology landed: the grudge is over and she softens a little."""
+    global _grudge_until
+
+    with _lock:
+        if not _grudge_until:
+            return
+        _grudge_until = 0.0
+
+    logbook.info("mood", "grudge over: %s", why)
+    _nudge(warmth=0.10, why=why)
 
 
 def _emote(name, sulking=False):
@@ -794,8 +944,22 @@ def _cell():
     grid = data["grid"]
     current_row = next((i for i, row in enumerate(grid) if _label in row), None)
 
+    lewd, grudge = _extra("lewd"), _extra("grudge")
+    if _label in lewd["row"]:
+        current_row = len(grid) - 1        # lewd sits on very warm: keep that band sticky
+    elif _label in grudge["row"]:
+        current_row = 0
+
     warmth_band = _band(_warmth, data["warmth"]["edges"], current_row)
     row = grid[warmth_band]
+
+    if _grudging():
+        row = list(grudge["row"])
+    elif warmth_band == len(grid) - 1:
+        enter = float(lewd.get("enter", 0.6))
+        if _desire >= enter or (_label in lewd["row"] and _desire >= enter - 0.1):
+            row = list(lewd["row"])
+
     energy_band = _band(_energy, data["energy"]["edges"],
                         row.index(_label) if _label in row else None)
     name = row[energy_band]
@@ -812,6 +976,39 @@ def _cell():
     return name, phrases[_phrasing.get(name, 0) % len(phrases)]
 
 
+# Plugins live somewhere lewd isn't allowed (twitch, youtube with
+# "lewd": false). While any is, the lewd row shows as the row below it -
+# teasing / frisky / heated as cuddly / loving / flirty - in her face,
+# idles, voice, portrait and mood line. The dials and desire keep going
+# underneath, so she's back where she was when the stream ends.
+_tame = set()
+
+
+def set_tame(source, on):
+    """A plugin saying lewd is (not) allowed where it's live."""
+    with _lock:
+        (_tame.add if on else _tame.discard)(source)
+
+    _announce()
+
+
+def tame():
+    """The plugins holding the lewd row back right now, or an empty list."""
+    return sorted(_tame)
+
+
+def _view():
+    """_cell(), as she shows it: the lewd row stepped down while tame."""
+    name, described = _cell()
+    lewd = _extra("lewd")["row"]
+
+    if _tame and name in lewd:
+        name = moods()["grid"][-1][lewd.index(name)]
+        described = (_state(name).get("lines") or [name])[0]
+
+    return name, described
+
+
 def label():
     """One word for the header: 'happy', 'mad'."""
     if not config.MOOD_ENABLED:
@@ -821,7 +1018,7 @@ def label():
         return str(_walk().get("label") or "withdrawn")
 
     with _lock:
-        return _cell()[0]
+        return _view()[0]
 
 
 def _public(name):
@@ -863,18 +1060,40 @@ def line(private=True):
             return f"\n{said}\n"
 
     with _lock:
-        name, described = _cell()
+        name, described = _view()
 
     if not private and _public(name) != name:
         lines = _state(_public(name)).get("lines") or [_public(name)]
         described = lines[0]
 
+    user = getattr(config, "USER", "the user")
+
+    row = _row_of(name)
+
+    if row == "grudge":
+        return (
+            f"\nRight now you feel {described}: {user} was hostile and hasn't made up, and you're "
+            "holding a grudge. Let it show - short, prickly, not warm. Grumble at requests; you "
+            "may refuse what isn't urgent until you get an apology, but alarms, reminders, safety "
+            "and anything urgent always get done. A real apology ends it: let it go.\n"
+        )
+
+    if row == "lewd":
+        return (
+            f"\nRight now you feel {described}. Let that colour how you sound and what you're "
+            f"in the mood for. Don't announce it unasked. Practical requests still get done.\n"
+        )
+
+    not_now = ("" if name in moods()["grid"][-1] else
+               " Pushed for sex or intimate roleplay now, you're not in the mood: say so your "
+               "own way and hint at what would change that. No lecture.")
+
     return (
         f"\nRight now you feel {described}. Let that colour how you "
         "sound - length, warmth, how playful you are - and nothing "
-        f"else. Don't announce it or explain it unasked; if {getattr(config, 'USER', 'the user')} asks how "
+        f"else. Don't announce it or explain it unasked; if {user} asks how "
         "you are, answer honestly and briefly. Never let it make you "
-        "less helpful or less careful.\n"
+        f"less helpful or less careful.{not_now}\n"
     )
 
 
@@ -890,7 +1109,7 @@ def voice_tint():
 
     with _lock:
         energy = _energy
-        name = _cell()[0]
+        name = _view()[0]
 
     # The mood's own tint from moods.json if it has one, else a little
     # slower when tired and quicker when wired, straight off the dial.
@@ -908,7 +1127,7 @@ def face():
         return {}
 
     with _lock:
-        name = _cell()[0]
+        name = _view()[0]
 
     k = min(1.0, _intensity())
 
@@ -921,7 +1140,7 @@ def idle():
         return []
 
     with _lock:
-        name = _cell()[0]
+        name = _view()[0]
 
     return [str(g) for g in (_state(name).get("idle") or [])]
 
@@ -929,7 +1148,7 @@ def idle():
 def emote():
     """An emote this mood shows now and then (loving, flirty: hearts)."""
     with _lock:
-        name = _cell()[0]
+        name = _view()[0]
 
     return _emote(_state(name).get("emote"))
 
@@ -938,11 +1157,17 @@ def state():
     """(label, energy, warmth, [recent reasons]) for /mood."""
     with _lock:
         return (
-            _cell()[0],
+            _view()[0],
             round(_energy, 2),
             round(_warmth, 2),
             [why for why, _when in _recent[-4:]],
         )
+
+
+def layers():
+    """{"desire": 0..1, "grudge": seconds left} for /mood and tests."""
+    with _lock:
+        return {"desire": round(_desire, 2), "grudge": round(_grudging())}
 
 
 def last_rating():
@@ -970,12 +1195,13 @@ def bands():
         return words[band] if band < len(words) else f"band {band + 1}"
 
     with _lock:
-        return word("energy", _energy), word("warmth", _warmth)
+        row = _row_of(_view()[0])
+        return word("energy", _energy), row or word("warmth", _warmth)
 
 
-def set_mood(energy=None, warmth=None):
+def set_mood(energy=None, warmth=None, desire=None, grudge_minutes=None):
     """Put her where you want her - /mood set, and tests."""
-    global _energy, _warmth
+    global _energy, _warmth, _desire, _grudge_until
 
     with _lock:
         if energy is not None:
@@ -984,16 +1210,25 @@ def set_mood(energy=None, warmth=None):
         if warmth is not None:
             _warmth = _clamp(float(warmth))
 
+        if desire is not None:
+            _desire = max(0.0, min(1.0, float(desire)))
+
+        if grudge_minutes is not None:
+            _grudge_until = time.time() + float(grudge_minutes) * 60 if grudge_minutes else 0.0
+            _settle()
+
     _announce()
 
 
 def reset():
     """Back to baseline for the hour."""
-    global _energy, _warmth, _started, _clean_run
+    global _energy, _warmth, _started, _clean_run, _desire, _grudge_until
 
     with _lock:
         _energy = _energy_baseline()
         _warmth = _warmth_baseline()
+        _desire = 0.0
+        _grudge_until = 0.0
         _started = time.monotonic()
         _clean_run = 0
         _recent.clear()
@@ -1088,10 +1323,11 @@ def _count_hostility(rating, warmth):
 
 
 def _withdraw(minutes):
-    global _warmth
+    global _warmth, _desire
 
     with _lock:
         _warmth = min(_warmth, -0.35)    # and cool with you when she's back
+        _desire = 0.0
 
     logbook.info("mood", "walked away for %.0f min", minutes)
     _nudge(why="walked away")
@@ -1135,10 +1371,12 @@ def heard_while_away(text, model):
     if not str(text or "").strip() or not model:
         return False
 
-    rating, _energy_, warmth, _feeling = _appraise(text, "", model)
+    rating, _energy_, warmth, _feeling, _flirt = _appraise(text, "", model)
 
     if warmth > 0 or rating >= 1:
         _back("that sounded like making up")
+        if warmth > 0 or rating >= 2:       # a grudge wants a real apology, same as in _layers
+            _make_up("you made up")
         return True
 
     return False
@@ -1154,6 +1392,8 @@ def _save():
         with open(STATE_FILE, "w") as handle:
             json.dump({"energy": round(_energy, 3),
                        "warmth": round(_warmth, 3),
+                       "desire": round(_desire, 3),
+                       "grudge_until": round(_grudge_until),
                        "at": time.time()}, handle)
     except OSError:
         pass  # a mood is not worth failing a turn over
@@ -1167,7 +1407,7 @@ def _restore():
     So the saved dials are pulled toward today's baseline in proportion
     to the gap, and are gone entirely after about four hours.
     """
-    global _energy, _warmth
+    global _energy, _warmth, _desire, _grudge_until
 
     try:
         with open(STATE_FILE) as handle:
@@ -1176,12 +1416,16 @@ def _restore():
         away = max(0.0, time.time() - float(saved["at"]))
         faded = min(1.0, away / (4 * 3600))
         energy, warmth = float(saved["energy"]), float(saved["warmth"])
+        desire, grudge = float(saved.get("desire", 0)), float(saved.get("grudge_until", 0))
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
     with _lock:
         _energy = _clamp(energy + (_energy_baseline() - energy) * faded)
         _warmth = _clamp(warmth + (_warmth_baseline() - warmth) * faded)
+        _desire = max(0.0, desire * 0.5 ** (away / 1200.0))
+        _grudge_until = grudge if grudge > time.time() else 0.0
+        _settle()
 
     logbook.info("mood", "restored after %.1f min away (%.0f%% faded)",
                  away / 60, faded * 100)
@@ -1199,15 +1443,15 @@ def portrait_state():
     if away():
         spec = _walk()
         moves = config.MOOD_GESTURES and _intensity() > 0
-        return {"label": str(spec.get("label") or "withdrawn"), "energy": energy if show else 0.0,
+        return {"label": str(spec.get("label") or "withdrawn"), "row": "", "energy": energy if show else 0.0,
                 "warmth": warmth if show else 0.0,
                 "face": dict(spec.get("face") or {}) if show else {}, "idle": [],
                 "hold": str(spec.get("hold") or "") if moves else "",
                 "emote": _emote(spec.get("emote"), sulking=True)}
 
-    return {"label": name, "energy": energy if show else 0.0,
+    return {"label": name, "row": _row_of(name), "energy": energy if show else 0.0,
             "warmth": warmth if show else 0.0, "face": face() if show else {}, "idle": idle(),
-            "hold": "", "emote": emote()}
+            "hold": "", "emote": emote(), "tame": bool(_tame)}
 
 
 def _announce():

@@ -643,8 +643,24 @@ def _speakable(text):
     return text if re.search(r"[0-9A-Za-z\u00C0-\uFFFF]", text) else ""
 
 
+def _pronounce(text):
+    """agent.json "pronounce" applied for the voice: each word (any case, its
+    last letter stretched - "nyaaa" counts as "nya") becomes Kokoro's
+    [word](/phonemes/) override, so she says her cat sounds instead of
+    spelling them out. Only the voice gets this; the screen keeps the word."""
+    for word, phonemes in (getattr(config, "PRONOUNCE", None) or {}).items():
+        word, phonemes = str(word).strip(), str(phonemes).strip().strip("/")
+        if not word or not phonemes:
+            continue
+        pattern = rf"(?<![\w\[])({re.escape(word)}{re.escape(word[-1])}*)(?![\w\]])"
+        text = re.sub(pattern, lambda m: f"[{m.group(1)}](/{phonemes}/)", text, flags=re.IGNORECASE)
+
+    return text
+
+
 def _synthesize(text):
     """POST one chunk to /tts and decode the WAV it returns."""
+    text = _pronounce(text)
     try:
         response = requests.post(
             f"{TTS_URL}/tts",

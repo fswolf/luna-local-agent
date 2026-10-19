@@ -1,6 +1,10 @@
 __pycache__/
 *.pyc
 
+# Your settings. The shipped defaults are config.example.json; the first
+# start copies them to config.json, which is yours and never pushed.
+config.json
+
 # Conversation log, the full transcript archive, scheduled reminders
 # and the long-term fact database - all personal, all regenerated at
 # runtime.
@@ -112,3 +116,12 @@ Luna.command
 # Local helper scripts
 pr.sh
 wiki.sh
+
+# The published experiments evals/setup.sh fetches (their own licences) and what they produce.
+evals/vendor/
+evals/results/
+
+# Her sounds (portrait/sounds/): bought or downloaded clips - yours to use,
+# usually not yours to share. Only the folder's README goes in git.
+portrait/sounds/*
+!portrait/sounds/README.md

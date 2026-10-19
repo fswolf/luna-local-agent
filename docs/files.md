@@ -152,7 +152,7 @@ program doesn't exist or dies straight away, she's told the error.
 It runs as you, through `bash -c` (PowerShell on Windows: `pwsh` if
 you have it, else the built-in one, and she's told which so she writes
 the right syntax), with nothing attached to its input, so anything that
-wants to ask (sudo's password, a y/n prompt) fails instead of hanging.
+wants to ask (a y/n prompt, sudo's password) fails instead of hanging.
 It's killed, along with everything it started, after
 `shell.timeout` seconds, and its output is capped at the first and last
 parts of `max_output_chars` and handed back marked as untrusted. The
@@ -161,8 +161,20 @@ command itself can read anything you can**. The popup is the control,
 so read it.
 
 ```json
-"shell": { "enabled": true, "timeout": 60, "max_output_chars": 6000 }
+"shell": { "enabled": true, "timeout": 60, "max_output_chars": 6000, "sudo": false }
 ```
+
+**sudo** is off by default, and then she's told so and a command with
+`sudo` in it is turned back before it asks you anything. Turn it on
+(`/set shell.sudo true`) and sudo asks *you*: approve the command as
+usual, then a password box opens on this screen
+([tools/askpass.sh](../tools/askpass.sh): zenity, kdialog, yad,
+ssh-askpass, or a dialog on macOS), titled with the command it's for.
+The password goes from that box straight to sudo; she never sees it,
+and it isn't stored. Cancel and the command fails. Every sudo asks,
+including ones inside a script she runs. Away from the desk (Discord)
+nobody's there to type it, so it times out as a no. Not on Windows.
+On Fedora, `sudo dnf install zenity` if no box appears.
 
 Stream chat never gets it (not in the chat tool ceiling). For Discord
 turns the plugin's `approval` setting decides: ask in the chat (the

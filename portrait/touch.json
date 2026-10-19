@@ -1,59 +1,693 @@
 {
-    "_about": "What she does when you click on her portrait (3D models). Each zone has a reaction per mood band - cool, neutral, warm, loving, from her warmth - and can also name one of her moods (flirty, mad...) to override its band. A reaction: gestures (one is picked at random), face (a quick expression: happy, relaxed, sad, angry, surprised, blush, lids, 0..1), seconds (how long the face holds), emote (hearts, sweat, anger, question), ears (twitch them). Leave a zone out, or a band, and that touch does nothing. Zones: head, nose, mouth, chest, tummy, groin, legs, and neck, arms, back, butt, tail. Gesture files can also join in on their own with touch: ['legs'] and moods: ['warm'] - those are added to a zone's gestures. too_much is what she does when you keep at it. docs/portrait.md explains it all.",
-
+    "_about": "What she does when you click on her portrait (3D models). Each zone has a reaction per mood band - cool, neutral, warm, loving, from her warmth, plus lewd and grudge (her rows past the grid; without them she falls back to loving / cool) - and can also name one of her moods (flirty, heated, furious...) to override its band. A reaction: gestures (one is picked at random), face (a quick expression: happy, relaxed, sad, angry, surprised, blush, lids, 0..1), seconds (how long the face holds), emote (hearts, sweat, anger, question), ears (twitch them). Leave a zone out, or a band, and that touch does nothing. Zones: head, nose, mouth, chest, tummy, groin, legs, neck, arms, back, butt, and tail (only on models with tail bones). Gesture files can also join in on their own with touch: ['legs'] and moods: ['warm'] - those are added to a zone's gestures. too_much is what she does when you keep at it. docs/portrait.md explains it all.",
     "enabled": true,
     "cooldown": 1.5,
-    "too_much": {"touches": 5, "seconds": 8},
-
+    "too_much": {
+        "touches": 5,
+        "seconds": 8
+    },
     "zones": {
         "head": {
-            "cool":    {"gestures": ["shrug"], "face": {"angry": 0.3}, "ears": true},
-            "neutral": {"gestures": ["bashful"], "face": {"happy": 0.3}, "ears": true},
-            "warm":    {"gestures": ["bashful"], "face": {"happy": 0.5, "lids": 0.5, "blush": 0.3}, "ears": true},
-            "loving":  {"gestures": ["bashful"], "face": {"happy": 0.6, "lids": 0.6, "blush": 0.5}, "emote": "hearts", "ears": true}
+            "cool": {
+                "gestures": [
+                    "shrug"
+                ],
+                "face": {
+                    "angry": 0.3
+                },
+                "ears": true
+            },
+            "neutral": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.3
+                },
+                "ears": true
+            },
+            "warm": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.5,
+                    "lids": 0.5,
+                    "blush": 0.3
+                },
+                "ears": true
+            },
+            "loving": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.6,
+                    "lids": 0.6,
+                    "blush": 0.5
+                },
+                "emote": "hearts",
+                "ears": true
+            },
+            "grudge": {
+                "gestures": [
+                    "shrug"
+                ],
+                "face": {
+                    "angry": 0.6
+                },
+                "emote": "anger",
+                "ears": true
+            },
+            "lewd": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.5,
+                    "blush": 0.7,
+                    "lids": 0.6
+                },
+                "emote": "hearts",
+                "ears": true
+            }
         },
         "nose": {
-            "cool":    {"gestures": ["surprise"], "face": {"angry": 0.4}},
-            "neutral": {"gestures": ["surprise"], "face": {"surprised": 0.5}},
-            "warm":    {"gestures": ["wink"], "face": {"happy": 0.5}},
-            "loving":  {"gestures": ["wink"], "face": {"happy": 0.6, "blush": 0.4}, "emote": "hearts"}
+            "cool": {
+                "gestures": [
+                    "surprise"
+                ],
+                "face": {
+                    "angry": 0.4
+                }
+            },
+            "neutral": {
+                "gestures": [
+                    "surprise"
+                ],
+                "face": {
+                    "surprised": 0.5
+                }
+            },
+            "warm": {
+                "gestures": [
+                    "wink"
+                ],
+                "face": {
+                    "happy": 0.5
+                }
+            },
+            "loving": {
+                "gestures": [
+                    "wink"
+                ],
+                "face": {
+                    "happy": 0.6,
+                    "blush": 0.4
+                },
+                "emote": "hearts"
+            },
+            "grudge": {
+                "gestures": [
+                    "shrug"
+                ],
+                "face": {
+                    "angry": 0.6
+                },
+                "emote": "anger"
+            },
+            "lewd": {
+                "gestures": [
+                    "nose_tease"
+                ]
+            }
         },
         "mouth": {
-            "cool":    {"gestures": ["shh"], "face": {"angry": 0.3}},
-            "neutral": {"gestures": ["shy"], "face": {"blush": 0.3}},
-            "warm":    {"gestures": ["kiss"], "face": {"happy": 0.4, "blush": 0.4}},
-            "loving":  {"gestures": ["kiss"], "face": {"happy": 0.5, "blush": 0.6}, "emote": "hearts"}
+            "cool": {
+                "gestures": [
+                    "shh"
+                ],
+                "face": {
+                    "angry": 0.3
+                }
+            },
+            "neutral": {
+                "gestures": [
+                    "shy"
+                ],
+                "face": {
+                    "blush": 0.3
+                }
+            },
+            "warm": {
+                "gestures": [
+                    "blow_kiss"
+                ],
+                "face": {
+                    "happy": 0.4,
+                    "blush": 0.4
+                }
+            },
+            "loving": {
+                "gestures": [
+                    "blow_kiss"
+                ],
+                "face": {
+                    "happy": 0.5,
+                    "blush": 0.6
+                },
+                "emote": "hearts"
+            },
+            "grudge": {
+                "gestures": [
+                    "shh"
+                ],
+                "face": {
+                    "angry": 0.6
+                }
+            },
+            "lewd": {
+                "gestures": [
+                    "blow_kiss"
+                ],
+                "face": {
+                    "blush": 0.8,
+                    "lids": 0.6
+                },
+                "emote": "hearts"
+            }
         },
         "chest": {
-            "cool":    {"gestures": ["hands_on_chest"], "face": {"angry": 0.5}, "emote": "anger"},
-            "neutral": {"gestures": ["shy"], "face": {"surprised": 0.3, "blush": 0.5}},
-            "warm":    {"gestures": ["bashful"], "face": {"blush": 0.7, "lids": 0.3}},
-            "loving":  {"gestures": ["cup_breasts"], "face": {"blush": 0.8, "lids": 0.5}}
+            "cool": {
+                "gestures": [
+                    "hands_on_chest"
+                ],
+                "face": {
+                    "angry": 0.5
+                },
+                "emote": "anger"
+            },
+            "neutral": {
+                "gestures": [
+                    "shy"
+                ],
+                "face": {
+                    "surprised": 0.3,
+                    "blush": 0.5
+                }
+            },
+            "warm": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "blush": 0.7,
+                    "lids": 0.3
+                }
+            },
+            "loving": {
+                "gestures": [
+                    "cup_breasts"
+                ],
+                "face": {
+                    "blush": 0.8,
+                    "lids": 0.5
+                }
+            },
+            "grudge": {
+                "gestures": [
+                    "hands_on_chest"
+                ],
+                "face": {
+                    "angry": 0.8
+                },
+                "emote": "anger"
+            },
+            "lewd": {
+                "gestures": [
+                    "cup_breasts"
+                ],
+                "face": {
+                    "blush": 0.9,
+                    "lids": 0.6
+                }
+            }
         },
         "tummy": {
-            "cool":    {"gestures": ["shrug"], "face": {"angry": 0.3}},
-            "neutral": {"gestures": ["surprise"], "face": {"happy": 0.3, "blush": 0.3}},
-            "warm":    {"gestures": ["bounce"], "face": {"happy": 0.6, "blush": 0.3}},
-            "loving":  {"gestures": ["bashful"], "face": {"happy": 0.6, "blush": 0.5}}
+            "cool": {
+                "gestures": [
+                    "shrug"
+                ],
+                "face": {
+                    "angry": 0.3
+                }
+            },
+            "neutral": {
+                "gestures": [
+                    "surprise"
+                ],
+                "face": {
+                    "happy": 0.3,
+                    "blush": 0.3
+                }
+            },
+            "warm": {
+                "gestures": [
+                    "giggle",
+                    "bounce"
+                ],
+                "face": {
+                    "happy": 0.6,
+                    "blush": 0.3
+                }
+            },
+            "loving": {
+                "gestures": [
+                    "giggle",
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.6,
+                    "blush": 0.5
+                }
+            },
+            "grudge": {
+                "gestures": [
+                    "shrug"
+                ],
+                "face": {
+                    "angry": 0.5
+                }
+            },
+            "lewd": {
+                "gestures": [
+                    "giggle",
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.4,
+                    "blush": 0.7,
+                    "lids": 0.5
+                }
+            }
         },
         "groin": {
-            "cool":    {"gestures": ["shy"], "face": {"angry": 0.6}, "emote": "anger"},
-            "neutral": {"gestures": ["shy"], "face": {"surprised": 0.4, "blush": 0.7}},
-            "warm":    {"gestures": ["bashful"], "face": {"blush": 0.8, "lids": 0.4}},
-            "loving":  {"gestures": ["touch_self"], "face": {"blush": 0.9, "lids": 0.6}}
+            "cool": {
+                "gestures": [
+                    "shy"
+                ],
+                "face": {
+                    "angry": 0.6
+                },
+                "emote": "anger"
+            },
+            "neutral": {
+                "gestures": [
+                    "shy"
+                ],
+                "face": {
+                    "surprised": 0.4,
+                    "blush": 0.7
+                }
+            },
+            "warm": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "blush": 0.8,
+                    "lids": 0.4
+                }
+            },
+            "loving": {
+                "gestures": [
+                    "touch_self"
+                ],
+                "face": {
+                    "blush": 0.9,
+                    "lids": 0.6
+                }
+            },
+            "grudge": {
+                "gestures": [
+                    "hands_on_chest"
+                ],
+                "face": {
+                    "angry": 0.9
+                },
+                "emote": "anger"
+            },
+            "lewd": {
+                "gestures": [
+                    "touch_self"
+                ],
+                "face": {
+                    "blush": 1.0,
+                    "lids": 0.7
+                }
+            }
         },
         "legs": {
-            "cool":    {"face": {"angry": 0.4}},
-            "neutral": {"face": {"surprised": 0.3, "blush": 0.3}},
-            "warm":    {"face": {"happy": 0.5, "blush": 0.3}},
-            "loving":  {"face": {"happy": 0.5, "blush": 0.5}, "emote": "hearts"}
+            "cool": {
+                "face": {
+                    "angry": 0.4
+                }
+            },
+            "neutral": {
+                "face": {
+                    "surprised": 0.3,
+                    "blush": 0.3
+                },
+                "gestures": [
+                    "standing_split"
+                ]
+            },
+            "warm": {
+                "face": {
+                    "happy": 0.5,
+                    "blush": 0.3
+                }
+            },
+            "loving": {
+                "face": {
+                    "happy": 0.5,
+                    "blush": 0.5
+                },
+                "emote": "hearts"
+            },
+            "grudge": {
+                "face": {
+                    "angry": 0.5
+                },
+                "emote": "anger"
+            },
+            "lewd": {
+                "face": {
+                    "happy": 0.4,
+                    "blush": 0.7,
+                    "lids": 0.5
+                },
+                "emote": "hearts",
+                "gestures": [
+                    "leg_hold"
+                ]
+            }
+        },
+        "butt": {
+            "cool": {
+                "gestures": [
+                    "step_back"
+                ],
+                "face": {
+                    "angry": 0.6
+                },
+                "emote": "anger"
+            },
+            "neutral": {
+                "gestures": [
+                    "surprise"
+                ],
+                "face": {
+                    "surprised": 0.6,
+                    "blush": 0.5
+                }
+            },
+            "warm": {
+                "gestures": [
+                    "shy"
+                ],
+                "face": {
+                    "happy": 0.3,
+                    "blush": 0.6
+                }
+            },
+            "loving": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.4,
+                    "blush": 0.7
+                },
+                "emote": "hearts"
+            },
+            "grudge": {
+                "gestures": [
+                    "huff"
+                ],
+                "face": {
+                    "angry": 0.8
+                },
+                "emote": "anger"
+            },
+            "lewd": {
+                "gestures": [
+                    "sultry_beckon",
+                    "wink"
+                ],
+                "face": {
+                    "happy": 0.3,
+                    "blush": 0.8,
+                    "lids": 0.6
+                },
+                "emote": "hearts"
+            }
+        },
+        "tail": {
+            "cool": {
+                "face": {
+                    "angry": 0.5
+                },
+                "ears": true
+            },
+            "neutral": {
+                "face": {
+                    "surprised": 0.4
+                },
+                "ears": true
+            },
+            "warm": {
+                "face": {
+                    "happy": 0.4
+                },
+                "ears": true
+            },
+            "loving": {
+                "face": {
+                    "happy": 0.5,
+                    "blush": 0.3
+                },
+                "emote": "hearts",
+                "ears": true
+            },
+            "grudge": {
+                "gestures": [
+                    "huff"
+                ],
+                "face": {
+                    "angry": 0.7
+                },
+                "emote": "anger",
+                "ears": true
+            },
+            "lewd": {
+                "face": {
+                    "blush": 0.7,
+                    "lids": 0.5
+                },
+                "emote": "hearts",
+                "ears": true
+            }
+        },
+        "back": {
+            "cool": {
+                "gestures": [
+                    "shrug"
+                ],
+                "face": {
+                    "angry": 0.4
+                }
+            },
+            "neutral": {
+                "face": {
+                    "surprised": 0.3
+                }
+            },
+            "warm": {
+                "face": {
+                    "happy": 0.4,
+                    "relaxed": 0.3
+                }
+            },
+            "loving": {
+                "face": {
+                    "happy": 0.4,
+                    "relaxed": 0.5
+                },
+                "emote": "hearts"
+            },
+            "grudge": {
+                "gestures": [
+                    "huff"
+                ],
+                "face": {
+                    "angry": 0.7
+                }
+            },
+            "lewd": {
+                "face": {
+                    "blush": 0.6,
+                    "lids": 0.5
+                }
+            }
+        },
+        "neck": {
+            "cool": {
+                "gestures": [
+                    "step_back"
+                ],
+                "face": {
+                    "angry": 0.5
+                }
+            },
+            "neutral": {
+                "gestures": [
+                    "shy"
+                ],
+                "face": {
+                    "blush": 0.4
+                }
+            },
+            "warm": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "happy": 0.3,
+                    "blush": 0.5
+                }
+            },
+            "loving": {
+                "gestures": [
+                    "bashful"
+                ],
+                "face": {
+                    "blush": 0.7,
+                    "lids": 0.4
+                },
+                "emote": "hearts"
+            },
+            "grudge": {
+                "gestures": [
+                    "huff"
+                ],
+                "face": {
+                    "angry": 0.8
+                },
+                "emote": "anger"
+            },
+            "lewd": {
+                "face": {
+                    "blush": 0.9,
+                    "lids": 0.7
+                },
+                "emote": "hearts"
+            }
+        },
+        "arms": {
+            "cool": {
+                "face": {
+                    "angry": 0.3
+                }
+            },
+            "neutral": {
+                "face": {
+                    "surprised": 0.2
+                }
+            },
+            "warm": {
+                "face": {
+                    "happy": 0.3
+                }
+            },
+            "loving": {
+                "face": {
+                    "happy": 0.4,
+                    "blush": 0.2
+                }
+            },
+            "grudge": {
+                "gestures": [
+                    "huff"
+                ],
+                "face": {
+                    "angry": 0.6
+                }
+            },
+            "lewd": {
+                "face": {
+                    "blush": 0.5,
+                    "lids": 0.4
+                }
+            }
         }
     },
-
     "too_much_reaction": {
-        "cool":    {"gestures": ["hands_on_chest"], "face": {"angry": 0.8}, "emote": "anger"},
-        "neutral": {"gestures": ["shrug"], "face": {"angry": 0.4}, "emote": "sweat"},
-        "warm":    {"gestures": ["surprise"], "face": {"blush": 0.6}, "emote": "sweat"},
-        "loving":  {"gestures": ["shy"], "face": {"blush": 0.9, "happy": 0.3}, "emote": "sweat"}
+        "cool": {
+            "gestures": [
+                "hands_on_chest"
+            ],
+            "face": {
+                "angry": 0.8
+            },
+            "emote": "anger"
+        },
+        "neutral": {
+            "gestures": [
+                "shrug"
+            ],
+            "face": {
+                "angry": 0.4
+            },
+            "emote": "sweat"
+        },
+        "warm": {
+            "gestures": [
+                "surprise"
+            ],
+            "face": {
+                "blush": 0.6
+            },
+            "emote": "sweat"
+        },
+        "loving": {
+            "gestures": [
+                "shy"
+            ],
+            "face": {
+                "blush": 0.9,
+                "happy": 0.3
+            },
+            "emote": "sweat"
+        },
+        "grudge": {
+            "gestures": [
+                "hands_on_chest"
+            ],
+            "face": {
+                "angry": 0.9
+            },
+            "emote": "anger"
+        },
+        "lewd": {
+            "gestures": [
+                "shy"
+            ],
+            "face": {
+                "blush": 1.0,
+                "lids": 0.6
+            },
+            "emote": "hearts"
+        }
     }
 }

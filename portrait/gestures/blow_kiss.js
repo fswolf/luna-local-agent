@@ -1,10 +1,9 @@
-// kiss: fingers to her lips, eyes closed, then blown your way (then her open palm toward you, like the wave's)
+// blow_kiss: fingers to her lips, eyes closed, then blown your way (then her open palm toward you, like the wave's)
 import { fingers, open } from './_pose.js';
 
 export default {
   keywords: ["blows a kiss", "blowing a kiss", "blows you a kiss", "😘"],   // in what she writes, *like this*
-  about: "blowing a kiss, affection",   // offered to her as [kiss] in tags mode
-  private: true,      // never from stream chat
+  about: "blowing a kiss, affection",   // offered to her as [blow_kiss] in tags mode
   dur: 3.0, fade: [0.45, 0.6],
   keys: [
     [0.0, { rightUpperArm: [0, 1.2, 0.4], rightLowerArm: [0, 2.0, -0.55, -0.4], rightHand: [-0.4, 0, 0], ...fingers('right', 0.45),

@@ -33,7 +33,7 @@ _files = {"at": 0.0, "found": {}}
 
 
 def builtin():
-    """{name: {"about": str, "private": bool, "left": bool, "full": bool}} for every gesture file."""
+    """{name: {"about": str, "private": bool, "left": bool, "full": bool, "lewd": bool, "view": bool}} for every gesture file."""
     if time.monotonic() - _files["at"] < 20:
         return _files["found"]
     found = {}
@@ -51,7 +51,9 @@ def builtin():
         found[name] = {"about": about.group(2) if about else "",
                        "private": bool(re.search(r"^\s*private:\s*true", text, re.M)),
                        "left": bool(re.search(r"^\s*left:\s*true", text, re.M)),
-                       "full": bool(re.search(r"^\s*full:\s*true", text, re.M))}
+                       "full": bool(re.search(r"^\s*full:\s*true", text, re.M)),
+                       "lewd": bool(re.search(r"^\s*lewd:\s*true", text, re.M)),
+                       "view": bool(re.search(r"^\s*view:\s*\d", text, re.M))}
     _files.update(at=time.monotonic(), found=found)
     return found
 
@@ -130,8 +132,10 @@ def prompt_line(private=True):
     if mode() != "tags" or not _three_d():
         return ""
 
+    import mood
+    tame = bool(mood.tame())      # live on a stream with lewd off: don't offer the lewd ones
     about = {n: g["about"] for n, g in builtin().items()
-             if g["about"] and (private or not g["private"]) and _shown(g)}
+             if g["about"] and (private or not g["private"]) and not (tame and g["lewd"]) and _shown(g)}
     for c in clips():
         if c.get("about") and (private or not c.get("private")):
             about[c["name"]] = str(c["about"])[:60]
@@ -215,7 +219,8 @@ def _prototypes(private=True):
     clip with an "about" line that isn't described already - so a gesture
     you write is matched by meaning too. Private ones only in private turns."""
     protos = {k: list(v) for k, v in PROTOTYPES.items()}
-    found = [(n, g["about"], g["private"]) for n, g in builtin().items() if _shown(g)]
+    # turns are asked for, not guessed from the mood of the talk: never by meaning
+    found = [(n, g["about"], g["private"]) for n, g in builtin().items() if _shown(g) and not g["view"]]
     found += [(c["name"], str(c.get("about") or ""), bool(c.get("private"))) for c in clips()]
     for name, about, is_private in found:
         if not about or name in protos or (is_private and not private):

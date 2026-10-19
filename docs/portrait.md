@@ -72,8 +72,11 @@ pointing hand over anywhere that does something.
 | groin | between her hips and the top of her legs |
 | legs | the rest of her legs (full-body framing); the leg gestures below |
 
-Her neck, arms, back, butt and tail are zones too, with nothing set for
-them yet: add them to touch.json when you want them.
+| neck | her throat and the sides of her neck |
+| arms | anywhere on her arms |
+| back | the back of her torso |
+| butt | the back of her hips (reachable when she's turned, or from behind in full-body framing) |
+| tail | her tail, on models whose tail has bones named "tail"; a model without one never gets it |
 
 How it finds the spot: a ray goes from the camera through the cursor and
 stops at the first piece of her it meets. Each spot on her skin is
@@ -89,8 +92,11 @@ mood band, from how warm she's feeling:
 
 - `cool` (warmth below -0.2), `neutral`, `warm` (above 0.35), `loving`
   (above 0.66), the same edges as `agent/moods.json`.
-- A zone can also name one of her moods (`"flirty": {...}`, `"mad"`),
-  and that wins over its band.
+- `lewd` and `grudge`, her two rows past the grid
+  ([Moods](moods.md#lewd-and-grudge)). A zone without them falls back
+  to `loving` and `cool`.
+- A zone can also name one of her moods (`"flirty": {...}`, `"heated"`,
+  `"mad"`), and that wins over its row and band.
 - A reaction has `gestures` (one picked at random, any gesture from
   `portrait/gestures/`), `face` (a quick expression for a few seconds:
   `happy`, `relaxed`, `sad`, `angry`, `surprised`, `blush`, `lids`, 0 to
@@ -104,7 +110,7 @@ lines in the gesture say which touches it answers:
 
 ```js
 touch: ['legs'],             // the zones
-moods: ['warm', 'loving'],   // the bands (or mood names); leave it out for any mood
+moods: ['warm', 'loving'],   // bands, rows (lewd, grudge) or mood names; leave it out for any mood
 ```
 
 Those gestures are added to whatever the zone already lists, and one is
@@ -364,6 +370,17 @@ and does small things on her own:
 | Cry | She writes `[cry]`, or she stays deeply sad for several seconds: tears well on her lower lids, streak down her cheeks with drops running along them, and the cry gesture adds a lowered head and shoulders hitching with sobs. They dry slowly. `"vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}` in luna.json moves them for a non-VRoid face |
 | Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
 
+### Posing her (the pose studio)
+
+The debug viewer (`?debug=1`) has a **pose studio** under the gesture menu.
+Click *start posing*, then click a part of her (or pick a bone from the
+list) and drag x / y / z / twist - she moves as you drag. *mirror* poses
+the other arm or leg to match, *face* has blush, smile, mouth and blink,
+and *start from it* loads any gesture at any moment of it to adjust.
+*copy bone* / *copy pose* give lines to paste straight into a gesture file.
+Torso and head bones are `'+'` (added on top of her breathing), like the
+gesture files write them.
+
 ### Writing a gesture in code
 
 The full guide, with how it all works, is its own page: [Gestures](gestures.md).
@@ -396,6 +413,11 @@ z negative bends the forearm up, a 4th number twists it; `'+head'` and
 `both()` mirrors a pose to both arms, `fingers(side, curl)`, `open(side)`.
 Other keys: `idle: true` (she does it on her own), `left: true` (also a
 left-handed `<name>_left`), `private: true` (never from stream chat),
+`view: 180` (no keys: swings the camera round her instead - `turn_around`,
+`turn_side`, `face_me`; Luna turns when asked, back to the front after 120 s),
+`lewd: true` (held back while a stream with lewd off is live - see
+[Moods](moods.md#streams-where-lewd-isnt-allowed)), `chain: [...]` (other
+gestures in turn, instead of keys),
 `osc` (a wobble), `hips` (lift her, metres). The header of
 `portrait/viewer/gestures.js` lists them all.
 
@@ -480,6 +502,8 @@ YouTube, IRC, pomf) and Discord reaches the portrait, answered or not:
 | In chat | She |
 |---------|-----|
 | `!wave` `!hug` `!jump` `!bounce` (`!dance`) `!shrug` `!stretch` | Does it. Anyone can, once every few seconds |
+| `!kiss` (`!blowkiss`) `!bashful` (`!blush`) | Blows a kiss / goes bashful. Same cooldown |
+| `!turn` `!side` `!front` | Swings the view round her: her back (again to turn back), her side, the front. Back to the front on its own after 2 minutes |
 | A hug for her: `*hugs Luna*`, `hug luna`, 🤗 | Hugs back |
 | Someone's first message is hi, hey, o/, 👋 | Waves |
 | bye, gn, cya | Waves |

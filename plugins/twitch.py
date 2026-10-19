@@ -57,6 +57,9 @@ DEFAULTS = {
     "speak": True,
     "post_replies": False,
     "max_reply_chars": 450,
+    # Lewd allowed on this stream? Off: while she's live here, her lewd
+    # mood row shows as the row below it and lewd-only moves never play.
+    "lewd": False,
     # The usual chat bots. Answering a bot is how a loop starts.
     "ignore": ["Nightbot", "StreamElements", "Streamlabs", "Moobot",
                "Fossabot", "Sery_Bot", "SoundAlerts"],
@@ -366,6 +369,9 @@ def start(model):
         _thread.start()
         _running = True
 
+    import mood
+    mood.set_tame(NAME, not settings().get("lewd", False))
+
     how = {(True, True): "out loud and in chat", (True, False): "in chat only, silently",
            (False, True): "out loud - she never posts"}[(post, bool(block.get("speak", True)))]
 
@@ -389,6 +395,9 @@ def stop():
             _send(f"PART #{_channel()}")
 
         _running = False
+
+    import mood
+    mood.set_tame(NAME, False)
 
     return True, "Stopped reading Twitch chat."
 

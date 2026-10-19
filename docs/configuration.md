@@ -39,8 +39,14 @@ changing it.
 Every block in `config.json` is optional and every value has a default
 in the `config/` package (one file per area: `voice.py`, `listening.py`,
 `moods.py`...), so a missing block means "use the defaults" rather than
-an error. The file that ships has them written out explicitly, because
-you can't turn a dial that isn't there.
+an error.
+
+`config.json` is yours and never goes to GitHub (it's in `.gitignore`).
+What ships is `config.example.json`, the defaults written out
+explicitly, because you can't turn a dial that isn't there. The first
+start copies it to `config.json`; after that, updates never touch your
+copy. A setting added in a later version takes its default from the
+code until you set it, and `config.example.json` shows it so you can.
 
 ```json
 {

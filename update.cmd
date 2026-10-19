@@ -25,6 +25,13 @@ git pull --autostash
 if errorlevel 1 goto :clash
 git diff --name-only --diff-filter=U | findstr . >nul
 if not errorlevel 1 goto :clash
+:pulled
+
+rem config.json used to be in git: the update that took it out removes the old
+rem copy, so yours comes back from the backup made above.
+if not exist config.json if exist "%backup%" (
+    copy /y "%backup%" config.json >nul && echo config.json: kept your settings ^(it's yours now, outside git^).
+)
 
 echo.
 if exist luna.cmd (
@@ -35,6 +42,20 @@ if exist luna.cmd (
 goto :end
 
 :clash
+rem Only config.json clashing (yours against the update's, or the update taking it
+rem out of git): keep yours from the backup and carry on.
+git diff --name-only --diff-filter=U > "%TEMP%\luna-update.txt"
+findstr /x "config.json" "%TEMP%\luna-update.txt" >nul || goto :realclash
+findstr /v /x "config.json" "%TEMP%\luna-update.txt" >nul && goto :realclash
+if not exist "%backup%" goto :realclash
+git checkout -q HEAD -- config.json 2>nul || git rm -q --cached config.json >nul 2>nul
+copy /y "%backup%" config.json >nul
+git reset -q
+git stash drop -q 2>nul
+echo config.json: kept your settings.
+goto :pulled
+
+:realclash
 echo.
 echo The update didn't go through cleanly - you and the update changed the same file.
 echo 'git status' shows which. To take the update's version of one:  git checkout HEAD -- ^<file^>

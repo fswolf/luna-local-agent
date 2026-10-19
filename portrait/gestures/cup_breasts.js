@@ -85,6 +85,7 @@ export default {
   ],
   about: "lewd, teasing, hands flat on her chest, blush, panting",
   private: false,
+  lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
   dur: DUR, fade: [0.6, 0.8],
   keys,
   expr: {

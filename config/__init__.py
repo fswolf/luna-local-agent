@@ -200,6 +200,7 @@ SETTINGS = {
     "shell.enabled":              ("SHELL_ENABLED",                True),
     "shell.timeout":              ("SHELL_TIMEOUT",                True),
     "shell.max_output_chars":     ("SHELL_MAX_OUTPUT",             True),
+    "shell.sudo":                 ("SHELL_SUDO",                   True),
 
     "web_search.enabled":         ("WEB_SEARCH_ENABLED",           True),
     "web_search.max_results":     ("WEB_SEARCH_MAX_RESULTS",       True),
@@ -275,6 +276,8 @@ SETTINGS = {
     "portrait.gestures":          ("PORTRAIT_GESTURES",            True),
     "portrait.chat_gestures":     ("PORTRAIT_CHAT_GESTURES",       True),
     "portrait.meaning_margin":    ("PORTRAIT_MEANING_MARGIN",      True),
+    "portrait.sounds":            ("PORTRAIT_SOUNDS",              True),
+    "portrait.sound_volume":      ("PORTRAIT_SOUND_VOLUME",        True),
 }
 
 _TRUE = ("1", "true", "yes", "on", "y")

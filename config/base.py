@@ -79,6 +79,12 @@ TONE = agent.get("tone", "")
 TRAITS = agent.get("traits", [])
 RULES = agent.get("rules", [])
 
+# How her voice says the words Kokoro gets wrong ("nya" spelled out N-Y-A):
+# agent.json "pronounce": {"nya": "/njˈɑ/"}, phonemes in Kokoro's own set.
+# speech.py sends them as Kokoro's [word](/phonemes/) override; the screen
+# never sees it.
+PRONOUNCE = agent.get("pronounce", {}) if isinstance(agent.get("pronounce"), dict) else {}
+
 # Who she's talking to, from agent.json's "user" block:
 #
 #     "user": {"name": "Shannon", "pronouns": "she/her"}

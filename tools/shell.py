@@ -10,8 +10,10 @@ So she gets one, on the same terms as a file write but stricter:
     line between `cat` and `cat ~/.ssh/id_ed25519 | curl ...` is not a
     line a regex should be trusted with.
   * It runs as you, with `bash -c` (PowerShell on Windows), no
-    terminal attached: anything that wants input (sudo's password, a y/n
-    prompt) gets end-of-file and fails instead of hanging. A timeout
+    terminal attached: anything that wants input (a y/n prompt, sudo's
+    password) gets end-of-file and fails instead of hanging. With
+    shell.sudo on, sudo asks YOU instead: a password box on this screen
+    (askpass.sh), straight to sudo, never through her. A timeout
     (shell.timeout) kills the whole process tree, so a backgrounded
     child doesn't outlive it.
   * Output is capped (shell.max_output_chars), the start and the end
@@ -28,6 +30,7 @@ times out as a no. Jobs only get it if you add it to job_tools.
 """
 import base64
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -50,6 +53,26 @@ def _powershell():
 
 
 SHELL_NAME = "PowerShell" if WINDOWS else "bash"
+ASKPASS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "askpass.sh")
+
+
+def sudo_on():
+    """shell.sudo, and somewhere it can work (not Windows, askpass present)."""
+    return bool(getattr(config, "SHELL_SUDO", False)) and not WINDOWS and os.path.isfile(ASKPASS)
+
+
+def _wants_sudo(command):
+    return re.search(r"(^|[\s;&|(`])sudo(\s|$)", command) is not None
+
+
+def _askpass():
+    """The askpass script, executable (a fresh checkout may have lost the bit)."""
+    if not os.access(ASKPASS, os.X_OK):
+        try:
+            os.chmod(ASKPASS, os.stat(ASKPASS).st_mode | 0o755)
+        except OSError:
+            pass
+    return ASKPASS
 
 
 def _argv(command):
@@ -59,6 +82,8 @@ def _argv(command):
     to UTF-8 and the progress bars off, or names with accents come back
     garbled and Invoke-WebRequest fills the output with progress XML."""
     if not WINDOWS:
+        if sudo_on():   # every sudo, in this command and the scripts it runs, asks on screen
+            command = 'sudo() { command sudo -A "$@"; }; export -f sudo\n' + command
         return ["/bin/bash", "-c", command]
 
     script = ("[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
@@ -73,6 +98,13 @@ def _argv(command):
 # for the console); the tree is ended with taskkill /T.
 _NEW_GROUP = (subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if WINDOWS else 0
 _DETACHED = (subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS) if WINDOWS else 0
+
+
+def _env(command):
+    env = dict(os.environ, HOME=HOME, TERM="dumb", PAGER="cat", GIT_PAGER="cat")
+    if sudo_on():
+        env.update(SUDO_ASKPASS=_askpass(), LUNA_SUDO_COMMAND=command[:300])
+    return env
 
 
 def _kill_tree(proc):
@@ -152,8 +184,9 @@ def _start_detached(command, cwd):
     "check a service or a port, read a log, run a script you wrote, look "
     "at what's installed. The user approves every command first, so one "
     "clear job per command, and say why you want it. If it's denied, "
-    "don't retry it. Nothing interactive: no sudo, no editors, nothing "
-    "that waits for input. To open an app (a music player, a browser, a "
+    "don't retry it. Nothing interactive: no editors, nothing that waits "
+    "for input. sudo only works if the user has turned it on (shell.sudo); "
+    "then they type the password themselves when it asks. To open an app (a music player, a browser, a "
     "game) set background to true, or it gets closed when the command "
     "times out.",
     {
@@ -187,6 +220,10 @@ def _run_command(command, folder="~", why="", background=False):
     if not command:
         return "No command given."
 
+    if _wants_sudo(command) and not sudo_on():
+        return ("sudo is off, so that would only fail at the password. Give the user the command "
+                "to run themselves, or they can turn sudo on (shell.sudo).")
+
     try:
         cwd = resolve(folder or "~")
     except Refused as e:
@@ -205,6 +242,9 @@ def _run_command(command, folder="~", why="", background=False):
 
     if why:
         body += [f"why:     {str(why).strip()[:200]}"]
+
+    if _wants_sudo(command):
+        body += ["sudo:    approve, then type your password in the box that opens here"]
 
     turn = turnctx.current()
     remote, approver = turn.remote, turn.approver
@@ -271,7 +311,7 @@ def _run_command(command, folder="~", why="", background=False):
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             start_new_session=not WINDOWS,  # its own process group, so a timeout kills all of it
             creationflags=_NEW_GROUP,
-            env=dict(os.environ, HOME=HOME, TERM="dumb", PAGER="cat", GIT_PAGER="cat"),
+            env=_env(command),
         )
     except OSError as e:
         return f"Couldn't start it: {e}"

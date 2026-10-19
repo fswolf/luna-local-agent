@@ -53,6 +53,11 @@ PORTRAIT_HOLOGRAM_ENABLED = bool(PORTRAIT_HOLOGRAM.get("enabled", False))
 PORTRAIT_GESTURES = str(_portrait_cfg.get("gestures", "tags"))
 PORTRAIT_CHAT_GESTURES = bool(_portrait_cfg.get("chat_gestures", True))
 PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
+# Little sounds with her gestures (portrait/sounds/, yours - not in git): a
+# gesture file names one, sound: 'touch-self'. No file there, no sound.
+# sound_volume 0-1.
+PORTRAIT_SOUNDS = bool(_portrait_cfg.get("sounds", True))
+PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume", 0.8))))
 PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
 if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
     # Its three expressions, so moods show on her face out of the box.

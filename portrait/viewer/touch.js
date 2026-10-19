@@ -1,6 +1,6 @@
 // Touching her: a click on the portrait finds the spot on her body it
 // landed on and names the zone - head, nose, mouth, chest, tummy, groin,
-// legs, and neck, arms, back, butt and tail (nothing set for those yet). What she
+// legs, neck, arms, back, butt and tail (tail only on models with tail bones). What she
 // does about it is portrait.js's business, and portrait/touch.json's;
 // this file only answers "where".
 //

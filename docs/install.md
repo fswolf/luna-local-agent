@@ -50,9 +50,14 @@ your `config.json` in `agent/backups/` first, pulls the update while
 keeping any changes you made, installs any Python packages the update
 added, and then checks everything (below). If you and the update both
 changed `config.json`, your settings win. On Windows it's `update.cmd`,
-which does the same except that last part: if the pull clashes, it stops
+which does the same; if the pull clashes over anything else, it stops
 and tells you where your saved `config.json` is. (It hasn't been tested
 on Windows yet.)
+
+`config.json` is yours and isn't in git: the first start makes it from
+`config.example.json`. It used to be tracked, so the update that took
+it out of git removes the old copy - `update.sh` and `update.cmd` put
+yours straight back from the backup they just made.
 
 **Checking:** `./start.sh --check` says in plain words what's missing
 and how to fix it: Python packages, the model server, the voice server.

@@ -13,6 +13,9 @@ Any arguments are passed on to main.py. Before her:
 Each is started only if it isn't already answering, and stopped again
 when she exits - one that was already running before is left alone.
 
+Your settings are config.json, which is yours and never in git: the
+first start makes it from config.example.json, the shipped defaults.
+
 First it checks that every package in installer/requirements.txt is
 installed - after a pull, a new one often isn't - and offers to install
 what's missing, instead of her stopping with a traceback.
@@ -58,12 +61,46 @@ def log_dir():
 LLAMA_DIR = os.path.join(ROOT, "llama")
 
 
-def llm_settings():
+CONFIG = os.path.join(ROOT, "config.json")
+EXAMPLE = os.path.join(ROOT, "config.example.json")
+
+
+def seed_config():
+    """config.json is yours and stays out of git; a fresh clone (or an
+    update that took the old tracked copy away) gets the shipped defaults.
+    Never overwrites one that's there. True if it made one."""
+    if os.path.exists(CONFIG) or not os.path.exists(EXAMPLE):
+        return False
+    import shutil
+
+    shutil.copyfile(EXAMPLE, CONFIG)
+    return True
+
+
+def settings():
     try:
-        with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as f:
-            return json.load(f).get("llm", {}) or {}
+        with open(CONFIG, encoding="utf-8") as f:
+            found = json.load(f)
+        return found if isinstance(found, dict) else {}
     except (OSError, ValueError):
         return {}
+
+
+def llm_settings():
+    return settings().get("llm", {}) or {}
+
+
+def tts_url():
+    """Where her voice is: config.json's tts.url (a kokoro-reader on another
+    machine counts), else what the installer set up, else this machine."""
+    url = (settings().get("tts") or {}).get("url") or state().get("voice", {}).get("url")
+    return str(url or "http://127.0.0.1:8899").rstrip("/")
+
+
+def _here(url):
+    from urllib.parse import urlparse
+
+    return (urlparse(url).hostname or "") in ("127.0.0.1", "localhost", "::1")
 
 
 def model_up():
@@ -269,15 +306,17 @@ def check(py):
              "open LM Studio's Local Server, or build llama.cpp: bash llama/install.sh")
 
     v = state().get("voice", {})
-    if v.get("mode") == "managed":
+    url = tts_url()
+    if v.get("mode") == "managed" and _here(url):
         ready = os.path.exists(v.get("python", "")) and os.path.exists(v.get("server", ""))
         line(ready, "her voice server is installed - ./start.sh starts it" if ready else
              "her voice server isn't where the installer left it", "run the installer again: ./installer/install.sh")
     elif v.get("mode") == "none":
         line(True, "no voice server set up - she'll be text-only")
     else:
-        url = v.get("url", "http://127.0.0.1:8899")
-        line(up(url + "/health"), f"voice server at {url}", "start kokoro-reader, or run the installer to set one up")
+        line(up(url + "/health"), f"voice server at {url}",
+             "start kokoro-reader there, or set tts.url in config.json" if not _here(url)
+             else "start kokoro-reader, or run the installer to set one up")
 
     print("Luna's check:\n" + "\n".join(lines))
     print("All good - ./start.sh" if good else "Fix the ✗ lines above, then ./start.sh")
@@ -301,6 +340,8 @@ def python():
 
 def main():
     args = sys.argv[1:]
+    if seed_config():
+        print("Made config.json from config.example.json - your settings live there, outside git.")
     py = python()
     if "--check" in args:
         sys.exit(0 if check(py) else 1)
@@ -314,15 +355,15 @@ def main():
     llama = start_llama(s)
     voice = None
     v = s.get("voice", {})
-    if v.get("mode") == "managed":
+    url = tts_url()
+    if v.get("mode") == "managed" and _here(url):   # a voice on another machine needs nothing started here
         voice = start_voice(v)
 
     warnings = []
     if not model_up():
         warnings.append("No model server - open LM Studio's Local Server, or run llama/start.sh.")
-    if v.get("mode") != "managed" and not up("http://127.0.0.1:8899/health"):
-        if v.get("mode") != "none":
-            warnings.append("No voice server on :8899 - she'll start text-only.")
+    if not (v.get("mode") == "managed" and _here(url)) and v.get("mode") != "none" and not up(url + "/health"):
+        warnings.append(f"No voice server at {url} - she'll start text-only.")
     if warnings:
         print("Starting anyway:\n  " + "\n  ".join(warnings), file=sys.stderr)
 

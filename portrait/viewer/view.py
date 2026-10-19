@@ -18,8 +18,19 @@ config.MONITOR_PORT = int(os.environ.get("LUNA_VIEW_PORT", 8793))
 import livefeed  # noqa: E402
 
 if not livefeed.start():
-    sys.exit(f"couldn't serve on port {config.MONITOR_PORT} - is a viewer already open? "
-             "(LUNA_VIEW_PORT=8794 ./viewer.sh for another)")
+    # Already running (a viewer left open, or Luna's own monitor on this port)?
+    # Then just show it rather than failing.
+    import urllib.request
+
+    address = f"http://127.0.0.1:{config.MONITOR_PORT}/portrait/?debug=1"
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{config.MONITOR_PORT}/portrait/config.json", timeout=3)
+    except Exception:
+        sys.exit(f"couldn't serve on port {config.MONITOR_PORT} and nothing there answers as a portrait "
+                 "(LUNA_VIEW_PORT=8794 ./viewer.sh for another port)")
+    print(f"a viewer is already running: {address}")
+    webbrowser.open(address)
+    sys.exit(0)
 
 address = f"{livefeed.url()}/portrait/?debug=1"
 print(f"portrait viewer: {address}  (Ctrl+C stops)")

@@ -20,6 +20,17 @@
 //   add        poses added on top for the whole gesture
 //   sob        shoulders hitch (crying)
 //   then       another gesture to flow into as this one ends ('pant')
+//   sound      a clip from portrait/sounds/ to play with it: 'name' or { name, from, len }
+//   emote      'sweat', { name, at: seconds in }, or a list of them - emotes while it plays
+//   wag        0-1: her tail swishes while it plays
+//   tail_up    0-1: her tail lifts and holds up, still, while it plays
+//   lewd       true: never plays while a stream with lewd off is live
+//              (twitch/youtube "lewd": false) - she shows the row below instead
+//   view       instead of keys: degrees to swing the camera round her (turn_around
+//              180, turn_side 90, face_me 0); back to the front after 120 s
+//   chain      instead of keys: other gestures to play in turn, each flowing into
+//              the next (['sultry_beckon', 'blow_kiss']); its own touch/moods/private/full
+//              apply, the steps' own don't
 //   about      when to use it: offered to her as a [tag] in tags mode, and
 //              what the meaning mode compares the conversation with
 //   keywords   ["beckon", "come hither", "🤫"]: plays it when she writes one
@@ -40,7 +51,7 @@ export { REST };
 
 // The list comes from the server (every gesture/*.js not starting with _);
 // without one (a static copy of the page), the built-ins.
-const BUILT_IN = ['dance', 'jog', 'pant', 'sultry_beckon', 'wink', 'shh', 'wave', 'hug', 'jump', 'shrug', 'kiss', 'shy', 'cry', 'stretch', 'look_hand',
+const BUILT_IN = ['dance', 'jog', 'pant', 'sultry_beckon', 'wink', 'shh', 'wave', 'hug', 'jump', 'shrug', 'blow_kiss', 'shy', 'cry', 'stretch', 'look_hand',
                   'tuck_hair', 'bounce', 'explain', 'sulk', 'bashful'];
 export const FAILED = {};      // name -> why it didn't load (shown on the debug page)
 const list = await fetch('gestures/index.json').then(r => r.ok ? r.json() : null).catch(() => null);
@@ -119,7 +130,7 @@ export function createGestures(THREE, vrm) {
   for (const j of vrm.springBoneManager?.joints || []) {
     if (/tail/i.test(j.bone?.name || '')) tail.push({ j, dir: j.settings.gravityDir.clone(), power: j.settings.gravityPower });
   }
-  const wag = { amount: 0, target: 0, phase: 0 };
+  const wag = { amount: 0, target: 0, phase: 0, sweep: 1 };
   const wagUp = new THREE.Vector3();
   // how a wag carries the tail: lift (pull), sweep (side to side), back (behind her)
   const TAIL = { lift: 3.0, sweep: 1.8, back: 0.5 };
@@ -182,15 +193,35 @@ export function createGestures(THREE, vrm) {
     play(name, publicOnly = false) {
       if (publicOnly && PRIVATE.includes(name)) return false;
       const vs = (clips[name] || []).filter(v => !publicOnly || !v.opts.private);
-      const g = GESTURES[name];
+      let g = GESTURES[name], next = [];
+      // a chain gesture ({ chain: ['sultry_beckon', 'blow_kiss'] }) plays its steps in turn
+      if (g && Array.isArray(g.chain)) { next = g.chain.filter(n => GESTURES[n] && !GESTURES[n].chain && GESTURES[n].view == null); g = GESTURES[next.shift()]; }
+      if (g && g.view != null) return false;      // a turn: the portrait moves the camera (portrait.js turnTo)
       if (!vs.length && !g) return false;
       for (const a of active) if (!a.out) a.out = a.t;          // let the old one go
       if (vs.length) active.push(startClip(name, vs[Math.floor(Math.random() * vs.length)]));
-      else active.push({ g, name, t: 0, out: 0, ch: channels(g) });
+      else active.push({ g, name, t: 0, out: 0, ch: channels(g), next });
       return true;
     },
     stop() { for (const a of active) if (!a.out) a.out = a.t; },
-    wag(level) { wag.target = level; },
+    // The pose studio (studio.js): a gesture that never ends, edited in place.
+    // pose is {bone: [x, y, z, twist?]} like any key; expr {blush: 0.6, ...}.
+    studio(pose, expr) {
+      for (const a of active) if (!a.out) a.out = a.t;
+      const g = { dur: 1e9, fade: [0.25, 0.4], keys: [[0, pose]], expr };
+      const a = { g, name: '(studio)', t: 0, out: 0, ch: channels(g) };
+      active.push(a);
+      return { refresh() { a.ch = channels(g); }, stop() { if (!a.out) a.out = a.t; } };
+    },
+    // A gesture's pose at t seconds: what the studio starts from
+    poseAt(name, t) {
+      const g = GESTURES[name], out = {};
+      if (!g || !Array.isArray(g.keys)) return out;
+      for (const n of channels(g)) { const v = sample(g.keys, n, t); if (v) out[n] = v.map(x => +x.toFixed(3)); }
+      return out;
+    },
+    // level 0-1; sweep 0 lifts the tail and holds it up without swishing
+    wag(level, sweep = 1) { wag.target = level; wag.sweep = sweep; },
 
     // The natural rest pose; called every frame before update(), so a
     // gesture that ends always has somewhere to go back to.
@@ -227,10 +258,12 @@ export function createGestures(THREE, vrm) {
         const end = a.out ? a.out + fo : g.dur;
         if (a.t >= end) { a.gone = true; continue; }
         // flow into the next one: it fades in while this one fades out
-        if (g.then && !a.out && !a.chained && a.t >= g.dur - fo && GESTURES[g.then]) {
+        // (a chain's next step, else the gesture's own then:)
+        const nx = a.next?.length ? a.next[0] : g.then;
+        if (nx && !a.out && !a.chained && a.t >= g.dur - fo && GESTURES[nx]) {
           a.chained = true;
-          const n = GESTURES[g.then];
-          active.push({ g: n, name: g.then, t: 0, out: 0, ch: channels(n) });
+          const n = GESTURES[nx], inChain = !!a.next?.length;
+          active.push({ g: n, name: inChain ? a.name : nx, t: 0, out: 0, ch: channels(n), next: inChain ? a.next.slice(1) : [] });
         }
         const wIn = Math.min(1, a.t / fi);
         const wOut = a.out ? 1 - (a.t - a.out) / fo : Math.min(1, (g.dur - a.t) / fo);
@@ -308,7 +341,7 @@ export function createGestures(THREE, vrm) {
         const a = wag.amount, s = Math.sin(wag.phase);
         for (const { j, dir, power } of tail) {
           if (a < 0.01) { j.settings.gravityDir.copy(dir); j.settings.gravityPower = power; continue; }
-          const up = wagUp.set(s * TAIL.sweep, 1, -TAIL.back).normalize();
+          const up = wagUp.set(s * TAIL.sweep * wag.sweep, 1, -TAIL.back).normalize();
           j.settings.gravityDir.copy(dir).lerp(up, Math.min(1, a * 1.5)).normalize();
           j.settings.gravityPower = power + a * TAIL.lift;
         }

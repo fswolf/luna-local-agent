@@ -51,5 +51,43 @@ class Packages(unittest.TestCase):
         self.assertIsNone(launch.missing_packages("/nowhere/python"))
 
 
+
+class Settings(unittest.TestCase):
+    """config.json is yours and outside git: made from config.example.json
+    once, never overwritten, and tts.url decides where her voice is."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.patches = [mock.patch.object(launch, "CONFIG", os.path.join(self.dir.name, "config.json")),
+                        mock.patch.object(launch, "EXAMPLE", os.path.join(self.dir.name, "config.example.json")),
+                        mock.patch.object(launch, "state", return_value={})]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.dir.cleanup()
+
+    def write(self, path, data):
+        import json
+
+        with open(path, "w") as f:
+            json.dump(data, f)
+
+    def test_made_once_from_the_example(self):
+        self.assertFalse(launch.seed_config())                     # no example: nothing to copy
+        self.write(launch.EXAMPLE, {"tts": {"url": "http://127.0.0.1:8899"}})
+        self.assertTrue(launch.seed_config())
+        self.write(launch.CONFIG, {"tts": {"url": "http://192.168.0.98:8899"}})
+        self.assertFalse(launch.seed_config())                     # yours is never overwritten
+        self.assertEqual(launch.tts_url(), "http://192.168.0.98:8899")
+
+    def test_where_her_voice_is(self):
+        self.assertEqual(launch.tts_url(), "http://127.0.0.1:8899")
+        self.assertTrue(launch._here("http://localhost:8899"))
+        self.assertFalse(launch._here("http://192.168.0.98:8899"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,7 @@
 # Update Luna to the latest version from GitHub:   ./update.sh
 #
 #   1. copies config.json to agent/backups/ first, so your settings are safe
+#      (config.json is yours and not in git; config.example.json is the defaults)
 #   2. pulls the update, keeping any changes you made (git's autostash)
 #   3. installs any Python packages the update added
 #   4. checks her servers and says plainly what's missing, if anything
@@ -34,7 +35,10 @@ fi
 conflicted=$(git diff --name-only --diff-filter=U)
 if [ -n "$conflicted" ]; then
     if echo "$conflicted" | grep -qx "config.json" && [ -f "$backup" ]; then
-        git checkout -q HEAD -- config.json && cp "$backup" config.json
+        # the update's copy if it still has one; if it took config.json out
+        # of git, just let go of the old tracked copy
+        git checkout -q HEAD -- config.json 2>/dev/null || git rm -q --cached config.json 2>/dev/null
+        cp "$backup" config.json
         echo "config.json: kept your settings."
         conflicted=$(git diff --name-only --diff-filter=U)
     fi
@@ -48,6 +52,12 @@ if [ -n "$conflicted" ]; then
     fi
     git reset -q                    # your other changes stay as they were, just unstaged
     git stash drop -q 2>/dev/null   # settled: the autostash isn't needed any more
+fi
+
+# config.json used to be in git. The update that took it out removes the
+# old tracked copy, so yours comes back from the backup made above.
+if [ ! -f config.json ] && [ -f "$backup" ]; then
+    cp "$backup" config.json && echo "config.json: kept your settings (it's yours now, outside git)."
 fi
 
 if [ "$before" = "$(git rev-parse HEAD)" ]; then

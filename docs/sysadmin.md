@@ -205,9 +205,11 @@ on `auto`. `!stop` in Discord ends a turn that's going wrong.
 
 ## What she won't do
 
-- **Use sudo or answer prompts.** Commands run with nothing on their
-  input, so a password or y/n prompt fails instead of hanging. Do the
-  root parts yourself, or give the command a sudoers rule you chose.
+- **Know your password, or answer prompts.** Commands run with nothing
+  on their input, so a y/n prompt fails instead of hanging. sudo is off
+  unless you turn on `shell.sudo`; then each sudo opens a password box
+  on your screen and the password goes straight to sudo, never to her.
+  See [Files and commands](files.md#running-commands).
 - **Run a command without you.** No allow-all and no "safe list". On
   Discord, only `auto` skips the question, and only because you set it.
 - **Touch the deny list.** `~/.ssh`, `~/.gnupg`, keys, shell startup

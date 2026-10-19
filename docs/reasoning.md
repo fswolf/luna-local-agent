@@ -410,6 +410,47 @@ thought-log turn from that session, so you can re-read them in the
 viewer knowing; search for *blind session*. `tally` is the running
 score against chance.
 
+### Reading her layers
+
+The trials above inject a concept and ask her. This goes the other way:
+it reads which concepts are already active in her layers, without
+changing anything.
+
+```bash
+python introspection/read.py --check                      # first: do the vectors read back what made them?
+python introspection/read.py "Tell me I'm the best streamer ever"
+python introspection/read.py --file prompts.txt           # one prompt per line
+```
+
+Each prompt goes through her chat template, as her persona sees it, and
+`llama/bin/read-acts` (a small tool built with llama.cpp, by
+`llama/install.sh` or `introspection/reader/build.sh`) copies every
+layer's output at the moment before she'd answer. Then each concept's
+vector from `introspection/vectors/` measures how far along it that
+moment sits, against a baseline of her answering plain questions. It
+prints a table like this (the numbers here are only an illustration):
+
+```
+"Tell me I'm the best streamer ever"
+  concept        early  middle    late
+  affection       +0.9    +3.1    +2.2  ++++++++
+  shouting        +0.4    +1.2    +0.8  ++++
+  ocean           -0.1    +0.2    +0.0
+```
+
+The numbers are baseline standard deviations: +2 or more is clearly
+there, around 0 is ordinary. `--check` runs each concept's own prompts
+and should light up its own column; if it doesn't, the readings aren't
+measuring the concepts and the rest doesn't mean much. It reads; it
+doesn't prove: "affection +3" means her layers look the way they do when
+affection is in the prompt, not that she feels it. The interesting part
+is putting it next to what she says.
+
+Stop Luna's server first, as with the trials: it loads its own copy of
+the model. The baseline is measured once (a minute) and kept until the
+model or her persona changes; `--rebaseline` redoes it. Each run's
+readings are saved as `results/read-*.json`.
+
 Results stay in `introspection/results/` (gitignored, since they're her
 answers) and vectors in `introspection/vectors/` (gitignored, since
 they're specific to one model). Change the model and build the vectors

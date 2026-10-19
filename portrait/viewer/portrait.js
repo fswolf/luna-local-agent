@@ -148,7 +148,7 @@ function frame() {
 
 const base = { lookY: 1.45, headZ: 0, follow: 0.7, dist: 2 };
 
-// The viewer (?debug=1): drag to turn around her, wheel to zoom, double-click
+// The viewer (?debug=1): left-drag to turn around her, wheel to zoom, double-click
 // to put the camera back. Off on the live portrait, so a stray click in OBS
 // or on the desktop never moves her.
 const orbit = { yaw: 0, pitch: 0, zoom: 1 };
@@ -156,7 +156,13 @@ if (params.get('debug')) {
   const el = renderer.domElement;
   let drag = null;
   el.style.cursor = 'grab';
-  el.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); el.style.cursor = 'grabbing'; });
+  // Left button only turns her; no right-click menu in the viewer.
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); el.style.cursor = 'grabbing';
+    view.target = null; view.back = 0;     // you've taken over: no easing, no drifting back
+  });
   el.addEventListener('pointermove', e => {
     if (!drag) return;
     orbit.yaw -= (e.clientX - drag.x) * 0.008;
@@ -167,7 +173,7 @@ if (params.get('debug')) {
   el.addEventListener('pointerup', stop);
   el.addEventListener('pointercancel', stop);
   el.addEventListener('wheel', e => { e.preventDefault(); orbit.zoom = Math.max(0.25, Math.min(4, orbit.zoom * Math.exp(e.deltaY * 0.001))); }, { passive: false });
-  el.addEventListener('dblclick', () => { orbit.yaw = 0; orbit.pitch = 0; orbit.zoom = 1; });
+  el.addEventListener('dblclick', () => { orbit.yaw = 0; orbit.pitch = 0; orbit.zoom = 1; view.target = null; view.back = 0; });
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +182,7 @@ if (params.get('debug')) {
 const mind = {
   stage: 'idle',              // idle listening thinking speaking waking
   label: '',                  // the mood's name (loving, mad...)
+  row: '',                    // 'lewd' or 'grudge' when she's past the grid's edges
   energy: 0, warmth: 0,       // mood dials, about -1..1
   face: null,                 // the mood's face from agent/moods.json (null: work it out from the dials)
   idle: [],                   // gestures this mood drifts into
@@ -249,6 +256,8 @@ function handle(ev) {
       mind.energy = +ev.energy || 0;
       mind.warmth = w;
       mind.label = typeof ev.label === 'string' ? ev.label : '';
+      mind.row = typeof ev.row === 'string' ? ev.row : '';
+      mind.tame = !!ev.tame;      // live on a stream with lewd off: no lewd moves
       mind.face = ev.face && typeof ev.face === 'object' ? ev.face : null;
       mind.idle = Array.isArray(ev.idle) ? ev.idle : [];
       // A held pose (walked away: "sulk"). Let go of it when the mood
@@ -315,13 +324,105 @@ function moodEmote(now) {
 // ---------------------------------------------------------------------------
 // Gestures: what sets them off
 // ---------------------------------------------------------------------------
+// Turning: a gesture file with view: (degrees) swings the camera round her
+// instead of moving her - Luna's "turn around". Eased; back to the front on
+// its own after VIEW_HOLD seconds.
+const VIEW_HOLD = 120;
+const view = { target: null, back: 0 };
+function turnTo(deg) {
+  const tau = Math.PI * 2;
+  orbit.yaw = ((orbit.yaw % tau) + tau + Math.PI) % tau - Math.PI;      // into -π..π, so she turns the short way
+  let t = deg * Math.PI / 180;
+  if (t - orbit.yaw > Math.PI) t -= tau;
+  if (orbit.yaw - t > Math.PI) t += tau;
+  view.target = t;
+  view.back = deg ? clock.elapsedTime + VIEW_HOLD : 0;
+}
+
+// Sounds: portrait/sounds/ (yours, not in git). A gesture file can name one:
+//   sound: 'touch-self'                 the file touch-self.mp3 (or .ogg/.wav), or a
+//                                       folder of that name - a random clip from it
+//   sound: { name, from, len }          from: seconds in, or 'random'; len: how long
+//                                       (default: the gesture's length)
+// It fades out at the end, or when another gesture starts. No file, no
+// sound, nothing else changes; portrait.sounds: false turns them all off.
+let SOUNDS = {};
+fetch('sounds/index.json').then(r => (r.ok ? r.json() : {})).then(j => { SOUNDS = j || {}; }).catch(() => {});
+const sound = { el: null, timer: 0, blobs: {} };
+// Loaded whole, once: the portrait's little server can't send part of a
+// file, and without that the browser can't jump into the middle of a clip.
+function clipUrl(file) {
+  return sound.blobs[file] ??= fetch(file).then(r => (r.ok ? r.blob() : null)).then(b => (b ? URL.createObjectURL(b) : null)).catch(() => null);
+}
+function stopSound(fade = 0.5) {
+  sound.ticket = (sound.ticket || 0) + 1;          // a clip still loading won't start
+  const el = sound.el;
+  if (!el) return;
+  sound.el = null;
+  clearTimeout(sound.timer);
+  const v0 = el.volume, t0 = performance.now();
+  const step = setInterval(() => {                 // a timer, not a frame: OBS may not be drawing
+    const k = 1 - (performance.now() - t0) / (fade * 1000);
+    if (k <= 0) { clearInterval(step); el.pause(); } else el.volume = v0 * k;
+  }, 30);
+}
+function playSound(spec, dur) {
+  if (cfg.sounds === false || !spec) return;
+  const s = typeof spec === 'string' ? { name: spec } : spec;
+  const files = SOUNDS[String(s.name || '').toLowerCase()];
+  if (!files || !files.length) return;
+  stopSound(0.2);
+  const ticket = sound.ticket = (sound.ticket || 0) + 1;
+  clipUrl(files[Math.floor(Math.random() * files.length)]).then(url => {
+    if (!url || ticket !== sound.ticket) return;     // gone, or another gesture took over meanwhile
+    const el = new Audio(url);
+    el.volume = Math.max(0, Math.min(1, cfg.sound_volume ?? 0.8));
+    const len = +s.len || dur || 0;
+    el.addEventListener('loadedmetadata', () => {
+      const room = Math.max(0, (el.duration || 0) - len);
+      el.currentTime = s.from === 'random' ? Math.random() * room : Math.min(+s.from || 0, room);
+      el.play().catch(() => {});      // a browser that wants a click first: just no sound
+    }, { once: true });
+    sound.el = el;
+    if (len) sound.timer = setTimeout(() => { if (sound.el === el) stopSound(0.9); }, Math.max(0.1, len - 0.9) * 1000);
+  });
+}
+// How long a gesture (or a whole chain) runs, for its sound
+function lengthOf(g) {
+  return Array.isArray(g.chain) ? g.chain.reduce((t, n) => t + (+GESTURES[n]?.dur || 0), 0) : +g.dur || 0;
+}
+
+// Is the view (or where it's heading) round the back of her?
+function facingAway() { return Math.cos(view.target ?? orbit.yaw) < -0.5; }
+
 function gesture(name, publicOnly = false) {
   if (!moves) return;
+  if (GESTURES[name] && GESTURES[name].view != null) {
+    const deg = +GESTURES[name].view || 0;
+    turnTo(deg === 180 && facingAway() ? 0 : deg);      // "turn around" while turned round: back to you
+    return;
+  }
   if (moves.playing().some(n => n.replace('_left', '') === name)) return;   // already doing it
+  if (mind.tame && GESTURES[name]?.lewd) return;
   if (name === 'wave' && !moves.hasClip('wave')) name = Math.random() < 0.7 ? 'wave' : 'wave_left';
   if (moves.play(name, publicOnly)) {
     idle.next = clock.elapsedTime + rand(20, 40);
+    const g = GESTURES[name.replace(/_left$/, '')];
+    if (g && g.sound) playSound(g.sound, lengthOf(g)); else stopSound();
+    // a gesture can show emotes (emote: 'sweat', { name, at: seconds in }, or a
+    // list of those, one after another) and swish her tail while it plays (wag: 0-1)
+    if (g && g.emote) {
+      for (const one of [].concat(g.emote)) {
+        const e = typeof one === 'string' ? { name: one } : one;
+        setTimeout(() => { if (moves.playing().includes(name)) { emoteLast = -99; emote(e.name); } }, (+e.at || 0) * 1000);
+      }
+    }
+    if (g && (g.wag || g.tail_up)) {
+      if (g.tail_up) moves.wag(+g.tail_up, 0); else moves.wag(+g.wag);
+      setTimeout(() => { if (!moves.playing().includes(name)) moves.wag(0); }, lengthOf(g) * 1000 + 300);
+    }
     if (/wave|hug|jump|bounce/.test(name)) { moves.wag(name === 'hug' ? 0.5 : 1); setTimeout(() => moves.wag(0), 3500); }
+    if (name === 'look_back') { moves.wag(0.6); setTimeout(() => moves.wag(0), 6000); }   // a slow swish while she's bent over
   }
 }
 
@@ -335,21 +436,25 @@ function fromYou(text) {
 let waveBack = false;
 
 // Chat, answered or not. Viewers can ask with !wave, !hug, !jump,
-// !bounce, !dance, !jog (or !run), !shrug, !stretch; plain chat works too: a hug
+// !bounce, !dance, !jog (or !run), !shrug, !stretch, !turn (round and back),
+// !side, !front, !kiss, !bashful; plain chat works too: a hug
 // for her, someone new saying hi, bye, laughing, hype. Rate-limited so
 // a busy chat doesn't keep her flailing.
 const chatSeen = new Set();
 const chatCool = { cmd: 0, auto: 0 };
 const CHAT_CMDS = { wave: 'wave', hug: 'hug', jump: 'jump', bounce: 'bounce',
                     shrug: 'shrug', stretch: 'stretch', hi: 'wave', hello: 'wave', hop: 'bounce', dance: 'dance',
-                    jog: 'jog', run: 'jog' };
+                    jog: 'jog', run: 'jog', side: 'turn_side', front: 'face_me',
+                    kiss: 'blow_kiss', blowkiss: 'blow_kiss', bashful: 'bashful', blush: 'bashful',
+                    turn: 'turn_around' };      // !turn: round, and again to come back (see gesture())
 function fromChat(ev) {
   const t = String(ev.text || '').toLowerCase().trim(), who = String(ev.who || '').toLowerCase();
   const now = clock.elapsedTime, first = who && !chatSeen.has(who);
   if (who) chatSeen.add(who);
   const cmd = t.match(/^!(\w+)/);
   if (cmd) {
-    if (CHAT_CMDS[cmd[1]] && now > chatCool.cmd) { chatCool.cmd = now + 5; chatCool.auto = now + 8; gesture(CHAT_CMDS[cmd[1]], true); }
+    const c = Object.hasOwn(CHAT_CMDS, cmd[1]) && CHAT_CMDS[cmd[1]];
+    if (c && now > chatCool.cmd) { chatCool.cmd = now + 5; chatCool.auto = now + 8; gesture(c, true); }
     return;
   }
   if (now < chatCool.auto) return;
@@ -722,6 +827,11 @@ function animate() {
     idleMoves(now, talking > 0.05);
     moves.update(Math.min(raw, 0.2));   // real time, so a wave lasts as long on a slow machine
     const hy = moves.hipsY() * base.follow;
+    if (view.back && now > view.back) turnTo(0);                       // drift back to the front
+    if (view.target != null) {
+      orbit.yaw = damp(orbit.yaw, view.target, 3.5, Math.min(raw, 0.2));
+      if (Math.abs(orbit.yaw - view.target) < 0.002) { orbit.yaw = view.target; view.target = null; }
+    }
     const d = base.dist * orbit.zoom, ty = base.lookY + hy;
     camera.position.set(Math.sin(orbit.yaw) * Math.cos(orbit.pitch) * d, ty + 0.01 + Math.sin(orbit.pitch) * d,
                         base.headZ + Math.cos(orbit.yaw) * Math.cos(orbit.pitch) * d);
@@ -735,6 +845,7 @@ function animate() {
     for (const [k, v] of Object.entries(gx)) {
       if (k === 'blush') blush.gesture = v;
       else if (k === 'tears') tears.gesture = v;
+      else if (k === 'drool') drool.gesture = v;
       else if (!has.has(k)) continue;
       else if ((k === 'sad' || k === 'angry') && moodParts()) continue;   // through updateMood's parts
       else if (PORTRAIT_SETS.has(k)) vrm.expressionManager.setValue(k, Math.max(vrm.expressionManager.getValue(k) || 0, v));
@@ -742,6 +853,7 @@ function animate() {
     }
     if (!Object.hasOwn(moves.expr(), 'blush')) blush.gesture = 0;
     if (!Object.hasOwn(moves.expr(), 'tears')) tears.gesture = 0;
+    if (!Object.hasOwn(moves.expr(), 'drool')) drool.gesture = 0;
     updateBlush(dt);
     updateBrows();
     updateTears(dt, now);
@@ -903,11 +1015,14 @@ function updateBlush(dt) {
 // What brings them: the cry gesture, or staying deeply sad for a while.
 // luna.json, "vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}
 // (where each tear starts, below the eye; the default is VRoid's layout).
+// The same layer carries drool: a gesture's "drool" channel (0..1) draws a
+// glossy strand from the corner of her mouth, "vrm": {"drool": {"start":
+// [u, v], "length": 0.07}} (default: VRoid's left mouth corner).
 const tears = { now: 0, gesture: 0, sadFor: 0, layer: null, tried: false, test: null, drops: [] };
+const drool = { now: 0, gesture: 0, test: null };
 function tearLayer() {
   if (tears.tried) return tears.layer;
   tears.tried = true;
-  if (cfg.vrm?.tears?.enabled === false) return null;
   let skin = null;
   vrm.scene.traverse(m => {
     if (!skin && m.isSkinnedMesh && m.renderOrder !== 1000 && !m.userData.overlay
@@ -940,13 +1055,21 @@ function updateTears(dt, now) {
   tears.sadFor = moodNow.sad > 0.55 ? tears.sadFor + dt : Math.max(0, tears.sadFor - dt * 2);
   const target = tears.test ?? Math.min(1, Math.max(tears.gesture, tears.sadFor > 6 ? Math.min(1, (tears.sadFor - 6) / 4) : 0));
   tears.now = damp(tears.now, target, target > tears.now ? 0.9 : 0.35, dt);    // well up slowly, dry slower
-  if (has.has('tears')) { vrm.expressionManager.setValue('tears', tears.now); return; }
-  const l = tearLayer();
+  const dTarget = drool.test ?? drool.gesture;
+  drool.now = damp(drool.now, dTarget, dTarget > drool.now ? 4 : 1.5, dt);
+  const exprTears = has.has('tears');
+  if (exprTears) vrm.expressionManager.setValue('tears', tears.now);
+  const showTears = !exprTears && cfg.vrm?.tears?.enabled !== false && tears.now > 0.01;
+  const showDrool = cfg.vrm?.drool?.enabled !== false && drool.now > 0.01;
+  if (!showTears) tears.drops.length = 0;
+  const l = showTears || showDrool ? tearLayer() : tears.layer;
   if (!l) return;
-  l.mesh.visible = tears.now > 0.01;
-  if (!l.mesh.visible) { tears.drops.length = 0; return; }
+  l.mesh.visible = showTears || showDrool;
+  if (!l.mesh.visible) return;
   const g = l.g, S = 512, k = tears.now;
   g.clearRect(0, 0, S, S);
+  if (showDrool) drawDrool(g, S, drool.now);
+  if (!showTears) { l.tex.needsUpdate = true; return; }
   // drops: born at the lid every so often, sliding down and slowing
   if (k > 0.35 && Math.random() < dt * 1.4 * k) {
     const side = Math.random() < 0.5 ? 0 : 1;
@@ -988,6 +1111,32 @@ function updateTears(dt, now) {
   for (const d of tears.drops) { d.y += d.v * dt * 6 * (1 - Math.min(0.6, d.y * 0.5)); }
   tears.drops = tears.drops.filter(d => d.y < 1.3);
   l.tex.needsUpdate = true;
+}
+
+// A strand from the corner of her mouth: grows down as the channel rises,
+// thin and glossy, with a bead gathering at its end.
+function drawDrool(g, S, k) {
+  const o = cfg.vrm?.drool || {}, [u, v] = o.start || [0.552, 0.762];
+  const x = u * S, y0 = v * S, len = (o.length || 0.07) * S * Math.min(1, k * 1.2);
+  const path = t => [x + Math.sin(t * 2.2) * 2.5 + t * 3, y0 + t * len];
+  const line = (w, style, to = 1.001, dx = 0) => {
+    g.strokeStyle = style; g.lineWidth = w; g.lineCap = 'round'; g.beginPath();
+    for (let t = 0; t <= to; t += 0.05) { const [px, py] = path(t); t ? g.lineTo(px + dx, py) : g.moveTo(px + dx, py); }
+    g.stroke();
+  };
+  line(6, `rgba(150,165,215,${0.35 * k})`);                               // a faint edge, so it reads on pale skin
+  const strand = g.createLinearGradient(x, y0, x, y0 + len);
+  strand.addColorStop(0, `rgba(235,242,255,${0.9 * k})`);
+  strand.addColorStop(1, `rgba(220,232,255,${0.75 * k})`);
+  line(4, strand);
+  line(1.4, `rgba(255,255,255,${0.95 * k})`, 0.85, -0.9);                  // the shine down it
+  const [bx, by] = path(1), r = 3 + 3 * k;                                 // the bead
+  g.fillStyle = `rgba(150,165,215,${0.35 * k})`;
+  g.beginPath(); g.ellipse(bx, by + r * 0.4, r * 0.85 + 1.2, r + 1.2, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = `rgba(225,236,255,${0.9 * k})`;
+  g.beginPath(); g.ellipse(bx, by + r * 0.4, r * 0.85, r, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = `rgba(255,255,255,${0.95 * k})`;
+  g.beginPath(); g.arc(bx - r * 0.3, by, r * 0.3, 0, Math.PI * 2); g.fill();
 }
 
 // Brows through the bangs, the anime way: a copy of the brows drawn over
@@ -1047,15 +1196,18 @@ function debugPanel() {
     flirty: () => { handle({ t: 'mood', energy: 0.5, warmth: 1, face: { happy: 0.3, blush: 0.4, lids: 0.45 }, emote: 'hearts' });
                     emoteLast = -99; emote('hearts'); },
     playful: () => handle({ t: 'feeling', face: { happy: 0.4, blush: 0.4, lids: 0.5 }, gesture: 'wink', seconds: 6 }),
+    // the two rows past the grid, so touches answer from their lewd / grudge entries
+    lewd: () => { handle({ t: 'mood', energy: 0.3, warmth: 0.9, label: 'frisky', row: 'lewd',
+                           face: { happy: 0.4, blush: 0.55, lids: 0.5 }, emote: 'hearts' });
+                  emoteLast = -99; emote('hearts'); },
+    grudge: () => handle({ t: 'mood', energy: 0.8, warmth: -0.5, label: 'furious', row: 'grudge',
+                           face: { angry: 0.9 }, emote: 'anger' }),
     'you: left': () => handle({ t: 'gaze', x: -0.8, y: -0.1 }),
     'you: right': () => handle({ t: 'gaze', x: 0.8, y: -0.1 }),
     'you: ahead': () => handle({ t: 'gaze', none: true }),
     glitch: () => holo?.glitch(1),
-    wave: () => gesture('wave'), hug: () => gesture('hug'), jump: () => gesture('jump'),
-    shrug: () => gesture('shrug'), stretch: () => gesture('stretch'), 'look at hand': () => gesture('look_hand'),
-    'tuck hair': () => gesture('tuck_hair'), bounce: () => gesture('bounce'), explain: () => gesture('explain'),
-    'blow a kiss': () => gesture('kiss'), shy: () => gesture('shy'), fluster: () => { blush.fluster = 1; },
-    cry: () => gesture('cry'), 'tears on/off': () => { tears.test = tears.test ? null : 1; },
+    fluster: () => { blush.fluster = 1; },
+    'tears on/off': () => { tears.test = tears.test ? null : 1; },
     'wag tail': () => { moves.wag(1); setTimeout(() => moves.wag(0), 3000); },
     'holo on/off': () => setHolo(!(holo && holo.isOn())),
     hearts: () => { emoteLast = -99; emote('hearts'); },
@@ -1086,14 +1238,21 @@ function debugPanel() {
     row2.append(r2, out2);
     row.after(row2);
   }
-  // a button for any gesture file without one above (a new gestures/*.js)
-  const covered = new Set(['wave', 'hug', 'jump', 'shrug', 'stretch', 'look_hand', 'tuck_hair', 'bounce', 'explain',
-                           'kiss', 'shy', 'cry']);
-  for (const n of GESTURE_NAMES) if (!covered.has(n) && !n.endsWith('_left')) buttons[n.replace(/_/g, ' ')] = () => gesture(n);
+  // a button for every gesture file, labelled by its file name (blow_kiss.js -> "blow kiss"),
+  // with a hover line saying what it is: about, touch zones, moods, and
+  // 🔥 lewd, 🔒 private (never from stream chat), 🧍 full body only, ⛓ a chain of others
+  const tips = {};
+  for (const n of GESTURE_NAMES) {
+    if (n.endsWith('_left')) continue;
+    const label = n.replace(/_/g, ' '), g = GESTURES[n] || {};
+    buttons[label] = () => gesture(n);
+    tips[label] = [`${n}.js` + (g.lewd ? ' 🔥' : '') + (g.private ? ' 🔒' : '') + (g.full ? ' 🧍' : '') + (g.chain ? ` ⛓ ${g.chain.join(' → ')}` : ''),
+                   g.about, g.touch && `touch: ${g.touch.join(', ')}`, g.moods && `moods: ${g.moods.join(', ')}`].filter(Boolean).join('\n');
+  }
   // grouped, each group alphabetical; anything not listed is a gesture
   const GROUPS = [
     ['her state', ['idle', 'listen', 'talk', 'think']],
-    ['face and mood', ['blink', 'cross', 'flirty', 'fluster', 'happy', 'neutral', 'playful', 'sad', 'tears on/off']],
+    ['face and mood', ['blink', 'cross', 'flirty', 'fluster', 'grudge', 'happy', 'lewd', 'neutral', 'playful', 'sad', 'tears on/off']],
     ['looking', ['you: ahead', 'you: left', 'you: right']],
     ['body', ['left ear', 'twitch', 'wag tail']],
     ['effects', ['glitch', 'holo on/off']],
@@ -1110,13 +1269,37 @@ function debugPanel() {
     h.style.margin = '6px 0 1px';
     h.textContent = title;
     box.appendChild(h);
+    if (title === 'gestures') {
+      // one menu, by file name: pick to play, ▶ to play it again
+      const sel = document.createElement('select'), again = document.createElement('button');
+      sel.style.maxWidth = '100%';
+      sel.add(new Option(`pick a gesture (${list.length})`, ''));
+      for (const label of list) {
+        const n = label.replace(/ /g, '_'), g = GESTURES[n] || {};
+        const o = new Option(n + (g.lewd ? ' 🔥' : '') + (g.private ? ' 🔒' : '') + (g.full ? ' 🧍' : '') + (g.chain ? ' ⛓' : ''), label);
+        o.title = tips[label] || '';
+        sel.add(o);
+      }
+      const play = () => { if (sel.value) buttons[sel.value](); sel.title = tips[sel.value] || ''; };
+      sel.onchange = play;
+      again.textContent = '▶'; again.title = 'play it again'; again.onclick = play;
+      const key = document.createElement('div');
+      key.className = 'dim';
+      key.textContent = '🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
+      box.append(sel, again, key);
+      continue;
+    }
     for (const label of list) {
       const b = document.createElement('button');
       b.textContent = label;
+      if (tips[label]) b.title = tips[label];
       b.onclick = buttons[label];
       box.appendChild(b);
     }
   }
+  // the pose studio, under the gestures
+  import('./studio.js').then(m => { studio = m.createStudio({ vrm, moves, GESTURES, box }); })
+    .catch(e => console.warn('pose studio:', e));
   // a gesture file with a mistake in it: say which and why, instead of a missing button
   if (Object.keys(GESTURE_FAILED).length) {
     const p = document.createElement('pre');
@@ -1199,27 +1382,32 @@ const touchCfg = await fetch('touch.json').then(r => r.ok ? r.json() : {}).catch
 const toucher = createTouch(THREE, camera, renderer.domElement);
 const touched = { last: -99, recent: [] };
 
-function moodBand() {          // the same edges as moods.json's warmth
+function warmthBand() {        // the same edges as moods.json's warmth
   const w = mind.warmth;
   return w < -0.2 ? 'cool' : w < 0.35 ? 'neutral' : w < 0.66 ? 'warm' : 'loving';
 }
-// which entry of a zone's table answers now: her mood by name, else its band
+function moodBand() { return mind.row || warmthBand(); }
+// What can answer now, most specific first: her mood by name (heated),
+// its row (lewd, grudge), then the warmth band - so a table without a
+// lewd entry falls back to loving, and without a grudge one to cool.
+function moodKeys() { return [mind.label, mind.row, warmthBand()].filter(Boolean); }
 function reactionKey(table) {
   if (!table) return '';
-  return table[mind.label] ? mind.label : table[moodBand()] ? moodBand() : '';
+  return moodKeys().find(k => table[k]) || '';
 }
 function pickReaction(table) {
   const key = reactionKey(table);
   return key ? table[key] : null;
 }
 // Gesture files can say which touches they answer: touch: ['legs'],
-// moods: ['warm', 'loving'] (no moods: any). Drop one in and it joins.
+// moods: ['warm', 'loving'], or a row ('lewd', 'grudge') or a mood name
+// (no moods: any). Drop one in and it joins.
 function taggedFor(zone) {
-  const band = moodBand();
+  const keys = moodKeys();
   return Object.keys(GESTURES).filter(n => {
     const g = GESTURES[n];
     if (n.endsWith('_left') || !Array.isArray(g.touch) || !g.touch.includes(zone)) return false;
-    return !Array.isArray(g.moods) || g.moods.includes(band) || g.moods.includes(mind.label);
+    return !Array.isArray(g.moods) || keys.some(k => g.moods.includes(k));
   });
 }
 function react(r, zone, side) {
@@ -1252,6 +1440,8 @@ function touch(zone, side) {
 // ...and Luna hears about it (livefeed -> touches.py): with touch talk on
 // she answers out loud, a moment later, in one short line. Every click
 // goes, so "on the head, 3 times" is right; the cooldown is hers.
+let studio = null;      // the pose studio (studio.js), debug viewer only
+
 function tell(zone) {
   if (params.get('demo')) return;
   fetch('touch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1269,6 +1459,7 @@ if (touchCfg.enabled !== false) {
     down = null;
     const hit = toucher.at(vrm, e.clientX, e.clientY, true);
     if (!hit) return;
+    if (studio?.active) { studio.pick(hit.bone); return; }     // posing: a click picks the bone
     touch(hit.zone, hit.side);
     tell(hit.zone);
   });
@@ -1300,7 +1491,7 @@ try {
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
   say('');
-  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
+  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
                       touchAt: (x, y) => toucher.at(vrm, x, y), touch };
   if (params.get('debug')) debugPanel();
   buildActs();

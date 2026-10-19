@@ -630,6 +630,10 @@ def launchers(state):
 # ---------------------------------------------------------------------------
 def set_config(section, key, value):
     path = os.path.join(ROOT, "config.json")
+    example = os.path.join(ROOT, "config.example.json")
+    if not os.path.exists(path) and os.path.exists(example):
+        # config.json is yours and not in git: a fresh clone starts from the defaults
+        shutil.copyfile(example, path)
     try:
         with open(path, encoding="utf-8") as f:
             cfg = json.load(f)

@@ -190,9 +190,15 @@ and a NickServ message sent after JOIN is sent after it was refused.
     "channel": "beerus",
     "speak": true,
     "post_replies": false,
+    "lewd": false,
     "ignore": ["Nightbot", "StreamElements", "Streamlabs", "Moobot", "Fossabot"]
 }
 ```
+
+`lewd` is off by default on Twitch and YouTube: while she's live there,
+her lewd mood shows as the row below it and lewd moves don't play (see
+[Moods](moods.md#streams-where-lewd-isnt-allowed)). Set it true if your
+channel allows it.
 
 Reading needs nothing at all. Twitch lets anyone read a public chat
 anonymously, so by default she joins as a nameless reader and answers

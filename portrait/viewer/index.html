@@ -31,6 +31,9 @@
   #debug pre { white-space: pre-wrap; margin: 6px 0 0; color: var(--dim); }
   #debug .dim { color: var(--dim); margin: 2px 0; }
   #debug h4 { margin: 8px 0 2px; color: var(--accent); font-weight: 600; }
+  #debug input[type=range] { accent-color: var(--accent); vertical-align: middle; }
+  #debug input[type=number] { background: #2a2040; color: var(--text); border: 1px solid #4a3a70;
+                              border-radius: 4px; font: inherit; padding: 1px 4px; }
   #debug select { background: #2a2040; color: var(--text); border: 1px solid #4a3a70; border-radius: 6px; font: inherit; max-width: 100%; }
 </style>
 </head>
@@ -41,7 +44,7 @@
     <span class="hint">drag here · corner resizes · h hides</span></div>
   <h4>model</h4><select id="dmodel"></select>
   <h4>view</h4><div id="dview"></div>
-  <div class="dim">drag her to turn around · wheel zooms · double-click resets</div>
+  <div class="dim">left-drag turns her · wheel zooms · double-click resets</div>
   <h4>try</h4>
   <div id="dbuttons"></div>
   <h4>clips</h4><div id="dclips"><span class="dim">none in portrait/animations</span></div>

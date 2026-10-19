@@ -11,6 +11,11 @@
     ["cuddly", "loving",  "flirty"]
   ],
 
+  "lewd":   { "_about": "Above very warm: entered at very warm once desire passes enter (0..1, built by flirting while she's warm, wiped by hostility). Tired, even, wired.",
+              "row": ["teasing", "frisky", "heated"], "enter": 0.6 },
+  "grudge": { "_about": "Below cool: real hostility while she's already cool. Lasts minutes (another insult restarts it); an apology or clear warmth ends it early. Tired, even, wired.",
+              "row": ["sulky", "hurt", "furious"], "minutes": 20 },
+
   "states": {
     "sad":     { "lines": ["sad and worn out", "low, and short on patience"],
                  "face": { "sad": 0.7, "angry": 0.1 }, "voice": { "speed": 0.95, "pitch": -0.35 } },
@@ -23,7 +28,7 @@
                  "face": { "sad": 0.3, "relaxed": 0.15 }, "voice": { "speed": 0.95, "pitch": -0.3 },
                  "idle": ["stretch"] },
     "calm":    { "lines": ["calm, nothing much either way", "fine, unhurried"],
-                 "face": { "happy": 0.06 } },
+                 "face": { "happy": 0.06 }, "idle": ["standing_split"] },
     "focused": { "lines": ["focused and interested", "alert, and enjoying having something to chew on"],
                  "face": { "happy": 0.12 }, "voice": { "speed": 1.03, "pitch": 0.2 },
                  "idle": ["look_hand"] },
@@ -45,7 +50,26 @@
                  "idle": ["shy"], "emote": "hearts" },
     "flirty":  { "lines": ["flirty and playful with him", "in a teasing, flirty mood, pleased with him"],
                  "face": { "happy": 0.3, "blush": 0.4, "lids": 0.45 }, "voice": { "speed": 1.03, "pitch": 0.25 },
-                 "idle": ["wink"], "emote": "hearts" }
+                 "idle": ["wink", "beckon_kiss"], "emote": "hearts" },
+
+    "teasing": { "lines": ["in the mood, slow and teasing, wanting him close", "languid and wanting, teasing him at her own pace"],
+                 "face": { "happy": 0.3, "relaxed": 0.3, "blush": 0.55, "lids": 0.6 }, "voice": { "speed": 0.95, "pitch": -0.3 },
+                 "idle": ["shy", "wink"], "emote": "hearts" },
+    "frisky":  { "lines": ["frisky and bold, enjoying getting him going", "playful and wanting, and not hiding it"],
+                 "face": { "happy": 0.4, "blush": 0.55, "lids": 0.5 }, "voice": { "speed": 1.03, "pitch": 0.25 },
+                 "idle": ["wink", "bounce", "look_back", "leg_hold"], "emote": "hearts" },
+    "heated":  { "lines": ["heated and eager, wanting him now", "worked up and wanting, impatient with anything else"],
+                 "face": { "happy": 0.2, "blush": 0.85, "lids": 0.65 }, "voice": { "speed": 1.04, "pitch": 0.1 },
+                 "idle": ["cup_breasts", "touch_self", "look_back"], "emote": "hearts" },
+
+    "sulky":   { "lines": ["sulking and short with him, not over it", "quietly hurt and in no mood to be nice"],
+                 "face": { "sad": 0.5, "angry": 0.25 }, "voice": { "speed": 0.95, "pitch": -0.35 },
+                 "idle": ["hands_on_chest"] },
+    "hurt":    { "lines": ["hurt and cool with him; he hasn't made it right", "stung, and keeping her distance"],
+                 "face": { "sad": 0.55, "angry": 0.3 }, "idle": ["shrug"] },
+    "furious": { "lines": ["furious with him and not hiding it", "properly angry, every word clipped"],
+                 "face": { "angry": 0.9 }, "voice": { "speed": 1.05, "pitch": 0.25 },
+                 "idle": ["hands_on_chest"], "emote": "anger" }
   },
 
   "walk_away": {

@@ -82,6 +82,12 @@ cmake --build "$BUILD" --config Release -j"$JOBS" \
 
 ln -sfn "$BUILD/bin" bin
 
+# read-acts: the introspection lab's layer reader (introspection/read.py).
+# Only the lab needs it, so a failure here never stops the install.
+if [ -f ../introspection/reader/build.sh ]; then
+    bash ../introspection/reader/build.sh || echo "read-acts didn't build - only introspection/read.py needs it"
+fi
+
 echo
 echo "Built for $KIND: llama/bin/llama-server"
 echo "Next: put a model in llama/models (or point MODEL= in llama/server.env at"
