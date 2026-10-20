@@ -135,7 +135,7 @@ def prompt_line(private=True):
     import mood
     tame = bool(mood.tame())      # live on a stream with lewd off: don't offer the lewd ones
     about = {n: g["about"] for n, g in builtin().items()
-             if g["about"] and (private or not g["private"]) and not (tame and g["lewd"]) and _shown(g)}
+             if g["about"] and (private or not g["private"]) and not (tame and g.get("lewd")) and _shown(g)}
     for c in clips():
         if c.get("about") and (private or not c.get("private")):
             about[c["name"]] = str(c["about"])[:60]
@@ -220,7 +220,7 @@ def _prototypes(private=True):
     you write is matched by meaning too. Private ones only in private turns."""
     protos = {k: list(v) for k, v in PROTOTYPES.items()}
     # turns are asked for, not guessed from the mood of the talk: never by meaning
-    found = [(n, g["about"], g["private"]) for n, g in builtin().items() if _shown(g) and not g["view"]]
+    found = [(n, g["about"], g["private"]) for n, g in builtin().items() if _shown(g) and not g.get("view")]
     found += [(c["name"], str(c.get("about") or ""), bool(c.get("private"))) for c in clips()]
     for name, about, is_private in found:
         if not about or name in protos or (is_private and not private):
