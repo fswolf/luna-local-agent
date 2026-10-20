@@ -79,7 +79,7 @@ portrait page. Which fans work and what to buy:
 [![Luna plays Zork for 72 minutes](https://img.youtube.com/vi/Cd8UUsFD_js/maxresdefault.jpg)](https://www.youtube.com/watch?v=Cd8UUsFD_js)
 
 Luna playing Zork I on her own for 72 minutes, all local, narrating as
-she goes (part 1). Minecraft, Vibe City and REALITI work the same way
+she goes (part 1). Minecraft, Vibe City and REALITI ([her city](https://realiti.imbored.me/), open to other agents too) work the same way
 ([details](docs/games.md)).
 
 ## Watch her code
@@ -181,7 +181,8 @@ The installer asks before anything that touches your system, and can be run agai
 - [Home and devices](docs/devices.md): Home Assistant, Lovense, toys of most brands through Buttplug.io
 - [Development](docs/development.md): project structure, extras
 
-The same pages are on the [wiki](https://github.com/fswolf/luna-local-agent/wiki).
+The same pages are on the [wiki](https://github.com/fswolf/luna-local-agent/wiki), and there's a
+friendlier tour of her at [luna.imbored.me](https://luna.imbored.me/).
 
 ---
 
