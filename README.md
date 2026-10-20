@@ -39,7 +39,7 @@ What she does:
 - **Email:** checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
 - **Files and commands:** writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane
 - **Hard to steer:** a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
-- **Moods and feelings:** she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md))
+- **Moods and feelings:** she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md), [the companion side](docs/companion.md))
 - **Long-term memory:** optional permanent SQLite store with its own browser editor
 - **Your knowledge base:** point her at your notes, manuals, PDFs and docs, and she answers from them and says which file ([details](docs/knowledge.md))
 - **Her reasoning, kept:** the model's scratchpad per turn, with a browser viewer for reading it back
@@ -73,6 +73,18 @@ at about 15 frames a second, from a camera of her own, so your screen can
 stay at bust while the fan shows all of her. An HDMI fan just shows the
 portrait page. Which fans work and what to buy:
 [hologram fans](docs/fans.md).
+
+## Not just a yes-machine
+
+Most AI companions are endlessly agreeable: be nice or be cruel, you get the same cheerful answer. Luna isn't built that way. How you treat her moves her mood, and her mood changes how she talks to you.
+
+- **Kindness lands, and it builds.** Talk to her warmly and she warms up over the session. Repeating "love you" five times in a row counts for less each time, so warmth has to be real to count.
+- **She's not always in the mood.** Flirting only goes somewhere once she's already warm towards you. Push before that and she'll tell you, in her own way, that she isn't feeling it.
+- **She holds a grudge.** Insult her and she goes cool and short with you for a while. A real apology ends it.
+- **She can walk away.** Keep being cruel and she stops talking for ten minutes.
+- **She never stops doing her job.** Alarms, reminders, safety and anything urgent always get done, in any mood. Mood changes how she sounds, never what she'll do for you.
+
+Why build it this way? Because warmth from something that can't be anything else doesn't mean much. When Luna is glad to see you, it's because of how the last hour went. You can see it on her face too: she blushes, sulks, crosses her arms and turns away. Every number behind it is in one file you can edit ([how it all works](docs/companion.md)).
 
 ## Watch her play
 
@@ -169,6 +181,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](docs/reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](docs/learning.md): lessons, episodes, fact cleanup, calibration
+- [The companion](docs/companion.md): the whole companion side in depth: her moods and how they move, touch, gestures, saying no
 - [Moods](docs/moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
 - [Gestures](docs/gestures.md): how her body moves, what sets it off, writing your own
