@@ -34,6 +34,7 @@ PLACES = {
     "head": "on the head", "nose": "on the nose", "mouth": "on the lips", "chest": "on the chest",
     "tummy": "on the tummy", "groin": "between the legs", "legs": "on the leg", "neck": "on the neck",
     "arms": "on the arm", "back": "on the back", "butt": "on the butt", "tail": "on the tail",
+    "spank": "with a spank on the butt",     # the portrait's spank (her top two moods): mood.note_spank
 }
 WINDOW = 1.5          # seconds of pokes gathered into one touch
 MAX_TOKENS = 40       # her line, not a paragraph
@@ -62,6 +63,14 @@ def cooldown():
 def note(zone):
     """A touch on the portrait. True if it was taken (she may still not
     answer it: too soon after the last, or she's busy)."""
+    if zone == "spank":
+        # counted whether or not she talks about it: too many is a punishment
+        try:
+            import mood
+
+            mood.note_spank()
+        except Exception:
+            pass
     if zone not in PLACES or not enabled() or not _state["model"]:
         return False
     with _lock:

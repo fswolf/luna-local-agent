@@ -55,7 +55,8 @@ framing and ignores the setting and the toggle, so an OBS source can
 keep its own,
 `?debug=1` (test buttons for every reaction, including *you: left /
 right / ahead* to try the looking), `?demo=1` (acts out a conversation
-on its own).
+on its own), `?fan=1` (for an HDMI hologram fan: black, all of her,
+nothing else). Hologram fans, HDMI and WiFi: [fans.md](fans.md).
 
 ## Touching her
 
@@ -370,16 +371,57 @@ and does small things on her own:
 | Cry | She writes `[cry]`, or she stays deeply sad for several seconds: tears well on her lower lids, streak down her cheeks with drops running along them, and the cry gesture adds a lowered head and shoulders hitching with sobs. They dry slowly. `"vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}` in luna.json moves them for a non-VRoid face |
 | Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
 
-### Posing her (the pose studio)
+### The pose studio: making gestures without code
 
-The debug viewer (`?debug=1`) has a **pose studio** under the gesture menu.
-Click *start posing*, then click a part of her (or pick a bone from the
-list) and drag x / y / z / twist - she moves as you drag. *mirror* poses
-the other arm or leg to match, *face* has blush, smile, mouth and blink,
-and *start from it* loads any gesture at any moment of it to adjust.
-*copy bone* / *copy pose* give lines to paste straight into a gesture file.
+The debug viewer (`?debug=1`) opens a second window, **pose studio** (the
+🎬 button in the debug panel brings it back). Both windows drag by their
+title bar, resize from the corner, fold to their title bar (▾) or tuck into
+the dock at the bottom left (–); they remember where they were.
+
+- **view** - *front*, *¾*, *side*, *back* and zoom, to check a pose from
+  every side. *● posing* in the title bar means she's holding your pose.
+- **pose** - *start posing*, then click a part of her (or pick a bone from
+  the grouped list, ◀ ▶ to step through) and drag x / y / z / twist.
+  Rotation rings on the bone, like a 3D program's: x (red), y (green),
+  z (blue) and twist (white), each sitting the way its slider really turns
+  it, a cone showing which way + goes; the near half is bright, the far
+  half faint, inside an outline, so it reads as a ball. Drag a ring to turn
+  the bone (shift: 15° steps), or slide along one seen edge-on; hovering
+  one lights it up. They stay the same size
+  on screen in any frame. *−* / *+* nudge by 0.05 (shift: finer), double-click a
+  slider for 0, and a bone you haven't touched starts where she rests,
+  not in a T-pose. *mirror* poses the other side to match. The chips show
+  what this key moves (click one to pick it). *hand* curls all the
+  fingers at once (*open*, *fist*). *face* sets blush, smile, mouth,
+  blink... at that moment. *copy bone* / *copy pose* give lines to paste.
+  Switching bust / face / full body on the debug panel no longer reloads,
+  and any other reload (model, hologram...) picks your work back up.
+- **animate** - a timeline: keys are the diamonds, the yellow line is
+  where you are, emotes and the sound are marked underneath. Click to go
+  somewhere, drag a key to move it. Posing at a time makes a key there.
+  *◀ key* / *key ▶* jump between keys, *+ key here*, *copy* / *paste key*,
+  *delete key*, *length*, *▶ play* (and *loop*).
+- **keys** - space play/stop · ← → previous/next key · K add a key ·
+  Del delete it · Ctrl+Z undo · Ctrl+Y (or Ctrl+Shift+Z) redo. The ↶ ↷
+  buttons do the same.
+- **details** - the name, what it's for (*about*, which is what Luna sees),
+  the words she writes that play it, fade in/out, 🔒 / 🔥 / 🧍 / idle,
+  which touches and moods play it, a sound from `portrait/sounds/` (from a
+  point or random, for how long), emotes at set times, and the tail (swish,
+  or lifted and held).
+- **link** - gestures one after another (*+ add*, ↑ ↓ ✕), played and saved
+  as one chain.
+
+*open a gesture… → load* brings any existing gesture in to edit. **save**
+writes `portrait/gestures/<name>.js` - plain data, the same shape as the
+hand-written files - and it plays straight away (other menus show it after
+a reload). Saving over an existing gesture asks first and keeps the old file
+in `portrait/gestures/backup/`. Saving only works from your own machine,
+like everything else on the portrait server.
+
 Torso and head bones are `'+'` (added on top of her breathing), like the
-gesture files write them.
+gesture files write them. Made from helpers like `both()` in code? A gesture
+saved from the studio comes out as plain numbers, which is fine.
 
 ### Writing a gesture in code
 

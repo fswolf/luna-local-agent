@@ -45,6 +45,7 @@ What she does:
 - **Her reasoning, kept:** the model's scratchpad per turn, with a browser viewer for reading it back
 - **See inside her:** token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
 - **An animated portrait:** Live2D or VRM, lip-synced, blinking, gestures, blushes and tears; click her and she reacts by mood; bust or full body ([details](docs/portrait.md#portrait))
+- **On a hologram fan:** live over WiFi on a Holoscope fan (P56, PD42), or on any HDMI fan as a screen; she floats in the air ([details](docs/fans.md))
 - **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
 - **Plays games:** Minecraft, Zork, Vibe City and REALITI, on her own when you go quiet, and remembers how she felt about them ([details](docs/games.md))
@@ -65,6 +66,13 @@ hologram mode. `/holo` switches between them live, in the portrait
 window and in OBS. Click her and she reacts: a head pat, a boop on the
 nose, a poke in the tummy, each answered by how she's feeling. Live2D
 and other VRM models work too ([details](docs/portrait.md#portrait)).
+
+She can also float in mid-air on a hologram fan, a spinning blade of LEDs
+where black shows as nothing. On a Holoscope WiFi fan she's streamed live
+at about 15 frames a second, from a camera of her own, so your screen can
+stay at bust while the fan shows all of her. An HDMI fan just shows the
+portrait page. Which fans work and what to buy:
+[hologram fans](docs/fans.md).
 
 ## Watch her play
 
@@ -164,6 +172,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Moods](docs/moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
 - [Gestures](docs/gestures.md): how her body moves, what sets it off, writing your own
+- [Hologram fans](docs/fans.md): Luna live on a Holoscope WiFi fan or an HDMI fan, and which to buy
 - [Home automation](docs/home.md): Home Assistant on your own network, setup, what always asks, local devices
 - [Sysadmin](docs/sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](docs/plugins.md): how they work, writing your own, scheduled jobs and Discord

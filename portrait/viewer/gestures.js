@@ -84,7 +84,7 @@ export const NAMES = Object.keys(GESTURES);
 const ease = t => t * t * (3 - 2 * t);
 
 // a key's value for one channel at time t (fill forward, fill back)
-function sample(keys, name, t) {
+export function sample(keys, name, t) {
   let prev = null, next = null;
   for (const [kt, p] of keys) {
     if (!(name in p)) continue;
@@ -99,7 +99,7 @@ function sample(keys, name, t) {
   const n = Math.max(prev[1].length, next[1].length);
   return Array.from({ length: n }, (_, i) => (prev[1][i] ?? 0) + ((next[1][i] ?? 0) - (prev[1][i] ?? 0)) * k);
 }
-function sampleScalar(v, t) {
+export function sampleScalar(v, t) {
   if (!Array.isArray(v)) return v;
   let prev = v[0], next = null;
   for (const kv of v) { if (kv[0] <= t) prev = kv; else { next = kv; break; } }

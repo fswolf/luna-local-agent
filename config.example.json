@@ -312,6 +312,11 @@
         },
         "hologram": {
             "enabled": false
+        },
+        "fan": {
+            "cast": false,
+            "framing": "full",
+            "fps": 15
         }
     },
     "mcp": {

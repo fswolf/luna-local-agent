@@ -894,6 +894,40 @@ def last_feeling():
         return _last_feeling
 
 
+# Spanks (the portrait, in her top two rows): fun up to a point, then a
+# punishment, tamagotchi style. Each one counts; they're forgotten one every
+# SPANK_FORGET seconds; every SPANK_LIMIT knocks her down a notch - warmth and
+# desire - so keeping at it takes her out of the mood.
+SPANK_LIMIT = 60
+SPANK_FORGET = 10.0
+SPANK_WARMTH = -0.10
+SPANK_DESIRE = -0.20
+_spanks = {"n": 0.0, "at": 0.0}
+
+
+def note_spank():
+    """One spank on the portrait. True if it was one too many (a notch down)."""
+    global _desire
+
+    if not config.MOOD_ENABLED:
+        return False
+
+    now = time.time()
+
+    with _lock:
+        before = max(0.0, _spanks["n"] - (now - _spanks["at"]) / SPANK_FORGET) if _spanks["at"] else 0.0
+        _spanks.update(n=before + 1.0, at=now)
+        over = int(_spanks["n"] // SPANK_LIMIT) > int(before // SPANK_LIMIT)
+        if over:
+            _desire = max(0.0, _desire + SPANK_DESIRE)
+
+    if over:
+        logbook.info("mood", "spanked %d times: a notch down", int(_spanks["n"]))
+        _nudge(warmth=SPANK_WARMTH, energy=-0.03, why="too many spanks")
+
+    return over
+
+
 # Older name, still called by anything that knows an explicit thank-you.
 def note_thanks():
     _nudge(warmth=0.12, why="you were kind about it")

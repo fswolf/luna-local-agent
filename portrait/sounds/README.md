@@ -16,4 +16,3 @@ Keep a CREDITS.md here for packs that ask for credit.
 | File / folder | Used by |
 |---|---|
 | touch-self.mp3 | touch_self, climax |
-| moan-sexy01.mp3, 02, 03 (えちおと！ セクシー系) | masturbate |

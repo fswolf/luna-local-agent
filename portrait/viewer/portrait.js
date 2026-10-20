@@ -12,6 +12,8 @@
 //   ?debug=1          bone list and test buttons
 //   ?demo=1           acts out a fake conversation, no assistant needed
 //   ?holo=1 / ?holo=0 the hologram look on or off (overrides config.json)
+//   ?fan=1            for an HDMI hologram fan: black, all of her, centred, nothing else
+//   ?nocast           never cast to a WiFi hologram fan from this page (fan.js)
 
 import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils,
          VRMAnimationLoaderPlugin, createVRMAnimationClip } from './vendor/luna-three.js';
@@ -19,6 +21,7 @@ import { createLook } from './look.js';
 import { createHologram3D } from './hologram3d.js';
 import { createEmotes } from './emotes.js';
 import { createTouch } from './touch.js';
+import { createFan } from './fan.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
@@ -32,7 +35,10 @@ if (params.get('bg') === 'transparent') document.body.classList.add('transparent
 if (params.get('debug')) document.body.classList.add('debug');
 
 const cfg = await fetch('config.json' + location.search).then(r => r.json()).catch(() => ({}));
-let framing = params.get('frame') || cfg.frame || 'bust';   // bust, face or full
+// ?fan=1: the page an HDMI hologram fan shows. Black is invisible on a fan.
+const fanView = params.get('fan') === '1';
+if (fanView) document.body.classList.add('fan');
+let framing = params.get('frame') || (fanView ? cfg.fan?.framing || 'full' : cfg.frame) || 'bust';   // bust, face or full
 
 // ---------------------------------------------------------------------------
 // Scene
@@ -41,7 +47,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserv
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x000000, 0);
+renderer.setClearColor(0x000000, fanView ? 1 : 0);
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -59,7 +65,7 @@ const emotes = createEmotes(THREE, scene);   // hearts, sweat drop... beside her
 // The hologram look: config.json "hologram": {"enabled": true}, or ?holo=1.
 // The URL sets how it starts; /holo and the tools pane switch it live.
 const holoCfg = cfg.hologram || {};
-const holoOn = params.has('holo') ? params.get('holo') !== '0' : !!holoCfg.enabled;
+const holoOn = params.has('holo') ? params.get('holo') !== '0' : !!holoCfg.enabled && !fanView;   // a fan is the hologram
 let holo = holoOn ? createHologram3D(THREE, renderer, holoCfg) : null;
 function setHolo(on) {
   if (on) { if (holo) holo.on(); else holo = createHologram3D(THREE, renderer, holoCfg); }
@@ -78,6 +84,7 @@ addEventListener('resize', () => {
 // ---------------------------------------------------------------------------
 let vrm = null;
 let moves = null;            // gestures.js: wave, hug, jump, idle things
+let fan = null;              // fan.js: casting to a WiFi hologram fan
 let fx = 1;                  // -1 on a VRM 0.x model: it faces the other way in its own space
 const ears = [];             // {node, rest, angle, vel, side}
 const has = new Set();       // expression names this model has
@@ -144,9 +151,10 @@ function frame() {
   base.dist = dist;
   base.lookY = lookY;
   base.headZ = p.z;
+  base.headY ||= p.y;   // her standing height, measured once (the fan's framing keeps to it)
 }
 
-const base = { lookY: 1.45, headZ: 0, follow: 0.7, dist: 2 };
+const base = { lookY: 1.45, headZ: 0, follow: 0.7, dist: 2, headY: 0 };
 
 // The viewer (?debug=1): left-drag to turn around her, wheel to zoom, double-click
 // to put the camera back. Off on the live portrait, so a stray click in OBS
@@ -216,10 +224,10 @@ function handle(ev) {
       break;
     }
     case 'frame':       // the tools pane: bust or full, while the page is open (a ?frame= page keeps its own)
-      if (!params.get('frame') && ['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
+      if (!params.get('frame') && !fanView && ['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
       break;
     case 'holo': {      // /holo or the tools pane, while the page is open
-      setHolo(!!ev.on);
+      setHolo(!!ev.on && !fanView);   // a fan is the hologram already
       break;
     }
     case 'gaze':
@@ -524,7 +532,7 @@ function idleMoves(now, talking) {
     let pick;
     // half the time, something that suits her mood (agent/moods.json "idle")
     const fits = mind.idle.filter(n => moves.names.includes(n) || moves.hasClip(n));
-    const seen = n => !(GESTURES[n]?.full && framing !== 'full');   // legs-only moves wait for full body
+    const seen = n => !(GESTURES[n]?.full && framing !== 'full' && !fan?.status().connected);   // legs-only moves wait for full body (or a fan)
     const pool = (fits.length && Math.random() < 0.5 ? fits : IDLE.concat(moves.clipsWhere('idle'))).filter(seen);   // clips marked "idle" join in
     if (pool.length) {
       do { pick = pool[Math.floor(Math.random() * pool.length)]; } while (pick === idle.last && pool.length > 1);
@@ -855,6 +863,7 @@ function animate() {
     if (!Object.hasOwn(moves.expr(), 'tears')) tears.gesture = 0;
     if (!Object.hasOwn(moves.expr(), 'drool')) drool.gesture = 0;
     updateBlush(dt);
+    updateSpank(dt);
     updateBrows();
     updateTears(dt, now);
     moodEmote(now);
@@ -867,6 +876,22 @@ function animate() {
 
   if (holo && holo.isOn()) holo.render(scene, camera);
   else renderer.render(scene, camera);
+  if (fan && vrm) fan.update(performance.now());
+}
+
+// ---------------------------------------------------------------------------
+// Hologram fan (fan.js, holofan.py): a WiFi fan gets her live, from a camera
+// of its own - centred, square, all of her (or bust), turning when she turns.
+// ---------------------------------------------------------------------------
+function placeFan(cam, how) {
+  // framed on her standing height, not where her head is this moment: a bow
+  // or a crouch moves her in the circle, the camera stays put (bust follows a jump)
+  const headY = base.headY || 1.4, bust = how === 'bust';
+  const height = bust ? 0.62 : headY + 0.3;                             // what fits the circle
+  const lookY = bust ? headY - 0.12 + moves.hipsY() * 0.7 : (headY + 0.15) / 2;
+  const dist = (height / 2) / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+  cam.position.set(Math.sin(orbit.yaw) * dist, lookY, base.headZ + Math.cos(orbit.yaw) * dist);
+  cam.lookAt(0, lookY, base.headZ);
 }
 
 // ---------------------------------------------------------------------------
@@ -1296,9 +1321,31 @@ function debugPanel() {
       b.onclick = buttons[label];
       box.appendChild(b);
     }
+    if (title === 'effects') box.appendChild(spankSlider());
   }
-  // the pose studio, under the gestures
-  import('./studio.js').then(m => { studio = m.createStudio({ vrm, moves, GESTURES, box }); })
+  if (fan) {            // the WiFi hologram fan, while casting is on
+    const h = Object.assign(document.createElement('div'), { className: 'dim', textContent: 'hologram fan' });
+    const line = Object.assign(document.createElement('div'), { className: 'dim' });
+    h.style.margin = '6px 0 1px';
+    const show = () => {
+      const f = fan.status();
+      line.textContent = !f.enabled ? 'cast is off (portrait.fan.cast)'
+        : !f.connected ? `waiting for a fan (on its WiFi, or your router)${f.error ? ' · ' + f.error : ''}`
+        : !f.type ? `a fan at ${f.ip}: asking which model it is...`
+        : !f.geometry ? `a fan at ${f.ip} (type ${f.type}): a model we can't draw for`
+        : `${f.model} (type ${f.type}) at ${f.ip} · ${f.casting ? `live ${f.fps}/s` : 'idle'} · jpeg q${f.quality}`
+          + (f.geometry.support === 'legacy' ? ' · older format: may not show live' : '')
+          + (f.error ? ' · ' + f.error : '');
+    };
+    show(); setInterval(show, 2000);
+    box.append(h, line);
+  }
+  // the pose studio: its own window (studio.js); this button brings it back
+  const open = document.createElement('button');
+  open.textContent = '🎬 pose studio';
+  open.onclick = () => studio?.show();
+  box.appendChild(open);
+  import('./studio.js').then(m => { studio = m.createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas: renderer.domElement, fx }); })
     .catch(e => console.warn('pose studio:', e));
   // a gesture file with a mistake in it: say which and why, instead of a missing button
   if (Object.keys(GESTURE_FAILED).length) {
@@ -1406,7 +1453,7 @@ function taggedFor(zone) {
   const keys = moodKeys();
   return Object.keys(GESTURES).filter(n => {
     const g = GESTURES[n];
-    if (n.endsWith('_left') || !Array.isArray(g.touch) || !g.touch.includes(zone)) return false;
+    if (n.endsWith('_left') || n.startsWith('__') || !Array.isArray(g.touch) || !g.touch.includes(zone)) return false;
     return !Array.isArray(g.moods) || keys.some(k => g.moods.includes(k));
   });
 }
@@ -1423,7 +1470,112 @@ function react(r, zone, side) {
   if (r.emote) emote(r.emote);
   if (r.ears) twitch(0, 1);
 }
+// Spanks. In her top two rows (very warm, lewd) a click on her bum is a
+// spank: she flinches (spank_flinch), and her bum reddens - a glow painted
+// over her cheeks that steps up every SPANK_STEP spanks and fades as they're
+// forgotten (one every SPANK_FORGET seconds). Not while a tame stream is live.
+// Each one also goes to Luna as 'spank' (touches.py -> mood.note_spank): every
+// 60 knocks her mood down a notch.
+const SPANK_STEP = 10, SPANK_FORGET = 10;
+const spank = { n: 0, flash: 0, layers: [], built: false };
+function spankMode() { return !mind.tame && (mind.row === 'lewd' || warmthBand() === 'loving'); }
+function buildBumBlush() {
+  spank.built = true;
+  // which vertices are her cheeks: in the hips bone's own frame at rest (from
+  // the skin's bind matrices, so it doesn't matter how she's posed right now),
+  // behind her and either side of the middle, fading out toward the edges
+  const rawHips = vrm.humanoid.getRawBoneNode('hips');
+  const p = new THREE.Vector3(), m = new THREE.Matrix4();
+  vrm.scene.traverse(o => {
+    if (!o.isSkinnedMesh || !o.skeleton || o.userData.bumBlush) return;
+    const bi = o.skeleton.bones.indexOf(rawHips);
+    if (bi < 0) return;
+    m.multiplyMatrices(o.skeleton.boneInverses[bi], o.bindMatrix);
+    const pos = o.geometry.attributes.position, n = pos.count;
+    const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight;
+    const tail = new Set(o.skeleton.bones.map((b, k) => (/tail/i.test(b.name) ? k : -1)).filter(k => k >= 0));
+    const w = new Float32Array(n);
+    let any = 0;
+    for (let i = 0; i < n; i++) {
+      if (tail.size && si && sw) {                                 // not her tail, however close it sits
+        let t = 0;
+        for (let c = 0; c < 4; c++) if (tail.has(si.getComponent(i, c))) t += sw.getComponent(i, c);
+        if (t > 0.3) continue;
+      }
+      p.fromBufferAttribute(pos, i).applyMatrix4(m);
+      if (fx < 0) { p.x = -p.x; p.z = -p.z; }
+      if (p.z > -0.02) continue;                                   // her front half
+      const dx = (Math.abs(p.x) - 0.065) / 0.075, dy = (p.y + 0.07) / 0.085;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 1) { w[i] = Math.pow(1 - d, 1.4); any++; }
+    }
+    if (any < 12) return;
+    const src = o.geometry.index ? o.geometry.index.array : [...Array(n).keys()];
+    const tri = [];
+    for (let i = 0; i < src.length; i += 3)
+      if (w[src[i]] > 0 || w[src[i + 1]] > 0 || w[src[i + 2]] > 0) tri.push(src[i], src[i + 1], src[i + 2]);
+    const g = new THREE.BufferGeometry();
+    for (const k of ['position', 'normal', 'skinIndex', 'skinWeight']) if (o.geometry.attributes[k]) g.setAttribute(k, o.geometry.attributes[k]);
+    const col = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) col.set([1, 0.16, 0.26, w[i]], i * 4);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+    g.setIndex(tri);
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false,
+                                              polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const layer = new THREE.SkinnedMesh(g, mat);
+    layer.userData.bumBlush = true;
+    layer.frustumCulled = false;
+    layer.renderOrder = 5;
+    layer.position.copy(o.position); layer.quaternion.copy(o.quaternion); layer.scale.copy(o.scale);
+    o.parent.add(layer);
+    layer.bind(o.skeleton, o.bindMatrix);
+    spank.layers.push(mat);
+  });
+}
+function spankHit() {
+  if (!spank.built) { try { buildBumBlush(); } catch (e) { console.warn('bum blush:', e); } }
+  const before = Math.floor(spank.n / SPANK_STEP);
+  spank.n += 1;
+  spank.flash = 1;
+  if (moves.playing().includes('spank_flinch')) moves.stop();
+  gesture('spank_flinch');
+  twitch(0, 1);
+  if (Math.floor(spank.n / SPANK_STEP) > before) { emoteLast = -99; emote(mind.row === 'lewd' ? 'hearts' : 'sweat'); }
+}
+// The debug panel's preview: drag to any number of spanks and the glow holds
+// there (no fading) until you let go of it with 'fade'. Any mood, no flinch.
+function spankSlider() {
+  const row = document.createElement('div'), r = document.createElement('input'), out = document.createElement('span');
+  const hit = document.createElement('button'), fade = document.createElement('button');
+  row.className = 'row';
+  Object.assign(r, { type: 'range', min: 0, max: 80, step: 1, value: 0, title: 'bum redness: how many spanks' });
+  r.style.width = '120px';
+  hit.textContent = 'spank'; hit.title = 'one spank, flinch and all (any mood)';
+  fade.textContent = 'fade'; fade.title = 'let it fade like it does live';
+  const show = () => { out.textContent = `${Math.round(spank.n)} · ${Math.round(spankLevel() * 100)}%`; r.value = Math.round(spank.n); };
+  r.oninput = () => {
+    if (!spank.built) { try { buildBumBlush(); } catch (e) { console.warn('bum blush:', e); } }
+    spank.n = +r.value; spank.hold = true; fade.style.borderColor = 'var(--accent)'; show();
+  };
+  hit.onclick = () => { spankHit(); show(); };
+  fade.onclick = () => { spank.hold = false; fade.style.borderColor = ''; };
+  setInterval(show, 500);
+  const label = document.createElement('span');
+  label.className = 'dim'; label.textContent = 'red bum ';
+  row.append(label, r, out, hit, fade);
+  return row;
+}
+function spankLevel() { return Math.min(0.75, Math.floor(spank.n / SPANK_STEP) * 0.13 + Math.min(1, spank.n / SPANK_STEP) * 0.06); }
+function updateSpank(dt) {
+  if (!spank.layers.length) return;
+  if (!spank.hold) spank.n = Math.max(0, spank.n - dt / SPANK_FORGET);
+  spank.flash = Math.max(0, spank.flash - dt * 2.5);
+  const a = mind.tame ? 0 : Math.min(0.85, spankLevel() + spank.flash * 0.18);
+  for (const m of spank.layers) { m.opacity = a; m.visible = a > 0.003; }
+}
+
 function touch(zone, side) {
+  if (zone === 'butt' && moves && spankMode()) { spankHit(); return 'spank'; }   // every click, no cooldown
   const now = clock.elapsedTime;
   // every click counts toward "too much", even ones too quick to answer
   const lim = touchCfg.too_much || {};
@@ -1460,8 +1612,7 @@ if (touchCfg.enabled !== false) {
     const hit = toucher.at(vrm, e.clientX, e.clientY, true);
     if (!hit) return;
     if (studio?.active) { studio.pick(hit.bone); return; }     // posing: a click picks the bone
-    touch(hit.zone, hit.side);
-    tell(hit.zone);
+    tell(touch(hit.zone, hit.side) || hit.zone);
   });
   // over a part of her: a pointing hand, and on the debug page the zone's
   // name. Looked up once the cursor rests (a ray through a skinned model
@@ -1491,8 +1642,12 @@ try {
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
   say('');
-  window.portrait = { handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
-                      touchAt: (x, y) => toucher.at(vrm, x, y), touch };
+  // the debug page's frame picker: bust / face / full without reloading (the studio keeps going)
+  const setFrame = f => { if (['bust', 'face', 'full'].includes(f)) { framing = f; frame(); } };
+  window.portrait = { setFrame, get fan() { return fan?.status(); }, handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
+                      touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank };
+  if (cfg.fan?.cast && !params.has('nocast'))
+    fan = createFan({ THREE, renderer, scene, cfg: { ...cfg.fan, ...(params.get('fanframe') ? { framing: params.get('fanframe') } : {}) }, place: placeFan });
   if (params.get('debug')) debugPanel();
   buildActs();
   loadClips().then(buildActs);

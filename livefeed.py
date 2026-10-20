@@ -29,6 +29,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import config
+import holofan
 import logbook
 
 _subs = set()
@@ -75,6 +76,127 @@ def emit(kind, **data):
                 pass  # a page that stopped reading loses events, not the turn
 
 
+# -- the pose studio's gesture files ------------------------------------------
+_GNAME = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
+_BONE = re.compile(r"^\+?[A-Za-z][A-Za-z0-9]{0,40}$")
+_WORD = re.compile(r"^[A-Za-z0-9_\- ]{1,40}$")
+_ZONES = {"head", "nose", "mouth", "chest", "tummy", "groin", "legs", "neck", "arms", "back", "butt", "tail"}
+
+
+def _num(v, lo=-1e4, hi=1e4):
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:
+        raise ValueError(f"not a number: {v!r}")
+    return round(max(lo, min(hi, float(v))), 4)
+
+
+def _words(v, limit=40, pattern=_WORD):
+    if not isinstance(v, list):
+        raise ValueError("expected a list")
+    out = [str(w).strip() for w in v if str(w).strip()][:limit]
+    for w in out:
+        if not pattern.match(w):
+            raise ValueError(f"not allowed: {w!r}")
+    return out
+
+
+def _text(v, limit=200):
+    return " ".join(str(v).split())[:limit]
+
+
+def gesture_file(data):
+    """(name, file text) for a gesture from the pose studio. Everything is
+    checked and rebuilt here - names, numbers, words - so what's written is
+    always plain data in the gesture-file shape, whatever was sent."""
+    if not isinstance(data, dict):
+        raise ValueError("expected a JSON object")
+    name = str(data.get("name", "")).strip().lower()
+    if not _GNAME.match(name):
+        raise ValueError("name: lower-case letters, numbers and _ only, starting with a letter")
+    g = {}
+    if data.get("chain") is not None:
+        g["chain"] = _words(data["chain"], 12, _GNAME)
+        if not g["chain"]:
+            raise ValueError("a chain needs at least one gesture")
+    else:
+        keys = []
+        for item in data.get("keys") or []:
+            t, pose = item
+            bones = {}
+            for b, v in pose.items():
+                if not _BONE.match(b) or not isinstance(v, list) or not 3 <= len(v) <= 4:
+                    raise ValueError(f"bad bone: {b!r}")
+                bones[b] = [_num(x, -7, 7) for x in v]
+            keys.append([_num(t, 0, 600), bones])
+        if not keys:
+            raise ValueError("no keyframes")
+        keys.sort(key=lambda k: k[0])
+        g["dur"] = _num(data.get("dur", keys[-1][0] or 1), 0.1, 600)
+        fade = data.get("fade") or [0.4, 0.5]
+        g["fade"] = [_num(fade[0], 0, 10), _num(fade[1], 0, 10)]
+        g["keys"] = keys
+        expr = {}
+        for ch, v in (data.get("expr") or {}).items():
+            if not _WORD.match(ch):
+                raise ValueError(f"bad face channel: {ch!r}")
+            expr[ch] = _num(v, 0, 1) if not isinstance(v, list) else [[_num(t, 0, 600), _num(x, 0, 1)] for t, x in v]
+        if expr:
+            g["expr"] = expr
+    if data.get("about"):
+        g["about"] = _text(data["about"])
+    if data.get("keywords"):
+        g["keywords"] = [_text(k, 60) for k in data["keywords"] if _text(k, 60)][:20]
+    for flag in ("private", "lewd", "full", "idle"):
+        if data.get(flag):
+            g[flag] = True
+    if data.get("touch"):
+        g["touch"] = [z for z in _words(data["touch"], 12) if z in _ZONES]
+    if data.get("moods"):
+        g["moods"] = _words(data["moods"], 20)
+    snd = data.get("sound")
+    if isinstance(snd, str) and snd.strip():
+        g["sound"] = _words([snd.strip()], 1)[0]
+    elif isinstance(snd, dict) and snd.get("name"):
+        s = {"name": _words([str(snd["name"])], 1)[0]}
+        if snd.get("from") == "random":
+            s["from"] = "random"
+        elif snd.get("from") not in (None, ""):
+            s["from"] = _num(snd["from"], 0, 3600)
+        if snd.get("len"):
+            s["len"] = _num(snd["len"], 0.1, 600)
+        g["sound"] = s
+    emotes = []
+    for e in (data.get("emote") or [])[:6]:
+        emotes.append({"name": _words([str(e["name"])], 1)[0], "at": _num(e.get("at", 0), 0, 600)})
+    if emotes:
+        g["emote"] = emotes if len(emotes) > 1 else emotes[0]
+    for k in ("wag", "tail_up"):
+        if data.get(k):
+            g[k] = _num(data[k], 0, 1)
+    # carried through from a gesture loaded into the studio, checked the same way
+    if data.get("then"):
+        g["then"] = _words([str(data["then"])], 1, _GNAME)[0]
+    if data.get("left"):
+        g["left"] = True
+    if data.get("osc"):
+        g["osc"] = [[b, int(_num(ax, 0, 3)), _num(a, -7, 7), _num(hz, 0, 60)]
+                    for b, ax, a, hz in data["osc"][:12] if _BONE.match(str(b))]
+    if data.get("add"):
+        g["add"] = {b: [_num(x, -7, 7) for x in v[:4]] for b, v in data["add"].items() if _BONE.match(str(b)) and isinstance(v, list)}
+
+    lines = [f"// {name}: made in the pose studio (portrait/viewer/studio.js).",
+             f"// {g['about']}" if g.get("about") else "// (no description yet)",
+             "export default {"]
+    for k, v in g.items():
+        if k == "keys":
+            lines.append("  keys: [")
+            lines += [f"    [{t}, {json.dumps(p)}]," for t, p in v]
+            lines.append("  ],")
+        else:
+            lines.append(f"  {k}: {json.dumps(v, ensure_ascii=False)},")
+    lines.append("};")
+    return name, "\n".join(lines) + "\n"
+
+
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -112,6 +234,8 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_response(301)
             self.send_header("Location", "/portrait/" + self.path[len("/portrait"):])
             self.end_headers()
+        elif self.path.split("?")[0] == "/portrait/fan/status":
+            self._json(200, holofan.status())
         elif self.path.startswith("/portrait/"):
             self._portrait(self.path.split("?", 1)[0][len("/portrait/"):])
         else:
@@ -124,6 +248,10 @@ class _Handler(BaseHTTPRequestHandler):
             self.end_headers()
         elif self.path == "/portrait/touch":
             self._touch()
+        elif self.path == "/portrait/gestures/save":
+            self._save_gesture()
+        elif self.path == "/portrait/fan/frame":
+            self._fan_frame()
         elif not self._page("POST") and not self._mounted("POST"):
             self.send_response(404)
             self.end_headers()
@@ -185,6 +313,59 @@ class _Handler(BaseHTTPRequestHandler):
             pass
         self.send_response(204)
         self.end_headers()
+
+    def _save_gesture(self):
+        """The pose studio's Save (studio.js): JSON in - never code - checked
+        field by field, written as portrait/gestures/<name>.js. A gesture that's
+        already there is only replaced with "overwrite": true, and the old file
+        goes to portrait/gestures/backup/ first."""
+        kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        try:
+            length = min(int(self.headers.get("Content-Length", 0)), 512 * 1024)
+            data = json.loads(self.rfile.read(length) or b"{}") if kind == "application/json" else None
+            name, text = gesture_file(data)
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
+            return self._json(400, {"ok": False, "error": str(e)[:200]})
+        gdir = os.path.join(config.BASE_DIR, "portrait", "gestures")
+        path = os.path.join(gdir, name + ".js")
+        if os.path.exists(path):
+            if not data.get("overwrite"):
+                return self._json(409, {"ok": False, "error": f"{name} already exists", "exists": True})
+            bdir = os.path.join(gdir, "backup")
+            os.makedirs(bdir, exist_ok=True)
+            import shutil
+            shutil.copy2(path, os.path.join(bdir, f"{name}.{time.strftime('%Y%m%d-%H%M%S')}.js"))
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(path + ".tmp", path)
+        logbook.info("portrait", "pose studio saved gestures/%s.js", name)
+        return self._json(200, {"ok": True, "name": name})
+
+    def _fan_frame(self):
+        """A frame for the hologram fan, already in its layout (fan.js)."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return self._json(400, {"ok": False, "error": "no length"})
+        if not holofan.enabled():
+            self.rfile.read(min(n, holofan.PACKET))
+            return self._json(409, {"ok": False, "error": "portrait.fan.cast is off"})
+        if n <= 0 or n > holofan.MAX_JPEG:
+            self.rfile.read(min(max(n, 0), 1 << 20))
+            return self._json(413, {"ok": False, "error": f"a frame is at most {holofan.MAX_JPEG} bytes"})
+        holofan.start()
+        ok, active = holofan.push(self.rfile.read(n), str(self.headers.get("X-Fan-Sender", ""))[:40])
+        # active False: another page has the fan, or none is connected - this one can rest
+        self._json(200 if ok else 400, {"ok": ok, "active": active})
+
+    def _json(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _mounted(self, method):
         """The thought viewer and the memory manager, served from here at
@@ -532,6 +713,8 @@ def portrait_config(preview=None):
             "sounds": bool(getattr(config, "PORTRAIT_SOUNDS", True)),
             "sound_volume": float(getattr(config, "PORTRAIT_SOUND_VOLUME", 0.8)),
             "frame": str(getattr(config, "PORTRAIT_FRAME", "bust")),
+            "fan": dict(getattr(config, "PORTRAIT_FAN", {}) or {},
+                        cast=bool(getattr(config, "PORTRAIT_FAN_CAST", False))),
             "clips": portrait_clips(),
             "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},
                              enabled=bool(getattr(config, "PORTRAIT_HOLOGRAM_ENABLED", False)))}
@@ -556,6 +739,7 @@ def start():
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=_gaze_loop, daemon=True, name="portrait-gaze").start()
+    holofan.start()          # only does anything with portrait.fan.cast on
     logbook.info("monitor", "live monitor on %s", url())
 
     return True

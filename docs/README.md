@@ -15,8 +15,10 @@ Everything the README only touches on, one subject per page.
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](learning.md): lessons, episodes, fact cleanup, calibration
+- [The companion](companion.md): the whole companion side in one place - persona, every mood and the exact numbers, the lewd and grudge rows, touches, gestures, sounds, settings, recipes
 - [Moods](moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
+- [Hologram fans](fans.md): Luna live on an HDMI or Holoscope WiFi fan
 - [Textures](textures.md): new clothes, irises and skin for her 3D model from UV templates, through ComfyUI
 - [Gestures](gestures.md): how her body moves, and writing your own
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
@@ -86,6 +88,7 @@ Everything the README only touches on, one subject per page.
 - Researches properly: reads the top pages in one go and keeps the parts that answer the question
 - Follow-through: when she says she'll check something and stops, she's made to actually do it
 - An animated portrait that looks at your terminal and visibly thinks
+- Live on a [hologram fan](fans.md): streamed over WiFi to a Holoscope fan, or on any HDMI fan
 - Rotating debug log that records decisions, not just errors
 - Every setting changeable from the terminal and saved, most without a restart
 - Diagnostics for the things that fail quietly: tool selection, prompt size, scrolling

@@ -16,6 +16,12 @@ motions and don't use any of this.
 - [Common mistakes](#common-mistakes)
 - [Code or a .vrma clip?](#code-or-a-vrma-clip)
 
+> **No code needed:** the debug viewer's pose studio poses her with sliders,
+> keyframes it, and saves the gesture file for you. See
+> [Portrait](portrait.md#the-pose-studio-making-gestures-without-code). Every
+> gesture she has, with its touches and moods, is listed in
+> [The companion](companion.md#every-gesture).
+
 ## What a gesture is
 
 A gesture is a short list of **key poses** in time. A pose says where some

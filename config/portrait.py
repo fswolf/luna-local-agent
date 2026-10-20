@@ -58,6 +58,16 @@ PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
 # sound_volume 0-1.
 PORTRAIT_SOUNDS = bool(_portrait_cfg.get("sounds", True))
 PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume", 0.8))))
+# Hologram fans (holofan.py, docs/fans.md). An HDMI fan just shows
+# /portrait/?fan=1. A WiFi fan run by the Holoscope app (P56, PD42...) gets
+# her live with cast on: Luna listens on TCP 6666 and announces herself on
+# UDP 8988. framing "full" or "bust"; scale/x/y move her in the circle;
+# rotation (degrees) and mirror for how the fan hangs; fps 8-25; ip: the
+# fan's address once it's on your router (it finds Luna either way); gain:
+# the brightness lift for dark pictures (per model, 1 = off).
+#   "fan": { "cast": true, "framing": "full", "fps": 15 }
+PORTRAIT_FAN = dict(_portrait_cfg.get("fan", {}) or {})
+PORTRAIT_FAN_CAST = bool(PORTRAIT_FAN.get("cast", False))
 PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
 if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
     # Its three expressions, so moods show on her face out of the box.

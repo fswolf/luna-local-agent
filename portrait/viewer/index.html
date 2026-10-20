@@ -10,38 +10,70 @@
   body { background: radial-gradient(120% 90% at 50% 20%, var(--bg-top), var(--bg-bottom));
          color: var(--text); font: 12px/1.4 system-ui, sans-serif; }
   body.transparent { background: transparent; }
+  body.fan { background: #000; cursor: none; }
+  body.fan #note { display: none; }
   canvas { display: block; width: 100vw; height: 100vh; }
   #note { position: fixed; inset: auto 0 12px 0; text-align: center; color: var(--dim);
           pointer-events: none; transition: opacity .6s; }
   #note.hidden { opacity: 0; }
   #touchtip { position: fixed; pointer-events: none; color: var(--accent); font-weight: 600;
               text-shadow: 0 1px 3px #000; white-space: nowrap; }
-  #debug { position: fixed; top: 8px; left: 8px; width: 360px; height: 60vh; min-width: 180px; min-height: 80px;
+  #debug, .panel { position: fixed; top: 8px; left: 8px; width: 360px; height: 60vh; min-width: 180px; min-height: 80px;
            max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow: auto; resize: both;
            background: #120d1ccc; border: 1px solid #3a2d55; border-radius: 8px; padding: 0 10px 8px;
            display: none; box-sizing: border-box; }
-  #dbar { position: sticky; top: 0; margin: 0 -10px; padding: 6px 10px; background: #1a1328; cursor: move;
+  #dbar, .pbar { position: sticky; top: 0; margin: 0 -10px; padding: 6px 10px; background: #1a1328; cursor: move;
           user-select: none; border-bottom: 1px solid #3a2d55; z-index: 1; }
-  #dbar .hint { float: right; color: var(--dim); }
-  #debug details > summary { cursor: pointer; color: var(--accent); font-weight: 600; margin: 8px 0 2px; }
-  body.debug #debug { display: block; }
-  #debug button { background: #2a2040; color: var(--text); border: 1px solid #4a3a70;
+  #dbar .hint, .pbar .hint { color: var(--dim); white-space: nowrap; }
+  #debug details > summary, .panel details > summary { cursor: pointer; color: var(--accent); font-weight: 600; margin: 8px 0 2px; }
+  body.debug #debug, body.debug .panel { display: block; }
+  #debug button, .panel button { background: #2a2040; color: var(--text); border: 1px solid #4a3a70;
                   border-radius: 6px; padding: 3px 8px; margin: 2px; cursor: pointer; font: inherit; }
-  #debug button:hover { border-color: var(--accent); }
-  #debug pre { white-space: pre-wrap; margin: 6px 0 0; color: var(--dim); }
-  #debug .dim { color: var(--dim); margin: 2px 0; }
-  #debug h4 { margin: 8px 0 2px; color: var(--accent); font-weight: 600; }
-  #debug input[type=range] { accent-color: var(--accent); vertical-align: middle; }
-  #debug input[type=number] { background: #2a2040; color: var(--text); border: 1px solid #4a3a70;
+  #debug button:hover, .panel button:hover { border-color: var(--accent); }
+  #debug pre, .panel pre { white-space: pre-wrap; margin: 6px 0 0; color: var(--dim); }
+  #debug .dim, .panel .dim { color: var(--dim); margin: 2px 0; }
+  #debug h4, .panel h4 { margin: 8px 0 2px; color: var(--accent); font-weight: 600; }
+  #debug input[type=range], .panel input[type=range] { accent-color: var(--accent); vertical-align: middle; }
+  #debug input[type=number], .panel input[type=number] { background: #2a2040; color: var(--text); border: 1px solid #4a3a70;
                               border-radius: 4px; font: inherit; padding: 1px 4px; }
-  #debug select { background: #2a2040; color: var(--text); border: 1px solid #4a3a70; border-radius: 6px; font: inherit; max-width: 100%; }
+  #debug select, .panel select { background: #2a2040; color: var(--text); border: 1px solid #4a3a70; border-radius: 6px; font: inherit; max-width: 100%; }
+  /* windows.js: fold, tuck into the dock */
+  #dbar, .pbar { display: flex; align-items: center; gap: 6px; }
+  .pbar .hint { margin-left: auto; }
+  #dbar b, .pbar b { white-space: nowrap; }
+  .wbtns { margin-left: auto; white-space: nowrap; }
+  .pbar .hint + .wbtns { margin-left: 0; }
+  .wbtns button { padding: 0 6px !important; margin: 0 0 0 2px !important; line-height: 16px; }
+  .folded { height: auto !important; resize: none !important; overflow: hidden !important; }
+  .folded > :not(#dbar):not(.pbar) { display: none !important; }
+  .tucked { display: none !important; }
+  #dock { position: fixed; left: 8px; bottom: 8px; display: flex; gap: 6px; z-index: 5; }
+  body:not(.debug) #dock { display: none; }
+  .docktab { background: #2a2040; color: var(--text); border: 1px solid #4a3a70; border-radius: 6px;
+             padding: 3px 10px; cursor: pointer; font: inherit; }
+  .docktab:hover { border-color: var(--accent); }
+  /* the pose studio */
+  #studio { left: auto; right: 8px; top: 8px; width: 430px; height: 80vh; }
+  .tabs button.on { border-color: var(--accent); color: var(--accent); }
+  .keys { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; }
+  .keys button.on { background: var(--accent); color: #120d1c; }
+  .row { margin: 3px 0; }
+  .row > span.l { display: inline-block; width: 74px; color: var(--dim); }
+  .panel input[type=text] { background: #2a2040; color: var(--text); border: 1px solid #4a3a70;
+                            border-radius: 4px; font: inherit; padding: 1px 4px; width: 230px; }
+  .chips label { display: inline-block; margin: 1px 6px 1px 0; }
+  .status { color: var(--accent); min-height: 1.2em; }
+  .posing { color: #ff5a6a; font-weight: 600; font-size: 11px; white-space: nowrap; }
+  canvas.timeline { display: block; width: 100%; height: 58px; cursor: pointer; border-radius: 6px; margin: 6px 0 2px; }
+  .panel optgroup { color: var(--accent); }
+  .panel optgroup option { color: var(--text); }
 </style>
 </head>
 <body>
 <div id="note">loading…</div>
-<div id="debug">
-  <div id="dbar"><b>portrait debug</b> - <span id="dstate"></span>
-    <span class="hint">drag here · corner resizes · h hides</span></div>
+<div id="debug" class="panel">
+  <div id="dbar" class="pbar"><b>portrait debug</b> - <span id="dstate"></span>
+    <span class="hint">h hides</span></div>
   <h4>model</h4><select id="dmodel"></select>
   <h4>view</h4><div id="dview"></div>
   <div class="dim">left-drag turns her · wheel zooms · double-click resets</div>

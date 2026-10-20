@@ -37,7 +37,13 @@ if (new URLSearchParams(location.search).get('debug')) {
   const frame = document.createElement('select');
   for (const [v, label] of [['', 'bust'], ['face', 'face'], ['full', 'full body']])
     frame.add(new Option(label, v, false, (q.get('frame') || '') === v));
-  frame.onchange = () => setParam('frame', frame.value);
+  frame.onchange = () => {   // live once she's up: no reload, so the pose studio and windows stay as they are
+    if (!window.portrait?.setFrame) return setParam('frame', frame.value);
+    window.portrait.setFrame(frame.value || 'bust');
+    const q = new URLSearchParams(location.search);
+    if (frame.value) q.set('frame', frame.value); else q.delete('frame');
+    history.replaceState(null, '', '?' + q.toString());
+  };
   box.appendChild(frame);
   const toggle = (label, key, on) => {
     const b = document.createElement('button');
@@ -52,31 +58,10 @@ if (new URLSearchParams(location.search).get('debug')) {
 }
 
 // The debug panel: drag it by its title bar, resize it from its corner,
-// fold the long lists away. Where it was and how big comes back on reload.
-function panelLayout() {
-  const panel = document.getElementById('debug'), bar = document.getElementById('dbar');
-  const load = k => { try { return JSON.parse(localStorage.getItem('luna.panel.' + k)); } catch (_) { return null; } };
-  const save = (k, v) => { try { localStorage.setItem('luna.panel.' + k, JSON.stringify(v)); } catch (_) {} };
-  const box = load('box');
-  if (box) Object.assign(panel.style, { left: box.left, top: box.top, width: box.width, height: box.height });
-  const keep = () => save('box', { left: panel.style.left, top: panel.style.top,
-                                   width: panel.offsetWidth + 'px', height: panel.offsetHeight + 'px' });
-  new ResizeObserver(keep).observe(panel);
-  bar.addEventListener('pointerdown', e => {
-    const x0 = e.clientX - panel.offsetLeft, y0 = e.clientY - panel.offsetTop;
-    bar.setPointerCapture(e.pointerId);
-    const move = ev => {
-      panel.style.left = Math.max(0, Math.min(innerWidth - 60, ev.clientX - x0)) + 'px';
-      panel.style.top = Math.max(0, Math.min(innerHeight - 30, ev.clientY - y0)) + 'px';
-    };
-    const up = () => { bar.removeEventListener('pointermove', move); keep(); };
-    bar.addEventListener('pointermove', move);
-    bar.addEventListener('pointerup', up, { once: true });
-  });
-  for (const d of panel.querySelectorAll('details[data-key]')) {
-    d.open = !!load('open.' + d.dataset.key);
-    d.addEventListener('toggle', () => save('open.' + d.dataset.key, d.open));
-  }
+// fold it or tuck it into the dock (windows.js). Where it was comes back on reload.
+async function panelLayout() {
+  const { makeWindow } = await import('./windows.js');
+  makeWindow(document.getElementById('debug'), document.getElementById('dbar'), 'box', 'debug');
 }
 
 function setParam(key, value) {
@@ -85,9 +70,9 @@ function setParam(key, value) {
   location.search = q.toString();
 }
 
-// h hides and shows the debug panel, to see the model unobstructed
+// h hides and shows the debug windows, to see the model unobstructed (not while typing)
 addEventListener('keydown', e => {
-  if (e.key === 'h' && new URLSearchParams(location.search).get('debug') && e.target.tagName !== 'SELECT')
+  if (e.key === 'h' && new URLSearchParams(location.search).get('debug') && !/^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName))
     document.body.classList.toggle('debug');
 });
 
