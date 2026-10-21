@@ -40,12 +40,12 @@ games/zork/. dfrotz has to be installed:
         "interpreter": "",      # path to dfrotz if it's somewhere odd
         "watch": false,         # open the watch window with /zork play
         "terminal": "",         # e.g. "kitty" or "gnome-terminal --"; "" = find one
-        "guide": true,          # each turn, what luna-knowledge/zork/ says about her room
+        "guide": true,          # each turn, what agent/knowledge/zork/ says about her room
         "turn_seconds": 150     # a turn that runs longer is cut short (0 = no limit)
     }
 
 With "guide" on, each turn also shows her what the notes in
-luna-knowledge/zork/ say about the room she's in (from the status line),
+agent/knowledge/zork/ say about the room she's in (from the status line),
 found by the room's name. Files marked "Spoilers: yes" are never used.
 
 /zork watch opens a terminal running games/zork/watch.py, which follows
@@ -312,7 +312,7 @@ def _room(screen):
 
 
 def _guide(here):
-    """The lines her knowledge folder (luna-knowledge/zork/) has about
+    """The lines her knowledge folder (agent/knowledge/zork/) has about
     where she is, for the turn prompt; "" when off, unknown or nothing."""
     return _game.guide_by_room(NAME, here, settings()["guide"])
 

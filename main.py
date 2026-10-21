@@ -1419,7 +1419,7 @@ def handle_input(text):
             knowledge.reindex()
             ui.add_message("system", "Knowledge: looking through the folders again - /knowledge shows progress.")
         elif word == "add" and arg:
-            path = os.path.realpath(os.path.expanduser(arg))
+            path = knowledge.resolve(arg)
 
             if not os.path.isdir(path):
                 ui.add_message("system", f"Knowledge: {arg} isn't a folder.")
@@ -1427,7 +1427,7 @@ def handle_input(text):
                 knowledge.set_folders(knowledge.folders() + [path])
                 ui.add_message("system", f"Knowledge: added {path}, indexing it now.")
         elif word == "remove" and arg:
-            path = os.path.realpath(os.path.expanduser(arg))
+            path = knowledge.resolve(arg)
             knowledge.set_folders([f for f in knowledge.folders() if f != path])
             ui.add_message("system", f"Knowledge: {path} removed; its passages go on the next scan.")
         elif word == "search" and arg:

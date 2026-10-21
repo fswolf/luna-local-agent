@@ -4,7 +4,7 @@
     > "What does the boss in chapter 3 do?"
     > "How do I reset the router again?"
 
-Point it at folders (knowledge.folders, default ~/luna-knowledge) and
+Point it at folders (knowledge.folders, default agent/knowledge) and
 she reads everything in them in the background: Markdown, text, code
 and config files, PDFs, Word documents, web pages saved to disk. Each
 file is cut into passages of a paragraph or so, and each passage gets
@@ -69,11 +69,18 @@ def enabled():
     return bool(getattr(config, "KNOWLEDGE_ENABLED", True))
 
 
+def resolve(folder):
+    """A folder as written (~/notes, agent/knowledge) -> its full path. A
+    relative one is inside the ai-voice folder, wherever Luna was started from."""
+    path = os.path.expanduser(str(folder))
+    return os.path.realpath(path if os.path.isabs(path) else os.path.join(config.BASE_DIR, path))
+
+
 def folders():
     out = []
 
-    for f in getattr(config, "KNOWLEDGE_FOLDERS", ["~/luna-knowledge"]) or []:
-        path = os.path.realpath(os.path.expanduser(str(f)))
+    for f in getattr(config, "KNOWLEDGE_FOLDERS", [config.KNOWLEDGE_DEFAULT]) or []:
+        path = resolve(f)
 
         if path not in out:
             out.append(path)
@@ -572,7 +579,7 @@ def start():
     """Create the default folder if it's the only one, then index in the
     background and keep rescanning."""
     for path in folders():
-        if path == os.path.realpath(os.path.expanduser("~/luna-knowledge")) and not os.path.exists(path):
+        if path == os.path.realpath(config.KNOWLEDGE_DEFAULT) and not os.path.exists(path):
             try:
                 os.makedirs(path, exist_ok=True)
                 with open(os.path.join(path, "README.md"), "w", encoding="utf-8") as f:

@@ -436,8 +436,8 @@ in conversation, so she can bring a game up herself. `/episodes` and
 the memory manager show them ([details](learning.md#episodic-memory-and-continuity)).
 
 **Her guide.** Notes you give her about a game go in
-`luna-knowledge/<game>/`: `luna-knowledge/zork/` for Zork,
-`luna-knowledge/realiti/` for REALITI. Each turn she sees what they say
+`agent/knowledge/<game>/`: `agent/knowledge/zork/` for Zork,
+`agent/knowledge/realiti/` for REALITI. Each turn she sees what they say
 about the room she's in, found by the room's name: a heading with that
 name and what's under it, or list items that start with it ("- Troll
 Room: south to the Cellar..."). It needs no search server, and it's
@@ -447,7 +447,7 @@ solutions file can sit next to the map without giving the game away.
 `"guide": false` in the plugin's block turns it off.
 
 Vibe City has no rooms, so its guide works by topic instead: each turn
-she's shown the two passages from `luna-knowledge/vibe-city/` (the Vibe
+she's shown the two passages from `agent/knowledge/vibe-city/` (the Vibe
 City manual) that best fit what she's working on, her goal, her plan
 and what she did last turn. "Add power to the new zone" brings up the
 power lines section; "the houses aren't growing" brings up water and
@@ -456,7 +456,7 @@ by words otherwise, and only ever in that one folder. `"guide"` in the
 `vibecity` block names the folder (`"vibe-city"` by default), and `""`
 turns it off.
 
-Minecraft works the same way, from `luna-knowledge/minecraft/`: each
+Minecraft works the same way, from `agent/knowledge/minecraft/`: each
 step she's shown the passages that fit her goal and her last couple of
 steps. The notes there cover the first day, recipes with the exact item
 names `craft-item` wants, which pickaxe mines what and how deep each

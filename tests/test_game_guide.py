@@ -1,5 +1,5 @@
 """Game turns knowing where she is: her own older notes about the room
-come back, and her guide (luna-knowledge/<game>/) is looked up by the
+come back, and her guide (agent/knowledge/<game>/) is looked up by the
 room's name. Temporary folders and databases; nothing of yours is read.
 
     python -m unittest discover tests        (from the repo folder)

@@ -133,9 +133,8 @@ On first start she makes the folder for you:
 
 | System | Folder |
 |--------|--------|
-| Linux | `~/luna-knowledge` |
-| macOS | `~/luna-knowledge` (`/Users/you/luna-knowledge`) |
-| Windows | `%USERPROFILE%\luna-knowledge` (`C:\Users\you\luna-knowledge`) |
+| Linux, macOS | `~/ai-voice/agent/knowledge` |
+| Windows | `ai-voice\agent\knowledge`, wherever you installed her |
 
 Drop files in, or `/knowledge add` any folder you already keep notes
 in. It all stays on your machine, and keys and credentials are skipped

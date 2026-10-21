@@ -39,10 +39,10 @@ Builds cost in-game money only, so nothing here asks for approval.
         "goal": "",
         "skip_tools": [],              # e.g. ["screenshot"] for a model that can't see
         "pause_game": true,            # pause the game when she stops playing
-        "guide": "vibe-city"           # her guide: a folder in luna-knowledge ("" = none)
+        "guide": "vibe-city"           # her guide: a folder in agent/knowledge ("" = none)
     }
 
-Her guide: each turn she's shown the two passages in luna-knowledge/
+Her guide: each turn she's shown the two passages in agent/knowledge/
 vibe-city/ (your Vibe City manual) that best fit what she's working on:
 her goal, her plan and what she did last turn. Only that folder is
 searched, and files marked "Spoilers: yes" are skipped.

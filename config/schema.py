@@ -444,7 +444,7 @@ SCHEMA = {
     "plugins.minecraft.max_steps": ("int", "Steps per goal before she pauses and asks"),
     "plugins.minecraft.speak": ("bool", "Say each step out loud"),
     "plugins.minecraft.web": ("bool", "Let her look things up on the web while playing"),
-    "plugins.minecraft.guide": ("text", "Her guide: a folder in luna-knowledge; empty for none"),
+    "plugins.minecraft.guide": ("text", "Her guide: a folder in her knowledge folder; empty for none"),
     "plugins.minecraft.mc_tools": ("list", "Which of the Minecraft server's tools she gets"),
     "plugins.minecraft.command": ("text", "Command that starts the Minecraft MCP server; empty uses the installed one or npx"),
 
@@ -457,7 +457,7 @@ SCHEMA = {
     "plugins.zork.interpreter": ("text", "Path to dfrotz if it's somewhere unusual"),
     "plugins.zork.watch": ("bool", "Open the watch window with /zork play"),
     "plugins.zork.terminal": ("text", "Terminal for the watch window, e.g. kitty; empty finds one"),
-    "plugins.zork.guide": ("bool", "Show her what luna-knowledge/zork/ says about the room she's in"),
+    "plugins.zork.guide": ("bool", "Show her what agent/knowledge/zork/ says about the room she's in"),
     "plugins.zork.turn_seconds": ("float", "Longest one turn may run before it is cut short, in seconds; 0 is no limit"),
 
     # --- Plugins: Vibe City -------------------------------------------------
@@ -471,7 +471,7 @@ SCHEMA = {
     "plugins.vibecity.goal": ("text", "What she aims for as mayor, e.g. reach 2000 people"),
     "plugins.vibecity.skip_tools": ("list", "Game tools to leave out, e.g. screenshot for a model that can't see"),
     "plugins.vibecity.pause_game": ("bool", "Pause the game when she stops playing"),
-    "plugins.vibecity.guide": ("text", "Her guide: a folder in luna-knowledge; empty for none"),
+    "plugins.vibecity.guide": ("text", "Her guide: a folder in her knowledge folder; empty for none"),
 
     # --- Plugins: REALITI ---------------------------------------------------
     "plugins.realiti.enabled": ("bool", "Let her into REALITI at startup"),
@@ -483,7 +483,7 @@ SCHEMA = {
     "plugins.realiti.node": ("text", "Path to node if it's somewhere unusual"),
     "plugins.realiti.watch": ("bool", "Open the watch window with /realiti visit"),
     "plugins.realiti.terminal": ("text", "Terminal for the watch window, e.g. kitty; empty finds one"),
-    "plugins.realiti.guide": ("bool", "Show her what luna-knowledge/realiti/ says about the room she's in"),
+    "plugins.realiti.guide": ("bool", "Show her what agent/knowledge/realiti/ says about the room she's in"),
     "plugins.realiti.city": ("text", "A REALITI server whose shared city she stays joined to; empty for her own world"),
 
     # --- Plugins: chess -----------------------------------------------------

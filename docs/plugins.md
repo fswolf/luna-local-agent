@@ -59,7 +59,7 @@ never learns what those keys mean.
 
 A game gets most of its machinery from `plugins/_game.py`: the loop
 that takes her turns while you're quiet (`_game.Loop`), settings over
-defaults, guides from `luna-knowledge/<game>/`, and `record()`, which
+defaults, guides from `agent/knowledge/<game>/`, and `record()`, which
 writes each turn to the playlog and her memory of the session. A game
 keeps only its own prompt, tools and rules.
 

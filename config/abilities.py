@@ -3,7 +3,9 @@ routing, the knowledge base, ComfyUI, the camera.
 
 Part of the config package (it was one config.py); see config/__init__.py.
 """
-from .base import setting
+import os
+
+from .base import BASE_DIR, setting
 
 # -------------------------
 # Logging
@@ -78,12 +80,14 @@ if isinstance(_old_enabled, (list, tuple)):
 #   "camera": { "device": 0, "width": 1280, "warmup": 5 }
 # Her knowledge base (knowledge.py): folders of your notes, manuals,
 # PDFs and docs she can look things up in. The index is a cache outside
-# the repo (~/.cache/ai-voice/knowledge.db).
-#   "knowledge": { "enabled": true, "folders": ["~/luna-knowledge"], "auto": true,
+# the repo (~/.cache/ai-voice/knowledge.db). The default folder is
+# agent/knowledge/ beside her other files, gitignored like the rest.
+#   "knowledge": { "enabled": true, "folders": ["agent/knowledge"], "auto": true,
 #                  "auto_passages": 2, "min_score": 0.55, "rescan_minutes": 10 }
 _knowledge_cfg = setting("knowledge", {})
 KNOWLEDGE_ENABLED = bool(_knowledge_cfg.get("enabled", True))
-KNOWLEDGE_FOLDERS = list(_knowledge_cfg.get("folders") or ["~/luna-knowledge"])
+KNOWLEDGE_DEFAULT = os.path.join(BASE_DIR, "agent", "knowledge")
+KNOWLEDGE_FOLDERS = list(_knowledge_cfg.get("folders") or [KNOWLEDGE_DEFAULT])
 KNOWLEDGE_AUTO = bool(_knowledge_cfg.get("auto", True))           # matching passages travel with the turn unasked
 KNOWLEDGE_AUTO_PASSAGES = int(_knowledge_cfg.get("auto_passages", 2))
 KNOWLEDGE_MIN_SCORE = float(_knowledge_cfg.get("min_score", 0.55))  # how close, by meaning, to come in unasked

@@ -52,7 +52,7 @@ outside content to her, like a web page. Needs git, and Node.js 20 or newer.
         "node": "",                # path to node if it's somewhere odd
         "watch": false,            # open the watch window with /realiti visit
         "terminal": "",            # e.g. "kitty" or "gnome-terminal --"; "" = find one
-        "guide": true,             # each turn, what luna-knowledge/realiti/ says about her room
+        "guide": true,             # each turn, what agent/knowledge/realiti/ says about her room
         "city": ""                 # a REALITI server to stay joined to, e.g. "http://127.0.0.1:8787"
     }
 
@@ -63,7 +63,7 @@ A private server's password comes from ~/.config/realiti/password or
 REALITI_PASSWORD. Unreachable, she plays in her own world as usual.
 
 With "guide" on, each turn also shows her what the notes in
-luna-knowledge/realiti/ say about the room she's in, found by the
+agent/knowledge/realiti/ say about the room she's in, found by the
 room's name. Files marked "Spoilers: yes" are never used.
 """
 import json
@@ -706,7 +706,7 @@ def _here():
 
 
 def _guide(here):
-    """The lines her knowledge folder (luna-knowledge/realiti/) has about
+    """The lines her knowledge folder (agent/knowledge/realiti/) has about
     where she is, for the turn prompt; "" when off, unknown or nothing."""
     return _game.guide_by_room(NAME, here, settings()["guide"])
 

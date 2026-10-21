@@ -38,10 +38,10 @@ Setup:
         "max_steps": 60,        # per goal, then she pauses and asks
         "speak": true,          # say each step out loud
         "web": true,            # she may look things up (web_search, research)
-        "guide": "minecraft"    # her guide: a folder in luna-knowledge ("" = none)
+        "guide": "minecraft"    # her guide: a folder in agent/knowledge ("" = none)
     }
 
-Her guide: each step she's shown the two passages in luna-knowledge/
+Her guide: each step she's shown the two passages in agent/knowledge/
 minecraft/ that best fit what she's working on: her goal and her last
 couple of steps. Recipes with exact item names, which pickaxe mines what,
 how deep the ores are, building block by block, night and mobs, and how

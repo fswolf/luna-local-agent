@@ -66,7 +66,7 @@ def record(name, title, turn, answer, exchanges=None, **playlog):
 
 
 def guide_by_room(folder, here, on=True):
-    """What her notes (luna-knowledge/<folder>/) say about the room she's
+    """What her notes (agent/knowledge/<folder>/) say about the room she's
     in, found by its name, for a turn prompt; "" when off or nothing."""
     if not here or not on:
         return ""
@@ -80,7 +80,7 @@ def guide_by_room(folder, here, on=True):
 
 
 def guide_by_topic(folder, query, intro="From your guide, on what you're working on"):
-    """The passages in luna-knowledge/<folder>/ that best fit what she's
+    """The passages in agent/knowledge/<folder>/ that best fit what she's
     doing, for a turn prompt; "" when there's no folder or nothing fits."""
     if not folder or not str(query or "").strip():
         return ""

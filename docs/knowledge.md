@@ -18,7 +18,7 @@ and the index is a cache next to her other caches.
 ## Setting it up
 
 There's nothing to set up. The first time Luna starts she makes
-`~/luna-knowledge` with a short README in it. Put files in there, in
+`agent/knowledge` (inside the ai-voice folder) with a short README in it. Put files in there, in
 any folders you like, and she reads them within a few minutes:
 
 ```
@@ -45,14 +45,19 @@ knowledge folder. `/knowledge` lists what she skipped and why.
 
 ## Where the folder lives
 
-The default is a folder called `luna-knowledge` in your home folder,
-made on first start with a short README inside:
+The default is `agent/knowledge` inside the ai-voice folder, next to
+her memory and her other files, made on first start with a short README
+inside. Like the rest of `agent/`, it's kept out of git, so your notes
+never end up on GitHub.
 
 | System | Default folder | Index (a cache she rebuilds) |
 |--------|----------------|------------------------------|
-| Linux | `~/luna-knowledge` | `~/.cache/ai-voice/knowledge.db` (or `$XDG_CACHE_HOME/ai-voice/`) |
-| macOS | `~/luna-knowledge`, i.e. `/Users/you/luna-knowledge` | `~/.cache/ai-voice/knowledge.db` |
-| Windows | `%USERPROFILE%\luna-knowledge`, i.e. `C:\Users\you\luna-knowledge` | `%LOCALAPPDATA%\ai-voice\knowledge.db` |
+| Linux | `~/ai-voice/agent/knowledge` | `~/.cache/ai-voice/knowledge.db` (or `$XDG_CACHE_HOME/ai-voice/`) |
+| macOS | `~/ai-voice/agent/knowledge` | `~/.cache/ai-voice/knowledge.db` |
+| Windows | `ai-voice\agent\knowledge`, wherever you installed her | `%LOCALAPPDATA%\ai-voice\knowledge.db` |
+
+A folder written without a full path (`agent/knowledge`) is always
+inside the ai-voice folder, whichever folder Luna was started from.
 
 **You don't have to move anything into it.** If you already keep notes
 somewhere, point her there instead of copying:
@@ -61,14 +66,14 @@ somewhere, point her there instead of copying:
 /knowledge add ~/Documents/notes          Linux, macOS
 /knowledge add ~/Obsidian/Vault           a whole Obsidian vault works as-is
 /knowledge add C:\Users\you\Documents\Manuals   Windows
-/knowledge remove ~/luna-knowledge        stop using the default
+/knowledge remove agent/knowledge         stop using the default
 ```
 
 That edits `knowledge.folders` in `config.json`, which you can also
 write by hand:
 
 ```json
-"knowledge": { "folders": ["~/luna-knowledge", "~/Documents/notes", "/mnt/nas/runbooks"] }
+"knowledge": { "folders": ["agent/knowledge", "~/Documents/notes", "/mnt/nas/runbooks"] }
 ```
 
 A folder can be anywhere she can read: another drive, a mounted share,
@@ -96,7 +101,7 @@ before she says she doesn't know. It returns the best passages with
 the file and the heading they came from:
 
 ```
-[1] ~/luna-knowledge/server/jellyfin.md > Ports
+[1] agent/knowledge/server/jellyfin.md > Ports
 Jellyfin runs on port 8096 on the Unraid box at 192.168.0.98.
 ```
 
@@ -111,7 +116,7 @@ Both only ever happen in your own turns: stream chat never sees your
 documents.
 
 **Game guides.** Game turns (Zork, REALITI) don't get `search_docs`.
-Instead, a folder named after the game, like `luna-knowledge/zork/`,
+Instead, a folder named after the game, like `agent/knowledge/zork/`,
 is her guide to it: each turn she's shown what it says about the room
 she's in. Only that folder is read, and a file with `Spoilers: yes`
 near its top is skipped. See [Games](games.md#her-memory-of-a-game).
@@ -135,7 +140,7 @@ that file, and switching embedding models re-embeds in the background.
 ```json
 "knowledge": {
     "enabled": true,
-    "folders": ["~/luna-knowledge"],
+    "folders": ["agent/knowledge"],
     "auto": true,
     "auto_passages": 2,
     "min_score": 0.55,
