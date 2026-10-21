@@ -8,6 +8,7 @@
 - [Web](web.md)
 - [Email](email.md)
 - [Vision](vision.md)
+- [People in the house](people.md)
 - [Reminders and alarms](reminders.md)
 - [Knowledge](knowledge.md)
 - [Memory](memory.md)

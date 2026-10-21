@@ -96,7 +96,8 @@ camera existed, it stays off.
 
 Once it's on:
 
-- **One picture per request.** No live feed, nothing in the background.
+- **One picture per request.** No live feed, nothing in the background
+  (unless you also turn on [presence](#presence-noticing-youre-there), below).
 - **Nothing is saved.** The picture lives for one turn, like a
   screenshot, and goes only to your local model.
 - **Only for you at the desk.** It's never offered to stream chat,
@@ -168,3 +169,65 @@ reads from it instead of fighting over `/dev/video0`.
 
 On every system, a camera that OBS or Discord is already using may
 refuse to open. She'll say so rather than guess.
+
+## Presence: noticing you're there
+
+A separate switch, off by default: the webcam stays open and she checks
+for a face a few times a second. That costs a few percent of one CPU
+core and no GPU. With it on she:
+
+- **Greets you when you come back** after being away a while (20
+  minutes by default), in one short line, only when nothing else is
+  going on. At startup, the usual "welcome back" waits until someone is
+  actually in front of the camera.
+- **Looks at you.** Her portrait's eyes follow your face instead of
+  aiming at the terminal.
+- **Keeps quiet in an empty room.** After 5 minutes with nobody in
+  view, games and scheduled jobs still run and still show on screen,
+  but don't talk out loud.
+- **Knows faces**, once you've enrolled them, so she greets the right
+  person by name (and, with voices too, knows who's talking: see
+  [People in the house](people.md)).
+
+Your camera's light stays on while it watches: that's the honest
+signal that it is. Nothing is recorded or sent: pictures live in memory, and the newest
+one also answers `look_at_camera`, so the two never fight over the
+camera. Face finding and face prints are OpenCV's YuNet and SFace, two
+small models (about 40 MB together) downloaded once into
+`~/.cache/ai-voice/models`. Until they arrive, OpenCV's built-in face
+detector stands in: it notices faces but can't tell whose.
+
+```
+/presence             on or off, what it's doing right now
+/presence on|off      switch it (saved to config.json)
+/people               who she knows
+/people enroll face Shannon    look at the camera for a few seconds
+/people forget Shannon [face]  forget the prints, or the whole person
+                               (voices: see people.md)
+```
+
+Enrolling takes ten face prints over a few seconds; turn your head a
+little while it does. Prints are numbers describing a face, not
+pictures, and live in `agent/people/` (one file per person, kept out of
+git). Enroll again in different light if she's unsure of you.
+
+```json
+"camera": { "presence": { "enabled": false, "fps": 3, "greet": true, "greet_after_minutes": 20,
+                          "look": true, "quiet": true, "quiet_after_minutes": 5,
+                          "recognise": true, "match": 0.36 } }
+```
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `enabled` | `false` | Keep the webcam watching |
+| `fps` | `3` | Face checks a second |
+| `greet` | `true` | Say hi when someone comes back |
+| `greet_after_minutes` | `20` | How long someone must have been away first |
+| `look` | `true` | Her portrait looks at the face in view |
+| `quiet` | `true` | Games and jobs stop speaking when nobody's there |
+| `quiet_after_minutes` | `5` | How long the room must be empty first |
+| `recognise` | `true` | Match faces to enrolled people |
+| `match` | `0.36` | How alike a face must be to count as someone (higher is stricter) |
+
+All of them are in the settings pane too. Presence needs a webcam on
+the same machine, not a camera server.

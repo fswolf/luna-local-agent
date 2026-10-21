@@ -837,7 +837,11 @@ def _gaze_loop():
             last = object()  # a page that opens later gets a fresh answer
             continue
 
-        target = gaze_target()
+        import presence
+
+        # Someone in front of the webcam: look at them. Otherwise at the
+        # terminal, where the conversation is.
+        target = presence.gaze() or gaze_target()
 
         if target is None:
             if last is not None:

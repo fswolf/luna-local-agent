@@ -155,7 +155,7 @@ What the model thought is what it thought.
 
 Recording can be switched three ways, and they are the same switch:
 the **recording** button in the viewer's top bar (red dot when on),
-**reasoning log** under *Thoughts* in the settings pane (Tab twice,
+**reasoning log** under *Thoughts* in the tools pane (Tab twice,
 beside Mood), or `/set thoughts.enabled false`. All three write
 `thoughts.enabled` in `config.json`, and the running app re-reads it
 whenever the file changes, so a switch flipped in the browser applies
@@ -288,7 +288,7 @@ directly: when she was unsure, did more thinking actually help?
 ```
 
 All of it can be changed live with `/set adaptive.<name>`, and
-**adaptive thinking** is a toggle under *Thoughts* in the settings pane.
+**adaptive thinking** is a toggle under *Thoughts* in the tools pane.
 `speak_corrections: false` still takes the second look and records it,
 but never says anything, which suits measuring before trusting it.
 
@@ -331,7 +331,7 @@ there for when she forgets.
 }
 ```
 
-**grounding check** is a toggle under *Thoughts* in the settings pane;
+**grounding check** is a toggle under *Thoughts* in the tools pane;
 `/set grounding.mode check` (or `flag`) changes how strict it is. It
 runs on any server, not just llama-server, and only on your own turns.
 The **flagged** filter in the thought viewer shows the turns it caught.

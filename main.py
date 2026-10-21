@@ -113,6 +113,10 @@ def _load_speech():
         ui.set_status("Idle")
         logbook.info("startup", "speech models ready | tts=%s", speech.server_label())
 
+        import voices
+
+        voices.warm_up()      # the speaker model, if anyone has voice prints
+
         # This check belongs here, not on the startup path. load_models()
         # is what probes the TTS server, and while that was synchronous
         # the caller could read the result immediately. Moving it to a
@@ -229,6 +233,15 @@ import touches  # noqa: E402
 
 reflect.start(MODEL, show=lambda line: ui.add_message("system", line))
 touches.start(MODEL)          # the portrait's touches, answered out loud (touches.py)
+
+# The webcam watching for someone in front of it (presence.py): greets on
+# arrival, looks at you, keeps quiet in an empty room.
+import presence  # noqa: E402
+
+presence.set_model(MODEL)
+
+if getattr(config, "PRESENCE_ENABLED", False) and not presence.start():
+    ui.add_message("system", "Presence didn't start: " + " ".join(presence.status()))
 
 
 # -------------------------
@@ -551,7 +564,8 @@ def handle_input(text):
                 section = path.split(".")[0] if "." in path else ""
                 grouped.setdefault(section, []).append(path)
 
-            lines = ["Change any of these with /set <name> <value>:"]
+            lines = ["Change any of these with /set <name> <value> (the settings pane, "
+                     "Tab three times, lists every setting with what it does):"]
 
             for section, paths in grouped.items():
                 lines.append(f"  [{section or 'general'}]")
@@ -566,11 +580,14 @@ def handle_input(text):
             ui.add_message("system", "\n".join(lines))
             return
 
+        from config.schema import SCHEMA
+
         if len(parts) == 2:
             path = parts[1]
 
-            if path not in config.SETTINGS:
-                ui.add_message("system", f"No setting called {path!r}. /set lists them.")
+            if path not in config.SETTINGS and path not in SCHEMA:
+                ui.add_message("system", f"No setting called {path!r}. /set lists them; "
+                               "the settings pane (Tab three times) has every one.")
                 return
 
             ui.add_message("system", f"{path} = {config.current(path)}")
@@ -579,7 +596,11 @@ def handle_input(text):
         path, value = parts[1], parts[2]
 
         try:
-            applied, live = config.save_setting(path, value)
+            # the table's settings may apply now; any other one the schema
+            # knows (plugins, the theme...) is saved for the next start
+            applied, live = (config.save_setting(path, value) if path in config.SETTINGS
+                             else config.save_any(path, value) if path in SCHEMA
+                             else config.save_setting(path, value))
         except ValueError as e:
             ui.add_message("system", f"Couldn't set that: {e}")
             return
@@ -1450,6 +1471,77 @@ def handle_input(text):
                 f"  device {config.CAMERA_DEVICE}, width {config.CAMERA_WIDTH}",
                 "  ready" if usable else f"  not usable: {camera.why_unavailable()}",
                 "  /camera list | /camera test"]))
+        return
+
+    if text == "/presence" or text.startswith("/presence "):
+        import presence
+
+        word = text[len("/presence"):].strip().lower()
+
+        if word in ("on", "off"):
+            config.save_setting("camera.presence.enabled", "true" if word == "on" else "false")
+            if word == "on":
+                started = presence.start()
+                ui.add_message("system", "Presence on: she'll notice when someone's in front of the camera."
+                               if started else "Presence saved as on, but it didn't start: "
+                               + " ".join(presence.status()))
+            else:
+                presence.stop()
+                ui.add_message("system", "Presence off. The camera is free.")
+        else:
+            ui.add_message("system", "\n".join(presence.status()))
+        return
+
+    if text == "/people" or text.startswith("/people "):
+        import people
+        import presence
+        import voices
+
+        words = text.split()
+
+        if len(words) >= 4 and words[1] == "enroll" and words[2] in ("face", "voice"):
+            name = " ".join(words[3:])
+
+            if not config.USER_NAME:
+                ui.add_message("system", "Put your own name in agent.json's user block first "
+                               "(\"user\": {\"name\": ...}): it's how she knows which enrolled person is you.")
+
+            if words[2] == "voice":
+                _ok, said = voices.enroll(name)
+                ui.add_message("system", said)
+                return
+
+            def _enroll():
+                ui.add_message("system", f"Look at the camera, {name}. Turn your head a little "
+                               "now and then (up to 20 seconds)...")
+                ok, said = presence.enroll(name)
+                ui.add_message("system", said)
+
+            threading.Thread(target=_enroll, daemon=True, name="people-enroll").start()
+            return
+
+        if len(words) == 2 and words[1] == "cancel":
+            job = voices.cancel()
+            ui.add_message("system", f"Stopped taking {job['name']}'s voice prints." if job
+                           else "No voice enrolment running.")
+            return
+
+        if len(words) >= 3 and words[1] == "forget":
+            kind = words[-1] if words[-1] in ("face", "voice") and len(words) >= 4 else None
+            name = " ".join(words[2:-1] if kind else words[2:])
+            gone = people.forget(name, kind)
+            ui.add_message("system", (f"Forgot {name}'s {kind} prints." if kind else f"Forgot {name}.")
+                           if gone else f"Nobody called {name} (or no {kind} prints).")
+            return
+
+        found = people.everyone()
+        ui.add_message("system", "\n".join(
+            (["People she knows:"] + [f"  {n}{' (' + p['pronouns'] + ')' if p.get('pronouns') else ''}: "
+                                       f"{len(p.get('face') or [])} face, {len(p.get('voice') or [])} voice prints, "
+                                       f"{len(p.get('facts') or [])} facts"
+                                       for n, p in found.items()] if found else ["Nobody enrolled yet."])
+            + ["  " + voices.status(), "  " + presence.status()[0],
+               "  /people enroll face|voice <name> | /people forget <name> [face|voice] | /people cancel"]))
         return
 
     if text == "/situation":

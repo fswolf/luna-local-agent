@@ -176,6 +176,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Web](docs/web.md): search, research, reading pages
 - [Email](docs/email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](docs/vision.md): looking at your screen, the webcam
+- [People in the house](docs/people.md): she knows who's talking, by voice or face
 - [Reminders and alarms](docs/reminders.md)
 - [Knowledge](docs/knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history

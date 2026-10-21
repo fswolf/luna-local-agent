@@ -7,7 +7,7 @@
 | Enter | Send typed message |
 | Tab | Open / close the help panel |
 | PgUp / PgDn | Scroll the conversation, or the help when it's open |
-| Tab | Cycle conversation → help → tools; the input bar names the next stop |
+| Tab | Cycle conversation → help → tools → settings; the input bar names the next stop |
 | F2 | Toggle mouse capture: see below |
 | End | Jump back to the newest message |
 | Esc | Quit |
@@ -52,6 +52,8 @@ Slash commands:
 | `/alarm off` | Stop one that's ringing; `/alarm test` hears the tone |
 | `/look` | List windows, or test a screenshot |
 | `/camera` | Webcam: `/camera on`, `off`, `list`, `test` |
+| `/presence` | Webcam presence: `/presence on`, `off`, or status |
+| `/people` | People she knows ([people.md](people.md)): `/people enroll face\|voice <name>`, `/people forget <name> [face\|voice]`, `/people cancel` |
 | `/log` | Tail the debug log without leaving the app |
 | `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |
@@ -62,7 +64,7 @@ Slash commands:
 | `/context` | What every turn sends, in tokens, against the model's context length |
 | `/mouse` | Wheel scrolling vs. being able to select text |
 | `/scroll` | Why the wheel isn't scrolling: pane sizes and what the terminal sent |
-| `/set` | List every setting, or change one: saved to `config.json` |
+| `/set` | List every setting, or change one: saved to `config.json`. The settings pane (Tab three times) shows them all with what each does |
 | `/tools` | Which tools the model can call, what each costs: Tab twice to change, and to set read/write/execute permissions |
 | `/tooltest` | Whether this model *actually* calls them |
 | `/repair` | Record past reminders as the tool calls they really were |

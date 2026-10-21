@@ -13,6 +13,7 @@ from speech import record_audio, transcribe
 
 import interrupts
 import logbook
+import people
 import speech
 import turnctx
 import ui
@@ -94,7 +95,7 @@ def _say_away(said):
     ui.set_status("Idle")
 
 
-def respond(text, model, source="typed"):
+def respond(text, model, source="typed", speaker=None):
     """Send a turn to the model and speak the reply as it arrives.
 
     Nothing here waits for the whole answer. Text appears on screen as
@@ -107,6 +108,10 @@ def respond(text, model, source="typed"):
     spoken - but it is still allowed to finish generating and stays on
     screen, the same bargain barge-in makes. Interrupting should cost
     you the audio, never the answer.
+
+    speaker: someone other than the owner, recognised by voice or face
+    (people.decide); None is the owner. Their name, pronouns and facts
+    are used for the turn instead of his.
 
     source: "typed" or "voice". Runs as the caller's Stop (interrupts)
     if it opened one - ptt does, at the key press - else its own, opened
@@ -131,7 +136,7 @@ def respond(text, model, source="typed"):
                     _say_away(said)
                     return said
 
-                return _respond(text, model, source, stop)
+                return _respond(text, model, source, stop, speaker)
             finally:
                 _hold(None)
 
@@ -229,6 +234,12 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
         if _gone() is not None:
             _hold(None)
             return ""       # walked away: jobs and games wait
+
+        if speak:
+            import presence
+            # Nobody in front of the camera for a while: the job still
+            # runs and shows on screen, it just doesn't talk to an empty room.
+            speak = not presence.nobody_here()
 
         player = speech.Player() if speak else None
 
@@ -337,7 +348,7 @@ def respond_remote(text, model, source, who, tools_allowed=None,
             ui.set_status("Idle")
 
 
-def _respond(text, model, source, stop):
+def _respond(text, model, source, stop, speaker=None):
     player = speech.Player()
 
     ui.set_status("Thinking...")
@@ -353,7 +364,7 @@ def _respond(text, model, source, stop):
         # Your own turn, typed or spoken: ask() leaves source None for
         # those (it's what turns on the second-look checks), so how it
         # reached her is set on the turn itself.
-        with turnctx.begin(source=source):
+        with turnctx.begin(source=source, speaker=speaker):
             answer = ask(
                 text, model, on_text=ui.extend_message, on_sentence=on_sentence
             )
@@ -382,6 +393,15 @@ def assistant_task(model, mode=None):
     """
     with interrupts.ensure("voice") as stop:
         return _spoken_turn(model, mode, stop)
+
+
+def _whose_voice(filename, heard):
+    try:
+        import voices
+
+        heard["name"], heard["score"] = voices.identify(filename)
+    except Exception as e:
+        logbook.warn("voices", "couldn't tell whose voice: %s", e)
 
 
 def _spoken_turn(model, mode, stop):
@@ -413,16 +433,23 @@ def _spoken_turn(model, mode, stop):
             ui.set_status("Idle")
             return False
 
+        # Whose voice, worked out beside Whisper so it costs no time.
+        heard = {}
+        who = threading.Thread(target=_whose_voice, args=(filename, heard), daemon=True)
+        who.start()
+
         ui.set_status("Transcribing...")
         text = transcribe(filename)
+        who.join(timeout=3)
 
         if not text:
             ui.set_status("Idle")
             return False
 
-        logbook.info("turn", "heard: %s", text[:200])
-        ui.add_message("user", text)
-        respond(text, model, source="voice")
+        speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None)
+        logbook.info("turn", "heard%s: %s", f" ({speaker})" if speaker else "", text[:200])
+        ui.add_message("user", f"[{speaker}] {text}" if speaker else text)
+        respond(text, model, source="voice", speaker=speaker)
         ui.set_status("Idle")
 
         return True

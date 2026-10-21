@@ -13,6 +13,7 @@ import gestures
 import logbook
 import mood
 import longterm
+import people
 import timeutil
 import turnctx
 
@@ -28,7 +29,7 @@ def build_memory_prompt(query=""):
     """
     prompt = ""
 
-    if "user_preferences" in memory:
+    if "user_preferences" in memory and not people.guest():   # the owner's, not a guest's
         prompt += "\nUser Preferences:\n"
 
         for key, value in memory["user_preferences"].items():
@@ -258,7 +259,7 @@ def build_system_prompt(query="", timing="", private=True):
 
     return f"""
 You are {AGENT_NAME}.
-{config.user_line() if private else ""}
+{people.user_line() if private else ""}
 Right now:
 {timeutil.describe_now()}
 {situation_block}

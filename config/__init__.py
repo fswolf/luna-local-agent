@@ -146,6 +146,17 @@ SETTINGS = {
     "camera.device":              ("CAMERA_DEVICE",                True),
     "camera.width":               ("CAMERA_WIDTH",                 True),
     "camera.warmup":              ("CAMERA_WARMUP",                True),
+    "camera.presence.enabled":    ("PRESENCE_ENABLED",             True),
+    "camera.presence.fps":        ("PRESENCE_FPS",                 True),
+    "camera.presence.greet":      ("PRESENCE_GREET",               True),
+    "camera.presence.greet_after_minutes": ("PRESENCE_GREET_AFTER", True),
+    "camera.presence.look":       ("PRESENCE_LOOK",                True),
+    "camera.presence.quiet":      ("PRESENCE_QUIET",               True),
+    "camera.presence.quiet_after_minutes": ("PRESENCE_QUIET_AFTER", True),
+    "camera.presence.recognise":  ("PRESENCE_RECOGNISE",           True),
+    "camera.presence.match":      ("PRESENCE_MATCH",               True),
+    "people.voice":               ("PEOPLE_VOICE",                 True),
+    "people.voice_match":         ("PEOPLE_VOICE_MATCH",           True),
 
     "desktop.enabled":            ("DESKTOP_ENABLED",              True),
     "desktop.clipboard":          ("DESKTOP_CLIPBOARD",            True),
@@ -322,16 +333,44 @@ def _stored(path):
 
 
 def _coerce(path, raw):
-    """Turn terminal text into the type the setting already has."""
+    """Turn terminal text into the type the setting already has.
+
+    What the setting is (config/schema.py) decides first: a list is
+    comma-separated words, a choice must be one of its values, a nested
+    block can't be typed on one line. Without an entry there, the value
+    already in the file (or in effect) decides, as it always did.
+    """
     if not isinstance(raw, str):
         return raw
+
+    from .schema import SCHEMA
+
+    entry = SCHEMA.get(path)
+    kind = entry[0] if entry else None
+    text = raw.strip()
+
+    if kind == "dict":
+        raise ValueError(f"{path} is a nested block - edit it in config.json")
+
+    if kind == "list":
+        return [part.strip() for part in text.split(",") if part.strip()]
+
+    if kind == "choice" and len(entry) > 2 and entry[2]:
+        for choice in entry[2]:
+            if text.lower() == str(choice).lower():
+                return choice
+
+        raise ValueError(f"{path} is one of {', '.join(map(str, entry[2]))}, not {raw!r}")
 
     existing = _stored(path)
 
     if existing is None:
         existing = current(path)
 
-    text = raw.strip()
+    # Nothing to go by in the file yet: the schema's kind stands in, so a
+    # first-time setting doesn't get saved as text.
+    if existing is None or isinstance(existing, str):
+        existing = {"bool": False, "int": 0, "float": 0.0}.get(kind, existing)
 
     if isinstance(existing, bool):
         if text.lower() in _TRUE:
@@ -387,6 +426,54 @@ def save_setting(path, raw):
         globals()[name] = value
 
     return value, live
+
+
+def save_any(path, raw):
+    """Save any setting, including the ones /set doesn't know.
+
+    The table's keys go through save_setting and may apply at once; the
+    rest (plugin blocks, the model server, the theme...) are typed by
+    the schema, written to config.json and take effect on a restart.
+    Returns (value, applied_now).
+    """
+    if path in SETTINGS:
+        return save_setting(path, raw)
+
+    value = _coerce(path, raw)
+    _store(path, value)
+
+    return value, False
+
+
+def reset_setting(path):
+    """Take a key out of config.json, so the built-in default applies
+    (after a restart: the default only lives in the code that reads it).
+    Returns True if there was anything to remove."""
+    stored = _load_json(CONFIG_FILE)
+    node, parts = stored, path.split(".")
+
+    for part in parts[:-1]:
+        node = node.get(part)
+
+        if not isinstance(node, dict):
+            return False
+
+    if parts[-1] not in node:
+        return False
+
+    del node[parts[-1]]
+
+    with open(CONFIG_FILE, "w") as file:
+        json.dump(stored, file, indent=4)
+        file.write("\n")
+
+    settings.clear()
+    settings.update(stored)
+
+    global _plugins_cfg
+    _plugins_cfg = settings.get("plugins", {})
+
+    return True
 
 
 def _store(path, value):

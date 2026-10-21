@@ -113,6 +113,8 @@ def _who(block):
 
 USER_NAME, (USER_THEY, USER_THEM, USER_THEIR), _USER_GAVE_PRONOUNS = _who(agent.get("user"))
 USER = USER_NAME or "the user"          # the subject of a prompt line: "when {USER} asks"
+# Others in the house (people.py): [{"name": "Shannon", "pronouns": "she/her"}]
+PEOPLE = [p for p in (agent.get("people") or []) if isinstance(p, dict) and p.get("name")]
 
 
 def user_line():

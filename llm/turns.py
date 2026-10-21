@@ -469,13 +469,19 @@ def _ask(text, model, on_text=None, on_sentence=None,
     # get_messages_full()'s own "timestamp" field stays the single
     # source of truth and formatting can change later without rewriting
     # anything already saved to disk.
-    history.add_message("user", text)
+    # Someone other than the owner said it (people.py): the history says
+    # who, so later turns don't put their words in his mouth.
+    import people
+
+    guest = people.guest()
+    said = f"[{guest}] {text}" if guest else text
+    history.add_message("user", said)
     history.add_message("assistant", answer, tools=_last_raw.get("exchanges"))
 
     # The same turns, to a file summarization never touches. history.py
     # deletes these once they're folded into the summary; this is what
     # makes "what did we decide last week" answerable.
-    transcript.add("user", text)
+    transcript.add("user", said)
     transcript.add("assistant", answer)
     history.maybe_summarize(model)
     history.save()

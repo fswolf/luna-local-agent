@@ -10,6 +10,7 @@ Everything the README only touches on, one subject per page.
 - [Web](web.md): search, research, reading pages
 - [Email](email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](vision.md): looking at your screen, the webcam
+- [People in the house](people.md): who's talking, by voice or face, and their own memories
 - [Reminders and alarms](reminders.md)
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history

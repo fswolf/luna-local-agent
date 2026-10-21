@@ -44,6 +44,7 @@ class Turn:
     skills: list = field(default_factory=list)   # skill ids shown, credited after
     routing: SimpleNamespace = field(default_factory=SimpleNamespace)  # tools/routing.py
     exchanges: list = field(default_factory=list)  # {name, arguments, result} per tool call, in order
+    speaker: Optional[str] = None      # someone other than the owner talking (people.py); None: the owner
 
 
 _current = contextvars.ContextVar("luna_turn", default=None)

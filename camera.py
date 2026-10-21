@@ -37,6 +37,7 @@ import glob
 import re
 import sys
 import threading
+import time
 import urllib.request
 
 import config
@@ -219,6 +220,28 @@ def grab(device=None):
     if cv2 is None:
         last_error = why_unavailable()
         return None, last_error
+
+    import presence
+
+    # Presence holds the webcam open: take its latest picture instead of
+    # fighting it for the device. It's 640 wide, plenty to look at.
+    shared = None
+
+    if presence.running() and device == _device():
+        for _ in range(8):                       # its next picture, rather than fight it for the device
+            shared = presence.frame()
+            if shared is not None:
+                break
+            time.sleep(0.25)
+
+    if shared is not None:
+        ok, jpeg = cv2.imencode(".jpg", shared, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+
+        if ok:
+            h, w = shared.shape[:2]
+            data = jpeg.tobytes()
+            last_error = ""
+            return data, f"camera {device}, {w}x{h}, {len(data) // 1024}KB (from presence)"
 
     with _lock:
         cap = _open(cv2, device, width)

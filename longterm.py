@@ -110,7 +110,25 @@ def _announce():
         pass  # headless, or the UI isn't up yet
 
 
+def _guest():
+    """Someone other than the owner is talking this turn (people.py): their
+    name, and their facts are the ones used. None for the owner."""
+    try:
+        import people
+
+        return people.guest()
+    except Exception:
+        return None
+
+
 def get_facts() -> list:
+    guest = _guest()
+
+    if guest:
+        import people
+
+        return people.facts(guest)
+
     if backend() == "sqlite":
         return factstore.active_facts()
 
@@ -160,6 +178,9 @@ def relevant_facts(query, limit=None):
     # word matching below takes over exactly as before.
     facts = get_facts()
 
+    if _guest():
+        return _by_words(facts, query, limit)   # their own few facts, never the owner's
+
     if len(facts) > limit:
         try:
             import embedmem
@@ -174,6 +195,11 @@ def relevant_facts(query, limit=None):
     if backend() == "sqlite":
         return factstore.search(query, limit)
 
+    return _by_words(facts, query, limit)
+
+
+def _by_words(facts, query, limit):
+    """Facts sharing vocabulary with the query, plus the newest few."""
     if len(facts) <= limit:
         return facts
 
@@ -279,6 +305,13 @@ def forget_fact(phrase):
     if index is None:
         return None, found
 
+    guest = _guest()
+
+    if guest:
+        import people
+
+        return (found, []) if people.set_fact(guest, found, None) else (None, [])
+
     if backend() == "sqlite":
         removed = factstore.remove(found)
         _announce()
@@ -309,6 +342,13 @@ def update_fact(phrase, replacement):
 
     if index is None:
         return None, found
+
+    guest = _guest()
+
+    if guest:
+        import people
+
+        return ((found, replacement), []) if people.set_fact(guest, found, replacement) else (None, [])
 
     if backend() == "sqlite":
         # A correction, not a change in the world - rewritten in place
@@ -357,6 +397,11 @@ def add_fact(fact: str, subject: str = "") -> bool:
     fact = fact.strip()
     if not _looks_like_valid_fact(fact):
         return False
+    guest = _guest()
+    if guest:
+        import people
+
+        return people.add_fact(guest, fact)
     if backend() == "sqlite":
         # No cap here - permanence is the point of this backend.
         stored = factstore.add(fact, subject)
@@ -513,7 +558,7 @@ def _extract_fact_sqlite(model, user_text, answer):
 
 
 def _extract_fact(model, user_text, answer):
-    if backend() == "sqlite":
+    if backend() == "sqlite" and not _guest():
         _extract_fact_sqlite(model, user_text, answer)
 
         return
@@ -562,6 +607,14 @@ def _extract_fact(model, user_text, answer):
 def extract_in_background(model, user_text, answer):
     if not config.LONG_TERM_MEMORY_ENABLED:
         return
-    threading.Thread(
-        target=_extract_fact, args=(model, user_text, answer), daemon=True
-    ).start()
+    import turnctx
+
+    # The thread starts with no turn of its own: carry who was talking,
+    # so a guest's fact lands in their file and not the owner's.
+    speaker = turnctx.current().speaker
+
+    def run():
+        with turnctx.begin(source="extract", private=True, speaker=speaker):
+            _extract_fact(model, user_text, answer)
+
+    threading.Thread(target=run, daemon=True).start()

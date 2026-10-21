@@ -32,6 +32,9 @@ async function main() {
     const {joinCity} = require(path.join(PKG, 'peer.cjs'));
     const s = await openResident({htmlPath: o.html, residentId: o.resident, storagePath: o.storage});
     const R = s.window.Realiti, door = s.door, sch = R.read('realiti://schemas');
+    // --resident is the name others see: claim it the first time, so the city shows a name, not a key fingerprint
+    try { const who = await door.run('id'); if (!who?.avatar?.name) await door.run('call me ' + o.resident); }
+    catch (e) { log(`couldn't claim the name ${o.resident}: ${e.message || e}`); }
     let city = null;
     async function join() {
         if (city || !o.city || o.city === 'none') return city;

@@ -34,6 +34,7 @@ from .help import (
 )
 from .messages import add_message, toggle_mouse
 from .text import _HORIZONTAL, _framed, _keyed, _rule
+from . import settings_pane
 from .tools_pane import (
     _ToolControl, _tool_cursor_point, _tool_fragments, _tool_group_toggle, _tool_header,
     _routing_toggle, _tool_height, _tool_move, _tool_scroll_position, _tool_toggle,
@@ -82,7 +83,7 @@ def _next_pane():
 # thing, so a fixed "tab for help" was honest; now it cycles, and a
 # label that names the next stop beats making you remember the ring.
 _TAB_HINT = {None: "tab for help", "help": "tab for tools",
-             "tools": "tab to close"}
+             "tools": "tab for settings", "settings": "tab to close"}
 
 
 def _tab_hint():
@@ -182,6 +183,37 @@ def _build_keys():
     def _(event):
         pass
 
+    # The settings pane: space flips or steps, enter edits, / filters,
+    # x goes back to the default. Not while its edit box is open: then
+    # the keys are the box's.
+    in_settings = Condition(lambda: view.pane == "settings" and not approving()
+                            and view.set_editing is None)
+
+    def _open_editor(event):
+        if view.set_editing is not None and view.set_editor is not None:
+            view.set_editor.text = view.set_editing.get("text", "")
+            view.set_editor.buffer.cursor_position = len(view.set_editor.text)
+            event.app.layout.focus(view.set_editor)
+
+    @keys.add(" ", filter=in_settings)
+    def _(event):
+        settings_pane.flip()
+        _open_editor(event)
+
+    @keys.add("enter", filter=in_settings)
+    def _(event):
+        settings_pane.edit()
+        _open_editor(event)
+
+    @keys.add("/", filter=in_settings)
+    def _(event):
+        settings_pane.start_filter()
+        _open_editor(event)
+
+    @keys.add("x", filter=in_settings)
+    def _(event):
+        settings_pane.reset()
+
     @keys.add(" ", filter=Condition(lambda: view.pane == "tools" and not approving()))
     def _(event):
         _tool_toggle()
@@ -197,7 +229,7 @@ def _build_keys():
     @keys.add("tab")
     def _(event):
 
-        if approving():
+        if approving() or view.set_editing is not None:
             return
 
         view.pane = _next_pane()
@@ -214,6 +246,14 @@ def _build_keys():
 
         if approving():
             _answer_approval(False)
+            return
+
+        if view.set_editing is not None:
+            settings_pane.cancel_edit()
+            event.app.layout.focus(view.input_area)
+            return
+
+        if view.pane == "settings" and settings_pane.clear_filter():
             return
 
         if view.pane is not None:
@@ -237,6 +277,10 @@ def _build_keys():
 
         if approving():
             _approval_scroll_by(-max(1, _approval_height() - 2))
+        elif view.set_editing is not None:
+            pass
+        elif view.pane == "settings":
+            settings_pane.move(-max(1, settings_pane._height() - 2))
         elif view.pane == "tools":
             _tool_move(-max(1, _tool_height() - 3))
         elif view.pane == "help":
@@ -250,6 +294,10 @@ def _build_keys():
 
         if approving():
             _approval_scroll_by(max(1, _approval_height() - 2))
+        elif view.set_editing is not None:
+            pass
+        elif view.pane == "settings":
+            settings_pane.move(max(1, settings_pane._height() - 2))
         elif view.pane == "tools":
             _tool_move(max(1, _tool_height() - 3))
         elif view.pane == "help":
@@ -271,6 +319,10 @@ def _build_keys():
 
         if approving():
             _approval_scroll_by(-1)
+        elif view.set_editing is not None:
+            pass
+        elif view.pane == "settings":
+            settings_pane.move(-1)
         elif view.pane == "tools":
             _tool_move(-1)
         elif view.pane == "help":
@@ -284,6 +336,10 @@ def _build_keys():
 
         if approving():
             _approval_scroll_by(1)
+        elif view.set_editing is not None:
+            pass
+        elif view.pane == "settings":
+            settings_pane.move(1)
         elif view.pane == "tools":
             _tool_move(1)
         elif view.pane == "help":
@@ -381,6 +437,60 @@ def run(on_submit, on_hotkey=None):
 
     view.tool_window = tools_list
 
+    settings_list = Window(
+        content=settings_pane.SettingsControl(
+            settings_pane._fragments,
+            get_cursor_position=settings_pane._cursor_point,
+        ),
+        height=Dimension(min=3, weight=1),
+        wrap_lines=False,
+        get_vertical_scroll=settings_pane._scroll_position,
+        always_hide_cursor=True,
+        right_margins=[ScrollbarMargin()],
+    )
+
+    view.set_window = settings_list
+
+    settings_window = HSplit([
+        Window(
+            content=FormattedTextControl(settings_pane._header),
+            height=Dimension.exact(2),
+        ),
+        _rule(_HORIZONTAL),
+        settings_list,
+    ])
+
+    # The settings pane's edit box: one line, over the pane. Enter saves
+    # (or keeps the filter), Esc cancels; the filter narrows as you type.
+    def _edited(buffer):
+        settings_pane.finish_edit(buffer.text)
+        view.app.layout.focus(input_area)
+        return False
+
+    editor = TextArea(height=1, multiline=False, wrap_lines=False,
+                      prompt=[("class:prompt", "> ")], accept_handler=_edited)
+
+    def _typing(_buffer):
+        if (view.set_editing or {}).get("mode") == "filter":
+            view.set_filter = editor.text.strip()
+            view.set_cursor = view.set_scroll = 0
+
+    editor.buffer.on_text_changed += _typing
+    view.set_editor = editor
+    view.input_area = input_area
+
+    editor_box = ConditionalContainer(
+        _framed(
+            HSplit([
+                Window(content=FormattedTextControl(lambda: [("class:dim", " " + settings_pane.editor_help())]),
+                       height=1),
+                editor,
+            ]),
+            title=settings_pane.editor_title,
+        ),
+        filter=Condition(lambda: view.set_editing is not None),
+    )
+
     tools_window = HSplit([
         Window(
             content=FormattedTextControl(_tool_header),
@@ -417,6 +527,10 @@ def run(on_submit, on_hotkey=None):
         ConditionalContainer(
             _framed(tools_window, title="Tools"),
             filter=Condition(lambda: view.pane == "tools"),
+        ),
+        ConditionalContainer(
+            _framed(settings_window, title="Settings"),
+            filter=Condition(lambda: view.pane == "settings"),
         ),
         _framed(input_area, title=_tab_hint),
     ])
@@ -465,6 +579,11 @@ def run(on_submit, on_hotkey=None):
         content=body,
         floats=[
             Float(
+                content=editor_box,
+                width=lambda: min(100, max(30, _cols() - 8)),
+                height=4,
+            ),
+            Float(
                 content=approval_box,
                 width=lambda: _approval_size()[0],
                 height=lambda: _approval_size()[1],
@@ -488,7 +607,7 @@ def run(on_submit, on_hotkey=None):
         # wheel notch into three arrow keys and the selection jumps
         # three switches at a time. Derived rather than saved and
         # restored, so it can't get stuck on.
-        mouse_support=Condition(lambda: view.mouse or view.pane == "tools"),
+        mouse_support=Condition(lambda: view.mouse or view.pane in ("tools", "settings")),
     )
 
     # First paint has no render_info, so the scroll lands at line one and
@@ -505,6 +624,12 @@ def run(on_submit, on_hotkey=None):
     view.app.after_render += _prime
 
     view.app.run()
+
+
+def _cols():
+    if view.app is None:
+        return 80
+    return view.app.output.get_size().columns
 
 
 def stop():

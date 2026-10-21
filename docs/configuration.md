@@ -78,6 +78,42 @@ fatal: hand-editing them is the whole point of their being JSON.
 
 ## Changing settings without leaving the terminal
 
+### The settings pane
+
+Press **Tab three times** (conversation, help, tools, then settings).
+It lists every setting `config.json` can hold, over 300 of them, grouped
+by section, with a heading per plugin. Each row shows the name, its value
+and a line saying what it does:
+
+```
+ Listening
+ > mode                       auto                 How listening starts and stops: auto (HOME starts, ...
+   vad                        auto               ↻ What decides you're talking: silero (a speech model)...
+   silence_seconds            1.2                  Seconds of silence after you speak before she stops...
+```
+
+- A green value is set in your `config.json`; a grey one is the default.
+- `↻` means a change takes effect on the next start; everything else
+  applies at once, the same split `/set` uses.
+- Passwords, tokens and keys show as `••••`, never in clear.
+
+| Key | Does |
+|---|---|
+| Up / Down, PgUp / PgDn, wheel | Pick a setting |
+| Space | Flip an on/off, step through a choice (`stt.mode`, `portrait.frame`...) |
+| Enter | The same, or open a box to type a value: a number, text, or a comma-separated list |
+| `/` | Filter: only the settings whose name or line matches, narrowing as you type. Esc clears it |
+| `x` | Back to the default: takes the setting out of `config.json` (after a restart) |
+| Esc | Cancel the edit box, clear the filter, then close the pane |
+
+Values are checked before they're saved: a number has to be a number, a
+choice one of its choices. A nested block like `mcp.servers` is shown but
+edited in the file. What each setting is (its kind, allowed values and
+explanation) lives in `config/schema.py`; a test fails if a setting in
+`config.example.json` or the `/set` table isn't described there.
+
+### /set
+
 `/set` lists everything you can change, with its current value:
 
 ```
@@ -96,7 +132,8 @@ stt.barge_in_margin = 3.5 - saved
 ```
 
 Changes are written to `config.json` immediately, so they survive a
-restart. Most take effect at once; the few that don't (a Whisper model
+restart. `/set` also takes any setting the settings pane knows (a
+plugin's, the theme's...); those are saved for the next start. Most take effect at once; the few that don't (a Whisper model
 size, a wake word file) say so rather than pretending.
 
 That split is real, not cosmetic. Settings are read once at import and

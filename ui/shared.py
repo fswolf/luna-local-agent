@@ -31,9 +31,9 @@ state = {
 }
 conversation = []  # list of (speaker, text) tuples
 
-# Which overlay can be up: None, "help" or "tools". Tab cycles through
-# them and back to the conversation.
-_panes = (None, "help", "tools")
+# Which overlay can be up: None, "help", "tools" or "settings". Tab
+# cycles through them and back to the conversation.
+_panes = (None, "help", "tools", "settings")
 
 view = SimpleNamespace(
     app=None,             # the running prompt_toolkit Application, or None (headless)
@@ -47,6 +47,14 @@ view = SimpleNamespace(
     tool_cursor=0,        # selected row in the tools pane
     tool_scroll=0,
     tool_window=None,
+    set_cursor=0,         # the settings pane (ui/settings_pane.py)
+    set_scroll=0,
+    set_window=None,
+    set_filter="",        # only settings matching this, "" for all
+    set_editing=None,     # the edit box: {"mode": "value"|"filter", "path", "text"}
+    set_status="",        # the last change, in the pane's header
+    set_editor=None,      # the edit box's TextArea, and the main input box
+    input_area=None,
     approval=None,        # the pending permission request, or None
     approval_scroll=0,
     approval_window=None,

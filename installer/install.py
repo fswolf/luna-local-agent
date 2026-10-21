@@ -12,7 +12,7 @@ without asking first - system packages show the exact command and wait.
     --backend X          lmstudio (default), llama, or skip
     --voice X            install (default), url:http://host:port, or skip
     --gpu X              auto (default), cpu, cuda, rocm - for the voice server
-    --extras a,b         wakeword, mcp, portrait, live2d, embeddings, reranker, chat, camera  (or "all")
+    --extras a,b         wakeword, mcp, portrait, live2d, embeddings, reranker, chat, camera, voices  (or "all")
     --no-system          don't install system packages, just say which are missing
     --check              only run the health check
 """
@@ -52,6 +52,7 @@ EXTRAS = {
     "documents": (["pypdf"], "PDFs in her knowledge folder (Markdown, text, Word and web pages need nothing)"),
     "toys": (["websocket-client"], "the Buttplug plugin: toys of most brands through Intiface Central"),
     "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
+    "voices": (["speechbrain"], "tell people in the house apart by voice (/people enroll voice)"),
 }
 
 # ---------------------------------------------------------------------------

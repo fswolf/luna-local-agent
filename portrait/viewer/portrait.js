@@ -1507,7 +1507,7 @@ function buildBumBlush() {
       if (p.z > -0.02) continue;                                   // her front half
       const dx = (Math.abs(p.x) - 0.065) / 0.075, dy = (p.y + 0.07) / 0.085;
       const d = Math.sqrt(dx * dx + dy * dy);
-      if (d < 1) { w[i] = Math.pow(1 - d, 1.4); any++; }
+      if (d < 1) { w[i] = Math.pow(1 - d, 0.6); any++; }          // full in the middle, soft at the edge
     }
     if (any < 12) return;
     const src = o.geometry.index ? o.geometry.index.array : [...Array(n).keys()];
@@ -1517,11 +1517,19 @@ function buildBumBlush() {
     const g = new THREE.BufferGeometry();
     for (const k of ['position', 'normal', 'skinIndex', 'skinWeight']) if (o.geometry.attributes[k]) g.setAttribute(k, o.geometry.attributes[k]);
     const col = new Float32Array(n * 4);
-    for (let i = 0; i < n; i++) col.set([1, 0.16, 0.26, w[i]], i * 4);
+    for (let i = 0; i < n; i++) col.set([1, 0.02, 0.03, w[i]], i * 4);   // a deep red (linear: three.js lightens it)
     g.setAttribute('color', new THREE.BufferAttribute(col, 4));
     g.setIndex(tri);
+    // multiplied into her skin, not painted over it: her own shading and
+    // highlights stay, the skin just goes red (white where there's no blush)
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false,
+                                              blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+                                              blendSrc: THREE.ZeroFactor, blendDst: THREE.SrcColorFactor,
                                               polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    mat.onBeforeCompile = sh => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>',
+        '#include <dithering_fragment>\n  gl_FragColor = vec4(mix(vec3(1.0), gl_FragColor.rgb, clamp(gl_FragColor.a, 0.0, 1.0)), 1.0);');
+    };
     const layer = new THREE.SkinnedMesh(g, mat);
     layer.userData.bumBlush = true;
     layer.frustumCulled = false;
@@ -1565,12 +1573,12 @@ function spankSlider() {
   row.append(label, r, out, hit, fade);
   return row;
 }
-function spankLevel() { return Math.min(0.75, Math.floor(spank.n / SPANK_STEP) * 0.13 + Math.min(1, spank.n / SPANK_STEP) * 0.06); }
+function spankLevel() { return Math.min(0.92, Math.floor(spank.n / SPANK_STEP) * 0.18 + Math.min(1, spank.n / SPANK_STEP) * 0.14); }
 function updateSpank(dt) {
   if (!spank.layers.length) return;
   if (!spank.hold) spank.n = Math.max(0, spank.n - dt / SPANK_FORGET);
   spank.flash = Math.max(0, spank.flash - dt * 2.5);
-  const a = mind.tame ? 0 : Math.min(0.85, spankLevel() + spank.flash * 0.18);
+  const a = mind.tame ? 0 : Math.min(0.97, spankLevel() + spank.flash * 0.25);
   for (const m of spank.layers) { m.opacity = a; m.visible = a > 0.003; }
 }
 

@@ -100,3 +100,26 @@ CAMERA_DEVICE = int(_cam) if isinstance(_cam, (int, float)) or str(_cam).strip()
 CAMERA_WIDTH = int(_camera_cfg.get("width", 1280))
 CAMERA_WARMUP = int(_camera_cfg.get("warmup", 5))
 
+# Presence (presence.py): the webcam kept open at a few checks a second to
+# notice someone in front of it. Greets you when you come back after
+# greet_after_minutes, looks at you while you're there, stays quiet when
+# nobody has been there for quiet_after_minutes, and knows faces enrolled
+# with /people enroll face <name>. Nothing is saved or sent anywhere.
+#   "camera": { "presence": { "enabled": true, "fps": 3, "greet_after_minutes": 20 } }
+_presence_cfg = _camera_cfg.get("presence", {}) or {}
+PRESENCE_ENABLED = bool(_presence_cfg.get("enabled", False))
+PRESENCE_FPS = float(_presence_cfg.get("fps", 3))
+PRESENCE_GREET = bool(_presence_cfg.get("greet", True))
+PRESENCE_GREET_AFTER = float(_presence_cfg.get("greet_after_minutes", 20))
+PRESENCE_LOOK = bool(_presence_cfg.get("look", True))
+PRESENCE_QUIET = bool(_presence_cfg.get("quiet", True))
+PRESENCE_QUIET_AFTER = float(_presence_cfg.get("quiet_after_minutes", 5))
+PRESENCE_RECOGNISE = bool(_presence_cfg.get("recognise", True))
+PRESENCE_MATCH = float(_presence_cfg.get("match", 0.36))
+
+# People (people.py, voices.py): telling the people in the house apart.
+# voice: match each spoken turn's voice against enrolled voice prints
+# (needs the voices extra). voice_match: how alike a voice must be, 0-1.
+_people_cfg = setting("people", {})
+PEOPLE_VOICE = bool(_people_cfg.get("voice", True))
+PEOPLE_VOICE_MATCH = float(_people_cfg.get("voice_match", 0.3))

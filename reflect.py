@@ -39,13 +39,14 @@ import interrupts
 import notebook
 
 START = (getattr(config, "STARTED", None) or datetime.now()).replace(microsecond=0)
-_activity = {"last": time.monotonic()}
+_activity = {"last": time.monotonic(), "turns": 0}
 _running = threading.Lock()   # one job batch at a time
 
 
 def touch():
     """A turn happened - the idle clock starts again."""
     _activity["last"] = time.monotonic()
+    _activity["turns"] += 1
 
 
 def idle_seconds():
@@ -778,6 +779,28 @@ def greet(model):
 
     if _busy():
         return
+
+    import presence
+
+    if presence.running() and not presence.present():
+        # The webcam is watching and nobody's in front of it yet: hold the
+        # greeting until someone shows up (a few seconds' grace first, the
+        # camera may just be starting).
+        for _ in range(10):
+            time.sleep(0.5)
+            if presence.present():
+                break
+        else:
+            turns = _activity["turns"]
+
+            def held():
+                # talked to her already (typed, say, camera pointed away):
+                # that conversation was the greeting
+                if _activity["turns"] == turns:
+                    greet(model)
+
+            presence.on_first_arrival(held)
+            return
 
     import assistant
     import history
