@@ -64,7 +64,9 @@ Slash commands:
 | `/context` | What every turn sends, in tokens, against the model's context length |
 | `/mouse` | Wheel scrolling vs. being able to select text |
 | `/scroll` | Why the wheel isn't scrolling: pane sizes and what the terminal sent |
-| `/set` | List every setting, or change one: saved to `config.json`. The settings pane (Tab three times) shows them all with what each does |
+| `/set` | List every setting, or change one: saved to `config.json`. The settings pane (Tab three times) shows the everyday ones |
+| `/settings` | Every setting in your browser: switches, sliders, search and presets |
+| `/preset` | `assistant`, `companion` or `streamer`: several settings at once |
 | `/tools` | Which tools the model can call, what each costs: Tab twice to change, and to set read/write/execute permissions |
 | `/tooltest` | Whether this model *actually* calls them |
 | `/repair` | Record past reminders as the tool calls they really were |

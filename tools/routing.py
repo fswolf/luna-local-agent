@@ -7,7 +7,8 @@ model picks worse from forty tools than from ten. The tools pane answers
 Per turn, by group (the tools pane's groups, MCP servers' and plugins'
 included):
 
-1. Core groups always travel (tools.core: time, math, reminders, memory, shell).
+1. Core groups always travel (tools.core: time, math, reminders, memory, shell,
+   help - her own manual).
 2. The groups closest in meaning to what was said, through the
    embedding server (embedmem: llama-server or LM Studio, whatever
    EMBED_URL points at). "Is the tower up?" brings Network because it
@@ -131,7 +132,7 @@ def choose(query, pool, group_of, previous="", quiet=False):
     for name, entry in pool.items():
         groups.setdefault(group_of(name), []).append(entry)
 
-    core = set(getattr(config, "TOOLS_CORE", ["Time", "Math", "Reminders", "Memory", "Shell"]))
+    core = set(getattr(config, "TOOLS_CORE", ["Time", "Math", "Reminders", "Memory", "Shell", "Help"]))
     top = max(1, int(getattr(config, "TOOLS_ROUTE_GROUPS", 3)))
     sticky = max(0, int(getattr(config, "TOOLS_STICKY_TURNS", 3)))
     extra = getattr(_t(), "extra", set())

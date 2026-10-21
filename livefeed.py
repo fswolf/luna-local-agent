@@ -286,6 +286,9 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", kind)
             self.send_header("Content-Length", str(len(out)))
             self.send_header("Cache-Control", "max-age=3600" if kind.startswith("image/") else "no-store")
+            # no other site may frame these pages and trick clicks through them
+            self.send_header("X-Frame-Options", "SAMEORIGIN")
+            self.send_header("Content-Security-Policy", "frame-ancestors 'self'")
             self.end_headers()
             self.wfile.write(out)
             return True
@@ -737,6 +740,14 @@ def start():
         return False
 
     server.daemon_threads = True
+
+    try:
+        import settings_web
+
+        settings_web.register()          # /settings/: every setting, in a browser
+    except Exception as e:
+        logbook.warn("monitor", "settings page unavailable: %s", e)
+
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=_gaze_loop, daemon=True, name="portrait-gaze").start()
     holofan.start()          # only does anything with portrait.fan.cast on

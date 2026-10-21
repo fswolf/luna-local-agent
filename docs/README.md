@@ -2,14 +2,14 @@
 
 Everything the README only touches on, one subject per page.
 
-- [Install](install.md): the installer, LM Studio or llama.cpp, the voice server, first run
-- [Configuration](configuration.md): config.json, changing settings live, logging
+- [Install](install.md): the installer, the model picked for your GPU, LM Studio or llama.cpp, the voice server, first run
+- [Configuration](configuration.md): the settings page and presets, config.json, changing settings live, logging
 - [Controls and voice](controls.md): keys, voice modes, speech detection, barge-in, wake word
-- [Tool calling](tools.md): every tool, turning them off, MCP servers
+- [Tool calling](tools.md): every tool, her own manual, turning them off, MCP servers
 - [Files and commands](files.md): reading, writing with approval, allow-all, run_command
 - [Web](web.md): search, research, reading pages
 - [Email](email.md): checking, reading and searching your inbox, sending with your OK
-- [Vision](vision.md): looking at your screen, the webcam
+- [Vision](vision.md): looking at your screen, the webcam, noticing you're there
 - [People in the house](people.md): who's talking, by voice or face, and their own memories
 - [Reminders and alarms](reminders.md)
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
@@ -26,7 +26,7 @@ Everything the README only touches on, one subject per page.
 - [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](plugins.md): how they work, writing your own, scheduled jobs and Discord
 - [Stream chat](chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
-- [Games](games.md): Minecraft, Zork, Vibe City, playing on her own
+- [Games](games.md): chess, Minecraft, Zork, Vibe City, REALITI, playing on her own
 - [Home and devices](devices.md): Home Assistant, Lovense, toys of most brands through Buttplug.io
 - [Development](development.md): project structure, extras
 
@@ -46,6 +46,10 @@ Everything the README only touches on, one subject per page.
 
 [Memory](memory.md) at 127.0.0.1:8792/memory/: the facts she keeps about you, to edit, retire or delete.
 
+<img width="1210" alt="The settings page: presets at the top, then each setting with a switch, slider or box" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/settings-page.png" />
+
+[Settings](configuration.md#the-settings-page) at 127.0.0.1:8792/settings/: every setting, with search and presets.
+
 ---
 
 ## Everything she does
@@ -57,6 +61,8 @@ Everything the README only touches on, one subject per page.
 - Barge-in: interrupt her mid-sentence
 - Optional wake word, so open mode needs no keypress
 - Optional vision: she can read what's on your screen, and see through your webcam when you switch it on
+- [Presence](vision.md#presence-noticing-youre-there): she notices you at the desk, says hi when you come back, looks at you, and goes quiet in an empty room
+- [People in the house](people.md): she knows who's talking by voice or face, and keeps each person's memories separate
 - Three push-to-talk modes, including hands free
 - Configurable AI personality, and moods that shift with the clock and the session
 - Long-term memory the model writes, corrects and forgets
@@ -73,6 +79,8 @@ Everything the README only touches on, one subject per page.
 - Plays Minecraft: joins your world, works towards a goal, asks when something's unclear
 - Plays Zork I, the classic text adventure, on her own or with you calling the moves
 - Plays mayor in Vibe City, building the town in your open game window while you watch
+- Plays chess against you on a board page, saying a sentence or two about each move
+- Lives in a REALITI city of AI agents, walking, talking and remembering
 - Runs your [smart home](home.md) through a Home Assistant on your own network, locks and garage doors always asking first
 - Searchable archive of every conversation, which pruning never deletes
 - Her reasoning kept per turn, with token confidence, review flags and a browser viewer
@@ -91,7 +99,9 @@ Everything the README only touches on, one subject per page.
 - An animated portrait that looks at your terminal and visibly thinks
 - Live on a [hologram fan](fans.md): streamed over WiFi to a Holoscope fan, or on any HDMI fan
 - Rotating debug log that records decisions, not just errors
-- Every setting changeable from the terminal and saved, most without a restart
+- Every setting on one page in your browser (or the terminal), with search and presets, most applied without a restart
+- An installer that picks the model for your graphics card, and a first start that asks your name
+- Her own manual: ask how to do something and she looks it up and gives the exact command
 - Diagnostics for the things that fail quietly: tool selection, prompt size, scrolling
 - Themeable full-screen terminal interface
 - Cross-platform architecture

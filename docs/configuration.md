@@ -78,12 +78,41 @@ fatal: hand-editing them is the whole point of their being JSON.
 
 ## Changing settings without leaving the terminal
 
+### The settings page
+
+`/settings` opens every setting in your browser, at
+`http://127.0.0.1:8792/settings/`: switches for on/off, drop-downs for
+choices, sliders for levels and volumes, a search box, and a line under
+each saying what it does. It opens on the everyday settings; **All**
+shows every one of the 300-odd, grouped by section with a heading per
+plugin. A green dot means it's set in your `config.json`; `↻ restart`
+means a change takes effect on the next start; `↺` puts a setting back
+to its default.
+
+**Presets** at the top change several settings at once:
+
+| Preset | For |
+|---|---|
+| Assistant | Calm and to the point: moods turned down, no sulking, no emotes |
+| Companion | Luna as designed: moods that move, a voice that follows them, emotes |
+| Streamer | Livelier on camera, chat can set off gestures, nothing lewd while live |
+
+A preset is a starting point, not a mode: it saves its values like any
+other change, and you can change any of them after. `/preset` lists
+them, `/preset assistant` applies one from the terminal.
+
+The page is served by Luna on your computer only (the live monitor's
+server, `monitor.enabled`). Other sites open in your browser can't
+change your settings: a change needs a key that only the page itself
+carries, and requests from anywhere else are refused. Passwords, tokens
+and keys are never sent to the page, only whether one is set.
+
 ### The settings pane
 
-Press **Tab three times** (conversation, help, tools, then settings).
-It lists every setting `config.json` can hold, over 300 of them, grouped
-by section, with a heading per plugin. Each row shows the name, its value
-and a line saying what it does:
+Press **Tab three times** (conversation, help, tools, then settings)
+for the everyday settings without leaving the terminal. `a` switches to
+all of them, and a filter (`/`) always searches all of them. Each row
+shows the name, its value and a line saying what it does:
 
 ```
  Listening
@@ -104,6 +133,7 @@ and a line saying what it does:
 | Enter | The same, or open a box to type a value: a number, text, or a comma-separated list |
 | `/` | Filter: only the settings whose name or line matches, narrowing as you type. Esc clears it |
 | `x` | Back to the default: takes the setting out of `config.json` (after a restart) |
+| `a` | Everyday settings, or all of them |
 | Esc | Cancel the edit box, clear the filter, then close the pane |
 
 Values are checked before they're saved: a number has to be a number, a

@@ -1,12 +1,15 @@
-"""The settings pane (Tab, three times): every setting config.json can hold,
-grouped by section, each with its value, a line saying what it does and
-whether a change applies now or on a restart.
+"""The settings pane (Tab, three times): the everyday settings, grouped by
+section, each with its value, a line saying what it does and whether a
+change applies now or on a restart. `a` shows every setting config.json
+can hold; a filter always searches all of them. The full list is nicer
+in a browser: the settings page (settings_web.py, /settings).
 
     up/down, PgUp/PgDn   pick a setting
     space                flip an on/off, step through a choice
     enter                the same, or type a new value (numbers, text, lists)
     /                    filter: only the settings whose name or line matches
     x                    back to the default (takes it out of config.json)
+    a                    everyday settings / all of them
 
 What a setting is comes from config/schema.py; which ones apply live comes
 from config.SETTINGS, the same table /set uses, so the pane and /set can
@@ -16,6 +19,7 @@ Part of the ui package; see ui/__init__.py.
 """
 import json
 import os
+import re
 
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.layout.controls import FormattedTextControl
@@ -94,6 +98,12 @@ def describe(path):
         return entry[0], entry[1], tuple(entry[2]) if len(entry) > 2 and entry[2] else ()
 
     value = _value(path)[0]
+
+    # a key the schema doesn't know whose name says it's a login: hide it
+    if re.search(r"(token|password|passwd|secret|api_?key|auth|cookie)", path.split(".")[-1], re.I) \
+            and not isinstance(value, (bool, int, float)):
+        return "secret", "", ()
+
     kind = ("bool" if isinstance(value, bool) else "int" if isinstance(value, int)
             else "float" if isinstance(value, float) else "list" if isinstance(value, list)
             else "dict" if isinstance(value, dict) else "text")
@@ -118,10 +128,14 @@ def _value(path):
 
 def _rows():
     """The settings shown, in order, after the filter: (path, group key, title)."""
+    from config.schema import BASIC
+
     needle = (view.set_filter or "").lower().strip()
     rows = []
 
     for path in _all_paths():
+        if not needle and not view.set_all and path not in BASIC:
+            continue
         if needle:
             _kind, line, _choices = describe(path)
 
@@ -253,11 +267,26 @@ def _fragments():
     return fragments
 
 
+def _web():
+    import config
+
+    if not getattr(config, "MONITOR_ENABLED", True):
+        return ""
+    try:
+        import settings_web
+
+        return settings_web.url()
+    except Exception:
+        return ""
+
+
 def _header():
     shown = len(_rows())
     total = len(_all_paths())
-    count = f"{shown} of {total}" if view.set_filter else f"{total} settings"
+    count = (f"{shown} of {total}" if view.set_filter else
+             f"all {total} settings" if view.set_all else f"{shown} everyday settings")
     flt = f'  filter: "{view.set_filter}" (Esc clears)' if view.set_filter else ""
+    web = _web()
 
     return [
         ("class:label", f" {count}"), ("class:dim", flt),
@@ -266,8 +295,16 @@ def _header():
         ("class:key", "enter"), ("class:dim", " edit  "),
         ("class:key", "/"), ("class:dim", " filter  "),
         ("class:key", "x"), ("class:dim", " default  "),
-        ("class:dim", view.set_status or ""),
+        ("class:key", "a"), ("class:dim", " everyday/all  "),
+        ("class:dim", view.set_status or (f"every setting, with sliders: {web}" if web else "")),
     ]
+
+
+def toggle_all():
+    """a: the everyday settings, or every one of them."""
+    view.set_all = not view.set_all
+    view.set_cursor = view.set_scroll = 0
+    _refresh()
 
 
 def _height():

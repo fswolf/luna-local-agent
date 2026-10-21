@@ -229,5 +229,5 @@ git). Enroll again in different light if she's unsure of you.
 | `recognise` | `true` | Match faces to enrolled people |
 | `match` | `0.36` | How alike a face must be to count as someone (higher is stricter) |
 
-All of them are in the settings pane too. Presence needs a webcam on
+All of them are on the settings page (`/settings`) too. Presence needs a webcam on
 the same machine, not a camera server.

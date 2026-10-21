@@ -13,6 +13,7 @@ without asking first - system packages show the exact command and wait.
     --voice X            install (default), url:http://host:port, or skip
     --gpu X              auto (default), cpu, cuda, rocm - for the voice server
     --extras a,b         wakeword, mcp, portrait, live2d, embeddings, reranker, chat, camera, voices  (or "all")
+    --model X            auto (default: picked for your GPU's memory), skip, or a size: 4b, 9b-q4, 9b, 27b...
     --no-system          don't install system packages, just say which are missing
     --check              only run the health check
 """
@@ -536,6 +537,182 @@ def backend(state):
 
 
 # ---------------------------------------------------------------------------
+# 5b. Her model, picked for this machine
+#
+# Which model and how big is the question most people stall on, so the
+# installer answers it: it reads how much video memory there is and
+# picks the biggest Qwen model that fits with room for her context and
+# her eyes (the vision adapter). Qwen 3.5/3.6: Apache-2.0, tool calling,
+# vision. The files are bartowski's GGUFs on Hugging Face.
+# ---------------------------------------------------------------------------
+HF = "https://huggingface.co/{repo}/resolve/main/{file}"
+
+# (key, label, repo, file, GB, mmproj or "", least VRAM it wants, context, LM Studio name@quant)
+MODELS = (
+    ("27b-q6", "Qwen3.5 27B, Q6_K", "bartowski/Qwen_Qwen3.5-27B-GGUF", "Qwen_Qwen3.5-27B-Q6_K.gguf", 23.7,
+     "mmproj-Qwen_Qwen3.5-27B-f16.gguf", 30, 16384, "qwen3.5-27b@q6_k"),
+    ("27b", "Qwen3.5 27B, Q4_K_M", "bartowski/Qwen_Qwen3.5-27B-GGUF", "Qwen_Qwen3.5-27B-Q4_K_M.gguf", 18.0,
+     "mmproj-Qwen_Qwen3.5-27B-f16.gguf", 22, 16384, "qwen3.5-27b@q4_k_m"),
+    ("9b", "Qwen3.5 9B, Q8_0", "bartowski/Qwen_Qwen3.5-9B-GGUF", "Qwen_Qwen3.5-9B-Q8_0.gguf", 9.8,
+     "mmproj-Qwen_Qwen3.5-9B-f16.gguf", 14, 16384, "qwen3.5-9b@q8_0"),
+    ("9b-q6", "Qwen3.5 9B, Q6_K", "bartowski/Qwen_Qwen3.5-9B-GGUF", "Qwen_Qwen3.5-9B-Q6_K.gguf", 8.0,
+     "mmproj-Qwen_Qwen3.5-9B-f16.gguf", 11, 16384, "qwen3.5-9b@q6_k"),
+    ("9b-q4", "Qwen3.5 9B, Q4_K_M", "bartowski/Qwen_Qwen3.5-9B-GGUF", "Qwen_Qwen3.5-9B-Q4_K_M.gguf", 6.2,
+     "", 7.5, 8192, "qwen3.5-9b@q4_k_m"),
+    ("4b", "Qwen3.5 4B, Q6_K", "bartowski/Qwen_Qwen3.5-4B-GGUF", "Qwen_Qwen3.5-4B-Q6_K.gguf", 3.8,
+     "mmproj-Qwen_Qwen3.5-4B-f16.gguf", 6, 8192, "qwen3.5-4b@q6_k"),
+    ("4b-q4", "Qwen3.5 4B, Q4_K_M", "bartowski/Qwen_Qwen3.5-4B-GGUF", "Qwen_Qwen3.5-4B-Q4_K_M.gguf", 3.0,
+     "", 0, 8192, "qwen3.5-4b@q4_k_m"),
+)
+
+
+def _gb(n):
+    return round(n / (1 << 30), 1)
+
+
+def detect_vram():
+    """(GB of memory her model can use, where that came from), or (0, why)."""
+    if shutil.which("nvidia-smi"):
+        try:
+            out = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                                 capture_output=True, text=True, timeout=10).stdout
+            mib = max(int(x) for x in out.split() if x.strip().isdigit())
+            return round(mib / 1024, 1), "NVIDIA"
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    if SYSTEM == "Darwin":
+        try:
+            ram = int(subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True).stdout)
+        except (OSError, ValueError):
+            return 0, "couldn't read this Mac's memory"
+        if platform.machine() != "arm64":
+            return 0, "Intel Mac: the model runs on the CPU"
+        # Apple Silicon shares memory with everything else: about two thirds is hers
+        return round(_gb(ram) * 0.65, 1), f"Apple Silicon, {_gb(ram)} GB shared"
+    if SYSTEM == "Linux":
+        import glob
+
+        sizes = []
+        for f in glob.glob("/sys/class/drm/card*/device/mem_info_vram_total"):
+            try:
+                with open(f) as fh:
+                    sizes.append(int(fh.read().strip()))
+            except (OSError, ValueError):
+                continue
+        if sizes:
+            return _gb(max(sizes)), "AMD"
+    if WIN:
+        try:
+            import winreg
+
+            best = 0
+            key = r"SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key) as root:
+                for i in range(64):
+                    try:
+                        with winreg.OpenKey(root, f"{i:04d}") as sub:
+                            best = max(best, int(winreg.QueryValueEx(sub, "HardwareInformation.qwMemorySize")[0]))
+                    except OSError:
+                        continue
+            if best:
+                return _gb(best), "graphics card"
+        except Exception:
+            pass
+    return 0, "no graphics memory found"
+
+
+def pick_model(vram):
+    """The biggest model that fits vram GB (the smallest when nothing does)."""
+    for m in MODELS:
+        if vram >= m[6]:
+            return m
+    return MODELS[-1]
+
+
+def _model_by_key(key):
+    return next((m for m in MODELS if m[0] == key), None)
+
+
+def _write_local_env(values):
+    """llama/server.local.env: this machine's model, read after server.env."""
+    path = os.path.join(ROOT, "llama", "server.local.env")
+    lines = ["# Written by the installer for this machine (not committed). Edit freely."]
+    lines += [f'{k}="{v}"' if isinstance(v, str) else f"{k}={v}" for k, v in values.items()]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return path
+
+
+def model(state):
+    step("Her model")
+    choice = (ARGS.model or "auto").lower()
+    if choice == "skip" or state.get("backend") == "skip":
+        note("model", False, "skipped")
+        return
+
+    vram, where = detect_vram()
+
+    # run again: the model from last time stays unless one is asked for by name
+    done = _model_by_key(state.get("model") or "")
+    if choice == "auto" and done:
+        here = os.path.exists(os.path.join(ROOT, "llama", "models", done[3]))
+        if state.get("backend") != "llama" or here:
+            ok(f"{done[1]} (set up last time; --model <size> picks another)")
+            return
+
+    m = _model_by_key(choice) if choice != "auto" else pick_model(vram)
+    if m is None:
+        warn(f"no model called {choice} - picking for this machine")
+        m = pick_model(vram)
+
+    key, label, repo, file, size, mmproj, _least, ctx, lms_name = m
+    if vram:
+        ok(f"{vram} GB to work with ({where})")
+    else:
+        warn(f"{where} - picking a small model that also runs on the CPU (slower)")
+    print(f"  {label}: {size} GB{', with vision' if mmproj else ''}, {ctx // 1024}k context")
+
+    if not ARGS.yes and choice == "auto":
+        options = [(m[0], f"{m[1]} ({m[4]} GB{', sees' if m[5] else ''})"
+                    + (" - too big for this machine" if vram and m[6] > vram else "")) for m in MODELS]
+        key = choose("Which model?", options, key)
+        key, label, repo, file, size, mmproj, _least, ctx, lms_name = _model_by_key(key)
+
+    if state.get("backend") == "llama":
+        dest_dir = os.path.join(ROOT, "llama", "models")
+        dest = os.path.join(dest_dir, file)
+        got = os.path.exists(dest) or (ask(f"Download {label} ({size} GB) into llama/models?")
+                                       and download(HF.format(repo=repo, file=file), dest))
+        if got and mmproj and not os.path.exists(os.path.join(dest_dir, mmproj)):
+            download(HF.format(repo=repo, file=mmproj), os.path.join(dest_dir, mmproj))
+        if not got:
+            note("model", False, "not downloaded - put a GGUF in llama/models")
+            return
+        local = os.path.join(ROOT, "llama", "server.local.env")
+        if os.path.exists(local) and not ask("llama/server.local.env exists - point it at this model?", default=False):
+            note("model", True, f"{label} in llama/models (server.local.env left as it was)")
+            return
+        mm = os.path.join(dest_dir, mmproj) if mmproj and os.path.exists(os.path.join(dest_dir, mmproj)) else "off"
+        _write_local_env({"MODEL": dest, "MMPROJ": mm, "CTX": ctx, "ALIAS": ""})
+        state["model"] = key
+        note("model", True, f"{label}, set in llama/server.local.env")
+        return
+
+    # LM Studio: its own command line can fetch it
+    lms = shutil.which("lms") or next((p for p in (os.path.expanduser("~/.lmstudio/bin/lms"),
+                                                  os.path.expanduser("~/.lmstudio/bin/lms.exe"))
+                                       if os.path.exists(p)), None)
+    if lms and ask(f"Download {label} with LM Studio ({size} GB)?"):
+        good = run([lms, "get", lms_name, "--gguf"])
+        state["model"] = key if good else state.get("model")
+        note("model", good, f"{label} in LM Studio - load it and start the server"
+             if good else "LM Studio couldn't fetch it - search it in the app")
+    else:
+        print(f"  In LM Studio: search \"{lms_name.split('@')[0]}\" and pick {lms_name.split('@')[1].upper()}.")
+        note("model", False, f"get {label} in LM Studio")
+
+
+# ---------------------------------------------------------------------------
 # 6. Extras that aren't pip packages
 # ---------------------------------------------------------------------------
 def extras_files(extras):
@@ -706,6 +883,7 @@ def main():
     ap.add_argument("--voice", default="install")
     ap.add_argument("--gpu", default="auto", choices=["auto", "cpu", "cuda", "rocm", "mps"])
     ap.add_argument("--extras", default=None)
+    ap.add_argument("--model", default="auto")
     ap.add_argument("--no-system", action="store_true")
     ap.add_argument("--check", action="store_true")
     ARGS = ap.parse_args()
@@ -743,6 +921,8 @@ def main():
     voice(state, gpu)
     save_state(state)
     backend(state)
+    model(state)
+    save_state(state)
     extras_files(extras)
     if py:
         launchers(state)

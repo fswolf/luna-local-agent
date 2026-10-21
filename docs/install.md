@@ -28,12 +28,31 @@ system:
    already answering on :8899, it uses that instead.
 5. **Her brain.** LM Studio (it tells you what to click), or llama.cpp
    built here (Linux) for the research features.
-6. **Extras, pick any:** wake word, MCP, portrait tools, Live2D runtime,
+6. **Her model, picked for your machine.** It reads how much graphics
+   memory you have and offers the biggest model that fits, with room for
+   her context and her eyes:
+
+   | Graphics memory | Model | Download |
+   |---|---|---|
+   | 32 GB and up | Qwen3.5 27B, Q6_K, sees | 24 GB |
+   | 22-31 GB | Qwen3.5 27B, Q4_K_M, sees | 18 GB |
+   | 14-21 GB | Qwen3.5 9B, Q8_0, sees | 10 GB |
+   | 11-13 GB | Qwen3.5 9B, Q6_K, sees | 8 GB |
+   | 8-10 GB | Qwen3.5 9B, Q4_K_M | 6 GB |
+   | 6-7 GB | Qwen3.5 4B, Q6_K, sees | 4 GB |
+   | less, or none | Qwen3.5 4B, Q4_K_M (runs on the CPU) | 3 GB |
+
+   Apple Silicon counts about two thirds of its shared memory. You can
+   pick another from the list. With llama.cpp it downloads the model
+   into `llama/models` and points `llama/server.local.env` at it; with
+   LM Studio it fetches it through LM Studio's own `lms` command, or
+   tells you what to search for. All Apache-2.0, with tool calling.
+7. **Extras, pick any:** wake word, MCP, portrait tools, Live2D runtime,
    embedding model, the pomf chat plugin.
-7. **Launchers.** A `luna` command and an app-launcher entry on Linux,
+8. **Launchers.** A `luna` command and an app-launcher entry on Linux,
    `Luna.command` on macOS, `luna.cmd` and a Start menu shortcut on
    Windows.
-8. **A health check**, then a summary of what's ready and what isn't.
+9. **A health check**, then a summary of what's ready and what isn't.
 
 Then start her:
 
@@ -44,6 +63,14 @@ luna            # or ./start.sh, or luna.cmd on Windows
 The launcher starts her voice server too if the installer set one up,
 and stops it again when she exits. One you were already running is
 left alone.
+
+**The first time**, before anything else, she asks three things: what
+to call you, your pronouns, and what you mostly want her for
+(Assistant, Companion or Streamer, see
+[presets](configuration.md#the-settings-page)). Type the answers; `skip`
+passes on one, `/skip` on all of it. Your name and pronouns go into
+`agent/agent.json`'s `user` block, where you can change them later, and
+she doesn't ask again.
 
 **Updating:** `./update.sh` gets the latest version. It saves a copy of
 your `config.json` in `agent/backups/` first, pulls the update while
@@ -77,7 +104,8 @@ where it left off and only does what's missing. `--yes` takes every
 default, and `--check` only runs the health check. Other options:
 `--backend lmstudio|llama|skip`,
 `--voice install|url:http://host:port|skip`,
-`--gpu auto|cpu|cuda|rocm`, `--extras wakeword,mcp,portrait,...`.
+`--gpu auto|cpu|cuda|rocm`, `--extras wakeword,mcp,portrait,...`,
+`--model auto|skip|4b|9b-q4|9b|27b...`.
 `python installer/uninstall.py` removes what it added and never touches
 your memory, history or settings.
 

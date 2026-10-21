@@ -339,6 +339,11 @@ def handle_input(text):
         ui.stop()
         return
 
+    import firstrun
+
+    if firstrun.handle(text):           # the first-start questions (firstrun.py)
+        return
+
     if text == "/clear":
         ui.clear()
         history.clear()
@@ -554,7 +559,36 @@ def handle_input(text):
             )
         return
 
-    if text.startswith("/set"):
+    if text == "/settings":
+        import webbrowser
+
+        import settings_web
+
+        if not config.MONITOR_ENABLED:
+            ui.add_message("system", "The settings page needs the live monitor - set monitor.enabled "
+                           "to true in config.json and restart. Tab three times has the everyday ones.")
+            return
+
+        webbrowser.open(settings_web.url())
+        ui.add_message("system", f"Settings: {settings_web.url()}")
+        return
+
+    if text == "/preset" or text.startswith("/preset "):
+        import settings_web
+        from config.presets import PRESETS
+
+        name = text[len("/preset"):].strip().lower()
+
+        if not name:
+            ui.add_message("system", "\n".join(
+                ["Presets (/preset <name>):"] + [f"  {n}: {p['about']}" for n, p in PRESETS.items()]))
+            return
+
+        _ok, said, _entry = settings_web.preset(name)
+        ui.add_message("system", said)
+        return
+
+    if text == "/set" or text.startswith("/set "):
         parts = text.split(None, 2)
 
         if len(parts) == 1:
@@ -1594,6 +1628,10 @@ def handle_input(text):
 
     threading.Thread(target=_process, args=(text, interrupts.open("typed")), daemon=True).start()
 
+
+import firstrun  # noqa: E402
+
+firstrun.maybe_start()          # a fresh install: her name for you, pronouns, a preset
 
 ui.run(on_submit=handle_input, on_hotkey=lambda: ptt.toggle(MODEL))
 

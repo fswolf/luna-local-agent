@@ -92,7 +92,7 @@ are OpenCV's YuNet and SFace. All of them download once into
 | `people.voice_match` | `0.3` | How alike a voice must be to count as someone, 0-1. Raise it if she mixes people up, lower it if she doesn't recognise you |
 | `camera.presence.match` | `0.36` | The same for faces |
 
-All of them are in the settings pane.
+All of them are on the settings page (`/settings`).
 
 **Getting it right:**
 

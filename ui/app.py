@@ -214,6 +214,10 @@ def _build_keys():
     def _(event):
         settings_pane.reset()
 
+    @keys.add("a", filter=in_settings)
+    def _(event):
+        settings_pane.toggle_all()
+
     @keys.add(" ", filter=Condition(lambda: view.pane == "tools" and not approving()))
     def _(event):
         _tool_toggle()

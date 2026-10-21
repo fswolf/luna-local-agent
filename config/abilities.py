@@ -61,8 +61,8 @@ _tools_cfg = setting("tools", {})
 TOOLS_ROUTING = bool(_tools_cfg.get("routing", True))
 TOOLS_ROUTE_GROUPS = int(_tools_cfg.get("route_groups", 3))
 TOOLS_STICKY_TURNS = int(_tools_cfg.get("sticky_turns", 3))
-_core = _tools_cfg.get("core", ["Time", "Math", "Reminders", "Memory", "Shell"])
-TOOLS_CORE = list(_core) if isinstance(_core, (list, tuple)) else ["Time", "Math", "Reminders", "Memory", "Shell"]
+_core = _tools_cfg.get("core", ["Time", "Math", "Reminders", "Memory", "Shell", "Help"])
+TOOLS_CORE = list(_core) if isinstance(_core, (list, tuple)) else ["Time", "Math", "Reminders", "Memory", "Shell", "Help"]
 # The opt-in tools (tools.OPT_IN, the camera) switched on - an on-list,
 # so they stay off until you choose them. Its own key: tools.enabled is
 # the master switch further down.

@@ -494,3 +494,15 @@ SCHEMA = {
     "plugins.chess.think_seconds": ("float", "Pause in seconds before her move, so it doesn't snap in"),
     "plugins.chess.turn_seconds": ("float", "Longest one of her turns may run before it is cut short, in seconds"),
 }
+
+# The everyday settings: what the terminal's settings pane shows first
+# (`a` there shows all of them), and what the web settings page opens on.
+BASIC = (
+    "voice", "tts.speed", "tts.volume",
+    "stt.mode", "stt.sensitivity", "stt.silence_seconds", "stt.language", "wake_word.enabled",
+    "mood.enabled", "mood.intensity", "mood.walk_away",
+    "portrait.frame", "portrait.gestures", "portrait.touch_talk",
+    "camera.presence.enabled", "people.voice",
+    "vision.enabled", "knowledge.enabled", "reminders.enabled", "alarms.volume",
+    "long_term_memory.enabled", "self.greet", "thoughts.enabled", "ui.mouse",
+)

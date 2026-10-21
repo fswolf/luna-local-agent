@@ -240,6 +240,8 @@ _HELP_SECTIONS = [
         "option - F2 and text selection go back to normal on the way out.",
         ("/mouse", "same as F2, and saves the choice"),
         ("/set", "alone lists every setting with its value; /set a.b x"),
+        ("/settings", "every setting in your browser: switches, sliders, search, presets"),
+        ("/preset", "assistant, companion or streamer: several settings at once"),
         "                changes one, saved to config.json, most apply live.",
         "the settings pane (Tab three times) lists every setting there is,",
         "grouped, each with what it does: space flips or steps, enter edits,",

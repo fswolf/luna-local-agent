@@ -193,6 +193,7 @@ _GROUPS = (
               "reflect_now", "save_skill")),
     ("Projects", ("start_project", "update_project", "project_notes")),
     ("Games", ("game_note",)),
+    ("Help", ("read_manual",)),
 )
 
 
@@ -395,4 +396,5 @@ from . import shell      # noqa: E402,F401
 from . import mail       # noqa: E402,F401
 from . import textures   # noqa: E402,F401
 from . import network    # noqa: E402,F401
+from . import manual     # noqa: E402,F401
 from . import routing    # noqa: E402,F401

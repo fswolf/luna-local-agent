@@ -12,6 +12,10 @@ what's usually called RAG (retrieval-augmented generation): before she
 answers, the passages that match the question are found and handed to
 her, so she works from your documents instead of guessing.
 
+Questions about Luna herself ("how do I get you to play chess?") don't
+need any of this: she has her own manual built in, these docs, and looks
+things up in it with `read_manual` ([Tools](tools.md)).
+
 Everything stays on your machine. The files are read where they are,
 and the index is a cache next to her other caches.
 

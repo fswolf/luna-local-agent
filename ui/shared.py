@@ -51,6 +51,7 @@ view = SimpleNamespace(
     set_scroll=0,
     set_window=None,
     set_filter="",        # only settings matching this, "" for all
+    set_all=False,        # every setting, not just the everyday ones (config.schema.BASIC)
     set_editing=None,     # the edit box: {"mode": "value"|"filter", "path", "text"}
     set_status="",        # the last change, in the pane's header
     set_editor=None,      # the edit box's TextArea, and the main input box

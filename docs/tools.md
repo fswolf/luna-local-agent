@@ -28,6 +28,7 @@ check the time, then schedule something.
 | `find_device` / `scan_network` | A machine's IP on your network, by name or MAC, remembered by MAC ([Sysadmin](sysadmin.md#finding-machines-on-your-network)) |
 | `check_email` / `read_email` / `search_email` | Your inbox, read-only: nothing gets marked read ([Email](email.md)) |
 | `search_docs` | Your own notes, manuals and PDFs, by meaning, with the file it came from ([Knowledge](knowledge.md)) |
+| `read_manual` | Her own manual (these docs): what she can do and the exact command or setting for it, so "how do I get you to play chess?" gets `/chess on` |
 | `make_texture` | New textures for her 3D model through ComfyUI, from a template ([Textures](textures.md)) |
 | `send_email` | Send or reply as you: **off until you switch it on, then you approve every one** |
 | `read_page` | Open a link and read it, not just the search snippet |
@@ -58,8 +59,8 @@ model picks worse from forty tools than from ten. So with routing on
 (the default), you leave tools on and each turn is sent only the
 groups it seems to need:
 
-1. **Core groups, always:** Time, Math, Reminders, Memory and Shell
-   (`tools.core`).
+1. **Core groups, always:** Time, Math, Reminders, Memory, Shell and
+   Help (`tools.core`).
 2. **What you said:** groups that match your message by meaning,
    through the embedding server. "Is the tower up?" brings Network;
    "check my inbox" brings Email. Without an embedding server nothing is

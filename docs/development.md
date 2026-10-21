@@ -15,7 +15,9 @@ ai-voice/
 │   ├── base.py       #   where things are read from, and her persona
 │   ├── server.py     #   the model server, embeddings, reranking
 │   ├── voice.py, desk.py, listening.py, abilities.py, moods.py,
-│   └── permissions.py, chat.py, mind.py, portrait.py, actions.py
+│   ├── permissions.py, chat.py, mind.py, portrait.py, actions.py
+│   ├── schema.py     #   what every setting is: its kind, choices and the line explaining it; BASIC
+│   └── presets.py    #   Assistant, Companion, Streamer: several settings at once
 ├── control.py
 ├── desktop.py
 ├── diagnose.py
@@ -46,6 +48,12 @@ ai-voice/
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── embedmem.py       # recalling facts by meaning (and reranking), when those servers are up
 ├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792 (and /portrait)
+├── settings_web.py   # the settings page - /settings, 127.0.0.1:8792/settings/
+├── firstrun.py       # the first start: your name, pronouns and a preset
+├── presence.py       # the webcam watching: arrivals, where you are, an empty room
+├── people.py         # who's who: face and voice prints, each person's own facts (agent/people/)
+├── voices.py         # whose voice it is, by SpeechBrain's speaker model
+├── holofan.py        # hologram fans: the Holoscope WiFi protocol, and a pretend fan to test with
 ├── portrait/         # her animated portrait
 │   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
 │   │                 #   look.js (where she looks), emotes.js (hearts, sweat drop...),
@@ -75,6 +83,8 @@ ai-voice/
 │   ├── home.py       # your smart home, through a local Home Assistant
 │   ├── zork.py       # she plays Zork I - /zork, saves in agent/zork/
 │   ├── vibecity.py   # she plays mayor in an open Vibe City window (its AI Player server)
+│   ├── chessgame.py  # chess against her on a board page - /chess
+│   ├── realiti.py    # she lives in a REALITI city of AI agents
 │   └── discord.py    # remote access for the owner over Discord
 ├── ptt.py
 ├── reminders.py
@@ -92,7 +102,8 @@ ai-voice/
 │   ├── desktop.py
 │   ├── web.py
 │   ├── shell.py      # run_command - every command asks
-│   └── introspect.py # the Self group - introspect, self_status, recall_episodes, note_lesson, reflect_now
+│   ├── introspect.py # the Self group - introspect, self_status, recall_episodes, note_lesson, reflect_now
+│   └── manual.py     # read_manual - her own docs, so she can say how to use her
 ├── transcript.py
 ├── ui/               # the TUI (prompt_toolkit), one job per file:
 │   ├── shared.py     #   the conversation, the status fields, where the view is
@@ -101,6 +112,7 @@ ai-voice/
 │   ├── conversation_pane.py # the conversation pane and the status bar
 │   ├── help.py       #   the help pane
 │   ├── tools_pane.py #   the tools pane
+│   ├── settings_pane.py # the settings pane: the everyday settings, `a` for all
 │   ├── approval.py   #   the permission popup (ask_approval)
 │   └── app.py        #   style, keys, run(), stop()
 ├── vision.py
