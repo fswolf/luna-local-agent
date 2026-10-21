@@ -26,6 +26,7 @@ models fetched once into ~/.cache/ai-voice/models). Until YuNet is there,
 OpenCV's own Haar detector stands in: it finds faces but can't tell whose.
 """
 import os
+import sys
 import threading
 import time
 import urllib.request
@@ -323,16 +324,27 @@ def _loop(cv2, stopping):
     faces = _faces_for(cv2)
     cap = None
     try:
-        with camera._lock:
-            # full size, so look_at_camera's picture is as sharp as its own;
-            # faces are looked for in a WIDTH-wide copy
-            cap = camera._open(cv2, camera._device(), int(getattr(config, "CAMERA_WIDTH", 1280)))
+        # macOS asks for camera permission on the first open and fails that
+        # one while the question is up: try again for a while before giving up
+        for attempt in range(6):
+            with camera._lock:
+                # full size, so look_at_camera's picture is as sharp as its own;
+                # faces are looked for in a WIDTH-wide copy
+                cap = camera._open(cv2, camera._device(), int(getattr(config, "CAMERA_WIDTH", 1280)))
+            if cap.isOpened() or stopping.wait(5):
+                break
+            cap.release()
         if not cap.isOpened():
             _state["error"] = f"couldn't open camera {camera._device()}." + camera._hint()
             return
+        # Linux keeps one frame queued (camera._open); Windows and macOS keep
+        # several, so at a few checks a second each read would be a second old
+        stale = 0 if sys.platform.startswith("linux") else 3
         logbook.info("presence", "watching camera %s", camera._device())
         while not stopping.is_set():
             began = time.monotonic()
+            for _ in range(stale):
+                cap.grab()
             ok, img = cap.read()
             if not ok or img is None:
                 _state["error"] = "the camera stopped sending pictures"

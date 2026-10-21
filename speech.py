@@ -207,6 +207,11 @@ def _calibrate(stream):
     return readings[len(readings) // 4] if readings else 0.0
 
 
+# The turn's recording, for Whisper. The system's temp folder: "/tmp" is
+# C:\tmp on Windows, which doesn't exist.
+_INPUT_WAV = os.path.join(tempfile.gettempdir(), "luna-input.wav")
+
+
 def _record_energy(mode):
     """RMS fallback. Only loudness to work with, so it is late to start
     and prone to cutting off - see _record_silero for the good path."""
@@ -311,7 +316,7 @@ def _record_energy(mode):
     if speech_seconds < MIN_SPEECH_SECONDS:
         return None
 
-    filename = "/tmp/input.wav"
+    filename = _INPUT_WAV
     write(filename, SAMPLE_RATE, recorded)
 
     return filename
@@ -412,7 +417,7 @@ def _record_silero(mode):
 
         return None
 
-    filename = "/tmp/input.wav"
+    filename = _INPUT_WAV
     write(filename, SAMPLE_RATE, recorded)
 
     return filename

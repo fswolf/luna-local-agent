@@ -199,6 +199,13 @@ friendlier tour of her at [luna.imbored.me](https://luna.imbored.me/).
 
 ---
 
+# Support her
+
+If Luna's useful or fun to you, you can [sponsor her development](https://github.com/sponsors/fswolf).
+It goes toward her own home server: a second GPU so she can run bigger, smarter models.
+
+---
+
 # License
 
 MIT License
