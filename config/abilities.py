@@ -81,7 +81,8 @@ if isinstance(_old_enabled, (list, tuple)):
 # Her knowledge base (knowledge.py): folders of your notes, manuals,
 # PDFs and docs she can look things up in. The index is a cache outside
 # the repo (~/.cache/ai-voice/knowledge.db). The default folder is
-# agent/knowledge/ beside her other files, gitignored like the rest.
+# agent/knowledge/ beside her other files. It ships with the repo as a
+# starter knowledge base (game guides and the like).
 #   "knowledge": { "enabled": true, "folders": ["agent/knowledge"], "auto": true,
 #                  "auto_passages": 2, "min_score": 0.55, "rescan_minutes": 10 }
 _knowledge_cfg = setting("knowledge", {})

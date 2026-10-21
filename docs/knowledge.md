@@ -47,8 +47,9 @@ knowledge folder. `/knowledge` lists what she skipped and why.
 
 The default is `agent/knowledge` inside the ai-voice folder, next to
 her memory and her other files, made on first start with a short README
-inside. Like the rest of `agent/`, it's kept out of git, so your notes
-never end up on GitHub.
+inside. It comes with a starter knowledge base, game guides and the
+like, and it's part of the repo: anything you add there is pushed with
+it, so keep private notes in a folder of your own (`/knowledge add`).
 
 | System | Default folder | Index (a cache she rebuilds) |
 |--------|----------------|------------------------------|
