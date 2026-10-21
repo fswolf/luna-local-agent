@@ -7,6 +7,7 @@
 # luna-local-agent
 
 [![Tests](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml)
+[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/fswolf)
 
 **A local voice companion you can see inside: reasoning, confidence and
 memory, all on your own machine.**
