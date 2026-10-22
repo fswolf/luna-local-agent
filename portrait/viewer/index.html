@@ -59,7 +59,21 @@
   .docktab:hover { border-color: var(--accent); }
   /* the pose studio */
   #studio { left: auto; right: 8px; top: 8px; width: 430px; height: 80vh; }
-  .tabs button.on { border-color: var(--accent); color: var(--accent); }
+  /* top of the studio: what you're editing, the view, the timeline; then real tabs */
+  .shead { padding: 6px 0 4px; border-bottom: 1px solid #3a2d55; }
+  .shead select { max-width: 170px; }
+  .now { margin: 4px 0 2px; padding: 4px 8px; border-radius: 6px; background: #1a1328; color: var(--text); }
+  .now.dirty { box-shadow: inset 3px 0 0 #ffd36b; }
+  .tabs { display: flex; gap: 2px; margin: 8px -10px 0; padding: 0 10px; border-bottom: 1px solid #4a3a70;
+          position: sticky; top: 30px; background: #120d1cf2; z-index: 1; }
+  .panel .tabs button { flex: 1; margin: 0; padding: 6px 4px; border: 1px solid transparent; border-bottom: none;
+                        border-radius: 6px 6px 0 0; background: transparent; color: var(--dim); }
+  .panel .tabs button:hover { color: var(--text); border-color: transparent; background: #1a1328; }
+  .panel .tabs button.on { background: #2a2040; color: var(--accent); border-color: #4a3a70; font-weight: 600;
+                           position: relative; top: 1px; }
+  .page { padding-top: 6px; }
+  .panel button.unsaved { border-color: #ffd36b; color: #ffd36b; }   /* something waiting to be saved */
+  .page > .dim:first-child { margin-bottom: 6px; }
   .keys { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; }
   .keys button.on { background: var(--accent); color: #120d1c; }
   .row { margin: 3px 0; }

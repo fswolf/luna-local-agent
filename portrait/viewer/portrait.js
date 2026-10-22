@@ -1377,10 +1377,14 @@ function debugPanel() {
       const play = () => { if (sel.value) buttons[sel.value](); sel.title = tips[sel.value] || ''; };
       sel.onchange = play;
       again.textContent = '▶'; again.title = 'play it again'; again.onclick = play;
+      // this menu plays; ✎ opens the picked one in the pose studio to change it
+      const edit = document.createElement('button');
+      edit.textContent = '✎ edit'; edit.title = 'open it in the pose studio';
+      edit.onclick = () => { const n = sel.value.replace(/ /g, '_'); if (n) studio?.open(n); else studio?.show(); };
       const key = document.createElement('div');
       key.className = 'dim';
-      key.textContent = '🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
-      box.append(sel, again, key);
+      key.textContent = 'pick to play · ✎ edit opens it in the pose studio · 🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
+      box.append(sel, again, edit, key);
       continue;
     }
     for (const label of list) {

@@ -1,16 +1,19 @@
 // The pose studio (debug viewer only): make and edit gestures without code.
 //
-//   pose     click a part of her (or pick a bone), drag x / y / z / twist,
-//            mirror to the other side, face sliders. Copy gives the lines.
-//   animate  keyframes on a timeline: posing at a time makes a key there
-//            (or changes the one that's there). Scrub, play, loop.
-//   details  name, what it's for, when it plays (touches, moods), flags,
-//            sound, emotes, tail.
-//   link     a chain: gestures one after another, saved as one.
-//   prop     something in her hand (props.js): pick it, move and turn it in
+// Always at the top: which gesture you're editing (pick one to open it),
+// save, undo, a line saying where you are, the view, and the timeline with
+// play - so the time you pose at is never on another page. Then the tabs:
+//
+//   Pose     click a part of her (or pick a bone), drag x / y / z / twist,
+//            mirror to the other side, hand curl, face sliders.
+//   Keys     the keys on the timeline: add, copy, paste, delete, move, length.
+//   Prop     something in her hand (props.js): pick it, move and turn it in
 //            the hand, size it, save where it sits (portrait/props/props.json).
 //            A gesture can be made with it: when it appears or goes, and
 //            whether her last pose is held while she carries it.
+//   Details  name, what it's for, when it plays (touches, moods), flags,
+//            sound, emotes, tail.
+//   Chain    gestures one after another, saved as one.
 //
 // Save writes portrait/gestures/<name>.js through the portrait server (your
 // own machine only; an existing gesture is backed up before it's replaced).
@@ -60,29 +63,59 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   const bar = el('div', { className: 'pbar' }, el('b', { textContent: 'pose studio' }), posingDot);
   const win = el('div', { id: 'studio', className: 'panel' }, bar);
   document.body.appendChild(win);
+  // real tabs: one page at a time
+  const TABS = [['pose', 'Pose'], ['animate', 'Keys'], ['prop', 'Prop'], ['details', 'Details'], ['link', 'Chain']];
   const tabsRow = el('div', { className: 'tabs' });
-  const pages = {};
-  for (const name of ['pose', 'animate', 'details', 'link', 'prop']) {
-    pages[name] = el('div', { hidden: name !== 'pose' });
-    tabsRow.appendChild(btn(name, () => {
-      for (const [n, p] of Object.entries(pages)) p.hidden = n !== name;
-      for (const b of tabsRow.children) b.classList.toggle('on', b.textContent === name);
-      if (name === 'animate') drawTimeline();
-      if (name === 'prop') fillProps();
-    }));
+  const pages = {}, tabBtn = {};
+  let tabNow = 'pose';
+  let ph, phDrag, phHot, phFrame;                     // the prop's handles (see below)
+  function showTab(name) {
+    if (!pages[name]) return;
+    tabNow = name;
+    for (const [n, p] of Object.entries(pages)) p.hidden = n !== name;
+    for (const [n, b] of Object.entries(tabBtn)) b.classList.toggle('on', n === name);
+    if (name === 'prop') fillProps();
+    moveGizmo();                                       // the bone's rings on Pose, the prop's handles on Prop
   }
-  tabsRow.firstChild.classList.add('on');
-  const onOff = btn('start posing', () => (st.on ? stop() : start()));
+  for (const [name, label] of TABS) {
+    pages[name] = el('div', { className: 'page', hidden: name !== 'pose' });
+    tabBtn[name] = btn(label, () => showTab(name));
+    tabsRow.append(tabBtn[name]);
+  }
+  tabBtn.pose.classList.add('on');
+
+  // the timeline, shown on every tab: the time you pose at is where the key goes
+  const time = el('input', { type: 'range', min: 0, max: 3, step: 0.05, value: 0, hidden: true });
+  const tl = el('canvas', { className: 'timeline', title: 'click to go there · drag a key to move it' });
+  const timeN = el('input', { type: 'number', step: 0.05, value: 0, style: 'width:62px', title: 'seconds' });
+  time.oninput = () => { timeN.value = time.value; seek(+time.value); };
+  timeN.onchange = () => { time.value = timeN.value; seek(+timeN.value); };
+  const loopBox = el('input', { type: 'checkbox' });
+  loopBox.onchange = () => { st.loop = loopBox.checked; };
+  const playBtn = btn('▶ play', () => (st.playing ? stopPlay() : play()), 'play it (space)');
+
+  const onOff = btn('start posing', () => (st.on ? stop() : start()), 'posing: she holds the pose you make, at the time on the timeline');
   const undoBtn = btn('↶', () => undo(), 'undo (Ctrl+Z)'), redoBtn = btn('↷', () => redo(), 'redo (Ctrl+Y)');
   // the camera, so you can check a pose from every side
   const cam = (yaw, label) => btn(label, () => { if (orbit) { orbit.yaw = yaw; } }, 'look at her from here');
   const zoom = (f, label) => btn(label, () => { if (orbit) orbit.zoom = Math.max(0.25, Math.min(4, orbit.zoom * f)); }, 'zoom');
-  win.append(el('div', { className: 'row' }, onOff, btn('new', () => { if (confirm('Start a new gesture? What isn\'t saved is lost.')) { remember(); A = fresh(); refreshAll(); } }),
-                  loadSel(), btn('load', load), undoBtn, redoBtn),
-             el('div', { className: 'row' }, el('span', { className: 'l', textContent: 'view' }),
-                cam(0, 'front'), cam(-0.8, '¾'), cam(-Math.PI / 2, 'side'), cam(Math.PI, 'back'), zoom(0.8, '＋'), zoom(1.25, '－')),
-             tabsRow, ...Object.values(pages), status);
+  const openSel = loadSel();
+  // blur after picking: a focused menu turns ← → into "open the next gesture"
+  openSel.onchange = () => { const v = openSel.value; openSel.blur(); if (v === '__new') newGesture(); else if (v) open(v); drawOpen(); };
+  const now = el('div', { className: 'now' });         // what you're editing, and where you are in it
+  const saveBtn = btn('save', () => saveIt(false), 'save it (over the file if it has one)');
+  const head = el('div', { className: 'shead' },
+    row('gesture', openSel, saveBtn,
+        btn('save as…', () => saveIt(true), 'save under a new name'), undoBtn, redoBtn),
+    now,
+    row('view', cam(0, 'front'), cam(-0.8, '¾'), cam(-Math.PI / 2, 'side'), cam(Math.PI, 'back'), zoom(0.8, '＋'), zoom(1.25, '－')),
+    tl,
+    row('time', timeN, btn('◀ key', () => stepKey(-1), 'previous key (←)'), btn('key ▶', () => stepKey(1), 'next key (→)'),
+        playBtn, el('label', {}, loopBox, ' loop')),
+    row('posing', onOff, el('span', { className: 'dim', textContent: ' she holds the pose you make (moving a bone turns it on)' })));
+  win.append(head, tabsRow, ...Object.values(pages), status);
   const winCtl = makeWindow(win, bar, 'studio', 'pose studio');
+  let dirty = false;                                   // changed since it was opened or saved
 
   // -- pose page ---------------------------------------------------------------
   // the bone list, grouped the way you think about a body
@@ -140,7 +173,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   }
   const poseText = el('pre', { style: 'user-select:text' });
   pages.pose.append(
-    el('div', { className: 'dim', textContent: 'click a part of her, or pick a bone · drag a ring on her (or a slider) to turn it · red x, green y, blue z, white twist' }),
+    el('div', { className: 'dim', textContent: 'click a part of her, or pick a bone · drag a ring on her (or a slider) to turn it · red x, green y, blue z, white twist. It changes the key at the time on the timeline (or makes one).' }),
     row('bone', btn('◀', () => stepBone(-1), 'previous bone'), pick, btn('▶', () => stepBone(1), 'next bone')),
     el('div', { className: 'row' }, el('span', { className: 'l' }), el('label', {}, mirror, ' mirror the other side'), ' ',
        el('label', {}, showAxes, ' show rings')),
@@ -150,30 +183,19 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     row('hand', handSide, curl, btn('open', () => { curl.value = 0.05; setHand(0.05); }), btn('fist', () => { curl.value = 1.2; setHand(1.2); })),
     faceBox, poseText);
 
-  // -- animate page --------------------------------------------------------------
-  const time = el('input', { type: 'range', min: 0, max: 3, step: 0.05, value: 0, hidden: true });
-  const tl = el('canvas', { className: 'timeline', title: 'click to go there · drag a key to move it' });
-  const timeN = el('input', { type: 'number', step: 0.05, value: 0, style: 'width:62px' });
-  time.oninput = () => { timeN.value = time.value; seek(+time.value); };
-  timeN.onchange = () => { time.value = timeN.value; seek(+timeN.value); };
+  // -- keys page ------------------------------------------------------------------
   const durN = el('input', { type: 'number', step: 0.1, min: 0.2, value: A.dur, style: 'width:62px' });
   durN.onchange = () => { A.dur = Math.max(0.2, +durN.value || 1); time.max = A.dur; drawKeys(); };
   const keyBox = el('div', { className: 'keys' });
-  const loopBox = el('input', { type: 'checkbox' });
-  loopBox.onchange = () => { st.loop = loopBox.checked; };
-  const playBtn = btn('▶ play', () => (st.playing ? stopPlay() : play()));
   pages.animate.append(
-    el('div', { className: 'dim', textContent: 'pose at a time and it becomes a key there · click a key to go to it' }),
-    tl, row('time', time, timeN, btn('◀ key', () => stepKey(-1), 'previous key (←)'), btn('key ▶', () => stepKey(1), 'next key (→)')),
+    el('div', { className: 'dim', textContent: 'a key is her pose at one moment (the diamonds on the timeline). Posing at a time makes a key there, or changes the one that\'s there. Click a key to go to it.' }),
+    el('div', { className: 'dim', textContent: 'keys in this gesture:' }), keyBox,
     row('length', durN, el('span', { className: 'dim', textContent: ' seconds' })),
     el('div', { className: 'row' }, btn('+ key here', () => { remember(); keyAt(st.t, true); show(); }, 'K'), btn('copy key', copyKey),
        btn('paste key', pasteKey), btn('delete key', deleteKey)),
     el('div', { className: 'row' }, btn('◀ 0.5s', () => nudgeKey(-0.5)), btn('0.5s ▶', () => nudgeKey(0.5)),
        el('span', { className: 'dim', textContent: ' move the key (or drag it on the timeline)' })),
-    el('div', { className: 'dim', textContent: 'keys: space play · ← → keys · K add · Del delete · Ctrl+Z undo' }),
-    keyBox,
-    el('div', { className: 'row' }, playBtn, el('label', {}, loopBox, ' loop'),
-       btn('save', () => saveIt(false)), btn('save as…', () => saveIt(true))));
+    el('div', { className: 'dim', textContent: 'keyboard: space play · ← → keys · K add · Del delete · Ctrl+Z undo' }));
 
   // -- details page --------------------------------------------------------------
   const nameIn = el('input', { type: 'text', placeholder: 'my_gesture (letters, numbers, _)' });
@@ -206,8 +228,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     el('div', { className: 'dim', textContent: 'in these moods (none ticked: any mood)' }), bands, row('', moodIn),
     row('sound', soundSel), row('', soundFrom, soundLen),
     el('div', { className: 'row' }, el('span', { className: 'l', textContent: 'emotes' }), btn('+ emote', () => { A.emote.push({ name: 'hearts', at: +st.t.toFixed(2) }); drawEmotes(); })),
-    emoteBox, row('tail', tailSel, tailLvl),
-    el('div', { className: 'row' }, btn('save', () => saveIt(false)), btn('save as…', () => saveIt(true))));
+    emoteBox, row('tail', tailSel, tailLvl));
 
   // -- link page -----------------------------------------------------------------
   const linkSel = el('select');
@@ -238,14 +259,16 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       if (!p) return;
       v = Math.round(Math.max(lo, Math.min(hi, v)) / step) * step;
       v = +v.toFixed(4);
+      remember(false);                                   // the prop's place is undoable too (not a gesture change)
       r.value = n.value = v;
       if (i < 0) P().set(pp.name, { [field]: v });
       else { const a = p[field].slice(); a[i] = v; P().set(pp.name, { [field]: a }); }
+      placed(true);
     };
     r.oninput = () => set(+r.value);
     n.onchange = () => set(+n.value);
     const nudge = d => btn(d > 0 ? '+' : '−', e => set((+n.value || 0) + d * step * (e.shiftKey ? 1 : 5)), 'shift: finer');
-    propSliders[label] = { r, n, field, i };
+    propSliders[label] = { r, n, field, i, set };
     const color = { x: AXC.x, y: AXC.y, z: AXC.z }[label.slice(-1)];
     propBox.append(el('div', { className: 'row' }, el('span', { className: 'l', textContent: label, style: color ? `color:${color}` : '' }),
                       nudge(-1), r, nudge(1), n));
@@ -255,19 +278,30 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   propUses.onchange = () => { remember(); A.extra.prop = propUses.checked && pp.name ? pp.name : undefined; drawPropUse(); };
   propHold.onchange = () => { remember(); A.extra.hold = propHold.checked || undefined; };
   propAt.onchange = () => { remember(); A.extra.prop_at = propAt.value === '' ? undefined : r2(+propAt.value); };
+  // where it sits is its own save (props.json, every gesture): say when it's changed
+  const savePlace = btn('save placement', () => saveProp(), 'where it sits, for every gesture (portrait/props/props.json)');
+  let placedNow = false;                               // moved since it was saved
+  function placed(changed) {
+    placedNow = changed;
+    savePlace.textContent = changed ? 'save placement ●' : 'save placement';
+    savePlace.classList.toggle('unsaved', changed);
+    savePlace.title = changed ? 'moved since it was saved: save it, or it\'s back where it was next time' : 'where it sits, for every gesture (portrait/props/props.json)';
+  }
+  const propNone = el('div', { className: 'dim', textContent: 'pick a prop to put it in her hand. (Opening a gesture made with one, like coffee_pickup, brings it out by itself.)' });
   pages.prop.append(
+    el('h4', { textContent: 'in her hand (every gesture)' }),
     el('div', { className: 'dim', textContent: 'a 3D model in her hand (portrait/props/*.glb); it moves with every gesture' }),
     row('prop', propSel, handSel),
-    propBox,
-    el('div', { className: 'dim', textContent: 'x y z move it in the hand (metres), turn spins it, size scales it · pose her arm on the pose page to check it from every side' }),
-    el('div', { className: 'row' }, btn('save placement', saveProp, 'where it sits, for every gesture (portrait/props/props.json)'),
+    propNone, propBox,
+    el('div', { className: 'dim', textContent: 'on her: drag an arrow to move it, a ring to turn it (red x, green y, blue z, like the sliders) · or the sliders: x y z move it in the hand (metres), turn spins it, size scales it' }),
+    el('div', { className: 'row' }, savePlace,
        btn('put it away', () => { propSel.value = ''; pickProp(); })),
-    el('div', { className: 'dim', textContent: 'this gesture (saved with it)' }),
+    el('h4', { textContent: 'this gesture (saved with it)' }),
     el('div', { className: 'row' }, el('label', {}, propUses, ' made with it (in her hand when it\'s opened)')),
     row('at', propAt, el('span', { className: 'dim', textContent: ' s, when it appears or goes ' }), btn('now', () => { propAt.value = st.t; propAt.onchange(); }, 'the time on the timeline')),
     el('div', { className: 'row' }, el('label', {}, propHold, ' hold her last pose while she carries it')));
   propSel.onchange = () => pickProp();
-  handSel.onchange = () => { if (pp.name) { P().set(pp.name, { hand: handSel.value }); } };
+  handSel.onchange = () => { if (pp.name) { remember(false); P().set(pp.name, { hand: handSel.value }); placed(true); } };
   async function fillProps() {
     const pr = P();
     if (!pr) return;
@@ -284,17 +318,19 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     if (!pr) return;
     // only put away what the studio got out (not her coffee, if she's drinking it)
     if (pp.shown && pp.shown !== propSel.value) { pr.hide(pp.shown); pp.shown = ''; }
+    if (pp.name !== propSel.value) placed(false);
     pp.name = propSel.value;
     if (pp.name) {
       handSel.value = pr.side(pp.name);
       const already = pr.held(pp.name);
-      pr.show(pp.name, handSel.value).then(ok => { if (ok && !already) pp.shown = pp.name; });
+      pr.show(pp.name, handSel.value).then(ok => { if (ok && !already) pp.shown = pp.name; propHandles(); });
     }
-    drawProp(); drawPropUse();
+    drawProp(); drawPropUse(); propHandles();
   }
   function drawProp() {
     const p = P()?.PROPS[pp.name];
     propBox.hidden = handSel.disabled = !p;
+    propNone.hidden = !!p;
     if (!p) return;
     for (const s of Object.values(propSliders)) s.r.value = s.n.value = +(s.i < 0 ? (p.scale ?? 1) : p[s.field][s.i]).toFixed(4);
   }
@@ -312,6 +348,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
         body: JSON.stringify({ name: pp.name, hand: handSel.value, at: p.at, turn: p.turn, scale: p.scale ?? 1 }) });
       const j = await r.json();
       say(j.ok ? `saved where the ${pp.name} sits` : j.error || 'not saved', 6000);
+      if (j.ok) placed(false);
     } catch (e) { say(`couldn't save: ${e.message || e}`, 8000); }
   }
 
@@ -321,12 +358,13 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     stopPlay();
     st.on = true; onOff.textContent = 'stop posing'; posingDot.textContent = '● posing';
     st.live = moves.studio(view, viewExpr);
-    show();
+    show(); drawNow();
   }
   function stop() {
     stopPlay();
     st.on = false; onOff.textContent = 'start posing'; posingDot.textContent = '';
     st.live?.stop(); st.live = null;
+    drawNow();
   }
   // the key at time t (made if asked)
   function keyAt(t, make) {
@@ -479,7 +517,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       let top = vrm.scene; while (top.parent) top = top.parent;   // the scene itself: the rings are placed in world space
       top.add(gizmo);
     }
-    gizmo.visible = !!vrm.humanoid.getNormalizedBoneNode(st.bone) && showAxes.checked && !win.classList.contains('tucked');
+    gizmo.visible = tabNow === 'pose' && !!vrm.humanoid.getNormalizedBoneNode(st.bone) && showAxes.checked && !win.classList.contains('tucked');
+    propHandles();
   }
   new MutationObserver(() => moveGizmo()).observe(win, { attributes: true, attributeFilter: ['class'] });   // tucked away: no rings
   // grabbing and dragging a ring
@@ -518,7 +557,9 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
         dragging.slide = { x: e.clientX, y: e.clientY, tx: tx / len, ty: ty / len, px: Math.max(30, Math.hypot(s0.x - c.x, s0.y - c.y)), sgn };
       }
       canvas.setPointerCapture?.(e.pointerId);
-      remember();                                          // the drag is one undo step (a burst)
+      lastMark = 0; dragStep = false;
+      remember();                                          // the drag is one undo step
+      dragStep = true;
     }, true);
     addEventListener('pointermove', e => {
       if (dragging) {
@@ -542,9 +583,172 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       hot = r ? r.ax : null;
       canvas.style.cursor = r ? 'pointer' : '';
     }, true);
-    const end = e => { if (!dragging) return; e.stopPropagation(); dragging = null; lastMark = 0; canvas.style.cursor = ''; };
+    const end = e => { if (!dragging) return; e.stopPropagation(); dragging = null; dragStep = false; lastMark = 0; canvas.style.cursor = ''; };
     addEventListener('pointerup', end, true);
     addEventListener('pointercancel', end, true);
+  }
+
+  // -- the prop's handles (Prop tab): arrows move it, rings turn it -------------------
+  // Like Blender's or Second Life's: red / green / blue for x / y / z, the same as
+  // the sliders. Drag an arrow to slide it along, a ring to turn it. They sit on
+  // the prop, in her hand's own frame (what the x y z sliders mean), and point the
+  // way + goes, so a mirrored left hand or a VRM 0.x model still reads right.
+  ph = null; phDrag = null; phHot = null; phFrame = -1;
+  const PH_AX = ['x', 'y', 'z'];
+  function propMake() {
+    const root = new THREE.Group();
+    const arrows = PH_AX.map((ax, i) => {
+      const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(AXC[ax]), depthTest: false, transparent: true, opacity: 0.6 });
+      const g = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.62, 8), mat);
+      shaft.position.y = 0.37;
+      const head = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.11, 12), mat);
+      head.position.y = 0.735;
+      const grab = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.85, 6), new THREE.MeshBasicMaterial({ visible: false }));
+      grab.position.y = 0.48;
+      grab.userData = { kind: 'move', i };
+      g.add(shaft, head, grab);
+      for (const o of [shaft, head]) { o.renderOrder = 1001; o.frustumCulled = false; o.onBeforeRender = propPlace; }
+      return { kind: 'move', i, ax, g, mat, grab, dir: V(0, 1, 0) };
+    });
+    const rings = PH_AX.map((ax, i) => {
+      const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(AXC[ax]), depthTest: false, transparent: true, opacity: 0.55 });
+      const g = new THREE.Group();
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.007, 6, 64), mat);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.09, 10), mat);
+      cone.position.set(0.42, 0, 0);
+      const grab = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 48), new THREE.MeshBasicMaterial({ visible: false }));
+      grab.userData = { kind: 'turn', i };
+      g.add(ring, cone, grab);
+      for (const o of [ring, cone]) { o.renderOrder = 1000; o.frustumCulled = false; o.onBeforeRender = propPlace; }
+      return { kind: 'turn', i, ax, g, mat, cone, grab };
+    });
+    root.add(...arrows.map(a => a.g), ...rings.map(r => r.g));
+    let top = vrm.scene; while (top.parent) top = top.parent;
+    top.add(root);
+    ph = { root, arrows, rings, all: [...arrows, ...rings] };
+  }
+  // the middle of a prop in its own space (worked out once): a mug's origin is its base
+  const middles = new WeakMap();
+  function propMiddle(obj) {
+    let m = middles.get(obj);
+    if (!m) {
+      obj.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(obj);
+      m = box.isEmpty() ? V(0, 0, 0) : obj.worldToLocal(box.getCenter(V(0, 0, 0)));
+      middles.set(obj, m);
+    }
+    return m.clone();
+  }
+  function propObj() { return pp.name ? P()?.object?.(pp.name) || null : null; }
+  // which way + on each slider goes (props.js place(): the left hand mirrors x,
+  // a VRM 0.x model turns x and z round)
+  function propSigns() {
+    const m = P()?.side(pp.name) === 'left' ? -1 : 1, f = fx === -1 ? -1 : 1;
+    return { move: [m * f, 1, f], turn: [1, m, m] };
+  }
+  function propPlace(renderer) {
+    const fr = renderer.info.render.frame;
+    if (fr === phFrame || !ph?.root.visible) return;
+    phFrame = fr;
+    const obj = propObj();
+    if (!obj?.parent) { ph.root.visible = false; return; }
+    ph.root.position.copy(obj.localToWorld(propMiddle(obj)));       // on the middle of it, not its base
+    const base = obj.parent.getWorldQuaternion(Q());                  // her hand, as it is now
+    const sg = propSigns(), e = obj.rotation;
+    const axes = [X, Y, Z];
+    ph.arrows.forEach((a, i) => {
+      a.dir.copy(axes[i]).multiplyScalar(sg.move[i]).applyQuaternion(base);
+      a.g.quaternion.setFromUnitVectors(Y, a.dir);
+      a.mat.opacity = !phHot && !phDrag ? 0.6 : (phHot === a || phDrag?.h === a) ? 0.85 : 0.2;
+    });
+    // the turns are a gimbal (Euler XYZ): x about the hand, y after x, z after both
+    const fx1 = base.clone().multiply(Q().setFromAxisAngle(X, e.x));
+    const fy1 = fx1.clone().multiply(Q().setFromAxisAngle(Y, e.y));
+    const frames = [base.clone().multiply(Q().setFromUnitVectors(Z, X)), fx1.multiply(Q().setFromUnitVectors(Z, Y)), fy1];
+    ph.rings.forEach((r, i) => {
+      r.g.quaternion.copy(frames[i]);
+      r.cone.rotation.set(0, 0, sg.turn[i] > 0 ? 0 : Math.PI);
+      r.mat.opacity = !phHot && !phDrag ? 0.4 : (phHot === r || phDrag?.h === r) ? 0.85 : 0.15;
+    });
+    const d = camera.position.distanceTo(ph.root.position);
+    ph.root.scale.setScalar(d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.36);
+    ph.root.updateMatrixWorld(true);
+  }
+  // shown on the Prop tab, while a prop is in her hand
+  function propHandles() {
+    if (!THREE || !camera) return;
+    const on = tabNow === 'prop' && !!propObj() && showAxes.checked && !win.classList.contains('tucked');
+    if (on && !ph) propMake();
+    if (ph) ph.root.visible = on;
+  }
+  function propHandleAt(e) {
+    if (!ph?.root.visible || !canvas) return null;
+    const b = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(ph.all.map(h => h.grab), false);
+    const hit = hits.find(h => h.object.userData.kind === 'move') || hits[0];   // an arrow wins where it crosses a ring
+    if (!hit) return null;
+    const ud = hit.object.userData;
+    return ud.kind === 'move' ? ph.arrows[ud.i] : ph.rings[ud.i];
+  }
+  if (canvas) {
+    addEventListener('pointerdown', e => {
+      if (e.button !== 0 || e.target !== canvas) return;
+      const h = propHandleAt(e), obj = propObj();
+      if (!h || !obj) return;
+      e.stopImmediatePropagation(); e.preventDefault();    // not an orbit, not a click on her
+      const sl = propSliders[h.kind === 'move' ? PH_AX[h.i] : 'turn ' + PH_AX[h.i]];
+      const c = screenOf(ph.root.position);
+      lastMark = 0; dragStep = false;
+      remember(false);                                    // the whole drag is one undo step
+      phDrag = { h, sl, from: +sl.n.value || 0, x: e.clientX, y: e.clientY };
+      dragStep = true;
+      if (h.kind === 'move') {
+        // metres per pixel along the arrow, from where 10 cm along it lands on screen
+        const tip = screenOf(ph.root.position.clone().add(h.dir.clone().multiplyScalar(0.1)));
+        const tx = tip.x - c.x, ty = tip.y - c.y, len = Math.hypot(tx, ty) || 1;
+        const scale = obj.parent.getWorldScale(V(1, 1, 1)).x || 1;
+        Object.assign(phDrag, { tx: tx / len, ty: ty / len, mpp: 0.1 / len / scale, steep: len < 8 });
+      } else {
+        const axis = V(0, 0, 1).applyQuaternion(h.g.getWorldQuaternion(Q()));
+        const toward = axis.dot(pTmp.copy(ph.root.position).sub(camera.position)) < 0;
+        const facing = Math.abs(axis.dot(pTmp.copy(camera.position).sub(ph.root.position).normalize()));
+        Object.assign(phDrag, { c, a: angleAt(e, c), turn: 0, k: (toward ? 1 : -1) * propSigns().turn[h.i], edge: facing < 0.3 });
+      }
+      canvas.setPointerCapture?.(e.pointerId);
+    }, true);
+    addEventListener('pointermove', e => {
+      if (phDrag) {
+        e.stopImmediatePropagation();
+        const dr = phDrag;
+        let v;
+        if (dr.h.kind === 'move') {
+          // an arrow pointing at you barely moves on screen: up/down drags it then
+          v = dr.steep ? dr.from - (e.clientY - dr.y) * 0.001
+                       : dr.from + ((e.clientX - dr.x) * dr.tx + (e.clientY - dr.y) * dr.ty) * dr.mpp;
+        } else if (dr.edge) {
+          v = dr.from + (e.clientX - dr.x) / 120;              // seen edge-on: sideways turns it
+        } else {
+          const a = angleAt(e, dr.c);
+          let d = a - dr.a; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
+          dr.a = a; dr.turn += d;
+          v = dr.from + dr.turn * dr.k;
+          if (e.shiftKey) v = Math.round(v / (Math.PI / 12)) * (Math.PI / 12);   // shift: 15° steps
+        }
+        if (dr.h.kind === 'turn') v = ((v + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;   // round and round, not stuck at ±π
+        dr.sl.set(v);
+        return;
+      }
+      if (e.target !== canvas || !ph?.root.visible || e.buttons) { if (phHot) phHot = null; return; }
+      phHot = propHandleAt(e);
+      canvas.style.cursor = phHot ? (phHot.kind === 'move' ? 'grab' : 'pointer') : '';
+      if (phHot) e.stopPropagation();                       // over a handle: no "arms · neutral" touch tip
+    }, true);
+    const phEnd = e => { if (!phDrag) return; e.stopImmediatePropagation(); phDrag = null; dragStep = false; lastMark = 0; canvas.style.cursor = ''; };
+    addEventListener('pointerup', phEnd, true);
+    addEventListener('pointercancel', phEnd, true);
   }
   function drawChips() {
     chips.textContent = '';
@@ -569,15 +773,36 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
 
   // -- undo ------------------------------------------------------------------------
   const past = [], future = [];
-  let lastMark = 0;
-  function remember() {                    // one step per burst of changes (a slider drag is one)
-    const now = performance.now();
-    if (now - lastMark > 600) { past.push(JSON.stringify(A)); if (past.length > 100) past.shift(); future.length = 0; }
-    lastMark = now;
+  let lastMark = 0, dragStep = false;
+  // A step is the gesture and where the prop sits in her hand, so Ctrl+Z takes back a
+  // mug you dragged too far as well as a pose. gesture: false for a prop-only change
+  // (it isn't a change to the gesture's file).
+  function snapshot() {
+    const p = pp.name && P()?.PROPS[pp.name];
+    return JSON.stringify({ A, prop: p ? { name: pp.name, hand: p.hand, at: p.at.slice(), turn: p.turn.slice(), scale: p.scale ?? 1 } : null,
+                            placed: placedNow });
   }
-  function restore(json) { A = JSON.parse(json); aToForm(); seek(st.t); show(); }
-  function undo() { if (!past.length) return say('nothing to undo'); future.push(JSON.stringify(A)); restore(past.pop()); lastMark = 0; say('undone', 1500); }
-  function redo() { if (!future.length) return say('nothing to redo'); past.push(JSON.stringify(A)); restore(future.pop()); lastMark = 0; say('redone', 1500); }
+  function remember(gesture = true) {      // one step per burst of changes (a slider drag is one)
+    const now = performance.now();
+    // a drag is one step however slowly the frames come (dragStep: its first change is in)
+    if (now - lastMark > 600 && !dragStep) { past.push(snapshot()); if (past.length > 100) past.shift(); future.length = 0; }
+    lastMark = now;
+    if (dragging || phDrag) dragStep = true;
+    if (gesture && !dirty) { dirty = true; drawNow(); }
+  }
+  function restore(json) {
+    const d = JSON.parse(json);
+    A = d.A || d;
+    aToForm(); seek(st.t); show();
+    if (d.prop && P()?.PROPS[d.prop.name]) {
+      const { name, ...where } = d.prop;
+      P().set(name, where);
+      if (name === pp.name) { handSel.value = where.hand || handSel.value; drawProp(); }
+      placed(!!d.placed);
+    }
+  }
+  function undo() { if (!past.length) return say('nothing to undo'); future.push(snapshot()); restore(past.pop()); lastMark = 0; say('undone', 1500); }
+  function redo() { if (!future.length) return say('nothing to redo'); past.push(snapshot()); restore(future.pop()); lastMark = 0; say('redone', 1500); }
 
   // -- the visual timeline ----------------------------------------------------------
   function drawTimeline(playhead) {
@@ -614,6 +839,23 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     const ph = playhead ?? st.t;
     g.strokeStyle = '#ffd36b'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(x(ph), 12); g.lineTo(x(ph), 44); g.stroke();
+    drawNow();
+  }
+  // the line at the top: what you're editing and where you are in it
+  function drawNow() {
+    if (!now) return;
+    const name = A.name || 'a new gesture';
+    let text;
+    if (A.chain.length && !A.keys.length) text = `editing ${name} · a chain of ${A.chain.length}`;
+    else {
+      const i = A.keys.findIndex(k => near(k.t, st.t));
+      const where = !A.keys.length ? 'no keys yet: pose her to make one'
+        : i >= 0 ? `on key ${i + 1} of ${A.keys.length}` : `between keys (${A.keys.length})`;
+      text = `editing ${name} · ${st.t.toFixed(2)} s of ${A.dur} · ${where}`;
+    }
+    now.textContent = text + (dirty ? ' · not saved' : '');
+    now.classList.toggle('dirty', dirty);
+    saveBtn.classList.toggle('unsaved', dirty);
   }
   {
     let drag = null;
@@ -641,10 +883,15 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   }
   // keys, while the studio is up and you're not typing
   addEventListener('keydown', e => {
-    if (!document.body.classList.contains('debug') || win.classList.contains('tucked') || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (!document.body.classList.contains('debug') || win.classList.contains('tucked')) return;
     const k = e.key.toLowerCase();
-    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
-    if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); return redo(); }
+    // Ctrl+Z works after a slider too (a slider keeps the focus); only typing in a box keeps the box's own undo
+    const typing = /^(SELECT|TEXTAREA)$/.test(e.target.tagName) || (e.target.tagName === 'INPUT' && !/^(range|checkbox)$/.test(e.target.type));
+    if ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'y') && !typing) {
+      e.preventDefault();
+      return k === 'y' || e.shiftKey ? redo() : undo();
+    }
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === ' ') { e.preventDefault(); st.playing ? stopPlay() : play(); }
     else if (k === 'arrowleft') { e.preventDefault(); stepKey(-1); }
@@ -742,10 +989,19 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     for (const s of [loadSel.el, linkSel]) {
       const cur = s.value;
       s.textContent = '';
-      s.add(new Option(s === linkSel ? 'a gesture…' : 'open a gesture…', ''));
+      s.add(new Option(s === linkSel ? 'a gesture…' : 'pick one to edit…', ''));
+      if (s !== linkSel) s.add(new Option('✚ new gesture', '__new'));
       for (const n of names) if (s !== linkSel || !GESTURES[n].chain) s.add(new Option(n + (GESTURES[n].chain ? ' ⛓' : ''), n));
       s.value = cur;
     }
+    drawOpen();
+  }
+  // the open menu shows what you're editing
+  function drawOpen() { const s = loadSel.el; if (s) s.value = A.name && GESTURES[A.name] ? A.name : ''; }
+  function newGesture() {
+    if (dirty && !confirm('Start a new gesture? What isn\'t saved is lost.')) return;
+    stop(); remember(); A = fresh(); refreshAll(); dirty = false; drawNow(); showTab('pose');
+    say('a new gesture: pose her and the first key is made', 5000);
   }
   function loadSel() { loadSel.el = el('select'); return loadSel.el; }
   function formToA() {
@@ -801,9 +1057,10 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   }
 
   // -- open an existing gesture ------------------------------------------------------------
-  function load() {
-    const n = loadSel.el.value, g = GESTURES[n];
+  function open(n) {
+    const g = GESTURES[n];
     if (!g) return;
+    if (dirty && !confirm(`Open ${n}? What isn't saved in ${A.name || 'this one'} is lost.`)) { drawOpen(); return; }
     stop();
     A = fresh();
     A.name = n; A.about = g.about || ''; A.keywords = (g.keywords || []).join(', ');
@@ -815,18 +1072,22 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     A.emote = [].concat(g.emote || []).map(e => (typeof e === 'string' ? { name: e, at: 0 } : { name: e.name, at: +e.at || 0 }));
     if (g.tail_up) { A.tail = 'tail_up'; A.tailLevel = g.tail_up; } else if (g.wag) { A.tail = 'wag'; A.tailLevel = g.wag; }
     for (const k of ['then', 'left', 'osc', 'add', 'prop', 'prop_at', 'hold']) if (g[k] != null) A.extra[k] = g[k];
-    if (g.prop && propSel) { propSel.value = g.prop; fillProps().then(pickProp); }
+    // made with a prop: in her hand straight away (the menu isn't filled yet, so say which first)
+    if (g.prop && propSel) { pp.name = propSel.value = g.prop; fillProps().then(() => { propSel.value = g.prop; pickProp(); }); }
+    else if (pp.shown && propSel) { propSel.value = ''; pickProp(); }          // not made with one: put away what the studio got out
     if (g.chain) {
       A.chain = g.chain.slice();
-      tabsRow.children[3].click();
+      showTab('link');
     } else if (Array.isArray(g.keys)) {
       A.dur = +g.dur || 3;
       A.keys = g.keys.map(([t, p]) => ({ t: +t, pose: JSON.parse(JSON.stringify(p)) }));
       for (const [f, v] of Object.entries(g.expr || {})) A.expr[f] = Array.isArray(v) ? v.map(p => p.slice()) : v;
-      tabsRow.children[1].click();
-    } else return say(`${n} isn't a pose animation (a turn or a clip) - nothing to edit`);
+      if (tabNow === 'link') showTab('pose');
+    } else { drawOpen(); return say(`${n} isn't a pose animation (a turn or a clip) - nothing to edit`); }
     if (g.sob) say('note: this one sobs (shoulder hitches) - that part isn\'t kept on save', 8000);
     refreshAll();
+    dirty = false; drawNow(); drawOpen();
+    if (A.keys.length) { seek(A.keys[0].t); start(); }      // posing, on the first key: ready to change it
     say(`opened ${n}`);
   }
 
@@ -849,7 +1110,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       if (r.status === 409 && confirm(`${name} already exists. Replace it? (the old one is kept in gestures/backup/)`)) { r = await post(true); j = await r.json(); }
       if (!j.ok) return say(j.error || 'not saved', 8000);
       GESTURES[name] = (await import(`./gestures/${name}.js?v=${Date.now()}`)).default;   // playable now; in every menu after a reload
-      fillLists();
+      dirty = false;
+      fillLists(); drawNow();
       say(`saved gestures/${name}.js`, 8000);
     } catch (e) {
       say(`couldn't save: ${e.message || e}`, 8000);
@@ -862,8 +1124,9 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   addEventListener('pagehide', () => {
     try {
       formToA();
-      const tab = [...tabsRow.children].findIndex(b => b.classList.contains('on'));
-      sessionStorage.setItem(DRAFT, JSON.stringify({ A, t: st.t, bone: st.bone, on: st.on, tab, mirror: mirror.checked }));
+      const p = placedNow && pp.name && P()?.PROPS[pp.name];       // a prop moved and not saved yet
+      sessionStorage.setItem(DRAFT, JSON.stringify({ A, t: st.t, bone: st.bone, on: st.on, tab: tabNow, mirror: mirror.checked, dirty,
+        prop: p ? { name: pp.name, hand: p.hand, at: p.at, turn: p.turn, scale: p.scale ?? 1 } : null }));
     } catch (_) {}
   });
   try {
@@ -873,18 +1136,25 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       refreshAll(); seek(d.t || 0);
       if (bones.includes(d.bone)) selectBone(d.bone);
       mirror.checked = !!d.mirror;
-      tabsRow.children[d.tab]?.click();
+      showTab(typeof d.tab === 'string' ? d.tab : 'pose');
+      dirty = !!d.dirty; drawOpen(); drawNow();
       if (d.on) start();
+      if (A.extra.prop && propSel) { pp.name = A.extra.prop; fillProps().then(() => { propSel.value = A.extra.prop; pickProp(); }); }
+      if (d.prop) {                                     // where you'd dragged it, still not saved
+        const { name, ...where } = d.prop;
+        Promise.resolve(P()?.ready).then(() => { if (P()?.PROPS[name]) { P().set(name, where); if (pp.name === name) drawProp(); placed(true); } });
+      }
       if (A.keys.length || A.chain.length) say('picked up where you were', 3000);
     }
   } catch (_) {}
   return {
     get active() { return st.on; },
     show: () => winCtl.show(),
+    open(name) { winCtl.show(); if (!st.on) moves.stop?.(); open(name); },      // the debug panel's ✎ edit (stop what it was playing)
     pick(bone) {
-      if (!bone || !bones.includes(bone)) return;
+      if (!bone || !bones.includes(bone) || tabNow === 'prop') return;   // placing a prop: a click on her isn't a bone pick
       selectBone(bone);
-      tabsRow.children[0].click();
+      showTab('pose');
     },
   };
 }

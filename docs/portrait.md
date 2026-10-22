@@ -446,16 +446,36 @@ and does small things on her own:
 
 ### The pose studio: making gestures without code
 
-The debug viewer (`?debug=1`) opens a second window, **pose studio** (the
-🎬 button in the debug panel brings it back). Both windows drag by their
-title bar, resize from the corner, fold to their title bar (▾) or tuck into
-the dock at the bottom left (–); they remember where they were.
+The debug viewer (`?debug=1`) has two windows. The **portrait debug** one on
+the left *plays* things; the **pose studio** on the right *makes and changes*
+gestures (the 🎬 button in the debug panel brings it back). Both drag by
+their title bar, resize from the corner, fold to their title bar (▾) or tuck
+into the dock at the bottom left (–); they remember where they were.
 
-- **view** - *front*, *¾*, *side*, *back* and zoom, to check a pose from
-  every side. *● posing* in the title bar means she's holding your pose.
-- **pose** - *start posing*, then click a part of her (or pick a bone from
+**First steps: change a gesture**
+
+1. Pick it in the studio's **gesture** menu at the top (or pick it in the
+   debug panel's gestures menu and press **✎ edit**). It opens on its first
+   key, with her holding that pose.
+2. Go to the moment you want on the **timeline** under it: click it, or
+   *◀ key* / *key ▶* to jump between keys (the diamonds).
+3. On the **Pose** tab, click the part of her to change and drag its rings
+   or sliders. That changes the key at that moment (or makes one).
+4. **▶ play** to watch it, then **save**.
+
+**First steps: make a new one**: *✚ new gesture* in the same menu, pose her,
+move along the timeline, pose her again, play, *save* (it asks for a name).
+
+**At the top, always:** the gesture menu, *save*, *save as…*, undo ↶ / redo ↷,
+a line saying what you're editing and where you are ("editing coffee_pickup ·
+1.60 s of 2.2 · on key 3 of 4", with *not saved* when it's changed), the
+camera (*front*, *¾*, *side*, *back*, zoom), the timeline, *▶ play* and
+*loop*, and *start / stop posing* (posing: she holds the pose you're making;
+touching a slider starts it). Then the tabs:
+
+- **Pose** - click a part of her (or pick a bone from
   the grouped list, ◀ ▶ to step through) and drag x / y / z / twist.
-  Rotation rings on the bone, like a 3D program's: x (red), y (green),
+  Rotation rings on the bone (on the Pose tab only), like a 3D program's: x (red), y (green),
   z (blue) and twist (white), each sitting the way its slider really turns
   it, a cone showing which way + goes; the near half is bright, the far
   half faint, inside an outline, so it reads as a ball. Drag a ring to turn
@@ -469,25 +489,30 @@ the dock at the bottom left (–); they remember where they were.
   blink... at that moment. *copy bone* / *copy pose* give lines to paste.
   Switching bust / face / full body on the debug panel no longer reloads,
   and any other reload (model, hologram...) picks your work back up.
-- **animate** - a timeline: keys are the diamonds, the yellow line is
-  where you are, emotes and the sound are marked underneath. Click to go
-  somewhere, drag a key to move it. Posing at a time makes a key there.
-  *◀ key* / *key ▶* jump between keys, *+ key here*, *copy* / *paste key*,
-  *delete key*, *length*, *▶ play* (and *loop*).
-- **keys** - space play/stop · ← → previous/next key · K add a key ·
+- **Keys** - the keys in this gesture (click one to go there), *+ key here*,
+  *copy* / *paste key*, *delete key*, move a key by half a second, and the
+  *length*. On the timeline at the top, keys are the diamonds, the yellow
+  line is where you are, emotes and the sound are marked underneath; click
+  to go somewhere, drag a key to move it.
+- **keyboard** - space play/stop · ← → previous/next key · K add a key ·
   Del delete it · Ctrl+Z undo · Ctrl+Y (or Ctrl+Shift+Z) redo. The ↶ ↷
-  buttons do the same.
-- **details** - the name, what it's for (*about*, which is what Luna sees),
+  buttons do the same. Undo takes back poses, keys and where a prop sits in
+  her hand alike (one drag is one step), and works straight after using a
+  slider. A refresh keeps your gesture and a prop you've moved but not saved.
+- **Details** - the name, what it's for (*about*, which is what Luna sees),
   the words she writes that play it, fade in/out, 🔒 / 🔥 / 🧍 / idle,
   which touches and moods play it, a sound from `portrait/sounds/` (from a
   point or random, for how long), emotes at set times, and the tail (swish,
   or lifted and held).
-- **link** - gestures one after another (*+ add*, ↑ ↓ ✕), played and saved
+- **Chain** - gestures one after another (*+ add*, ↑ ↓ ✕), played and saved
   as one chain.
-- **prop** - something in her hand, like her coffee mug. Pick it and the
-  hand, then move it (*x y z*, in metres, in the hand), turn it and size
-  it, and it follows along live; pose her arm on the pose page to check it
-  from every side. *save placement* keeps where it sits for every gesture
+- **Prop** - something in her hand, like her coffee mug. Opening a
+  gesture made with one (like coffee_pickup) puts it in her hand; otherwise
+  pick it and the hand, then move it (*x y z*, in metres, in the hand), turn it and size
+  it, and it follows along live. On her, the prop gets handles like Blender's:
+  drag a red / green / blue **arrow** to slide it along x / y / z, or a **ring** to
+  turn it (shift: 15° steps); they point the way + goes on the matching slider; pose her arm on the Pose tab to check it
+  from every side (go to the key where she holds it). *save placement* keeps where it sits for every gesture
   (`portrait/props/props.json`). Under *this gesture*: whether it's made
   with the prop (it's in her hand when you open it), *at* which second it appears or goes (*now*
   takes the timeline's time), and whether her last pose is held while she
@@ -496,8 +521,7 @@ the dock at the bottom left (–); they remember where they were.
   they're the ones that pick it up and put it down. What sets that off is
   still code: `coffee.py` is the example to copy.
 
-*open a gesture… → load* brings any existing gesture in to edit. **save**
-writes `portrait/gestures/<name>.js` - plain data, the same shape as the
+**save** writes `portrait/gestures/<name>.js` - plain data, the same shape as the
 hand-written files - and it plays straight away (other menus show it after
 a reload). Saving over an existing gesture asks first and keeps the old file
 in `portrait/gestures/backup/`. Saving only works from your own machine,
