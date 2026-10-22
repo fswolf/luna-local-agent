@@ -1134,6 +1134,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     if (d?.A) {
       A = { ...fresh(), ...d.A };
       refreshAll(); seek(d.t || 0);
+      // nothing unsaved: the file on disk wins (it may have been changed since, by you or Claude)
+      if (!d.dirty && A.name && GESTURES[A.name] && Array.isArray(GESTURES[A.name].keys)) { open(A.name); seek(d.t || 0); }
       if (bones.includes(d.bone)) selectBone(d.bone);
       mirror.checked = !!d.mirror;
       showTab(typeof d.tab === 'string' ? d.tab : 'pose');

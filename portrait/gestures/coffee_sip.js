@@ -6,8 +6,9 @@ import { fingers } from './_pose.js';
 
 const HAND = { ...fingers('right', 0.95),          // fingers through the handle, thumb round the mug
                rightThumbMetacarpal: [0, -0.3, 0.4], rightThumbProximal: [0, 0, 0.5], rightThumbDistal: [0, 0, 0.4] };
-const CARRY = { rightUpperArm: [0, 0.6, 1.0], rightLowerArm: [0, 2.2, 0], rightHand: [-0.55, 0, 0], ...HAND };
-const SIP = { rightUpperArm: [0, 0.75, 0.95], rightLowerArm: [0, 2.65, 0], rightHand: [-0.9, 0, -0.3], ...HAND };
+const CARRY = { rightUpperArm: [0, 0.6, 1.0], rightLowerArm: [-0.15, 2.2, 0],   // the mug out in front of her, as coffee_pickup ends
+                rightHand: [-0.55, 0, 0], ...HAND };
+const SIP = { rightUpperArm: [0, 0.85, 0.45], rightLowerArm: [-0.3, 2.6, 0], rightHand: [-0.35, 0, -0.25], ...HAND };   // mug up at her chin: tune the last bit in the studio
 
 export default {
   dur: 3.4, fade: [0.3, 0.3],
