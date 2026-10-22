@@ -229,12 +229,35 @@ def _attach_image(content):
         return f"[a picture came back but couldn't be passed on: {e}]"
 
 
-def _text_of(result):
+def _compact(text):
+    """A JSON answer with its empty fields dropped and no padding: a
+    message board's "reply_to": null, "mentions": [], "attachments": []
+    on every message is context a 16k window can't spare."""
+    t = text.strip()
+    if t[:1] not in ("{", "["):
+        return text
+
+    try:
+        data = json.loads(t)
+    except ValueError:
+        return text
+
+    def prune(v):
+        if isinstance(v, dict):
+            return {k: prune(x) for k, x in v.items() if x not in (None, "", [], {})}
+        if isinstance(v, list):
+            return [prune(x) for x in v]
+        return v
+
+    return json.dumps(prune(data), ensure_ascii=False, separators=(",", ":"))
+
+
+def _text_of(result, limit=MAX_RESULT):
     parts = []
     for c in getattr(result, "content", None) or []:
         kind = getattr(c, "type", "")
         if kind == "text":
-            parts.append(c.text)
+            parts.append(_compact(c.text))
         elif kind == "resource":
             res = getattr(c, "resource", None)
             parts.append(getattr(res, "text", None) or f"[resource {getattr(res, 'uri', '')}]")
@@ -246,8 +269,8 @@ def _text_of(result):
     if not parts and structured:
         parts.append(json.dumps(structured, ensure_ascii=False))
     text = "\n".join(parts).strip() or "(no output)"
-    if len(text) > MAX_RESULT:
-        text = text[:MAX_RESULT] + f"\n... [{len(text) - MAX_RESULT} more characters cut]"
+    if len(text) > limit:
+        text = text[:limit] + f"\n... [{len(text) - limit} more characters cut]"
     return text
 
 
@@ -283,7 +306,11 @@ def _make_runner(server, tool):
         except Exception as e:
             return f"Error: {server}'s {tool.name} failed: {e}"
 
-        text = _text_of(result)
+        try:
+            limit = max(500, int((entry.get("spec") or {}).get("max_result") or MAX_RESULT))
+        except (TypeError, ValueError):
+            limit = MAX_RESULT
+        text = _text_of(result, limit)
         if _field(result, "is_error", "isError", False):
             return f"Error from {server}: {text}"
 
@@ -359,6 +386,34 @@ def disconnect_server(name):
         _loop.call_soon_threadsafe(entry["stop"].set)
 
 
+def prompt_lines(private=True):
+    """Each connected server's own "prompt" note from config.json - how to
+    use it, for a small model that won't work that out from the tool
+    schemas (the bridge: read first, reply only when asked). Only in your
+    own conversations, like the tools themselves."""
+    if not private:
+        return ""
+
+    lines = []
+    for name, spec in (getattr(config, "MCP_SERVERS", {}) or {}).items():
+        note = spec.get("prompt") if isinstance(spec, dict) else None
+        if note and connected(name) and _any_enabled(name):
+            lines.append(" ".join(str(note).split()))
+
+    return "".join("\n" + line + "\n" for line in lines)
+
+
+def _any_enabled(name):
+    """Is at least one of a server's tools switched on? Its note is no use
+    to her when all of them are off in the tools pane."""
+    try:
+        import tools
+
+        return any(tools.enabled(n) for n in (_servers.get(name) or {}).get("registered") or [])
+    except Exception:
+        return True
+
+
 def connected(name):
     return (_servers.get(name) or {}).get("session") is not None
 
@@ -378,6 +433,8 @@ def set_server(name, on):
         message = f"{name}: connected, {message}" if ok else f"{name}: not connected - {message}"
     else:
         disconnect_server(name)
+        if name in _servers:
+            _servers[name]["error"] = "switched off in the tools pane"
         ok, message = True, f"{name}: disconnected, its tools are out of the prompt"
 
     if ok:

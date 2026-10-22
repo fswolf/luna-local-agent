@@ -102,6 +102,13 @@ class Coffee(unittest.TestCase):
         self.assertFalse(coffee.holding())
         self.assertEqual(self.events[-1], ("prop", {"name": "mug", "on": False}))
 
+    def test_start_clears_a_stale_mug(self):
+        with mock.patch("threading.Thread"):
+            coffee._state["thread"] = None
+            coffee.start()
+            coffee._state["thread"] = None
+        self.assertEqual(self.events[0], ("prop", {"name": "mug", "on": False}))
+
     def test_begin_twice(self):
         self.assertTrue(coffee.begin(now=0))
         self.assertFalse(coffee.begin(now=1))

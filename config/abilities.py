@@ -128,3 +128,10 @@ PRESENCE_MATCH = float(_presence_cfg.get("match", 0.36))
 _people_cfg = setting("people", {})
 PEOPLE_VOICE = bool(_people_cfg.get("voice", True))
 PEOPLE_VOICE_MATCH = float(_people_cfg.get("voice_match", 0.3))
+
+# Relay stations (station.py): talk to her from another room on an old phone
+# or tablet. Off until switched on; then she listens on your home network only
+# (port, and port + 1 for the setup page), each device paired by QR code.
+_station_cfg = setting("station", {})
+STATION_ENABLED = bool(_station_cfg.get("enabled", False))
+STATION_PORT = int(_station_cfg.get("port", 8793))

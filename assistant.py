@@ -95,7 +95,7 @@ def _say_away(said):
     ui.set_status("Idle")
 
 
-def respond(text, model, source="typed", speaker=None):
+def respond(text, model, source="typed", speaker=None, sink=None, approver=None):
     """Send a turn to the model and speak the reply as it arrives.
 
     Nothing here waits for the whole answer. Text appears on screen as
@@ -113,7 +113,11 @@ def respond(text, model, source="typed", speaker=None):
     (people.decide); None is the owner. Their name, pronouns and facts
     are used for the turn instead of his.
 
-    source: "typed" or "voice". Runs as the caller's Stop (interrupts)
+    sink: where the reply's sentences go instead of the PC's speakers (a
+    relay station plays them on its own speaker). approver: who answers her
+    permission questions for this turn (a station asks on its own screen).
+
+    source: "typed", "voice" or "station". Runs as the caller's Stop (interrupts)
     if it opened one - ptt does, at the key press - else its own, opened
     now, before waiting: a HOME pressed while it waits still reaches it.
     """
@@ -133,10 +137,13 @@ def respond(text, model, source="typed", speaker=None):
                 said = _gone(text, model)
 
                 if said is not None:
-                    _say_away(said)
+                    if sink is not None:
+                        sink(said)
+                    else:
+                        _say_away(said)
                     return said
 
-                return _respond(text, model, source, stop, speaker)
+                return _respond(text, model, source, stop, speaker, sink, approver)
             finally:
                 _hold(None)
 
@@ -348,8 +355,10 @@ def respond_remote(text, model, source, who, tools_allowed=None,
             ui.set_status("Idle")
 
 
-def _respond(text, model, source, stop, speaker=None):
-    player = speech.Player()
+def _respond(text, model, source, stop, speaker=None, sink=None, approver=None):
+    # a relay station speaks the reply itself: no Player on the PC's speakers
+    player = speech.Player() if sink is None else None
+    say = sink or player.say
 
     ui.set_status("Thinking...")
     ui.begin_message(AGENT_NAME.lower())
@@ -358,13 +367,13 @@ def _respond(text, model, source, stop, speaker=None):
         # HOME during generation means "don't bother speaking this" -
         # the reply still finishes and stays on screen.
         if not stop.speaking.is_set():
-            player.say(sentence)
+            say(sentence)
 
     try:
         # Your own turn, typed or spoken: ask() leaves source None for
         # those (it's what turns on the second-look checks), so how it
         # reached her is set on the turn itself.
-        with turnctx.begin(source=source, speaker=speaker):
+        with turnctx.begin(source=source, speaker=speaker, approver=approver):
             answer = ask(
                 text, model, on_text=ui.extend_message, on_sentence=on_sentence
             )
@@ -374,7 +383,8 @@ def _respond(text, model, source, stop, speaker=None):
         # Read now, while she's still speaking, so a laugh or a blush
         # lands with the words rather than after them.
         _note_mood(text, answer, model)
-        player.wait()
+        if player is not None:
+            player.wait()
 
         return answer
     except Exception:
@@ -399,6 +409,7 @@ def _whose_voice(filename, heard):
     try:
         import voices
 
+        heard["enroll"] = voices.enrolling()       # a sample being read out, not a question
         heard["name"], heard["score"] = voices.identify(filename)
     except Exception as e:
         logbook.warn("voices", "couldn't tell whose voice: %s", e)
@@ -445,6 +456,14 @@ def _spoken_turn(model, mode, stop):
         if not text:
             ui.set_status("Idle")
             return False
+
+        if heard.get("enroll"):
+            # an enrolment line read out loud ("please remind me to water the
+            # flowers"): a voice sample, so she doesn't act on it
+            logbook.info("turn", "voice sample: %s", text[:200])
+            ui.add_message("user", f"[voice sample] {text}")
+            ui.set_status("Idle")
+            return True
 
         speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None)
         logbook.info("turn", "heard%s: %s", f" ({speaker})" if speaker else "", text[:200])

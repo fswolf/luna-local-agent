@@ -426,6 +426,8 @@ pip install mcp          # once, in Luna's venv
 | `tools` | Only these tools from it. A small model picks better from five than from fifty. |
 | `approve` | Every call pops the same yes/no window as a file write. Tools the server itself marks destructive always ask. |
 | `enabled` | `false` keeps it in the file without starting it. |
+| `prompt` | A note added to her prompt while it's connected: how to use it, for a small model that won't work it out from the tool list ("read your inbox first, reply only when asked"). Never in stream chat. |
+| `max_result` | Longest answer she's handed, in characters (default 6000). Lower it for a chatty server on a small context window. JSON answers already have their empty fields dropped. |
 
 The OBS one is [royshil/obs-mcp](https://lobehub.com/mcp/royshil-obs-mcp).
 It needs OBS 31+ with its WebSocket server on (Tools → WebSocket Server

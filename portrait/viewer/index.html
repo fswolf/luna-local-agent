@@ -9,8 +9,13 @@
   html, body { margin: 0; height: 100%; overflow: hidden; }
   body { background: radial-gradient(120% 90% at 50% 20%, var(--bg-top), var(--bg-bottom));
          color: var(--text); font: 12px/1.4 system-ui, sans-serif; }
-  body.transparent { background: transparent; }
-  body.fan { background: #000; cursor: none; }
+  /* portrait.background: a colour or a picture you picked (boot.js); see-through
+     for OBS and black for the fans still win, they come after */
+  body.custom-bg { background: var(--user-bg) center / cover no-repeat fixed, #0b0711; }
+  body.custom-bg.solid { background: var(--user-bg); }
+  body.custom-bg.clear { background: transparent; }
+  body.transparent { background: transparent !important; }
+  body.fan { background: #000 !important; cursor: none; }
   body.fan #note { display: none; }
   canvas { display: block; width: 100vw; height: 100vh; }
   #note { position: fixed; inset: auto 0 12px 0; text-align: center; color: var(--dim);

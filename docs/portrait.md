@@ -58,6 +58,22 @@ right / ahead* to try the looking), `?demo=1` (acts out a conversation
 on its own), `?fan=1` (for an HDMI hologram fan: black, all of her,
 nothing else). Hologram fans, HDMI and WiFi: [fans.md](fans.md).
 
+## What's behind her
+
+`/settings`, Portrait, **background**, picks what's behind her and changes an
+open portrait straight away:
+
+- **default**: her usual dark gradient.
+- **none**: see-through.
+- **a colour**: pick one with the swatch.
+- **a picture**: any `.png`, `.jpg` or `.webp` you put in
+  `portrait/backgrounds/`. It fills the window and is cropped to fit.
+
+It's `portrait.background` in config.json (`""`, `"none"`, `"#1a1025"` or a
+file name). It only ever changes when you change it. The OBS page
+(`?bg=transparent`) stays see-through and the hologram fans stay black
+whatever it's set to.
+
 ## Touching her
 
 Click a part of her and she reacts (3D models). The cursor turns into a
@@ -420,7 +436,9 @@ the dock at the bottom left (–); they remember where they were.
   with the prop (it's in her hand when you open it), *at* which second it appears or goes (*now*
   takes the timeline's time), and whether her last pose is held while she
   carries it. A `.glb` dropped in `portrait/props/` shows up in the list
-  as a new prop.
+  as a new prop; name its gestures `<prop>_pickup` and `<prop>_putdown` and
+  they're the ones that pick it up and put it down. What sets that off is
+  still code: `coffee.py` is the example to copy.
 
 *open a gesture… → load* brings any existing gesture in to edit. **save**
 writes `portrait/gestures/<name>.js` - plain data, the same shape as the

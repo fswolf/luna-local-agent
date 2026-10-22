@@ -385,6 +385,19 @@ def _after(path, value):
             import livefeed
 
             livefeed.emit("frame", frame=value)
+        elif path == "station.enabled":
+            import station
+
+            if value:
+                ok, said = station.start()
+                add_message("system", f"Relay stations: {said}" if ok else f"Relay stations didn't start: {said}")
+            else:
+                station.stop()
+                add_message("system", "Relay stations: off")
+        elif path == "portrait.background":
+            import livefeed
+
+            livefeed.emit("background", value=value)
         elif path == "portrait.model":
             import livefeed
 

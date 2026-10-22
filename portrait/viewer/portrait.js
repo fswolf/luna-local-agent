@@ -213,6 +213,9 @@ function stageOf(status) {
 function handle(ev) {
   mind.lastEvent = performance.now();
   switch (ev.t) {
+    case 'background':  // /settings: what's behind her, picked by you
+      window.lunaBackground?.(ev.value);
+      break;
     case 'stage': {
       const next = stageOf(ev.status);
       if (next === 'listening' && mind.stage !== 'listening') twitch(0, 1.0);  // ears up: he's talking
@@ -524,7 +527,9 @@ function actOut(text) {
 // On her own: every so often while idle, something small. While she
 // talks, now and then a hand comes up.
 const idle = { next: 25, last: '', talkNext: 0 };
-// A prop in her hand (props.js): the pick-up gesture plays, the prop appears
+// A prop in her hand (props.js): the pick-up gesture plays (its PROPS entry's
+// pickup, else <name>_pickup, so a prop placed in the studio needs no code),
+// the prop appears
 // part way through it (the gesture's prop_at), and the pose she ends in is
 // held (its hold) until she puts it down again, so between sips her arm
 // stays round the mug.
@@ -541,16 +546,16 @@ function propEvent(ev) {
   if (!p || !moves) return;
   if (ev.on) {
     if (props.held(ev.name)) return;
-    const g = GESTURES[p.pickup];
+    const g = GESTURES[p.pickup || ev.name + '_pickup'];
     if (!g) { props.show(ev.name); return; }
-    gesture(p.pickup);
+    gesture(p.pickup || ev.name + '_pickup');
     setTimeout(() => props.show(ev.name), (+g.prop_at || 0) * 1000);
     setTimeout(() => moves.hold(heldPose(g)), Math.max(0, g.dur - (g.fade?.[1] ?? 0.4)) * 1000);
   } else {
     if (!props.held(ev.name)) return;
-    const g = GESTURES[p.putdown];
+    const g = GESTURES[p.putdown || ev.name + '_putdown'];
     if (!g) { props.hide(ev.name); moves.hold(null); return; }
-    gesture(p.putdown);
+    gesture(p.putdown || ev.name + '_putdown');
     setTimeout(() => moves.hold(null), (g.fade?.[0] ?? 0.3) * 1000 + 50);   // once the gesture has her arm
     setTimeout(() => props.hide(ev.name), (+g.prop_at || 0) * 1000);
   }

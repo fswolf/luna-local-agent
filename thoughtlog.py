@@ -206,7 +206,7 @@ def record(user_text, rounds, answer, source="typed", tools=(),
     hedge_below = float(getattr(config, "SELF_HEDGE_BELOW", 0.6))
 
     if (shape["conf"] is not None and shape["conf"] < hedge_below and shape["shaky"]
-            and not names and source in ("typed", "voice")
+            and not names and source in ("typed", "voice", "station")
             and not _HEDGED.search(str(answer or ""))
             and (checks is None or "overconfident" in checks)):
         flags.append(f"overconfident: sounded sure at {shape['conf']:.0%} "

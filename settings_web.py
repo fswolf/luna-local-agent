@@ -71,6 +71,10 @@ def entry(path):
            "live": bool(config.SETTINGS.get(path, (None, False))[1]),
            "basic": path in BASIC, "range": _range(kind, line, path)}
 
+    if path == "portrait.background":
+        # its own control on the page: default / see-through / a colour / a picture
+        out["kind"], out["choices"] = "background", config.backgrounds()
+
     if kind == "secret":
         out["value"] = None
         out["has"] = bool(value)                  # never the secret itself
@@ -109,7 +113,16 @@ def listing():
                 "active": all(pane._value(path)[0] == v for path, v in p["values"].items())}
                for n, p in PRESETS.items()]
 
-    return {"groups": groups, "presets": presets}
+    return {"groups": groups, "presets": presets, "station": _station_panel()}
+
+
+def _station_panel():
+    try:
+        import station
+
+        return station.panel()
+    except Exception as e:
+        return {"error": f"relay stations: {e}"}
 
 
 def _raw(value):
@@ -200,12 +213,29 @@ def handle(method, sub, body, key=None):
             ok, message, item = reset(data.get("path"))
         elif action == "preset":
             ok, message, item = preset(str(data.get("name", "")))
+        elif action in ("station_pair", "station_forget"):
+            return 200, "application/json", json.dumps(_station_action(action, data))
         else:
             ok, message, item = False, "unknown action", None
 
         return (200 if ok else 400), "application/json", json.dumps({"ok": ok, "message": message, "entry": item})
 
     return 404, "text/plain; charset=utf-8", "not found"
+
+
+def _station_action(action, data):
+    """Pair a phone or tablet (a one-time code and its QR), or unpair one."""
+    import station
+
+    if action == "station_forget":
+        ok = station.forget(str(data.get("key", "")))
+        return {"ok": ok, "message": "unpaired" if ok else "no such device", "station": station.panel()}
+    if not station.running():
+        return {"ok": False, "message": "switch relay stations on first" if not getattr(config, "STATION_ENABLED", False)
+                else (station.panel().get("error") or "the stations aren't running")}
+    code, url = station.new_pairing(data.get("name") or "station")
+    return {"ok": True, "message": f"scan it within {station.PAIR_MINUTES} minutes", "url": url,
+            "qr": station.qr_svg(url), "station": station.panel()}
 
 
 def register():
@@ -268,6 +298,22 @@ section>h2 .after{color:var(--warn);font-size:11.5px;font-weight:400;margin-left
 .ctl input[type=text],.ctl input[type=password]{width:min(360px,100%)}
 .ctl input[type=number]{width:110px}
 .ctl input[type=range]{width:220px;accent-color:var(--accent)}
+.stationbox{border-top:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.stationbox .st{color:var(--dim);font-size:13px}.stationbox .st b{color:var(--text)}
+.stationbox .st.bad b{color:var(--warn)}
+.stationbox code{font-family:ui-monospace,monospace;font-size:12px;background:#0e0a16;border:1px solid var(--line);border-radius:5px;padding:2px 6px;word-break:break-all}
+.stationbox .add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stationbox input{background:#0e0a16;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 9px;font:inherit;width:160px}
+.stationbox button{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}
+.stationbox button:hover{background:var(--accent);color:#14081c}
+.stationbox .qr{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.stationbox .qr svg{width:180px;height:180px;border-radius:8px;background:#fff}
+.stationbox ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.stationbox li{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.stationbox li span{color:var(--dim)}
+.ctl input[type=color]{width:46px;height:32px;padding:2px;background:#0e0a16;border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.ctl input[type=color]::-webkit-color-swatch-wrapper{padding:0}.ctl input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
+.ctl input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
 .ctl output{font-family:ui-monospace,monospace;color:var(--accent);min-width:40px}
 .ctl .note{color:var(--dim);font-size:12.5px}
 .sw{position:relative;width:42px;height:24px;flex:none}
@@ -351,6 +397,19 @@ function control(s) {
       (s.choices.some(c => String(c).toLowerCase() === String(s.value).toLowerCase()) ? "" : `<option selected disabled>${esc(s.value ?? "choose")}</option>`) +
       s.choices.map(c =>
       `<option ${String(c).toLowerCase() === String(s.value).toLowerCase() ? "selected" : ""}>${esc(c)}</option>`).join("") + `</select>`;
+  if (s.kind === "background") {
+    // default, see-through, a colour (the swatch) or a picture from portrait/backgrounds/
+    const v = String(s.value ?? ""), colour = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v);
+    const full = c => c.length === 4 ? "#" + [...c.slice(1)].map(x => x + x).join("") : c;
+    const opt = (val, label, on) => `<option value="${esc(val)}" ${on ? "selected" : ""}>${esc(label)}</option>`;
+    return `<select id="${id}" data-path="${esc(s.path)}" data-bg="pick">` +
+      opt("", "default (her dark gradient)", !v) + opt("none", "none (see-through)", v === "none") +
+      opt("colour", "a colour", colour) +
+      (s.choices.length ? `<optgroup label="pictures (portrait/backgrounds/)">` +
+        s.choices.map(c => opt(c, c, c === v)).join("") + `</optgroup>` : "") +
+      `</select> <input type="color" id="${id}_c" data-path="${esc(s.path)}" data-bg="colour" value="${colour ? full(v) : "#1a1025"}"` +
+      ` title="pick the colour" ${colour ? "" : "hidden"}>`;
+  }
   if (s.kind === "dict")
     return `<span class="note">${s.has ? s.has + " entries, edited" : "Edited"} in config.json (a nested block)</span>`;
   if (s.kind === "secret")
@@ -384,6 +443,23 @@ function row(s) {
     ${s.help ? `<div class="help">${hl(s.help)}</div>` : ""}</div>`;
 }
 
+// Relay stations: their state, pairing a phone or tablet (QR), the paired ones
+let pairing = null;
+function stationBox() {
+  const s = data.station || {};
+  const state = s.error && !s.running ? `<div class="st bad"><b>${esc(s.error)}</b></div>`
+    : !s.on ? `<div class="st">Off. Switch it on above, then pair a phone or tablet here.</div>`
+    : s.running ? `<div class="st">Listening on <b>${esc(s.ip)}</b>, port ${s.port} (setup page ${s.port + 1}), your home network only.</div>`
+    : `<div class="st bad"><b>Switched on but not running yet.</b></div>`;
+  const need = s.available === false ? `<div class="st">Needs the stations extra: <code>python3 installer/install.py --extras stations</code></div>` : "";
+  const fw = s.on && s.firewall ? `<div class="st">Fedora's firewall blocks other devices until the ports are open, once: <code>${esc(s.firewall)}</code></div>` : "";
+  const qr = pairing ? `<div class="qr">${pairing.qr || ""}<div class="st">Scan with the phone or tablet's camera, or open<br><code>${esc(pairing.url)}</code><br>Works once, for 15 minutes.</div></div>` : "";
+  const list = (s.devices || []).length ? `<ul>${s.devices.map(d => `<li><b>${esc(d.name)}</b> <span>paired ${esc(d.paired)}</span> <button data-unpair="${esc(d.key)}">Unpair</button></li>`).join("")}</ul>`
+    : `<div class="st">No devices paired yet.</div>`;
+  return `<div class="stationbox">${state}${need}${fw}
+    <div class="add"><input id="stname" placeholder="kitchen" maxlength="30"><button id="stpair">Add a phone or tablet</button></div>${qr}${list}</div>`;
+}
+
 function render() {
   if (!data) return;
   const q = query.toLowerCase();
@@ -399,7 +475,7 @@ function render() {
     const after = allRestart.has(g.key) ? '<span class="after" title="every setting here takes effect after a restart">↻ after a restart</span>' : "";
     sections.push(g);
     html += `<section class="${shut ? "closed" : ""}" data-group="${esc(g.key)}" id="s_${esc(g.key)}"><h2><div>${esc(g.title)}${changed && view !== "changed" ? `<em>${changed} set</em>` : ""}${after}</div> <span>${rows.length}</span></h2>
-             <div class="rows">${rows.map(row).join("")}</div></section>`;
+             <div class="rows">${rows.map(row).join("")}</div>${g.key === "station" ? stationBox() : ""}</section>`;
   }
   $("#list").innerHTML = html || `<div class="empty">${query ? `Nothing matches "${esc(query)}".` : "Nothing set in config.json yet: everything is at its default."}</div>`;
   // presets are for browsing, not for a search or the list of your changes
@@ -437,12 +513,18 @@ async function save(path, value) {
   flash(path, out.ok);
   toast(out.ok ? `${path}: ${out.message}` : out.message, !out.ok);
   if (!out.ok) setTimeout(load, 900);
+  else if (path.startsWith("station.")) setTimeout(load, 900);     // its state box follows
 }
 
 $("#list").addEventListener("change", e => {
   const el = e.target, path = el.dataset.path;
   if (!path) return;
-  if (el.type === "checkbox") save(path, el.checked);
+  if (el.dataset.bg === "pick") {
+    const swatch = el.nextElementSibling;
+    if (swatch) swatch.hidden = el.value !== "colour";
+    save(path, el.value === "colour" ? swatch.value : el.value);
+  }
+  else if (el.type === "checkbox") save(path, el.checked);
   else if (el.type === "range" || el.type === "number") { if (el.value !== "") save(path, el.value); }
   else if (el.type === "password") { if (el.value) save(path, el.value); }
   else save(path, el.value);
@@ -451,6 +533,18 @@ $("#list").addEventListener("input", e => {
   if (e.target.type === "range") e.target.nextElementSibling.textContent = e.target.value;
 });
 $("#list").addEventListener("click", async e => {
+  if (e.target.id === "stpair") {
+    const out = await send({action: "station_pair", name: ($("#stname").value || "station").trim()});
+    if (!out.ok) return toast(out.message, true);
+    pairing = out; data.station = out.station; render(); toast(out.message);
+    return;
+  }
+  if (e.target.dataset.unpair) {
+    if (!confirm("Unpair this device? It will need a new pairing code.")) return;
+    const out = await send({action: "station_forget", key: e.target.dataset.unpair});
+    data.station = out.station || data.station; render(); toast(out.message, !out.ok);
+    return;
+  }
   const h = e.target.closest("section > h2");
   if (h) {
     const key = h.parentElement.dataset.group;

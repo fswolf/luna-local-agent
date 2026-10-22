@@ -9,6 +9,7 @@
 - [Email](email.md)
 - [Vision](vision.md)
 - [People in the house](people.md)
+- [Relay stations](stations.md)
 - [Reminders and alarms](reminders.md)
 - [Knowledge](knowledge.md)
 - [Memory](memory.md)

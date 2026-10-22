@@ -4,6 +4,21 @@
 
 const cfg = await fetch('config.json' + location.search).then(r => r.json()).catch(() => ({}));
 const model = cfg.model || '';
+
+// What's behind her (portrait.background): your pick in /settings, live.
+// "" her usual gradient, "none" see-through, a colour, or a picture in
+// portrait/backgrounds/. ?bg=transparent (OBS) and the fans keep their own.
+window.lunaBackground = value => {
+  const b = document.body, v = String(value || '').trim();
+  b.classList.remove('custom-bg', 'solid', 'clear');
+  b.style.removeProperty('--user-bg');
+  if (!v) return;
+  b.classList.add('custom-bg');
+  if (v === 'none') b.classList.add('clear');
+  else if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) { b.classList.add('solid'); b.style.setProperty('--user-bg', v); }
+  else b.style.setProperty('--user-bg', `url("backgrounds/${encodeURIComponent(v)}")`);
+};
+window.lunaBackground(cfg.background);
 const note = document.getElementById('note');
 
 if (!model) {

@@ -62,6 +62,33 @@ class Voices(_Folder):
         self.assertIsNone(voices._state["enroll"])
         self.assertEqual(len(people.load("Shannon")["voice"]), 2)
 
+    def test_enrolment_gives_lines_to_read(self):
+        told = []
+        with mock.patch.object(voices, "threading"), mock.patch.object(voices, "_tell", told.append):
+            ok, said = voices.enroll("Shannon")
+            lines = voices._state["enroll"]["lines"]
+            self.assertEqual(len(set(lines)), voices.ENROLL_TURNS)          # 5 different ones
+            self.assertTrue(set(lines) <= set(voices.LINES))
+            self.assertIn(lines[0], said)
+            self.assertTrue(voices.enrolling())
+            with mock.patch.object(voices, "print_of", return_value=None):
+                voices.identify("x.wav")                                     # too short: same line again
+            self.assertIn(lines[0], told[-1])
+            with mock.patch.object(voices, "print_of", return_value=SHANNON):
+                voices.identify("x.wav")
+            self.assertIn(lines[1], told[-1])
+            # no speaker model: the enrolment stops instead of going deaf
+            voices._state["error"] = "the speaker model didn't load"
+            try:
+                with mock.patch.object(voices, "print_of", return_value=None):
+                    voices.identify("x.wav")
+            finally:
+                voices._state["error"] = ""
+            self.assertFalse(voices.enrolling())
+            self.assertIn("stopped", told[-1])
+        for line in voices.LINES:
+            self.assertTrue(8 <= len(line.split()) <= 15, line)
+
     def test_matches_the_closest_voice(self):
         people.add_prints("Shannon", "voice", [SHANNON])
         people.add_prints("Ryan", "voice", [RYAN])

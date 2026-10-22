@@ -790,6 +790,7 @@ def portrait_config(preview=None):
             "sounds": bool(getattr(config, "PORTRAIT_SOUNDS", True)),
             "sound_volume": float(getattr(config, "PORTRAIT_SOUND_VOLUME", 0.8)),
             "frame": str(getattr(config, "PORTRAIT_FRAME", "bust")),
+            "background": str(getattr(config, "PORTRAIT_BACKGROUND", "") or ""),
             "fan": dict(getattr(config, "PORTRAIT_FAN", {}) or {},
                         cast=bool(getattr(config, "PORTRAIT_FAN_CAST", False))),
             "clips": portrait_clips(),

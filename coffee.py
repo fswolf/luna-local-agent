@@ -188,5 +188,9 @@ def _loop():
 
 def start():
     if _state["thread"] is None:
+        # A restart forgets a cup in progress, so tell an open portrait the
+        # mug is down: kept as the last prop event, a page that reconnects
+        # puts it away instead of holding it all day.
+        _emit("prop", name="mug", on=False)
         _state["thread"] = threading.Thread(target=_loop, daemon=True, name="coffee")
         _state["thread"].start()

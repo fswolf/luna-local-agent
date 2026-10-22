@@ -237,6 +237,16 @@ def _plugin_lines(private):
         return ""
 
 
+def _mcp_lines(private):
+    """Connected MCP servers' own notes (config.json: mcp.servers.<name>.prompt)."""
+    try:
+        import mcpclient
+
+        return mcpclient.prompt_lines(private)
+    except Exception:
+        return ""
+
+
 def build_system_prompt(query="", timing="", private=True):
     # Ryan's history summary, his facts and her notes are his business -
     # a turn from stream chat gets the persona and the clock, not them.
@@ -278,7 +288,7 @@ Traits:
 
 Rules:
 {', '.join(RULES)}
-{gestures.prompt_line(private)}{build_tools_prompt(private)}{_plugin_lines(private)}
+{gestures.prompt_line(private)}{build_tools_prompt(private)}{_plugin_lines(private)}{_mcp_lines(private)}
 {build_memory_prompt(query) if private else ""}
 {build_self_prompt(query) if private else ""}
 {summary_block}

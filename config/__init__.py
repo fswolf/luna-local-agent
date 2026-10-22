@@ -25,6 +25,8 @@ config.X (or `from config import X` for ones that never change at run
 time); never from a section module, which keeps its import-time value.
 """
 import json
+import os
+import re
 
 from .base import *  # noqa: F401,F403
 from .server import *  # noqa: F401,F403
@@ -156,6 +158,8 @@ SETTINGS = {
     "camera.presence.recognise":  ("PRESENCE_RECOGNISE",           True),
     "camera.presence.match":      ("PRESENCE_MATCH",               True),
     "people.voice":               ("PEOPLE_VOICE",                 True),
+    "station.enabled":            ("STATION_ENABLED",              True),
+    "station.port":               ("STATION_PORT",                 False),
     "people.voice_match":         ("PEOPLE_VOICE_MATCH",           True),
 
     "desktop.enabled":            ("DESKTOP_ENABLED",              True),
@@ -281,6 +285,7 @@ SETTINGS = {
     "portrait.browser":           ("PORTRAIT_BROWSER",             True),
     "portrait.size":              ("PORTRAIT_SIZE",                True),
     "portrait.frame":             ("PORTRAIT_FRAME",               True),
+    "portrait.background":        ("PORTRAIT_BACKGROUND",          True),
     "portrait.touch_talk":        ("PORTRAIT_TOUCH_TALK",          True),
     "portrait.coffee.enabled":    ("PORTRAIT_COFFEE",              True),
     "portrait.coffee.from":       ("PORTRAIT_COFFEE_FROM",         True),
@@ -391,6 +396,9 @@ def _coerce(path, raw):
             raise ValueError(f"portrait.frame is bust, full or face, not {raw!r}")
         return text.lower()
 
+    if path == "portrait.background":
+        return background_value(text)
+
     if path == "camera.device":   # a number, a /dev path or a URL
         return int(text) if text.lstrip("-").isdigit() else text
 
@@ -411,6 +419,37 @@ def _coerce(path, raw):
             raise ValueError(f"{path} is a number - {raw!r} isn't one") from None
 
     return text
+
+
+BACKGROUND_TYPES = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def backgrounds():
+    """The pictures in portrait/backgrounds/, by file name."""
+    folder = os.path.join(BASE_DIR, "portrait", "backgrounds")
+    try:
+        return sorted(f for f in os.listdir(folder)
+                      if f.lower().endswith(BACKGROUND_TYPES) and not f.startswith("."))
+    except OSError:
+        return []
+
+
+def background_value(text):
+    """portrait.background, checked: "" (her usual gradient), "none"
+    (see-through), a #rgb / #rrggbb colour, or a picture that's really in
+    portrait/backgrounds/ - never a path."""
+    text = str(text or "").strip()
+    low = text.lower()
+    if low in ("", "default"):
+        return ""
+    if low in ("none", "transparent", "see-through"):
+        return "none"
+    if re.fullmatch(r"#[0-9a-f]{3}([0-9a-f]{3})?", low):
+        return low
+    if text in backgrounds():
+        return text
+    raise ValueError(f"portrait.background is default, none, a colour like #1a1025, or a picture in "
+                     f"portrait/backgrounds/ ({', '.join(backgrounds()) or 'none there yet'}), not {text!r}")
 
 
 def save_setting(path, raw):

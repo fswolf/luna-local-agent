@@ -105,6 +105,24 @@ class Page(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertEqual(self._file()["mood"]["intensity"], 0.5)
 
+    def test_background(self):
+        bg = os.path.join(self.tmp, "portrait", "backgrounds")
+        os.makedirs(bg)
+        open(os.path.join(bg, "night room.png"), "wb").close()
+        with mock.patch.object(config, "BASE_DIR", self.tmp), \
+             mock.patch.object(config, "PORTRAIT_BACKGROUND", "", create=True):
+            entry = settings_web.entry("portrait.background")
+            self.assertEqual((entry["kind"], entry["choices"]), ("background", ["night room.png"]))
+            for value, stored in (("#1A1025", "#1a1025"), ("none", "none"), ("night room.png", "night room.png"),
+                                  ("default", "")):
+                code, out = self._post(key=settings_web.KEY, action="set", path="portrait.background", value=value)
+                self.assertEqual(code, 200, out)
+                self.assertEqual(self._file()["portrait"]["background"], stored)
+            for bad in ("../config.json", "red", "missing.png", "#12"):
+                code, _out = self._post(key=settings_web.KEY, action="set", path="portrait.background", value=bad)
+                self.assertEqual(code, 400, bad)
+            self.assertEqual(self._file()["portrait"]["background"], "")
+
     def test_switches_and_choices(self):
         self._post(key=settings_web.KEY, action="set", path="plugins.twitch.lewd", value=True)
         self.assertIs(self._file()["plugins"]["twitch"]["lewd"], True)

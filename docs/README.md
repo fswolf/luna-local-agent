@@ -11,6 +11,7 @@ Everything the README only touches on, one subject per page.
 - [Email](email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](vision.md): looking at your screen, the webcam, noticing you're there
 - [People in the house](people.md): who's talking, by voice or face, and their own memories
+- [Relay stations](stations.md): talk to her from another room on an old phone or tablet
 - [Reminders and alarms](reminders.md)
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
@@ -63,6 +64,7 @@ Everything the README only touches on, one subject per page.
 - Optional vision: she can read what's on your screen, and see through your webcam when you switch it on
 - [Presence](vision.md#presence-noticing-youre-there): she notices you at the desk, says hi when you come back, looks at you, and goes quiet in an empty room
 - [People in the house](people.md): she knows who's talking by voice or face, and keeps each person's memories separate
+- [Relay stations](stations.md): talk to her from another room through an old phone or tablet, no extra hardware
 - Three push-to-talk modes, including hands free
 - Configurable AI personality, and moods that shift with the clock and the session
 - Long-term memory the model writes, corrects and forgets

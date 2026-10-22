@@ -23,12 +23,18 @@ python3 installer/install.py --extras camera     # OpenCV, for faces
 Enroll people in Luna:
 
 ```
-/people enroll voice Shannon    the next 5 things said to her out loud are Shannon's voice
+/people enroll voice Shannon    Shannon reads 5 short lines out loud, one at a time
 /people enroll face Shannon     Shannon looks at the camera for a few seconds
 /people                         who she knows, and how many prints each
 /people cancel                  stop a voice enrolment early
 /people forget Shannon [voice]  forget the voice prints, or the whole person
 ```
+
+A voice enrolment shows each line to read: everyday things like "Can you
+set a short timer for three minutes?", picked at random from 15 so the
+prints don't all come from the same words. While it runs she only
+listens: she doesn't answer the lines or act on them (no timer gets set).
+A line read too quickly to make a print is asked for again.
 
 Enroll yourself too, under the name in your `user` block. Otherwise she
 can only tell "Shannon" from "not Shannon". Not Shannon is you.

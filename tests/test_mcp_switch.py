@@ -70,6 +70,32 @@ class ServerSwitch(unittest.TestCase):
         self.assertFalse(mcpclient.set_server("nope", True)[0])
 
 
+class SmallContext(unittest.TestCase):
+    def test_compact(self):
+        out = mcpclient._compact('{"messages": [{"id": 1, "to": null, "body": "hi", "mentions": [], "attachments": []}]}')
+        self.assertEqual(out, '{"messages":[{"id":1,"body":"hi"}]}')
+        self.assertEqual(mcpclient._compact("plain text {"), "plain text {")
+        self.assertEqual(mcpclient._compact("{not json"), "{not json")
+
+    def test_limit(self):
+        class R:
+            content = [type("C", (), {"type": "text", "text": "x" * 3000})()]
+        self.assertIn("2000 more characters cut", mcpclient._text_of(R(), 1000))
+
+    def test_prompt_lines(self):
+        servers = {"bridge": {"url": "u", "prompt": "Read your   inbox first."}, "other": {"url": "u"}}
+        with mock.patch.object(config, "MCP_SERVERS", servers, create=True), \
+             mock.patch.object(mcpclient, "connected", lambda n: True):
+            with mock.patch.object(mcpclient, "_any_enabled", lambda n: True):
+                self.assertEqual(mcpclient.prompt_lines(True), "\nRead your inbox first.\n")
+            with mock.patch.object(mcpclient, "_any_enabled", lambda n: False):
+                self.assertEqual(mcpclient.prompt_lines(True), "")    # every tool of it switched off
+            self.assertEqual(mcpclient.prompt_lines(False), "")       # never in stream chat
+        with mock.patch.object(config, "MCP_SERVERS", servers, create=True), \
+             mock.patch.object(mcpclient, "connected", lambda n: False):
+            self.assertEqual(mcpclient.prompt_lines(True), "")        # not while it's off
+
+
 class PaneShrinks(unittest.TestCase):
     def test_scroll_clamped(self):
         # a scroll and selection left past the end once the list got shorter

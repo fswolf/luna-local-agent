@@ -30,6 +30,7 @@ SECTIONS = {
     "vision": "Vision",
     "camera": "Camera",
     "people": "People",
+    "station": "Relay stations",
     "comfyui": "ComfyUI",
     "desktop": "Desktop",
     "tools": "Tools",
@@ -142,6 +143,7 @@ SCHEMA = {
     "portrait.size": ("text", "Portrait window size in pixels, width x height (e.g. 420x560)"),
     "portrait.frame": ("choice", "How much of her the camera shows: bust (head and shoulders), full, or face (close crop)",
                        ("bust", "full", "face")),
+    "portrait.background": ("text", "What's behind her: default (her dark gradient), none (see-through), a colour like #1a1025, or a picture in portrait/backgrounds/"),
     "portrait.live2d": ("dict", "Live2D only: which model expression is which mood, and which parameters are the ears"),
     "portrait.touch_talk": ("bool", "When you touch her portrait, she also answers out loud in one short line"),
     "portrait.touch_talk_cooldown": ("float", "Seconds between spoken touch lines"),
@@ -214,6 +216,10 @@ SCHEMA = {
     "camera.presence.match": ("float", "How alike a face must be to an enrolled one to count, 0-1 (0.36 is OpenCV's advice)"),
     "people.voice": ("bool", "Tell people apart by voice on spoken turns (needs the voices extra and /people enroll voice)"),
     "people.voice_match": ("float", "How alike a voice must be to an enrolled one to count, 0-1: higher is stricter"),
+
+    # --- Relay stations ------------------------------------------------------
+    "station.enabled": ("bool", "Talk to her from another room on an old phone or tablet: she listens on your home network (pair each device below)"),
+    "station.port": ("int", "Port for the stations (the setup page uses the next one up)"),
 
     # --- ComfyUI ------------------------------------------------------------
     "comfyui.url": ("text", "Address of ComfyUI, used to make textures for her model"),
@@ -507,8 +513,8 @@ BASIC = (
     "voice", "tts.speed", "tts.volume",
     "stt.mode", "stt.sensitivity", "stt.silence_seconds", "stt.language", "wake_word.enabled",
     "mood.enabled", "mood.intensity", "mood.walk_away",
-    "portrait.frame", "portrait.gestures", "portrait.touch_talk",
-    "camera.presence.enabled", "people.voice",
+    "portrait.frame", "portrait.background", "portrait.gestures", "portrait.touch_talk",
+    "camera.presence.enabled", "people.voice", "station.enabled",
     "vision.enabled", "knowledge.enabled", "reminders.enabled", "alarms.volume",
     "long_term_memory.enabled", "self.greet", "thoughts.enabled", "ui.mouse",
 )

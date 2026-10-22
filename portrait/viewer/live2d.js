@@ -133,6 +133,9 @@ function handle(ev) {
   if (ev.t !== 'gaze') act.lastEvent = performance.now() / 1000;
 
   switch (ev.t) {
+    case 'background':  // /settings: what's behind her, picked by you
+      window.lunaBackground?.(ev.value);
+      break;
     case 'stage': {
       const next = stageOf(ev.status);
       if (next === 'listening' && mind.stage !== 'listening') {

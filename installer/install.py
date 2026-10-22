@@ -54,6 +54,7 @@ EXTRAS = {
     "toys": (["websocket-client"], "the Buttplug plugin: toys of most brands through Intiface Central"),
     "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
     "voices": (["speechbrain"], "tell people in the house apart by voice (/people enroll voice)"),
+    "stations": (["cryptography", "segno"], "talk to her from another room on an old phone or tablet (relay stations)"),
 }
 
 # ---------------------------------------------------------------------------
