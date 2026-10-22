@@ -22,6 +22,7 @@ import { createHologram3D } from './hologram3d.js';
 import { createEmotes } from './emotes.js';
 import { createTouch } from './touch.js';
 import { createFan } from './fan.js';
+import { createProps } from './props.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
@@ -279,6 +280,9 @@ function handle(ev) {
       mind.emote = em;
       break;
     }
+    case 'prop':       // her morning coffee (coffee.py): pick the mug up, put it down
+      propEvent(ev);
+      break;
     case 'emote':      // a compliment landed (moods.json "compliment")
       emote(ev.name);
       break;
@@ -520,6 +524,38 @@ function actOut(text) {
 // On her own: every so often while idle, something small. While she
 // talks, now and then a hand comes up.
 const idle = { next: 25, last: '', talkNext: 0 };
+// A prop in her hand (props.js): the pick-up gesture plays, the prop appears
+// part way through it (the gesture's prop_at), and the pose she ends in is
+// held (its hold) until she puts it down again, so between sips her arm
+// stays round the mug.
+// hold: true keeps the pose of its last key (the '+' torso bones are left
+// to her breathing); an object is a pose of its own
+function heldPose(g) {
+  if (g.hold && typeof g.hold === 'object') return g.hold;
+  if (g.hold !== true || !g.keys?.length) return null;
+  const last = g.keys[g.keys.length - 1][1];
+  return Object.fromEntries(Object.entries(last).filter(([b]) => !b.startsWith('+')));
+}
+function propEvent(ev) {
+  const p = props?.PROPS[ev.name];
+  if (!p || !moves) return;
+  if (ev.on) {
+    if (props.held(ev.name)) return;
+    const g = GESTURES[p.pickup];
+    if (!g) { props.show(ev.name); return; }
+    gesture(p.pickup);
+    setTimeout(() => props.show(ev.name), (+g.prop_at || 0) * 1000);
+    setTimeout(() => moves.hold(heldPose(g)), Math.max(0, g.dur - (g.fade?.[1] ?? 0.4)) * 1000);
+  } else {
+    if (!props.held(ev.name)) return;
+    const g = GESTURES[p.putdown];
+    if (!g) { props.hide(ev.name); moves.hold(null); return; }
+    gesture(p.putdown);
+    setTimeout(() => moves.hold(null), (g.fade?.[0] ?? 0.3) * 1000 + 50);   // once the gesture has her arm
+    setTimeout(() => props.hide(ev.name), (+g.prop_at || 0) * 1000);
+  }
+}
+
 function idleMoves(now, talking) {
   // Holding a pose: nothing else on her own, and back into it as soon as
   // anything that interrupted it has finished.
@@ -528,6 +564,7 @@ function idleMoves(now, talking) {
     return;
   }
   if (!moves || moves.busy()) return;
+  if (moves.holding()) return;     // her hands are full (the mug): she sips instead
   if (mind.stage === 'idle' && now > idle.next) {
     let pick;
     // half the time, something that suits her mood (agent/moods.json "idle")
@@ -834,6 +871,7 @@ function animate() {
     moves.rest(armsDown);
     idleMoves(now, talking > 0.05);
     moves.update(Math.min(raw, 0.2));   // real time, so a wave lasts as long on a slow machine
+    props.update(Math.min(raw, 0.2));
     const hy = moves.hipsY() * base.follow;
     if (view.back && now > view.back) turnTo(0);                       // drift back to the front
     if (view.target != null) {
@@ -1345,7 +1383,7 @@ function debugPanel() {
   open.textContent = '🎬 pose studio';
   open.onclick = () => studio?.show();
   box.appendChild(open);
-  import('./studio.js').then(m => { studio = m.createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas: renderer.domElement, fx }); })
+  import('./studio.js').then(m => { studio = m.createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas: renderer.domElement, fx, props: () => props }); })
     .catch(e => console.warn('pose studio:', e));
   // a gesture file with a mistake in it: say which and why, instead of a missing button
   if (Object.keys(GESTURE_FAILED).length) {
@@ -1601,6 +1639,7 @@ function touch(zone, side) {
 // she answers out loud, a moment later, in one short line. Every click
 // goes, so "on the head, 3 times" is right; the cooldown is hers.
 let studio = null;      // the pose studio (studio.js), debug viewer only
+let props = null;       // things in her hands (props.js): the morning mug
 
 function tell(zone) {
   if (params.get('demo')) return;
@@ -1646,6 +1685,7 @@ if (touchCfg.enabled !== false) {
 try {
   vrm = await load(cfg.model);
   moves = createGestures(THREE, vrm);
+  props = createProps({ THREE, GLTFLoader, vrm, fx: vrm.meta?.metaVersion === '0' ? -1 : 1 });
   earRange = cfg.vrm?.ear_range ?? (ears.some(e => /catear/i.test(e.node.name)) ? 0.3 : 1);
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
@@ -1653,7 +1693,7 @@ try {
   // the debug page's frame picker: bust / face / full without reloading (the studio keeps going)
   const setFrame = f => { if (['bust', 'face', 'full'].includes(f)) { framing = f; frame(); } };
   window.portrait = { setFrame, get fan() { return fan?.status(); }, handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
-                      touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank };
+                      touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank, get props() { return props; } };
   if (cfg.fan?.cast && !params.has('nocast'))
     fan = createFan({ THREE, renderer, scene, cfg: { ...cfg.fan, ...(params.get('fanframe') ? { framing: params.get('fanframe') } : {}) }, place: placeFan });
   if (params.get('debug')) debugPanel();

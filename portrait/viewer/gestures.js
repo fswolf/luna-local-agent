@@ -123,6 +123,7 @@ export function createGestures(THREE, vrm) {
   const euler = (x, y, z) => e.set(fx * x, y, fx * z);
   const qt = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0);
   let exprNow = {};
+  let held = null;      // a pose she keeps between gestures (holding her mug): hold()
 
   // the tail: spring bones, so it can't be posed; it wags by swinging
   // the gravity its joints feel from side to side
@@ -222,6 +223,11 @@ export function createGestures(THREE, vrm) {
     },
     // level 0-1; sweep 0 lifts the tail and holds it up without swishing
     wag(level, sweep = 1) { wag.target = level; wag.sweep = sweep; },
+    // A pose that replaces the rest pose for the bones it names, until
+    // hold(null): her arm stays round the mug between sips. Gestures still
+    // play over it and come back to it.
+    hold(pose) { held = pose || null; },
+    holding() { return held; },
 
     // The natural rest pose; called every frame before update(), so a
     // gesture that ends always has somewhere to go back to.
@@ -244,6 +250,16 @@ export function createGestures(THREE, vrm) {
         const n = Object.keys(vrm.humanoid.humanBones).find(k => bone(k) === o);
         if (n && (MANAGED.has(n) || n in REST)) continue;
         o.quaternion.identity();
+      }
+      // last, so nothing above undoes it
+      if (held) {
+        for (const [n, v] of Object.entries(held)) {
+          const b = n === 'hips' || n.startsWith('+') ? null : bone(n);
+          if (!b) continue;
+          euler(v[0], v[1], v[2]);
+          b.quaternion.setFromEuler(e);
+          if (v.length > 3) b.quaternion.multiply(qt.setFromAxisAngle(X, fx * v[3]));
+        }
       }
     },
 

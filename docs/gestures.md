@@ -306,6 +306,9 @@ export default {
 | `full: true` | It only reads with all of her on screen (her legs): offered to her, and played as an idle move, only while the portrait is framed full body. In the bust view it would be a tag that shows nothing |
 | `touch: [...]` | Touch zones it answers when you click her: `['legs']`. See *Touching her* in [portrait](portrait.md) |
 | `moods: [...]` | With `touch`: the mood bands (`cool`, `neutral`, `warm`, `loving`) or mood names it suits. Leave it out for any mood |
+| `prop: 'mug'` | The prop it's made with (a `.glb` in `portrait/props/`, placed in her hand from the pose studio's *prop* page); opening the gesture in the studio puts it in her hand. Her morning coffee plays `coffee_pickup`, `coffee_sip` and `coffee_putdown` |
+| `prop_at: 0.9` | With `prop`: the second the prop appears in her hand (picking up) or goes (putting down) |
+| `hold: true` | With `prop`: her last pose is held after the gesture ends, so her arm stays round the mug between sips, until it's put down |
 
 ### How keys fill in
 

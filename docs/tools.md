@@ -437,7 +437,10 @@ Servers connect in the background at startup, so a slow `npx`
 download doesn't hold Luna up. `/mcp` shows each server: connected or
 not, and which tools it has. Their tools appear in the tools pane under
 **MCP: <server>**, with their token cost and an on/off switch like any
-other. They're named `<server>__<tool>`, so two servers can't collide.
+other. The first row of the group, *<server> server*, switches the whole
+server: space disconnects it (its tools leave the prompt) or connects it
+again, live and saved (`"enabled"` on its entry), so it stays that way
+after a restart. They're named `<server>__<tool>`, so two servers can't collide.
 A server's own log goes to `~/.cache/ai-voice/mcp-<server>.log`, not
 over the terminal.
 

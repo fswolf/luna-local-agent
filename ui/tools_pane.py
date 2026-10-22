@@ -285,6 +285,38 @@ def _with_plugin_switches(groups):
         else:
             out.append((label, [row], 0, 0))
 
+    # and every server of your own (config.json's mcp.servers) gets one too:
+    # off disconnects it and takes its tools out of the prompt, saved
+    try:
+        import mcpclient
+
+        servers = getattr(config, "MCP_SERVERS", {}) or {}
+    except Exception:
+        servers = {}
+
+    for name, spec in servers.items():
+        if not isinstance(spec, dict) or plugins.get(name):
+            continue
+
+        saved = spec.get("enabled", True) is not False
+        live = mcpclient.connected(name)
+        if live:
+            why = "connected - space disconnects it"
+        elif saved:
+            why = "on, but not connected (/mcp says why) - space switches it off"
+        else:
+            why = "off - space connects it"
+        row = (f"{name} server", live or saved, True, why, 0, "mcpserver:" + name)
+        label = f"MCP: {name}"
+
+        for i, (glabel, members, glive, total) in enumerate(out):
+            if glabel == label:
+                # while it's off its tools cost nothing: they aren't sent
+                out[i] = (glabel, [row] + list(members), glive if live else 0, total)
+                break
+        else:
+            out.append((label, [row], 0, 0))
+
     return out
 
 
@@ -584,6 +616,8 @@ def _tool_toggle():
             add_message("system", f"Portrait gestures: {nxt} - {_gesture_note()[1]}.")
         elif setting and setting.startswith("plugin:"):
             _toggle_plugin(setting[len("plugin:"):], on)
+        elif setting and setting.startswith("mcpserver:"):
+            _toggle_server(setting[len("mcpserver:"):], on)
         elif setting and setting.startswith("perm:"):
             import config
 
@@ -674,6 +708,20 @@ def _toggle_plugin(name, on):
     threading.Thread(target=go, daemon=True, name=f"plugin-{name}").start()
 
 
+def _toggle_server(name, on):
+    """Connect or disconnect one of your own MCP servers, saved. In a
+    thread, like a plugin: connecting can take a few seconds."""
+    import mcpclient
+
+    def go():
+        _ok, message = mcpclient.set_server(name, not on)
+        add_message("system", message)
+        _refresh()
+
+    add_message("system", f"{'Disconnecting' if on else 'Connecting'} {name}...")
+    threading.Thread(target=go, daemon=True, name=f"mcp-{name}").start()
+
+
 def _tool_group_toggle():
     """Switch every row in the selected row's group at once: all off if
     they're all on, otherwise all on. Rows that cycle (Permissions) or
@@ -687,7 +735,7 @@ def _tool_group_toggle():
     else:
         return
 
-    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "pick:", "plugin:"))]
+    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "pick:", "plugin:", "mcpserver:"))]
 
     if not rows:
         add_message("system", f"{label}: nothing here switches as a group")
@@ -760,11 +808,23 @@ def _keep_cursor_visible():
                 return
 
 
+def _clamp():
+    """Keep the selection and the scroll inside the list. It can shrink
+    under them while the pane is open: a server switched off or a plugin
+    disconnecting takes its tools with it, and a scroll left past the new
+    last line crashed the renderer (list index out of range)."""
+    rows = len(_tool_rows())
+    view.tool_cursor = max(0, min(view.tool_cursor, rows - 1))
+    view.tool_scroll = max(0, min(view.tool_scroll, _tool_line_count() - _tool_height()))
+
+
 def _tool_scroll_position(window):
+    _clamp()
     return view.tool_scroll
 
 
 def _tool_cursor_point():
+    _clamp()
     return Point(x=0, y=view.tool_scroll)
 
 

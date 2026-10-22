@@ -53,6 +53,7 @@ Slash commands:
 | `/look` | List windows, or test a screenshot |
 | `/camera` | Webcam: `/camera on`, `off`, `list`, `test` |
 | `/presence` | Webcam presence: `/presence on`, `off`, or status |
+| `/coffee` | Her morning coffee ([portrait.md](portrait.md#gestures)): `/coffee` pours one now, `/coffee sip`, `/coffee off` |
 | `/people` | People she knows ([people.md](people.md)): `/people enroll face\|voice <name>`, `/people forget <name> [face\|voice]`, `/people cancel` |
 | `/log` | Tail the debug log without leaving the app |
 | `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |

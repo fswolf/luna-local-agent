@@ -38,7 +38,7 @@ _lock = threading.Lock()
 # The last of each of these, replayed to a page that opens mid-session,
 # so it shows where things stand instead of a blank screen until the
 # next turn.
-_SNAPSHOT_KINDS = ("stage", "mood", "context", "server", "turn", "gaze", "holo")
+_SNAPSHOT_KINDS = ("stage", "mood", "context", "server", "turn", "gaze", "holo", "prop")
 _snapshot = {}
 
 
@@ -180,6 +180,14 @@ def gesture_file(data):
     if data.get("osc"):
         g["osc"] = [[b, int(_num(ax, 0, 3)), _num(a, -7, 7), _num(hz, 0, 60)]
                     for b, ax, a, hz in data["osc"][:12] if _BONE.match(str(b))]
+    # a prop it picks up or puts down (props.js): which, when in it the prop
+    # appears or goes, and whether her last pose is held while she carries it
+    if data.get("prop"):
+        g["prop"] = _words([str(data["prop"])], 1, _GNAME)[0]
+    if data.get("prop_at") not in (None, ""):
+        g["prop_at"] = _num(data["prop_at"], 0, 600)
+    if data.get("hold") is True:
+        g["hold"] = True
     if data.get("add"):
         g["add"] = {b: [_num(x, -7, 7) for x in v[:4]] for b, v in data["add"].items() if _BONE.match(str(b)) and isinstance(v, list)}
 
@@ -195,6 +203,37 @@ def gesture_file(data):
             lines.append(f"  {k}: {json.dumps(v, ensure_ascii=False)},")
     lines.append("};")
     return name, "\n".join(lines) + "\n"
+
+
+def prop_entry(data):
+    """(name, entry) for portrait/props/props.json from the pose studio's prop
+    tab: where a prop sits in her hand. Numbers only, clamped; the prop must
+    be a .glb in portrait/props/."""
+    if not isinstance(data, dict):
+        raise ValueError("expected a JSON object")
+    name = str(data.get("name", "")).strip().lower()
+    if not _GNAME.match(name):
+        raise ValueError("name: lower-case letters, numbers and _ only")
+    if not os.path.isfile(os.path.join(config.BASE_DIR, "portrait", "props", name + ".glb")):
+        raise ValueError(f"there's no portrait/props/{name}.glb")
+    hand = str(data.get("hand", "right"))
+    if hand not in ("right", "left"):
+        raise ValueError("hand: right or left")
+    at, turn = list(data.get("at") or []), list(data.get("turn") or [])
+    if len(at) != 3 or len(turn) != 3:
+        raise ValueError("at and turn are three numbers each")
+    return name, {"hand": hand, "at": [_num(v, -0.5, 0.5) for v in at],
+                  "turn": [_num(v, -7, 7) for v in turn],
+                  "scale": _num(data.get("scale", 1), 0.05, 5)}
+
+
+def props_list():
+    """Every prop model in portrait/props/ (a .glb by its name)."""
+    try:
+        return sorted(f[:-4] for f in os.listdir(os.path.join(config.BASE_DIR, "portrait", "props"))
+                      if f.endswith(".glb") and _GNAME.match(f[:-4]))
+    except OSError:
+        return []
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -250,6 +289,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._touch()
         elif self.path == "/portrait/gestures/save":
             self._save_gesture()
+        elif self.path == "/portrait/props/save":
+            self._save_prop()
         elif self.path == "/portrait/fan/frame":
             self._fan_frame()
         elif not self._page("POST") and not self._mounted("POST"):
@@ -344,6 +385,32 @@ class _Handler(BaseHTTPRequestHandler):
         logbook.info("portrait", "pose studio saved gestures/%s.js", name)
         return self._json(200, {"ok": True, "name": name})
 
+    def _save_prop(self):
+        """The pose studio's prop tab: where a prop sits in her hand, kept in
+        portrait/props/props.json (JSON in, checked, numbers out)."""
+        kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        try:
+            length = min(int(self.headers.get("Content-Length", 0)), 4096)
+            data = json.loads(self.rfile.read(length) or b"{}") if kind == "application/json" else None
+            name, entry = prop_entry(data)
+        except (ValueError, TypeError, AttributeError) as e:
+            return self._json(400, {"ok": False, "error": str(e)[:200]})
+        path = os.path.join(config.BASE_DIR, "portrait", "props", "props.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                saved = json.load(f)
+            if not isinstance(saved, dict):
+                saved = {}
+        except (OSError, ValueError):
+            saved = {}
+        saved[name] = entry
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(saved, f, indent=2)
+            f.write("\n")
+        os.replace(path + ".tmp", path)
+        logbook.info("portrait", "pose studio placed the %s prop", name)
+        return self._json(200, {"ok": True, "name": name, **entry})
+
     def _fan_frame(self):
         """A frame for the hologram fan, already in its layout (fan.js)."""
         try:
@@ -435,6 +502,13 @@ class _Handler(BaseHTTPRequestHandler):
             except OSError:
                 names = []
             return self._body(json.dumps(names).encode(), "application/json")
+
+        if rel == "props/index.json":
+            return self._body(json.dumps(props_list()).encode(), "application/json")
+
+        if rel == "props/props.json" and not os.path.isfile(
+                os.path.join(config.BASE_DIR, "portrait", "props", "props.json")):
+            return self._body(b"{}", "application/json")     # nothing placed yet: the defaults
 
         if rel == "sounds/index.json":
             # portrait/sounds/: {name: [files]} - a file by its name without the

@@ -345,7 +345,7 @@ def connect_server(name, spec, timeout=None):
         return False, entry["error"] or "it didn't connect", []
 
     n = _register(name)
-    logbook.info("mcp", "%s: %d tools (connected by a plugin)", name, n)
+    logbook.info("mcp", "%s: %d tools (connected live)", name, n)
 
     return True, f"{n} tools", list(entry["registered"])
 
@@ -357,6 +357,35 @@ def disconnect_server(name):
 
     if entry and entry.get("stop") is not None and _loop is not None:
         _loop.call_soon_threadsafe(entry["stop"].set)
+
+
+def connected(name):
+    return (_servers.get(name) or {}).get("session") is not None
+
+
+def set_server(name, on):
+    """Switch one config.json server on or off from the tools pane:
+    connected or disconnected now, and saved (mcp.servers.<name>.enabled)
+    so the next start does the same. Returns (ok, message). Connecting
+    can take a few seconds, so call it off the UI thread."""
+    spec = (getattr(config, "MCP_SERVERS", {}) or {}).get(name)
+
+    if not isinstance(spec, dict):
+        return False, f"there's no MCP server called {name} in config.json"
+
+    if on:
+        ok, message, _names = connect_server(name, spec)
+        message = f"{name}: connected, {message}" if ok else f"{name}: not connected - {message}"
+    else:
+        disconnect_server(name)
+        ok, message = True, f"{name}: disconnected, its tools are out of the prompt"
+
+    if ok:
+        spec["enabled"] = bool(on)
+        config._store(f"mcp.servers.{name}.enabled", bool(on))
+        message += " (saved)"
+
+    return ok, message
 
 
 # ---------------------------------------------------------------------------

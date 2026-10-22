@@ -234,6 +234,10 @@ import touches  # noqa: E402
 reflect.start(MODEL, show=lambda line: ui.add_message("system", line))
 touches.start(MODEL)          # the portrait's touches, answered out loud (touches.py)
 
+import coffee  # noqa: E402
+
+coffee.start()                # her morning coffee (coffee.py), on the portrait
+
 # The webcam watching for someone in front of it (presence.py): greets on
 # arrival, looks at you, keeps quiet in an empty room.
 import presence  # noqa: E402
@@ -1505,6 +1509,20 @@ def handle_input(text):
                 f"  device {config.CAMERA_DEVICE}, width {config.CAMERA_WIDTH}",
                 "  ready" if usable else f"  not usable: {camera.why_unavailable()}",
                 "  /camera list | /camera test"]))
+        return
+
+    if text == "/coffee" or text.startswith("/coffee "):
+        import coffee
+
+        word = text[len("/coffee"):].strip().lower()
+
+        if word in ("", "on", "now"):
+            ui.add_message("system", "Coffee time. She picks up her mug." if coffee.begin()
+                           else "She already has her coffee.")
+        elif word in ("off", "done"):
+            ui.add_message("system", "She puts her mug down." if coffee.finish() else "She isn't holding one.")
+        elif word == "sip":
+            ui.add_message("system", "A sip." if coffee.sip() else "She has no coffee - /coffee first.")
         return
 
     if text == "/presence" or text.startswith("/presence "):

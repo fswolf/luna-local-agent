@@ -7,6 +7,10 @@
 //   details  name, what it's for, when it plays (touches, moods), flags,
 //            sound, emotes, tail.
 //   link     a chain: gestures one after another, saved as one.
+//   prop     something in her hand (props.js): pick it, move and turn it in
+//            the hand, size it, save where it sits (portrait/props/props.json).
+//            A gesture can be made with it: when it appears or goes, and
+//            whether her last pose is held while she carries it.
 //
 // Save writes portrait/gestures/<name>.js through the portrait server (your
 // own machine only; an existing gesture is backed up before it's replaced).
@@ -27,7 +31,8 @@ const EMOTES = ['hearts', 'sweat', 'anger', 'question'];
 const r2 = v => Math.round(v * 100) / 100;
 const near = (a, b) => Math.abs(a - b) < 0.015;
 
-export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas, fx = 1 }) {
+export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas, fx = 1, props = null }) {
+  const P = () => (typeof props === 'function' ? props() : props);
   const bones = Object.keys(vrm.humanoid.humanBones)
     .filter(n => vrm.humanoid.getNormalizedBoneNode(n) && !/Eye|jaw/.test(n));
   const key = b => (ADDED.has(b) ? '+' + b : b);
@@ -57,12 +62,13 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   document.body.appendChild(win);
   const tabsRow = el('div', { className: 'tabs' });
   const pages = {};
-  for (const name of ['pose', 'animate', 'details', 'link']) {
+  for (const name of ['pose', 'animate', 'details', 'link', 'prop']) {
     pages[name] = el('div', { hidden: name !== 'pose' });
     tabsRow.appendChild(btn(name, () => {
       for (const [n, p] of Object.entries(pages)) p.hidden = n !== name;
       for (const b of tabsRow.children) b.classList.toggle('on', b.textContent === name);
       if (name === 'animate') drawTimeline();
+      if (name === 'prop') fillProps();
     }));
   }
   tabsRow.firstChild.classList.add('on');
@@ -211,6 +217,103 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     el('div', { className: 'row' }, linkSel, btn('+ add', () => { if (linkSel.value) { A.chain.push(linkSel.value); drawChain(); } })),
     chainBox,
     el('div', { className: 'row' }, btn('▶ play chain', playChain), btn('save chain', () => saveIt(false, true)), btn('save chain as…', () => saveIt(true, true))));
+
+  // -- prop page -------------------------------------------------------------------
+  // what she holds, where it sits in her hand (saved for every gesture), and
+  // what this gesture does with it
+  const PI = Math.PI;
+  const propSel = el('select'), handSel = el('select');
+  for (const h of ['right', 'left']) handSel.add(new Option(h + ' hand', h));
+  const pp = { name: '', shown: '' };
+  const propSliders = {};
+  const propBox = el('div');
+  const PF = [['at', 0, 'x', -0.25, 0.25, 0.002], ['at', 1, 'y', -0.25, 0.25, 0.002], ['at', 2, 'z', -0.25, 0.25, 0.002],
+              ['turn', 0, 'turn x', -PI, PI, 0.01], ['turn', 1, 'turn y', -PI, PI, 0.01], ['turn', 2, 'turn z', -PI, PI, 0.01],
+              ['scale', -1, 'size', 0.2, 2, 0.01]];
+  for (const [field, i, label, lo, hi, step] of PF) {
+    const r = el('input', { type: 'range', min: lo, max: hi, step, value: 0, style: 'width:150px' });
+    const n = el('input', { type: 'number', step, style: 'width:64px' });
+    const set = v => {
+      const p = P()?.PROPS[pp.name];
+      if (!p) return;
+      v = Math.round(Math.max(lo, Math.min(hi, v)) / step) * step;
+      v = +v.toFixed(4);
+      r.value = n.value = v;
+      if (i < 0) P().set(pp.name, { [field]: v });
+      else { const a = p[field].slice(); a[i] = v; P().set(pp.name, { [field]: a }); }
+    };
+    r.oninput = () => set(+r.value);
+    n.onchange = () => set(+n.value);
+    const nudge = d => btn(d > 0 ? '+' : '−', e => set((+n.value || 0) + d * step * (e.shiftKey ? 1 : 5)), 'shift: finer');
+    propSliders[label] = { r, n, field, i };
+    const color = { x: AXC.x, y: AXC.y, z: AXC.z }[label.slice(-1)];
+    propBox.append(el('div', { className: 'row' }, el('span', { className: 'l', textContent: label, style: color ? `color:${color}` : '' }),
+                      nudge(-1), r, nudge(1), n));
+  }
+  const propUses = el('input', { type: 'checkbox' }), propHold = el('input', { type: 'checkbox' });
+  const propAt = el('input', { type: 'number', step: 0.05, min: 0, placeholder: 'seconds', style: 'width:72px' });
+  propUses.onchange = () => { remember(); A.extra.prop = propUses.checked && pp.name ? pp.name : undefined; drawPropUse(); };
+  propHold.onchange = () => { remember(); A.extra.hold = propHold.checked || undefined; };
+  propAt.onchange = () => { remember(); A.extra.prop_at = propAt.value === '' ? undefined : r2(+propAt.value); };
+  pages.prop.append(
+    el('div', { className: 'dim', textContent: 'a 3D model in her hand (portrait/props/*.glb); it moves with every gesture' }),
+    row('prop', propSel, handSel),
+    propBox,
+    el('div', { className: 'dim', textContent: 'x y z move it in the hand (metres), turn spins it, size scales it · pose her arm on the pose page to check it from every side' }),
+    el('div', { className: 'row' }, btn('save placement', saveProp, 'where it sits, for every gesture (portrait/props/props.json)'),
+       btn('put it away', () => { propSel.value = ''; pickProp(); })),
+    el('div', { className: 'dim', textContent: 'this gesture (saved with it)' }),
+    el('div', { className: 'row' }, el('label', {}, propUses, ' made with it (in her hand when it\'s opened)')),
+    row('at', propAt, el('span', { className: 'dim', textContent: ' s, when it appears or goes ' }), btn('now', () => { propAt.value = st.t; propAt.onchange(); }, 'the time on the timeline')),
+    el('div', { className: 'row' }, el('label', {}, propHold, ' hold her last pose while she carries it')));
+  propSel.onchange = () => pickProp();
+  handSel.onchange = () => { if (pp.name) { P().set(pp.name, { hand: handSel.value }); } };
+  async function fillProps() {
+    const pr = P();
+    if (!pr) return;
+    await pr.ready;
+    const cur = propSel.value || pp.name;
+    propSel.textContent = '';
+    propSel.add(new Option('nothing in her hand', ''));
+    for (const n of pr.names()) propSel.add(new Option(n, n));
+    propSel.value = pr.names().includes(cur) ? cur : '';
+    drawProp(); drawPropUse();
+  }
+  function pickProp() {
+    const pr = P();
+    if (!pr) return;
+    // only put away what the studio got out (not her coffee, if she's drinking it)
+    if (pp.shown && pp.shown !== propSel.value) { pr.hide(pp.shown); pp.shown = ''; }
+    pp.name = propSel.value;
+    if (pp.name) {
+      handSel.value = pr.side(pp.name);
+      const already = pr.held(pp.name);
+      pr.show(pp.name, handSel.value).then(ok => { if (ok && !already) pp.shown = pp.name; });
+    }
+    drawProp(); drawPropUse();
+  }
+  function drawProp() {
+    const p = P()?.PROPS[pp.name];
+    propBox.hidden = handSel.disabled = !p;
+    if (!p) return;
+    for (const s of Object.values(propSliders)) s.r.value = s.n.value = +(s.i < 0 ? (p.scale ?? 1) : p[s.field][s.i]).toFixed(4);
+  }
+  function drawPropUse() {
+    propUses.checked = !!A.extra.prop;
+    propUses.disabled = !pp.name && !A.extra.prop;
+    propHold.checked = !!A.extra.hold;
+    propAt.value = A.extra.prop_at ?? '';
+  }
+  async function saveProp() {
+    const p = P()?.PROPS[pp.name];
+    if (!p) return say('pick a prop first');
+    try {
+      const r = await fetch('props/save', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: pp.name, hand: handSel.value, at: p.at, turn: p.turn, scale: p.scale ?? 1 }) });
+      const j = await r.json();
+      say(j.ok ? `saved where the ${pp.name} sits` : j.error || 'not saved', 6000);
+    } catch (e) { say(`couldn't save: ${e.message || e}`, 8000); }
+  }
 
   // -- posing ----------------------------------------------------------------------
   function start() {
@@ -664,7 +767,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     fillSounds(); soundSel.value = A.sound.name || ''; soundFrom.value = A.sound.from ?? ''; soundLen.value = A.sound.len ?? '';
     tailSel.value = A.tail; tailLvl.value = A.tailLevel;
     durN.value = A.dur; time.max = A.dur;
-    drawEmotes(); drawChain();
+    drawEmotes(); drawChain(); drawPropUse();
   }
   function refreshAll() { aToForm(); seek(0); show(); }
 
@@ -711,7 +814,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     A.sound = { name: s.name || '', from: s.from ?? '', len: s.len ?? '' };
     A.emote = [].concat(g.emote || []).map(e => (typeof e === 'string' ? { name: e, at: 0 } : { name: e.name, at: +e.at || 0 }));
     if (g.tail_up) { A.tail = 'tail_up'; A.tailLevel = g.tail_up; } else if (g.wag) { A.tail = 'wag'; A.tailLevel = g.wag; }
-    for (const k of ['then', 'left', 'osc', 'add']) if (g[k] != null) A.extra[k] = g[k];
+    for (const k of ['then', 'left', 'osc', 'add', 'prop', 'prop_at', 'hold']) if (g[k] != null) A.extra[k] = g[k];
+    if (g.prop && propSel) { propSel.value = g.prop; fillProps().then(pickProp); }
     if (g.chain) {
       A.chain = g.chain.slice();
       tabsRow.children[3].click();

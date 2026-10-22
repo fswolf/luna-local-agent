@@ -41,6 +41,7 @@ agent/playlogs/
 agent/backups/
 # Face and voice prints of the people she knows (people.py). Personal: never commit.
 agent/people/
+agent/coffee.json
 games/zork/saves/
 
 # llama.cpp is built in place by llama/install.sh; only the scripts and

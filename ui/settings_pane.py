@@ -245,13 +245,20 @@ def _fragments():
             live = config.SETTINGS.get(path, (None, False))[1]
             here = index == view.set_cursor
 
-            name = _clip(_short(path, key), 26)
+            name = _clip(_short(path, key), 24)
             shown = _clip(_show(path, value, kind), 18)
             mark = "" if live else " ↻"
 
             fragments.append(("class:key" if here else "", " >" if here else "  "))
-            fragments.append(("class:value bold" if here else "class:value", f" {name:<26} "))
-            fragments.append(("class:ok" if is_set else "class:dim", f"{shown:<18}"))
+            # a switch is green when it's on, grey when it's off, wherever the
+            # value came from; • marks one you've set yourself in config.json
+            fragments.append(("class:ok" if is_set else "", " • " if is_set else "   "))
+            fragments.append(("class:value bold" if here else "class:value", f"{name:<24} "))
+            if kind == "bool":
+                style = "class:ok" if value else "class:dim"
+            else:
+                style = "class:ok" if is_set else "class:dim"
+            fragments.append((style, f"{shown:<18}"))
             fragments.append(("class:warn" if here and not live else "class:dim", f"{mark:<3}"))
             rest = width - 52
 
@@ -290,7 +297,7 @@ def _header():
 
     return [
         ("class:label", f" {count}"), ("class:dim", flt),
-        ("class:dim", "   green = set in config.json, grey = default, ↻ = after a restart\n"),
+        ("class:dim", "   • = set in config.json (no dot: default) · switches: green on, grey off · ↻ = after a restart\n"),
         ("class:key", " space"), ("class:dim", " flip/step  "),
         ("class:key", "enter"), ("class:dim", " edit  "),
         ("class:key", "/"), ("class:dim", " filter  "),

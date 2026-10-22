@@ -57,6 +57,18 @@ PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
 # gesture file names one, sound: 'touch-self'. No file there, no sound.
 # sound_volume 0-1.
 PORTRAIT_SOUNDS = bool(_portrait_cfg.get("sounds", True))
+# Her morning coffee (coffee.py): once a day, between from and to (hours,
+# 24h clock), the first time you're around she picks up her mug, takes a
+# sip every few minutes, and puts it down after `minutes`. Each sip wakes
+# her up a little (energy, 0 for none).
+#   "coffee": { "enabled": true, "from": 5, "to": 11, "minutes": 40, "sip_minutes": 4, "wake": 0.03 }
+_coffee_cfg = dict(_portrait_cfg.get("coffee", {}) or {})
+PORTRAIT_COFFEE = bool(_coffee_cfg.get("enabled", True))
+PORTRAIT_COFFEE_FROM = int(_coffee_cfg.get("from", 5))
+PORTRAIT_COFFEE_TO = int(_coffee_cfg.get("to", 11))
+PORTRAIT_COFFEE_MINUTES = float(_coffee_cfg.get("minutes", 40))
+PORTRAIT_COFFEE_SIP_MINUTES = float(_coffee_cfg.get("sip_minutes", 4))
+PORTRAIT_COFFEE_WAKE = float(_coffee_cfg.get("wake", 0.03))
 PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume", 0.8))))
 # Hologram fans (holofan.py, docs/fans.md). An HDMI fan just shows
 # /portrait/?fan=1. A WiFi fan run by the Holoscope app (P56, PD42...) gets

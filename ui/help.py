@@ -225,6 +225,7 @@ _HELP_SECTIONS = [
         ("/holo", "portrait hologram look on/off (live, saved)"),
         ("/camera", "webcam on/off, list cameras, take a test picture"),
         ("/presence", "notice who's at the desk: on/off, status"),
+        ("/coffee", "her coffee now (it happens on its own in the morning); /coffee off, sip"),
         ("/people", "who she knows: enroll face|voice <name>, forget <name>"),
         ("/allow", "is allow-all on for file changes? /allow off ends it"),
         ("/log", "tail the debug log without leaving the app"),

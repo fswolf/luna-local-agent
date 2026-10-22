@@ -101,13 +101,14 @@ she goes (part 1). Minecraft, Vibe City and REALITI ([her city](https://realiti.
 
 ## Watch her code
 
-<img width="1210" alt="Luna writing a backup script in the terminal: she reads the SSH config, writes the file with approval, catches her own syntax error, fixes it and schedules the job (placeholder mockup until a real screenshot)" src="assets/luna-coding.png" />
+<img width="1210" alt="Luna coding in the terminal: she wants to create a Python script in her sandbox folder, and the permission window shows the whole file before you allow it (Y), allow all file changes this session (A) or deny it (N)" src="assets/luna-coding.png" />
 
 Ask for a script and she writes it: she reads what she needs first,
 every write asks you before it lands, and what she wrote is checked
 straight away (Python, shell, JSON, TOML, YAML) but never run. Here she
-catches her own unclosed quote and fixes it in the same turn
-([files](docs/files.md), [checking her code](docs/learning.md#coding-checking-what-she-wrote)).
+wants to save a new script, and the whole file is in front of you before
+anything is written: allow it, allow her file changes for this session,
+or say no ([files](docs/files.md), [checking her code](docs/learning.md#coding-checking-what-she-wrote)).
 
 ## See inside her
 

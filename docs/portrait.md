@@ -369,6 +369,7 @@ and does small things on her own:
 | Tail wag | With the happy ones, and when her mood warms up |
 | Blow a kiss, shy | Affectionate ones, for people who role-play with her: fingers to her lips then blown your way; hands together at her chest, looking away, then a peek. Only in your own conversations: never from stream chat, and never offered to her in a chat room's turn |
 | Cry | She writes `[cry]`, or she stays deeply sad for several seconds: tears well on her lower lids, streak down her cheeks with drops running along them, and the cry gesture adds a lowered head and shoulders hitching with sobs. They dry slowly. `"vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}` in luna.json moves them for a non-VRoid face |
+| Morning coffee | Once a day in the morning, the first time you're around, she picks up her mug, takes a sip every few minutes (each one wakes her up a little) and puts it down when it's finished. `/coffee` pours one now, `/coffee off` puts it down. Settings: `portrait.coffee.*` |
 | Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
 
 ### The pose studio: making gestures without code
@@ -411,6 +412,15 @@ the dock at the bottom left (–); they remember where they were.
   or lifted and held).
 - **link** - gestures one after another (*+ add*, ↑ ↓ ✕), played and saved
   as one chain.
+- **prop** - something in her hand, like her coffee mug. Pick it and the
+  hand, then move it (*x y z*, in metres, in the hand), turn it and size
+  it, and it follows along live; pose her arm on the pose page to check it
+  from every side. *save placement* keeps where it sits for every gesture
+  (`portrait/props/props.json`). Under *this gesture*: whether it's made
+  with the prop (it's in her hand when you open it), *at* which second it appears or goes (*now*
+  takes the timeline's time), and whether her last pose is held while she
+  carries it. A `.glb` dropped in `portrait/props/` shows up in the list
+  as a new prop.
 
 *open a gesture… → load* brings any existing gesture in to edit. **save**
 writes `portrait/gestures/<name>.js` - plain data, the same shape as the
