@@ -190,6 +190,9 @@ def _show(path, value, kind):
         return _HIDDEN if value else "not set"
     if value is None:
         return "-"
+    if kind == "dict":
+        # a nested block (MCP servers, satellites) can hold logins: only how many
+        return f"{{{len(value)} entries}}" if isinstance(value, (dict, list)) and value else "{}"
     if isinstance(value, bool):
         return "on" if value else "off"
     if isinstance(value, list):

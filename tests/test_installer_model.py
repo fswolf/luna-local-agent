@@ -50,6 +50,24 @@ class Pick(unittest.TestCase):
             self.assertTrue(u[8].startswith(u[2] + "@"))
             self.assertIs(install.variant(m, uncensored=False), m)
 
+    def test_an_older_install_keeps_its_model(self):
+        # set up before the uncensored choice existed: a model, no flavour
+        tmp = tempfile.mkdtemp()
+        try:
+            os.makedirs(os.path.join(tmp, "llama", "models"))
+            m = install._model_by_key("9b")
+            open(os.path.join(tmp, "llama", "models", m[3]), "w").close()      # Qwen's own file is there
+            state = {"model": "9b", "backend": "llama"}
+            args = mock.Mock(model="auto", standard=False, yes=True)
+            with mock.patch.object(install, "ROOT", tmp), mock.patch.object(install, "ARGS", args), \
+                    mock.patch.object(install, "download") as download, \
+                    mock.patch.object(install, "detect_vram", return_value=(16.0, "test")):
+                install.model(state)
+            download.assert_not_called()
+            self.assertEqual(state["flavour"], "standard")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_local_env_is_written_for_start_sh(self):
         tmp = tempfile.mkdtemp()
         try:

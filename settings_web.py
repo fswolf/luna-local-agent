@@ -80,7 +80,7 @@ def entry(path):
         out["has"] = bool(value)                  # never the secret itself
     elif kind == "dict":
         out["value"] = None                       # a nested block can hold logins (mcp.servers' headers)
-        out["has"] = len(value) if isinstance(value, dict) else 0
+        out["has"] = len(value) if isinstance(value, (dict, list)) else 0
     else:
         out["value"] = value
 
@@ -456,7 +456,9 @@ function stationBox() {
   const qr = pairing ? `<div class="qr">${pairing.qr || ""}<div class="st">Scan with the phone or tablet's camera, or open<br><code>${esc(pairing.url)}</code><br>Works once, for 15 minutes.</div></div>` : "";
   const list = (s.devices || []).length ? `<ul>${s.devices.map(d => `<li><b>${esc(d.name)}</b> <span>paired ${esc(d.paired)}</span> <button data-unpair="${esc(d.key)}">Unpair</button></li>`).join("")}</ul>`
     : `<div class="st">No devices paired yet.</div>`;
-  return `<div class="stationbox">${state}${need}${fw}
+  const sats = (s.satellites || []).length ? `<div class="st"><b>Satellites (experimental, untested):</b></div><ul>${s.satellites.map(d =>
+    `<li><b>${esc(d.name)}</b> <span>${esc(d.host)} · ${esc(d.status)}</span></li>`).join("")}</ul>` : "";
+  return `<div class="stationbox">${state}${need}${fw}${sats}
     <div class="add"><input id="stname" placeholder="kitchen" maxlength="30"><button id="stpair">Add a phone or tablet</button></div>${qr}${list}</div>`;
 }
 

@@ -486,6 +486,13 @@ class _Setup(_Base):
         if url.path == "/":
             code = (parse_qs(url.query).get("code") or [""])[0]
             return self._send(200, _setup_page(code))
+        if url.path.startswith("/sat/") and url.path.endswith(".wav"):
+            # an ESPHome satellite fetching her reply (satellites.py): plain http, as
+            # those devices play from a link; the id is random and lasts minutes
+            import satellites
+
+            wav = satellites.clip(url.path[5:-4])
+            return self._send(200, wav, "audio/wav") if wav else self._send(404, "gone")
         self._send(404, "not found")
 
 
@@ -622,10 +629,25 @@ def start():
     _state["servers"] = [secure, setup]
     _state["error"] = ""
     logbook.info("station", "relay stations on https://%s:%d (setup page on %d)", ip, port, port + 1)
-    return True, f"listening on {ip}, port {port} (setup page {port + 1})"
+    said = f"listening on {ip}, port {port} (setup page {port + 1})"
+    try:
+        import satellites                  # experimental: ESPHome devices listed in config.json
+
+        if satellites.configured():
+            ok, sat = satellites.start()
+            said += f"; satellites: {sat}"
+    except Exception as e:
+        logbook.warn("station", "satellites didn't start: %s", e)
+    return True, said
 
 
 def stop():
+    try:
+        import satellites
+
+        satellites.stop()
+    except Exception:
+        pass
     servers, _state["servers"] = _state["servers"], []
     for server in servers:
         try:
@@ -647,7 +669,21 @@ def panel():
             "error": _state["error"], "available": available(), "ip": _state["ip"] or lan_ip(),
             "port": port, "firewall": firewall,
             "devices": [{"key": k, "name": v.get("name", ""), "paired": v.get("paired", "")}
-                        for k, v in devices().items()]}
+                        for k, v in devices().items()],
+            "satellites": _satellites()}
+
+
+def _satellites():
+    """The experimental ESPHome satellites and how they're doing."""
+    try:
+        import satellites
+
+        running = {d["name"]: d for d in satellites.status()}
+        return [running.get(str(s.get("name") or s["host"])[:30],
+                            {"name": str(s.get("name") or s["host"]), "host": s["host"], "status": "not started"})
+                for s in satellites.configured()]
+    except Exception:
+        return []
 
 
 def qr_svg(text):

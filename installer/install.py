@@ -55,6 +55,7 @@ EXTRAS = {
     "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
     "voices": (["speechbrain"], "tell people in the house apart by voice (/people enroll voice)"),
     "stations": (["cryptography", "segno"], "talk to her from another room on an old phone or tablet (relay stations)"),
+    "satellites": (["aioesphomeapi"], "EXPERIMENTAL: ESPHome voice satellites (Satellite1, Voice PE) as relay stations"),
 }
 
 # ---------------------------------------------------------------------------
@@ -686,7 +687,10 @@ def model(state):
 
     vram, where = detect_vram()
 
-    uncensored = not ARGS.standard and state.get("flavour", "uncensored") != "standard"
+    # an install from before the uncensored choice existed has a model and no
+    # flavour: that model is Qwen's own, and a re-run mustn't swap it for another
+    flavour = state.get("flavour") or ("standard" if state.get("model") else "uncensored")
+    uncensored = not ARGS.standard and flavour != "standard"
 
     # run again: the model from last time stays unless one is asked for by name
     done = _model_by_key(state.get("model") or "")
@@ -695,6 +699,7 @@ def model(state):
     if choice == "auto" and done:
         here = os.path.exists(os.path.join(ROOT, "llama", "models", done[3]))
         if state.get("backend") != "llama" or here:
+            state["flavour"] = "uncensored" if uncensored else "standard"
             ok(f"{done[1]} (set up last time; --model <size> picks another)")
             return
 

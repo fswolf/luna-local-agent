@@ -220,6 +220,7 @@ SCHEMA = {
     # --- Relay stations ------------------------------------------------------
     "station.enabled": ("bool", "Talk to her from another room on an old phone or tablet: she listens on your home network (pair each device below)"),
     "station.port": ("int", "Port for the stations (the setup page uses the next one up)"),
+    "station.satellites": ("dict", "EXPERIMENTAL, untested: ESPHome voice satellites (Satellite1, Voice PE) by name, host and API key - see docs/stations.md"),
 
     # --- ComfyUI ------------------------------------------------------------
     "comfyui.url": ("text", "Address of ComfyUI, used to make textures for her model"),

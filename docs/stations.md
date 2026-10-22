@@ -84,3 +84,39 @@ stations wait: read the enrolment lines at the PC.
   off a real website to a device that trusts it.
 - Permission questions are always asked on the device, never answered for
   you.
+
+## Experimental: ESPHome voice satellites
+
+> **Untested on real hardware.** Written from the libraries' documentation
+> and Home Assistant's own code, not yet run against a device. Expect rough
+> edges, and please report what happens.
+
+Dedicated voice devices that run ESPHome can be stations too, with no Home
+Assistant in between: FutureProofHomes' **Satellite1**, Home Assistant's
+**Voice Preview Edition**, a **ReSpeaker Lite**, an ESP32-S3-BOX. They
+hear their own wake word ("Okay Nabu", "Hey Jarvis"...), cancel their own
+echo and have proper room microphones. Luna connects to each one the way
+Home Assistant would, takes the audio straight from it (so she knows whose
+voice it is), answers, and tells the device where to fetch her reply.
+
+1. Install the extra: `python3 installer/install.py --extras satellites`.
+2. Relay stations must be switched on (the device fetches her reply from
+   the setup port, 8794).
+3. List the devices in `config.json`, with each one's API encryption key
+   (from its ESPHome config, or the Home Assistant device page):
+
+   ```json
+   "station": {
+       "enabled": true,
+       "satellites": [
+           {"name": "kitchen", "host": "192.168.0.50", "key": "base64 key from the device"}
+       ]
+   }
+   ```
+
+4. Restart Luna. The settings page lists each satellite under Relay
+   stations with its status.
+
+A device answers one controller at a time: remove it from Home Assistant
+(or stop Home Assistant using its voice) while Luna has it. With no screen,
+she declines anything that needs your permission on these devices.
