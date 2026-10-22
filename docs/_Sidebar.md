@@ -1,6 +1,7 @@
 **[Luna](README.md)**
 
 - [Install](install.md)
+- [Models](models.md)
 - [Configuration](configuration.md)
 - [Controls and voice](controls.md)
 - [Tool calling](tools.md)

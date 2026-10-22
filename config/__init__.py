@@ -295,6 +295,12 @@ SETTINGS = {
     "portrait.coffee.wake":       ("PORTRAIT_COFFEE_WAKE",         True),
     "portrait.touch_talk_cooldown": ("PORTRAIT_TOUCH_TALK_COOLDOWN", True),
     "portrait.hologram.enabled":  ("PORTRAIT_HOLOGRAM_ENABLED",    True),
+    "portrait.lights.enabled":    ("PORTRAIT_LIGHTS_ENABLED",      True),
+    "portrait.lights.color":      ("PORTRAIT_LIGHTS_COLOR",        True),
+    "portrait.lights.brightness": ("PORTRAIT_LIGHTS_BRIGHTNESS",   True),
+    "portrait.lights.voice":      ("PORTRAIT_LIGHTS_VOICE",        True),
+    "portrait.lights.private":    ("PORTRAIT_LIGHTS_PRIVATE",      True),
+    "portrait.lights.style":      ("PORTRAIT_LIGHTS_STYLE",        True),
     "portrait.gestures":          ("PORTRAIT_GESTURES",            True),
     "portrait.chat_gestures":     ("PORTRAIT_CHAT_GESTURES",       True),
     "portrait.meaning_margin":    ("PORTRAIT_MEANING_MARGIN",      True),
@@ -398,6 +404,20 @@ def _coerce(path, raw):
 
     if path == "portrait.background":
         return background_value(text)
+
+    if path == "portrait.lights.color":
+        word = text.strip().lower()
+        if word in ("", "mood", "default"):
+            return ""
+        if word == "own" or re.fullmatch(r"#[0-9a-f]{6}", word):
+            return word
+        raise ValueError(f"portrait.lights.color is mood (empty), own, or a colour like #ff4fb4, not {raw!r}")
+
+    if path == "portrait.lights.brightness":
+        try:
+            return max(0.0, min(2.0, float(text)))
+        except ValueError:
+            raise ValueError(f"{path} is a number from 0 to 2 - {raw!r} isn't one") from None
 
     if path == "camera.device":   # a number, a /dev path or a URL
         return int(text) if text.lstrip("-").isdigit() else text

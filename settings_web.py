@@ -38,6 +38,7 @@ RANGES = {
     "tts.speed": (0.5, 2, 0.05), "tts.volume": (0, 2, 0.05), "tts.pitch": (-6, 6, 0.5),
     "stt.sensitivity": (0.2, 3, 0.05), "stt.silence_seconds": (0.4, 4, 0.1),
     "alarms.volume": (0, 2, 0.05), "portrait.sound_volume": (0, 1, 0.05),
+    "portrait.lights.brightness": (0, 2, 0.05),
     "camera.presence.fps": (1, 10, 0.5), "camera.presence.greet_after_minutes": (5, 240, 5),
     "camera.presence.quiet_after_minutes": (1, 60, 1),
 }

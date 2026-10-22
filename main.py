@@ -1180,6 +1180,15 @@ def handle_input(text):
         ui.add_message("system", f"Portrait hologram {word} (saved; an open portrait switches now).")
         return
 
+    if text in ("/lights", "/lights on", "/lights off"):
+        import livefeed
+
+        word = text.split()[1] if " " in text else ("off" if config.PORTRAIT_LIGHTS_ENABLED else "on")
+        config.save_setting("portrait.lights.enabled", "true" if word == "on" else "false")
+        livefeed.lights_changed()
+        ui.add_message("system", f"Light strips {word} (saved; an open portrait switches now).")
+        return
+
     if text == "/portrait models" or text.startswith("/portrait use"):
         import livefeed
 

@@ -384,6 +384,10 @@ def _after(path, value):
             import livefeed
 
             livefeed.emit("holo", on=bool(value))
+        elif path.startswith("portrait.lights."):
+            import livefeed
+
+            livefeed.lights_changed()
         elif path == "portrait.frame":
             import livefeed
 

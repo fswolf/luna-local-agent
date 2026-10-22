@@ -49,6 +49,19 @@ if PORTRAIT_FRAME not in FRAMES + ("face",):
 #   "hologram": { "enabled": true, "tint": "#c37bff", "mix": 0.8 }
 PORTRAIT_HOLOGRAM = dict(_portrait_cfg.get("hologram", {}) or {})
 PORTRAIT_HOLOGRAM_ENABLED = bool(PORTRAIT_HOLOGRAM.get("enabled", False))
+# Light strips (portrait/viewer/lights.js): the LED paint on a robot model
+# glows and reacts. Needs a lights/ folder beside the model (portrait/lights.py
+# makes it). Off unless "enabled": true. color: "" follows her mood, "own"
+# is the paint's colour, or a #hex. private: light the chest and groin
+# (never on a tame stream either way). style: neon or plain.
+#   "lights": { "enabled": true, "color": "", "brightness": 1.0 }
+PORTRAIT_LIGHTS = dict(_portrait_cfg.get("lights", {}) or {})
+PORTRAIT_LIGHTS_ENABLED = bool(PORTRAIT_LIGHTS.get("enabled", False))
+PORTRAIT_LIGHTS_COLOR = str(PORTRAIT_LIGHTS.get("color", "") or "").strip()
+PORTRAIT_LIGHTS_BRIGHTNESS = max(0.0, min(2.0, float(PORTRAIT_LIGHTS.get("brightness", 1.0))))
+PORTRAIT_LIGHTS_VOICE = bool(PORTRAIT_LIGHTS.get("voice", True))
+PORTRAIT_LIGHTS_PRIVATE = bool(PORTRAIT_LIGHTS.get("private", True))
+PORTRAIT_LIGHTS_STYLE = "plain" if str(PORTRAIT_LIGHTS.get("style", "neon")).lower() == "plain" else "neon"
 # Gestures on a 3D model (gestures.py, portrait/viewer/gestures.js). How her
 # replies set them off: "tags" (she picks, keywords as fallback),
 # "meaning" (the embedding model, keywords as fallback), "keywords",

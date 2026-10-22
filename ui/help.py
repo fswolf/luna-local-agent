@@ -223,6 +223,7 @@ _HELP_SECTIONS = [
     ("Session", [
         ("/look", "list windows, or test a screenshot"),
         ("/holo", "portrait hologram look on/off (live, saved)"),
+        ("/lights", "light strips on her robot model on/off (live, saved)"),
         ("/camera", "webcam on/off, list cameras, take a test picture"),
         ("/presence", "notice who's at the desk: on/off, status"),
         ("/coffee", "her coffee now (it happens on its own in the morning); /coffee off, sip"),

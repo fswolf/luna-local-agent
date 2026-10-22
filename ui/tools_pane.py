@@ -27,6 +27,7 @@ _FEATURES = (
 # How the portrait looks - nothing to do with the prompt, so no cost.
 _PORTRAIT_FEATURES = (
     ("hologram look", "PORTRAIT_HOLOGRAM_ENABLED", "portrait.hologram.enabled", "/holo, live"),
+    ("light strips", "PORTRAIT_LIGHTS_ENABLED", "portrait.lights.enabled", "/lights, robot model, live"),
     ("chat gestures", "PORTRAIT_CHAT_GESTURES", "portrait.chat_gestures", "!hug, hi, lol in chat"),
     ("touch talk", "PORTRAIT_TOUCH_TALK", "portrait.touch_talk", "click her: she answers out loud, 1 short line"),
 )
@@ -655,6 +656,10 @@ def _tool_toggle():
                 import livefeed
 
                 livefeed.emit("holo", on=not on)
+            if setting == "portrait.lights.enabled":
+                import livefeed
+
+                livefeed.lights_changed()
             if setting == "portrait.chat_gestures":
                 import livefeed
 
@@ -756,6 +761,10 @@ def _tool_group_toggle():
                     import livefeed
 
                     livefeed.emit("holo", on=turn_on)
+                elif setting == "portrait.lights.enabled":
+                    import livefeed
+
+                    livefeed.lights_changed()
                 elif setting.startswith("mood."):
                     import mood
 

@@ -369,6 +369,62 @@ look-at come from the VRM itself. Ears are nodes named like `Ear_L`, or
 listed in `portrait.ear_bones`. VRoid Studio exports VRM models that
 work as they are.
 
+### Light strips
+
+Luna's robot model has LED paint at her joints, a light on each side of her
+chest, one in her belt and one low on her front. With light strips on, they
+glow and react:
+
+- **at rest** they breathe, slowly.
+- **listening**: a little brighter, her ears most of all.
+- **thinking**: a sweep runs down her, ears to tail.
+- **talking**: they pulse with her voice.
+- **a tool fails**: they flicker.
+- **you click a part of her**: that part lights up.
+- **her mood** picks the colour (unless you pick one): her own pink when
+  she's fine, blue when she's low, red when she's cross, violet when she's
+  tired.
+
+Switch them with `/lights` (or `/lights on`, `/lights off`), the **light
+strips** row in the tools pane, or `/settings`, Portrait. All of it is live.
+
+| Setting | What it does |
+|---|---|
+| `portrait.lights.enabled` | on or off (off unless you turn it on) |
+| `portrait.lights.color` | empty follows her mood, `own` is the paint's colour, or a colour like `#22e0ff` |
+| `portrait.lights.brightness` | 0 to 2, 1 as designed |
+| `portrait.lights.voice` | pulse with her voice |
+| `portrait.lights.private` | light the chest and groin too |
+| `portrait.lights.style` | `neon` (white-hot cores in the colour) or `plain` |
+
+The chest and groin lights stay dark on a stream with lewd off, whatever
+`private` says. `?lights=1` or `?lights=0` on the portrait URL overrides
+the setting for that page (an OBS source, say).
+
+**The maps.** The lights come from a `lights/` folder beside the model:
+for each lit texture, a glow map (white where it glows, grey for dimmer)
+and a zone map (which part of her each pixel is, as flat colours; the
+legend is in `lights.json`). `portrait/lights.py` makes them:
+
+```
+python3 portrait/lights.py models/luna/robot_default.vrm \
+    --panel chest=source/layers/chest-led-pearl-slot-v4.png \
+    --panel navel=source/layers/belly-led-pearl-rose-v1.png \
+    --panel groin=source/layers/bikini-led-pearl-slot-v2.png \
+    --private chest=source/templates/guide_bra.png \
+    --private groin=source/templates/guide_panties.png
+```
+
+It finds the strips by their paint (hot pink; `--color` for another
+colour), and each pixel's zone from the bones that move it. `--panel`
+names an LED by the layer you painted it with; `--private` marks what's
+under a bra or panties template. Re-run it after you change her texture.
+
+You can fix the maps in GIMP: paint white on the glow map to add a strip,
+black to take one away. Re-running keeps your edits unless you pass
+`--force`. Another model gets lights the same way, as long as its strips
+are painted in one bright colour.
+
 ### Gestures
 
 A 3D model moves more than her head. She waves, hugs, jumps, shrugs,

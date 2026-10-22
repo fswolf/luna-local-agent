@@ -14,6 +14,7 @@
 //   ?holo=1 / ?holo=0 the hologram look on or off (overrides config.json)
 //   ?fan=1            for an HDMI hologram fan: black, all of her, centred, nothing else
 //   ?nocast           never cast to a WiFi hologram fan from this page (fan.js)
+//   ?lights=1 / ?lights=0  her light strips on or off (overrides config.json)
 
 import { THREE, GLTFLoader, VRMLoaderPlugin, VRMUtils,
          VRMAnimationLoaderPlugin, createVRMAnimationClip } from './vendor/luna-three.js';
@@ -23,6 +24,7 @@ import { createEmotes } from './emotes.js';
 import { createTouch } from './touch.js';
 import { createFan } from './fan.js';
 import { createProps } from './props.js';
+import { createLights } from './lights.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 
 const params = new URLSearchParams(location.search);
@@ -68,6 +70,25 @@ const emotes = createEmotes(THREE, scene);   // hearts, sweat drop... beside her
 const holoCfg = cfg.hologram || {};
 const holoOn = params.has('holo') ? params.get('holo') !== '0' : !!holoCfg.enabled && !fanView;   // a fan is the hologram
 let holo = holoOn ? createHologram3D(THREE, renderer, holoCfg) : null;
+// Light strips (lights.js): config.json portrait.lights, switched live by
+// /lights, the tools pane and /settings. Built the first time they're on,
+// so a model that never uses them pays nothing.
+let lights = null, lightsTried = false;
+function lightsCfg(s) {
+  const out = { ...(s || {}) };
+  if (params.has('lights')) out.enabled = params.get('lights') !== '0';
+  return out;
+}
+function setLights(s) {
+  cfg.lights = s;
+  if (lights) { lights.set(lightsCfg(s)); return; }
+  if (!lightsCfg(s).enabled || lightsTried || !vrm) return;
+  lightsTried = true;
+  createLights(THREE, vrm, cfg.model, lightsCfg(s))
+    .then(l => { lights = l; if (!l) console.info('no light strips for this model (portrait/lights.py makes them)'); })
+    .catch(e => console.warn('light strips:', e));
+}
+
 function setHolo(on) {
   if (on) { if (holo) holo.on(); else holo = createHologram3D(THREE, renderer, holoCfg); }
   else holo?.off();
@@ -227,6 +248,9 @@ function handle(ev) {
       holo?.bright(next === 'speaking' ? 1.12 : next === 'thinking' ? 0.9 : 1);
       break;
     }
+    case 'lights':      // /lights, the tools pane, /settings
+      setLights(ev.lights || {});
+      break;
     case 'frame':       // the tools pane: bust or full, while the page is open (a ?frame= page keeps its own)
       if (!params.get('frame') && !fanView && ['bust', 'face', 'full'].includes(ev.frame)) { framing = ev.frame; frame(); }
       break;
@@ -303,7 +327,7 @@ function handle(ev) {
     case 'flags': {
       const flags = ev.flags || [];
       if (flags.length) tilt.target = 0.12;   // a "hm" tilt when the review didn't like it
-      if (flags.some(f => /^(tool failed|no answer|cut off)/.test(f))) { holo?.glitch(1); gesture('shrug'); }
+      if (flags.some(f => /^(tool failed|no answer|cut off)/.test(f))) { holo?.glitch(1); lights?.failed(); gesture('shrug'); }
       break;
     }
     case 'voice':
@@ -915,6 +939,8 @@ function animate() {
     vrm.update(dt);
     closeMouth(talking);
     updateEars(now, dt);   // after update: spring bones won't overwrite a twitch
+    lights?.update(dt, { stage: mind.stage, energy: mind.energy, warmth: mind.warmth, row: mind.row,
+                         tame: mind.tame, talking });
   }
 
   if (holo && holo.isOn()) holo.render(scene, camera);
@@ -1626,6 +1652,7 @@ function updateSpank(dt) {
 }
 
 function touch(zone, side) {
+  lights?.touched(zone);
   if (zone === 'butt' && moves && spankMode()) { spankHit(); return 'spank'; }   // every click, no cooldown
   const now = clock.elapsedTime;
   // every click counts toward "too much", even ones too quick to answer
@@ -1695,10 +1722,12 @@ try {
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
   say('');
+  setLights(cfg.lights);
   // the debug page's frame picker: bust / face / full without reloading (the studio keeps going)
   const setFrame = f => { if (['bust', 'face', 'full'].includes(f)) { framing = f; frame(); } };
   window.portrait = { setFrame, get fan() { return fan?.status(); }, handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
-                      touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank, get props() { return props; } };
+                      touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank, get props() { return props; },
+                      get lights() { return lights; }, setLights };
   if (cfg.fan?.cast && !params.has('nocast'))
     fan = createFan({ THREE, renderer, scene, cfg: { ...cfg.fan, ...(params.get('fanframe') ? { framing: params.get('fanframe') } : {}) }, place: placeFan });
   if (params.get('debug')) debugPanel();

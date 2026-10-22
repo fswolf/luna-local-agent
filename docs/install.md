@@ -28,9 +28,12 @@ system:
    already answering on :8899, it uses that instead.
 5. **Her brain.** LM Studio (it tells you what to click), or llama.cpp
    built here (Linux) for the research features.
-6. **Her model, picked for your machine.** It reads how much graphics
-   memory you have and offers the biggest model that fits, with room for
-   her context and her eyes:
+6. **Her model, picked for your machine.** These are the models I run
+   and test her on, not the only ones she works with: any model with tool
+   calling on llama.cpp or LM Studio should do (see [Models](models.md)
+   for what's tested, quants, context and using your own). The installer
+   reads how much graphics memory you have and offers the biggest one that
+   fits, with room for her context and her eyes:
 
    | Graphics memory | Model | Download |
    |---|---|---|
@@ -143,7 +146,7 @@ server, and stays text-only without it.
 # Running LM Studio
 
 1. Install LM Studio
-2. Download a model
+2. Download a model with tool calling ([which ones](models.md))
 3. Start the Local Server
 4. Verify it is running on:
 

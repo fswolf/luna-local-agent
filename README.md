@@ -28,7 +28,7 @@ git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
 Powered by:
 
 - [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper): speech to text
-- LM Studio or llama.cpp: the local model, with tool calling, picked automatically
+- LM Studio or llama.cpp: the local model. Any model with tool calling should work; the installer picks one for your card ([models](docs/models.md))
 - [kokoro-reader](https://github.com/fswolf/kokoro-reader): Kokoro TTS over local HTTP
 - MCP: OBS, Home Assistant, ComfyUI and the rest of the MCP ecosystem as her tools
 
@@ -49,6 +49,7 @@ What she does:
 - **Her reasoning, kept:** the model's scratchpad per turn, with a browser viewer for reading it back
 - **See inside her:** token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor
 - **An animated portrait:** Live2D or VRM, lip-synced, blinking, gestures, blushes and tears; click her and she reacts by mood; bust or full body ([details](docs/portrait.md#portrait))
+- **Light strips:** the LEDs on her robot model glow in her mood's colour, breathe, pulse with her voice and sweep while she thinks; chest and groin stay dark on a tame stream ([details](docs/portrait.md#light-strips))
 - **On a hologram fan:** live over WiFi on a Holoscope fan (P56, PD42), or on any HDMI fan as a screen; she floats in the air ([details](docs/fans.md))
 - **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
@@ -174,7 +175,10 @@ luna            # or ./start.sh, or luna.cmd on Windows
 
 The installer looks at your graphics card and offers the biggest model
 that fits (Qwen 3.5, from 4B up to 27B, uncensored unless you pick the
-standard release). The first time she starts, she
+standard release). That's my pick, not a requirement: any model with
+tool calling on LM Studio or llama.cpp should work, and
+[docs/models.md](docs/models.md) says what's been tested and how to use
+your own. The first time she starts, she
 asks what to call you and what you mostly want her for. After that,
 `/settings` has everything, and you can just ask her how things work.
 
@@ -185,6 +189,7 @@ The installer asks before anything that touches your system, and can be run agai
 # Documentation
 
 - [Install](docs/install.md): the installer, the model picked for your GPU, LM Studio or llama.cpp, the voice server, first run
+- [Models](docs/models.md): which models work, what's been tested, graphics memory, quants, context, using your own
 - [Configuration](docs/configuration.md): the settings page and presets, config.json, changing settings live, logging
 - [Controls and voice](docs/controls.md): keys, voice modes, speech detection, barge-in, wake word
 - [Tool calling](docs/tools.md): every tool, her own manual, turning them off, MCP servers

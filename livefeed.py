@@ -753,6 +753,21 @@ def gesture_mode_changed():
          chat=bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)))
 
 
+def lights_config():
+    """portrait.lights, as the page's lights.js takes it."""
+    return {"enabled": bool(getattr(config, "PORTRAIT_LIGHTS_ENABLED", False)),
+            "color": str(getattr(config, "PORTRAIT_LIGHTS_COLOR", "") or ""),
+            "brightness": float(getattr(config, "PORTRAIT_LIGHTS_BRIGHTNESS", 1.0)),
+            "voice": bool(getattr(config, "PORTRAIT_LIGHTS_VOICE", True)),
+            "private": bool(getattr(config, "PORTRAIT_LIGHTS_PRIVATE", True)),
+            "style": str(getattr(config, "PORTRAIT_LIGHTS_STYLE", "neon"))}
+
+
+def lights_changed():
+    """Tell an open portrait the light strip settings changed."""
+    emit("lights", lights=lights_config())
+
+
 def portrait_config(preview=None):
     """What the portrait page needs from config.json: which model, and
     which nodes are her ears if their names don't say so. A model that
@@ -790,6 +805,7 @@ def portrait_config(preview=None):
             "sounds": bool(getattr(config, "PORTRAIT_SOUNDS", True)),
             "sound_volume": float(getattr(config, "PORTRAIT_SOUND_VOLUME", 0.8)),
             "frame": str(getattr(config, "PORTRAIT_FRAME", "bust")),
+            "lights": lights_config(),
             "background": str(getattr(config, "PORTRAIT_BACKGROUND", "") or ""),
             "fan": dict(getattr(config, "PORTRAIT_FAN", {}) or {},
                         cast=bool(getattr(config, "PORTRAIT_FAN_CAST", False))),

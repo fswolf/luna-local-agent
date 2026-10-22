@@ -1,0 +1,104 @@
+{
+ "version": 1,
+ "zones": [
+  "none",
+  "torso",
+  "chest",
+  "groin",
+  "navel",
+  "neck",
+  "arm_l",
+  "arm_r",
+  "hand_l",
+  "hand_r",
+  "leg_l",
+  "leg_r",
+  "foot_l",
+  "foot_r",
+  "ears",
+  "tail"
+ ],
+ "zone_colors": {
+  "none": "#000000",
+  "torso": "#ffaa00",
+  "chest": "#ff0000",
+  "groin": "#960000",
+  "navel": "#ffff00",
+  "neck": "#00ffff",
+  "arm_l": "#0080ff",
+  "arm_r": "#0000ff",
+  "hand_l": "#8000ff",
+  "hand_r": "#ff00ff",
+  "leg_l": "#00ff00",
+  "leg_r": "#007800",
+  "foot_l": "#80ff80",
+  "foot_r": "#005028",
+  "ears": "#ffffff",
+  "tail": "#808080"
+ },
+ "private": [
+  "chest",
+  "groin"
+ ],
+ "materials": {
+  "N00_000_00_Body_00_SKIN": {
+   "glow": "N00_000_00_Body_00_SKIN.glow.png",
+   "zones": "N00_000_00_Body_00_SKIN.zones.png",
+   "color": "#ff598e",
+   "size": [
+    2048,
+    2048
+   ],
+   "lit": [
+    "arm_l",
+    "arm_r",
+    "chest",
+    "foot_l",
+    "foot_r",
+    "groin",
+    "hand_l",
+    "hand_r",
+    "leg_l",
+    "leg_r",
+    "navel",
+    "torso"
+   ]
+  },
+  "Accessory_CatEar_01_CLOTH_01": {
+   "glow": "Accessory_CatEar_01_CLOTH_01.glow.png",
+   "zones": "Accessory_CatEar_01_CLOTH_01.zones.png",
+   "color": "#ff5965",
+   "size": [
+    512,
+    512
+   ],
+   "lit": [
+    "ears"
+   ]
+  },
+  "Accessory_CatEar_01_CLOTH_02": {
+   "glow": "Accessory_CatEar_01_CLOTH_02.glow.png",
+   "zones": "Accessory_CatEar_01_CLOTH_02.zones.png",
+   "color": "#ff5965",
+   "size": [
+    512,
+    512
+   ],
+   "lit": [
+    "ears"
+   ]
+  },
+  "Accessory_CatTail_01_CLOTH": {
+   "glow": "Accessory_CatTail_01_CLOTH.glow.png",
+   "zones": "Accessory_CatTail_01_CLOTH.zones.png",
+   "color": "#ff598c",
+   "size": [
+    256,
+    1024
+   ],
+   "lit": [
+    "tail"
+   ]
+  }
+ }
+}
