@@ -566,6 +566,39 @@ MODELS = (
      "", 0, 8192, "qwen3.5-4b@q4_k_m"),
 )
 
+# The same sizes, uncensored: huihui-ai's abliterated Qwen3.5 (refusals taken out
+# of the weights, nothing else retrained), quantised by mradermacher, with the
+# vision files. This is what most people run her on, so it's the default;
+# --standard (or "standard" when asked) keeps Qwen's own release.
+#   key: (label, repo, file, GB, mmproj, LM Studio name)
+_HUIHUI = "mradermacher/Huihui-Qwen3.5-{b}-abliterated-GGUF"
+UNCENSORED = {
+    "27b-q6": ("Qwen3.5 27B uncensored, Q6_K", _HUIHUI.format(b="27B"), "Huihui-Qwen3.5-27B-abliterated.Q6_K.gguf",
+               22.1, "Huihui-Qwen3.5-27B-abliterated.mmproj-f16.gguf"),
+    "27b": ("Qwen3.5 27B uncensored, Q4_K_M", _HUIHUI.format(b="27B"), "Huihui-Qwen3.5-27B-abliterated.Q4_K_M.gguf",
+            16.5, "Huihui-Qwen3.5-27B-abliterated.mmproj-f16.gguf"),
+    "9b": ("Qwen3.5 9B uncensored, Q8_0", _HUIHUI.format(b="9B"), "Huihui-Qwen3.5-9B-abliterated.Q8_0.gguf",
+           9.5, "Huihui-Qwen3.5-9B-abliterated.mmproj-f16.gguf"),
+    "9b-q6": ("Qwen3.5 9B uncensored, Q6_K", _HUIHUI.format(b="9B"), "Huihui-Qwen3.5-9B-abliterated.Q6_K.gguf",
+              7.4, "Huihui-Qwen3.5-9B-abliterated.mmproj-f16.gguf"),
+    "9b-q4": ("Qwen3.5 9B uncensored, Q4_K_M", _HUIHUI.format(b="9B"), "Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf",
+              5.6, ""),
+    "4b": ("Qwen3.5 4B uncensored, Q6_K", _HUIHUI.format(b="4B"), "Huihui-Qwen3.5-4B-abliterated.Q6_K.gguf",
+           3.5, "Huihui-Qwen3.5-4B-abliterated.mmproj-f16.gguf"),
+    "4b-q4": ("Qwen3.5 4B uncensored, Q4_K_M", _HUIHUI.format(b="4B"), "Huihui-Qwen3.5-4B-abliterated.Q4_K_M.gguf",
+              2.7, ""),
+}
+
+
+def variant(m, uncensored=True):
+    """The table row as downloaded: the uncensored files for its size, or
+    Qwen's own (the row as it is)."""
+    if not uncensored or m[0] not in UNCENSORED:
+        return m
+    label, repo, file, size, mmproj = UNCENSORED[m[0]]
+    quant = file.rsplit(".", 2)[-2].lower()
+    return (m[0], label, repo, file, size, mmproj, m[6], m[7], f"{repo}@{quant}")
+
 
 def _gb(n):
     return round(n / (1 << 30), 1)
@@ -653,8 +686,12 @@ def model(state):
 
     vram, where = detect_vram()
 
+    uncensored = not ARGS.standard and state.get("flavour", "uncensored") != "standard"
+
     # run again: the model from last time stays unless one is asked for by name
     done = _model_by_key(state.get("model") or "")
+    if done:
+        done = variant(done, uncensored)
     if choice == "auto" and done:
         here = os.path.exists(os.path.join(ROOT, "llama", "models", done[3]))
         if state.get("backend") != "llama" or here:
@@ -666,7 +703,14 @@ def model(state):
         warn(f"no model called {choice} - picking for this machine")
         m = pick_model(vram)
 
-    key, label, repo, file, size, mmproj, _least, ctx, lms_name = m
+    if not ARGS.yes and choice == "auto" and not ARGS.standard:
+        uncensored = choose("Uncensored or standard?", [
+            ("uncensored", "Uncensored (abliterated): answers anything you ask, the usual pick for a companion"),
+            ("standard", "Standard: Qwen's own release, which turns down some requests")],
+            "uncensored" if uncensored else "standard") == "uncensored"
+    state["flavour"] = "uncensored" if uncensored else "standard"
+
+    key, label, repo, file, size, mmproj, _least, ctx, lms_name = variant(m, uncensored)
     if vram:
         ok(f"{vram} GB to work with ({where})")
     else:
@@ -674,10 +718,11 @@ def model(state):
     print(f"  {label}: {size} GB{', with vision' if mmproj else ''}, {ctx // 1024}k context")
 
     if not ARGS.yes and choice == "auto":
-        options = [(m[0], f"{m[1]} ({m[4]} GB{', sees' if m[5] else ''})"
-                    + (" - too big for this machine" if vram and m[6] > vram else "")) for m in MODELS]
+        rows = [variant(r, uncensored) for r in MODELS]
+        options = [(r[0], f"{r[1]} ({r[4]} GB{', sees' if r[5] else ''})"
+                    + (" - too big for this machine" if vram and r[6] > vram else "")) for r in rows]
         key = choose("Which model?", options, key)
-        key, label, repo, file, size, mmproj, _least, ctx, lms_name = _model_by_key(key)
+        key, label, repo, file, size, mmproj, _least, ctx, lms_name = variant(_model_by_key(key), uncensored)
 
     if state.get("backend") == "llama":
         dest_dir = os.path.join(ROOT, "llama", "models")
@@ -885,6 +930,8 @@ def main():
     ap.add_argument("--gpu", default="auto", choices=["auto", "cpu", "cuda", "rocm", "mps"])
     ap.add_argument("--extras", default=None)
     ap.add_argument("--model", default="auto")
+    ap.add_argument("--standard", action="store_true",
+                    help="Qwen's own release instead of the uncensored (abliterated) one")
     ap.add_argument("--no-system", action="store_true")
     ap.add_argument("--check", action="store_true")
     ARGS = ap.parse_args()

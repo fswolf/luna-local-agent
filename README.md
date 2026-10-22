@@ -173,7 +173,8 @@ luna            # or ./start.sh, or luna.cmd on Windows
 ```
 
 The installer looks at your graphics card and offers the biggest model
-that fits (Qwen 3.5, from 4B up to 27B). The first time she starts, she
+that fits (Qwen 3.5, from 4B up to 27B, uncensored unless you pick the
+standard release). The first time she starts, she
 asks what to call you and what you mostly want her for. After that,
 `/settings` has everything, and you can just ask her how things work.
 

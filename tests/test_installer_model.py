@@ -37,6 +37,19 @@ class Pick(unittest.TestCase):
             self.assertIn("@", lms)
             self.assertGreaterEqual(ctx, 8192)
 
+    def test_uncensored_is_the_default_and_matches_the_tiers(self):
+        for m in install.MODELS:
+            u = install.variant(m)
+            self.assertIn("uncensored", u[1])
+            self.assertIn("abliterated", u[3])
+            self.assertEqual((u[0], u[6], u[7]), (m[0], m[6], m[7]))          # same size tier, memory, context
+            self.assertTrue(u[3].endswith(".gguf") and u[2].count("/") == 1)
+            self.assertEqual(bool(u[5]), bool(m[5]), m[0])                     # eyes where the standard has them
+            self.assertTrue(abs(u[4] - m[4]) < 2.5, m[0])                       # about the same download
+            self.assertLessEqual(u[4] + (1.0 if u[5] else 0) + 1.0, m[6] or 99, m[0])
+            self.assertTrue(u[8].startswith(u[2] + "@"))
+            self.assertIs(install.variant(m, uncensored=False), m)
+
     def test_local_env_is_written_for_start_sh(self):
         tmp = tempfile.mkdtemp()
         try:

@@ -47,6 +47,14 @@ system:
    into `llama/models` and points `llama/server.local.env` at it; with
    LM Studio it fetches it through LM Studio's own `lms` command, or
    tells you what to search for. All Apache-2.0, with tool calling.
+
+   **Uncensored by default.** It then asks uncensored or standard, with
+   uncensored first: the same Qwen3.5 sizes with the refusals taken out
+   (huihui-ai's abliterated versions, quantised by mradermacher, eyes
+   included). That's what most people run a companion on. Standard is
+   Qwen's own release, which turns down some requests; `--standard`
+   picks it without asking. The download sizes are the same as above,
+   give or take a few hundred MB.
 7. **Extras, pick any:** wake word, MCP, portrait tools, Live2D runtime,
    embedding model, the pomf chat plugin.
 8. **Launchers.** A `luna` command and an app-launcher entry on Linux,
@@ -105,7 +113,8 @@ default, and `--check` only runs the health check. Other options:
 `--backend lmstudio|llama|skip`,
 `--voice install|url:http://host:port|skip`,
 `--gpu auto|cpu|cuda|rocm`, `--extras wakeword,mcp,portrait,...`,
-`--model auto|skip|4b|9b-q4|9b|27b...`.
+`--model auto|skip|4b|9b-q4|9b|27b...`, `--standard` (Qwen's own
+release instead of the uncensored one).
 `python installer/uninstall.py` removes what it added and never touches
 your memory, history or settings.
 
