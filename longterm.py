@@ -612,6 +612,13 @@ def extract_in_background(model, user_text, answer):
     # The thread starts with no turn of its own: carry who was talking,
     # so a guest's fact lands in their file and not the owner's.
     speaker = turnctx.current().speaker
+    try:
+        import people
+
+        if speaker == people.STRANGER:
+            return              # nobody to keep facts for: skip the model call
+    except Exception:
+        pass
 
     def run():
         with turnctx.begin(source="extract", private=True, speaker=speaker):

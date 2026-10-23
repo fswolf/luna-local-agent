@@ -12,6 +12,7 @@ Everything the README only touches on, one subject per page.
 - [Email](email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](vision.md): looking at your screen, the webcam, noticing you're there
 - [People in the house](people.md): who's talking, by voice or face, and their own memories
+- [Who she's talking to](who.md): how every turn is matched to a person, and what changes for a guest
 - [Relay stations](stations.md): talk to her from another room on an old phone or tablet
 - [Reminders and alarms](reminders.md)
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in

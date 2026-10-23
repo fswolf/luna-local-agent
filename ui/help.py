@@ -228,7 +228,7 @@ _HELP_SECTIONS = [
         ("/presence", "notice who's at the desk: on/off, status"),
         ("/coffee", "her coffee now (it happens on its own in the morning); /coffee off, sip"),
         ("/read", "she reads a book (it happens on its own when you're quiet); /read off, page, look"),
-        ("/people", "who she knows: enroll face|voice <name>, forget <name>"),
+        ("/people", "who she knows: enroll face|voice <name>, forget <name>, check (a face check now), guest <name> (name who she just met), keep <name>"),
         ("/allow", "is allow-all on for file changes? /allow off ends it"),
         ("/log", "tail the debug log without leaving the app"),
         ("/context", "how big every prompt is vs the model's context"),

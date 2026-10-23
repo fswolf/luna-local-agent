@@ -45,6 +45,10 @@ A module with a `NAME` and whichever of these it needs:
 | `start(model)` / `stop()` | `(ok, message)` |
 | `running()` / `status()` | state, and the block `/<name>` prints |
 | `command(text)` | anything else after `/<name>`: `/minecraft goal build a hut` calls `command("goal build a hut")` |
+| `prompt_line(private)` | a line for her prompt while it runs ("a toy is connected") |
+| `on_user_text(text)` | sees each of your messages before she does |
+| `panic()` | you interrupted her (HOME): stop anything physical |
+| `on_camera_open(device)` / `on_camera_close(device)` | the webcam is opening / has closed again; keep it quick ([camera light](vision.md#the-camera-light-and-hooks), `plugins/camera_led.py`) |
 
 A plugin can also bring an MCP server with it and drop it again:
 `mcpclient.connect_server(name, spec)` starts the server and registers

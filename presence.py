@@ -102,7 +102,7 @@ def gaze_from(box, width, height):
 # State shared with the rest of Luna
 # ---------------------------------------------------------------------------
 _state = {"thread": None, "stop": threading.Event(), "model": None, "frame": None, "frame_at": 0.0,
-          "box": None, "size": (0, 0), "who": None, "who_at": 0.0, "who_score": 0.0, "greeted_at": -1e9,
+          "box": None, "size": (0, 0), "who": None, "stranger": False, "who_at": 0.0, "who_score": 0.0, "greeted_at": -1e9,
           "error": "", "detector": "", "enroll": None, "checks": 0, "first": None}
 _tracker = Tracker()
 _lock = threading.Lock()
@@ -129,6 +129,20 @@ def who():
     """The recognised person in view, or None (nobody, a stranger, or no
     face prints to compare with)."""
     return _state["who"] if present() else None
+
+
+def verdict():
+    """who(), or people.STRANGER while a face that clearly isn't the
+    owner's is in view, or None."""
+    if not present():
+        return None
+    if _state["who"]:
+        return _state["who"]
+    if _state.get("stranger"):
+        import people
+
+        return people.STRANGER
+    return None
 
 
 def gaze():
@@ -323,6 +337,8 @@ def _loop(cv2, stopping):
 
     faces = _faces_for(cv2)
     cap = None
+    device = camera._device()
+    camera.hooks("open", device)                 # camera.before and plugins (an LED, say)
     try:
         # macOS asks for camera permission on the first open and fails that
         # one while the question is up: try again for a while before giving up
@@ -378,11 +394,12 @@ def _loop(cv2, stopping):
         if cap is not None:
             cap.release()
         _tracker.present = False
+        camera.hooks("close", device)            # whatever happened above
 
 
 def _recognise(faces, img, face, now, force=False):
     if not getattr(config, "PRESENCE_RECOGNISE", True):
-        _state["who"] = None
+        _state["who"], _state["stranger"] = None, False
         return
     if not force and now - _state["who_at"] < WHO_EVERY:
         return
@@ -391,8 +408,10 @@ def _recognise(faces, img, face, now, force=False):
         return
     import people
 
-    name, score = people.match("face", vector, float(getattr(config, "PRESENCE_MATCH", 0.36)))
-    _state["who"], _state["who_score"], _state["who_at"] = name, score, now
+    seen, score = people.verdict("face", vector, float(getattr(config, "PRESENCE_MATCH", 0.36)))
+    stranger = seen == people.STRANGER
+    _state["who"] = None if stranger else seen
+    _state["stranger"], _state["who_score"], _state["who_at"] = stranger, score, now
 
 
 # ---------------------------------------------------------------------------

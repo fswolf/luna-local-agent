@@ -148,6 +148,8 @@ SETTINGS = {
     "camera.device":              ("CAMERA_DEVICE",                True),
     "camera.width":               ("CAMERA_WIDTH",                 True),
     "camera.warmup":              ("CAMERA_WARMUP",                True),
+    "camera.before":              ("CAMERA_BEFORE",                True),
+    "camera.after":               ("CAMERA_AFTER",                 True),
     "camera.presence.enabled":    ("PRESENCE_ENABLED",             True),
     "camera.presence.fps":        ("PRESENCE_FPS",                 True),
     "camera.presence.greet":      ("PRESENCE_GREET",               True),
@@ -161,6 +163,9 @@ SETTINGS = {
     "station.enabled":            ("STATION_ENABLED",              True),
     "station.port":               ("STATION_PORT",                 False),
     "people.voice_match":         ("PEOPLE_VOICE_MATCH",           True),
+    "people.face_check":          ("PEOPLE_FACE_CHECK",            True),
+    "people.face_check_minutes":  ("PEOPLE_FACE_CHECK_MINUTES",    True),
+    "people.face_check_seconds":  ("PEOPLE_FACE_CHECK_SECONDS",    True),
 
     "desktop.enabled":            ("DESKTOP_ENABLED",              True),
     "desktop.clipboard":          ("DESKTOP_CLIPBOARD",            True),

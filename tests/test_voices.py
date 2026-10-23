@@ -96,8 +96,13 @@ class Voices(_Folder):
             self.assertEqual(voices.identify("x.wav")[0], "Shannon")
         with mock.patch.object(voices, "print_of", return_value=[0.0, 0.0, 1.0]):
             name, score = voices.identify("x.wav")
-            self.assertIsNone(name)
-            self.assertIsNotNone(score)            # compared, matched nobody
+            self.assertEqual(name, people.STRANGER)   # compared: clearly not Ryan
+            self.assertIsNotNone(score)
+        people.forget("Ryan")
+        with mock.patch.object(voices, "print_of", return_value=[0.0, 0.0, 1.0]):
+            name, score = voices.identify("x.wav")
+            self.assertIsNone(name)                # no prints of Ryan's: can't tell it isn't him
+            self.assertIsNotNone(score)
 
     def test_switched_off(self):
         people.add_prints("Shannon", "voice", [SHANNON])
@@ -122,7 +127,7 @@ class WhoIsTalking(_Folder):
         self.assertIsNone(people.decide("ryan", voice_checked=True))
 
     def test_face_stands_in_when_voices_cant_be_compared(self):
-        with mock.patch.object(presence, "who", return_value="Shannon"):
+        with mock.patch.object(presence, "verdict", return_value="Shannon"):
             self.assertEqual(people.decide(None, voice_checked=False), "Shannon")
             # a voice that was compared and matched nobody is the owner,
             # even with Shannon on camera

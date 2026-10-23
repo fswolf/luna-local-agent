@@ -374,8 +374,10 @@ def _respond(text, model, source, stop, speaker=None, sink=None, approver=None):
         # those (it's what turns on the second-look checks), so how it
         # reached her is set on the turn itself.
         with turnctx.begin(source=source, speaker=speaker, approver=approver):
+            # a stranger or a session guest gets the short list (people.tools_for)
             answer = ask(
-                text, model, on_text=ui.extend_message, on_sentence=on_sentence
+                text, model, on_text=ui.extend_message, on_sentence=on_sentence,
+                tools_allowed=people.tools_for(speaker),
             )
 
         ui.replace_message(answer)
@@ -405,7 +407,7 @@ def assistant_task(model, mode=None):
         return _spoken_turn(model, mode, stop)
 
 
-def _whose_voice(filename, heard):
+def _whose_voice(filename, heard, at_desk=False):
     try:
         import voices
 
@@ -413,6 +415,12 @@ def _whose_voice(filename, heard):
         heard["name"], heard["score"] = voices.identify(filename)
     except Exception as e:
         logbook.warn("voices", "couldn't tell whose voice: %s", e)
+    if at_desk and heard.get("name") in (None, people.STRANGER) and not heard.get("enroll"):
+        # not sure (or no voice prints): the face check, if it's on, looks
+        # now while Whisper is still transcribing; decide() later finds the
+        # answer ready instead of opening the camera then. Never raises.
+        people.decide(heard.get("name"), voice_checked=heard.get("score") is not None,
+                      voice_score=heard.get("score"), at_desk=True)
 
 
 def _spoken_turn(model, mode, stop):
@@ -446,7 +454,7 @@ def _spoken_turn(model, mode, stop):
 
         # Whose voice, worked out beside Whisper so it costs no time.
         heard = {}
-        who = threading.Thread(target=_whose_voice, args=(filename, heard), daemon=True)
+        who = threading.Thread(target=_whose_voice, args=(filename, heard, True), daemon=True)
         who.start()
 
         ui.set_status("Transcribing...")
@@ -465,7 +473,8 @@ def _spoken_turn(model, mode, stop):
             ui.set_status("Idle")
             return True
 
-        speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None)
+        speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None,
+                                voice_score=heard.get("score"), at_desk=True)
         logbook.info("turn", "heard%s: %s", f" ({speaker})" if speaker else "", text[:200])
         ui.add_message("user", f"[{speaker}] {text}" if speaker else text)
         respond(text, model, source="voice", speaker=speaker)

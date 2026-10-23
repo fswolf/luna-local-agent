@@ -31,10 +31,27 @@ Windows.
     pip install opencv-python-headless       (installer: --extras camera)
 
     "camera": { "device": 0, "width": 1280, "warmup": 5 }
+
+## Hooks: something to do each time the webcam opens and closes
+
+Every time Luna opens the webcam herself (a picture, the face check,
+presence starting) and closes it again:
+
+    "camera": { "before": "v4l2-ctl -d /dev/video0 -c led1_mode=0",
+                "after":  "v4l2-ctl -d /dev/video0 -c led1_mode=3" }
+
+runs those commands ({device} in them becomes the camera), and running
+plugins with on_camera_open(device) / on_camera_close(device) hear about
+it (plugins/camera_led.py is one). A hook is a guest: one that fails,
+hangs past HOOK_SECONDS or raises is logged and the camera goes on, and
+"after" runs whenever "before" did, even when the picture failed.
 """
 import base64
+import contextlib
 import glob
 import re
+import shlex
+import subprocess
 import sys
 import threading
 import time
@@ -45,6 +62,7 @@ import logbook
 
 _lock = threading.Lock()
 last_error = ""
+HOOK_SECONDS = 3.0        # longest a hook may take before the camera goes on without it
 
 
 def _cv2():
@@ -204,6 +222,162 @@ def _hint():
     return " Check that something else isn't using it, and that you're in the video group."
 
 
+# ---------------------------------------------------------------------------
+# Hooks around opening the webcam
+# ---------------------------------------------------------------------------
+def _bounded(fn, seconds, what):
+    """Run fn on a thread and wait at most seconds. Whatever fn does
+    (raises, hangs) stays there."""
+    def run():
+        try:
+            fn()
+        except Exception as e:
+            logbook.warn("camera", "%s failed: %s", what, e)
+
+    thread = threading.Thread(target=run, daemon=True, name="camera-hook")
+    try:
+        thread.start()
+    except Exception as e:
+        logbook.warn("camera", "%s didn't start: %s", what, e)
+        return
+    thread.join(seconds)
+    if thread.is_alive():
+        logbook.warn("camera", "%s took longer than %g s; going on without it", what, seconds)
+
+
+def _run_command(which, device):
+    command = str(getattr(config, "CAMERA_" + which.upper(), "") or "").strip()
+    if not command:
+        return
+    try:
+        args = [a.replace("{device}", str(device)) for a in shlex.split(command)]
+    except ValueError as e:
+        logbook.warn("camera", "camera.%s isn't a command I can read (%s)", which, e)
+        return
+    if not args:
+        return
+    try:
+        done = subprocess.run(args, capture_output=True, text=True, timeout=HOOK_SECONDS)
+    except FileNotFoundError:
+        logbook.warn("camera", "camera.%s: %s isn't installed or isn't on the PATH", which, args[0])
+        return
+    except subprocess.TimeoutExpired:
+        logbook.warn("camera", "camera.%s took longer than %g s", which, HOOK_SECONDS)
+        return
+    except OSError as e:
+        logbook.warn("camera", "camera.%s couldn't run: %s", which, e)
+        return
+    if done.returncode != 0:
+        logbook.warn("camera", "camera.%s exited %d: %s", which, done.returncode,
+                     (done.stderr or done.stdout or "").strip()[:200])
+
+
+def _plugin_hook(which, device):
+    try:
+        import plugins
+    except Exception:
+        return
+    hook = getattr(plugins, "camera_" + which, None)
+    if callable(hook):
+        hook(device)
+
+
+def hooks(which, device):
+    """The camera.<which> command, then the plugins' hooks. which is
+    "open" or "close". Never raises; each part has HOOK_SECONDS."""
+    command = "before" if which == "open" else "after"
+    try:
+        if str(getattr(config, "CAMERA_" + command.upper(), "") or "").strip():
+            _bounded(lambda: _run_command(command, device), HOOK_SECONDS + 0.5, f"camera.{command}")
+        _bounded(lambda: _plugin_hook(which, device), HOOK_SECONDS, f"plugin on_camera_{which}")
+    except Exception as e:                       # belt and braces: hooks never stop the camera
+        logbook.warn("camera", "camera hooks (%s) failed: %s", which, e)
+
+
+@contextlib.contextmanager
+def opened(device):
+    """Around opening the webcam: the open hooks first, and the close
+    hooks afterwards whatever happened in between."""
+    hooks("open", device)
+    try:
+        yield
+    finally:
+        hooks("close", device)
+
+
+def _read_local(cv2, device, width, warmup):
+    """(frame, "") or (None, error) from a webcam on this machine: opened,
+    a few frames thrown away, closed again, with the hooks around it."""
+    with _lock, opened(device):
+        cap = None
+
+        try:
+            cap = _open(cv2, device, width)
+
+            if not cap.isOpened():
+                return None, f"couldn't open camera {device}." + _hint()
+
+            frame = None
+
+            for _ in range(warmup + 1):
+                ok, got = cap.read()
+
+                if ok and got is not None:
+                    frame = got
+
+            if frame is None:
+                return None, f"camera {device} opened but sent no picture." + _hint()
+
+            return frame, ""
+        except Exception as e:
+            return None, f"camera {device} failed: {e}"
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+
+
+def frame(device=None, width=None):
+    """(BGR image, description) or (None, error): one picture to look at
+    in code (the face check), not to send. Presence's latest picture when
+    it's watching, otherwise the webcam opened just for this, asked for
+    width pixels across (camera.width if None). Never raises."""
+    try:
+        cv2 = _cv2()
+        device = _device() if device is None else device
+
+        if cv2 is None:
+            return None, "OpenCV isn't installed - pip install opencv-python-headless"
+
+        if _is_http(device):
+            import numpy as np
+
+            data = _grab_http(device, timeout=4)
+            img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+            return (img, "camera server") if img is not None else (None, "the camera server's picture didn't decode")
+
+        import presence
+
+        if presence.running() and device == _device():
+            shared = presence.frame()
+            if shared is not None:
+                return shared, "from presence"
+
+        width = int(width or getattr(config, "CAMERA_WIDTH", 1280))
+        warmup = max(0, int(getattr(config, "CAMERA_WARMUP", 5)))
+        img, problem = _read_local(cv2, device, width, warmup)
+
+        if img is None:
+            return None, problem
+
+        return img, f"camera {device}"
+    except Exception as e:
+        where = re.sub(r"//[^/@]*@", "//", str(device))   # never a password from the URL
+        return None, f"couldn't get a picture from {where}: {type(e).__name__}: {e}"
+
+
 def grab(device=None):
     """(jpeg bytes, description) or (None, error). One frame, after a few
     thrown away so auto-exposure has settled - the first frame from most
@@ -243,27 +417,11 @@ def grab(device=None):
             last_error = ""
             return data, f"camera {device}, {w}x{h}, {len(data) // 1024}KB (from presence)"
 
-    with _lock:
-        cap = _open(cv2, device, width)
+    frame, problem = _read_local(cv2, device, width, warmup)
 
-        try:
-            if not cap.isOpened():
-                last_error = f"couldn't open camera {device}." + _hint()
-                return None, last_error
-
-            frame = None
-
-            for _ in range(warmup + 1):
-                ok, got = cap.read()
-
-                if ok and got is not None:
-                    frame = got
-
-            if frame is None:
-                last_error = f"camera {device} opened but sent no picture." + _hint()
-                return None, last_error
-        finally:
-            cap.release()
+    if frame is None:
+        last_error = problem
+        return None, last_error
 
     h, w = frame.shape[:2]
 
