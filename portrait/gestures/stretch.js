@@ -4,7 +4,7 @@ import { both } from './_pose.js';
 export default {
   keywords: ["stretch", "yawn"],   // in what she writes, *like this*
   about: "tired, waking up",   // offered to her as [stretch] in tags mode
-  idle: true,         // one of the things she does on her own
+  idle: ['cool', 'neutral', 'warm', 'loving'],   // on her own, in these moods (studio: Details)
   dur: 4.2, fade: [0.8, 0.9],
   keys: [
     [0.0, { ...both({ rightUpperArm: [0, 0.1, -1.35], rightLowerArm: [0, 0.6, 0], rightHand: [0, 0.3, 0] }),

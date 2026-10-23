@@ -42,7 +42,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
 
   // -- what's being made -----------------------------------------------------
   const fresh = () => ({ name: '', about: '', keywords: '', dur: 3, fade: [0.4, 0.5],
-                         keys: [], expr: {}, private: false, lewd: false, full: false, idle: false,
+                         keys: [], expr: {}, private: false, lewd: false, full: false, idle: [],
                          touch: [], moods: [], sound: { name: '', from: '', len: '' }, emote: [],
                          tail: 'none', tailLevel: 0.8, chain: [], extra: {} });
   let A = fresh();
@@ -210,12 +210,16 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   const fadeOut = el('input', { type: 'number', step: 0.05, min: 0, value: 0.5, style: 'width:62px' });
   const flagBoxes = {};
   const flags = el('div', { className: 'chips' });
-  for (const [f, label] of [['private', '🔒 never from chat'], ['lewd', '🔥 lewd'], ['full', '🧍 full body only'], ['idle', 'idle (on her own)']]) {
+  for (const [f, label] of [['private', '🔒 never from chat'], ['lewd', '🔥 lewd'], ['full', '🧍 full body only']]) {
     flagBoxes[f] = el('input', { type: 'checkbox' });
     flags.append(el('label', {}, flagBoxes[f], ' ' + label));
   }
   const zoneBoxes = {}, zones = el('div', { className: 'chips' });
   for (const z of ZONES) { zoneBoxes[z] = el('input', { type: 'checkbox' }); zones.append(el('label', {}, zoneBoxes[z], ' ' + z)); }
+  // idle: she drifts into it on her own, in the moods ticked (all = any mood)
+  const IDLE_BANDS = ['grudge', 'cool', 'neutral', 'warm', 'loving', 'lewd'];
+  const idleBoxes = {}, idles = el('div', { className: 'chips' });
+  for (const b of IDLE_BANDS) { idleBoxes[b] = el('input', { type: 'checkbox' }); idles.append(el('label', {}, idleBoxes[b], ' ' + b)); }
   const bandBoxes = {}, bands = el('div', { className: 'chips' });
   for (const b of BANDS) { bandBoxes[b] = el('input', { type: 'checkbox' }); bands.append(el('label', {}, bandBoxes[b], ' ' + b)); }
   const moodIn = el('input', { type: 'text', placeholder: 'or mood names: flirty, heated…', style: 'width:200px' });
@@ -229,6 +233,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   pages.details.append(
     row('name', nameIn), row('about', aboutIn), row('keywords', kwIn), row('fade', fadeIn, fadeOut, el('span', { className: 'dim', textContent: ' in / out' })),
     el('div', { className: 'dim', textContent: 'flags' }), flags,
+    el('div', { className: 'dim', textContent: 'idle: she does it on her own in these moods (none: never)' }), idles,
     el('div', { className: 'dim', textContent: 'touches that play it' }), zones,
     el('div', { className: 'dim', textContent: 'in these moods (none ticked: any mood)' }), bands, row('', moodIn),
     row('sound', soundSel), row('', soundFrom, soundLen),
@@ -380,7 +385,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     stopPlay();
     st.on = false; onOff.textContent = 'start posing'; posingDot.textContent = '';
     st.live?.stop(); st.live = null;
-    drawNow();
+    drawNow(); moveGizmo();
   }
   // the key at time t (made if asked)
   function keyAt(t, make) {
@@ -533,7 +538,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       let top = vrm.scene; while (top.parent) top = top.parent;   // the scene itself: the rings are placed in world space
       top.add(gizmo);
     }
-    gizmo.visible = tabNow === 'pose' && !!vrm.humanoid.getNormalizedBoneNode(st.bone) && showAxes.checked && !win.classList.contains('tucked');
+    // only while posing: otherwise a click meant as a touch lands on a ring
+    gizmo.visible = st.on && tabNow === 'pose' && !!vrm.humanoid.getNormalizedBoneNode(st.bone) && showAxes.checked && !win.classList.contains('tucked');
     propHandles();
   }
   new MutationObserver(() => moveGizmo()).observe(win, { attributes: true, attributeFilter: ['class'] });   // tucked away: no rings
@@ -573,9 +579,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
         dragging.slide = { x: e.clientX, y: e.clientY, tx: tx / len, ty: ty / len, px: Math.max(30, Math.hypot(s0.x - c.x, s0.y - c.y)), sgn };
       }
       canvas.setPointerCapture?.(e.pointerId);
-      lastMark = 0; dragStep = false;
-      remember();                                          // the drag is one undo step
-      dragStep = true;
+      lastMark = 0; dragStep = false;                      // the drag is one undo step, from its first real move
     }, true);
     addEventListener('pointermove', e => {
       if (dragging) {
@@ -860,7 +864,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   // the line at the top: what you're editing and where you are in it
   function drawNow() {
     if (!now) return;
-    if (closed && !A.keys.length && !A.chain.length && !dirty) {
+    const unsaved = dirty && (A.keys.length > 0 || A.chain.length > 0);   // nothing in it: nothing to save
+    if (closed && !A.keys.length && !A.chain.length) {
       now.textContent = 'nothing open · pick a gesture to edit, or ✚ new gesture';
       now.classList.remove('dirty'); saveBtn.classList.remove('unsaved');
       return;
@@ -875,9 +880,9 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
         : i >= 0 ? `on key ${i + 1} of ${A.keys.length}` : `between keys (${A.keys.length})`;
       text = `editing ${name} · ${st.t.toFixed(2)} s of ${A.dur} · ${where}`;
     }
-    now.textContent = text + (dirty ? ' · not saved' : '');
-    now.classList.toggle('dirty', dirty);
-    saveBtn.classList.toggle('unsaved', dirty);
+    now.textContent = text + (unsaved ? ' · not saved' : '');
+    now.classList.toggle('dirty', unsaved);
+    saveBtn.classList.toggle('unsaved', unsaved);
   }
   {
     let drag = null;
@@ -1038,6 +1043,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     A.name = nameIn.value.trim(); A.about = aboutIn.value.trim(); A.keywords = kwIn.value;
     A.fade = [Math.max(0, +fadeIn.value || 0), Math.max(0, +fadeOut.value || 0)];
     for (const f of Object.keys(flagBoxes)) A[f] = flagBoxes[f].checked;
+    A.idle = IDLE_BANDS.filter(b => idleBoxes[b].checked);
     A.touch = ZONES.filter(z => zoneBoxes[z].checked);
     A.moods = [...BANDS.filter(b => bandBoxes[b].checked), ...moodIn.value.split(',').map(s => s.trim()).filter(Boolean)];
     A.sound = { name: soundSel.value, from: soundFrom.value.trim(), len: soundLen.value };
@@ -1047,6 +1053,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     nameIn.value = A.name; aboutIn.value = A.about; kwIn.value = A.keywords;
     fadeIn.value = A.fade[0]; fadeOut.value = A.fade[1];
     for (const f of Object.keys(flagBoxes)) flagBoxes[f].checked = !!A[f];
+    if (!Array.isArray(A.idle)) A.idle = A.idle ? IDLE_BANDS.slice() : [];   // a draft from before
+    for (const b of IDLE_BANDS) idleBoxes[b].checked = A.idle.includes(b);
     for (const z of ZONES) zoneBoxes[z].checked = A.touch.includes(z);
     for (const b of BANDS) bandBoxes[b].checked = A.moods.includes(b);
     moodIn.value = A.moods.filter(m => !BANDS.includes(m)).join(', ');
@@ -1064,7 +1072,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     if (A.about) g.about = A.about;
     const kw = A.keywords.split(',').map(s => s.trim()).filter(Boolean);
     if (kw.length) g.keywords = kw;
-    for (const f of ['private', 'lewd', 'full', 'idle']) if (A[f]) g[f] = true;
+    for (const f of ['private', 'lewd', 'full']) if (A[f]) g[f] = true;
+    if (A.idle.length) g.idle = A.idle.length === IDLE_BANDS.length ? true : A.idle.slice();
     if (A.touch.length) g.touch = A.touch;
     if (A.moods.length) g.moods = A.moods;
     if (A.sound.name) {
@@ -1095,7 +1104,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     A = fresh();
     A.name = n; A.about = g.about || ''; A.keywords = (g.keywords || []).join(', ');
     A.fade = (g.fade || [0.4, 0.5]).slice();
-    for (const f of ['private', 'lewd', 'full', 'idle']) A[f] = !!g[f];
+    for (const f of ['private', 'lewd', 'full']) A[f] = !!g[f];
+    A.idle = g.idle === true ? IDLE_BANDS.slice() : Array.isArray(g.idle) ? IDLE_BANDS.filter(b => g.idle.includes(b)) : [];
     A.touch = (g.touch || []).slice(); A.moods = (g.moods || []).slice();
     const s = typeof g.sound === 'string' ? { name: g.sound } : g.sound || {};
     A.sound = { name: s.name || '', from: s.from ?? '', len: s.len ?? '' };

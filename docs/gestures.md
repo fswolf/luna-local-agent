@@ -72,7 +72,7 @@ with `_` are helpers or notes and are never loaded as gestures.
 1. The portrait asks the server for `gestures/index.json`: a list of every
    `.js` file in `portrait/gestures/` except the `_` ones.
 2. It loads each file and reads its settings. `left: true` makes a mirrored
-   copy called `<name>_left`, `idle: true` adds it to her idle moves,
+   copy called `<name>_left`, `idle` adds it to her idle moves,
    `private: true` keeps it away from stream chat.
 3. The viewer (`./viewer.sh`) makes a button for every gesture it found. A
    file with a mistake in it gets a pink line in the panel saying which
@@ -90,7 +90,7 @@ is enough.
 | Keywords | A word from a gesture's `keywords` inside an action she writes (`*beckons you closer*`), or its emoji anywhere. Also you saying hi or asking for a hug |
 | Chat | Viewers' `!wave`, `!hug`, a first "hi", "lol" (never private gestures) |
 | You | `/portrait wink`, or the button in the viewer |
-| On her own | Gestures with `idle: true`, every 25 to 55 seconds while she's idle |
+| On her own | Gestures with `idle`, every 25 to 55 seconds while she's idle, in the moods they're marked for |
 | Events | She waves when she wakes up and shrugs when a tool fails |
 
 `/portrait gestures <mode>`, or the **gestures** row in the tools pane,
@@ -300,7 +300,7 @@ export default {
 |---------|--------------|
 | `about: "..."` | When to use it. Offers it to her as a tag in tags mode, and is what meaning mode compares with. Without it she won't choose it herself, but it still plays from buttons, commands and idle |
 | `keywords: [...]` | Words that play it when she writes them inside an `*action*`, and emoji that play it anywhere |
-| `idle: true` | One of the things she does on her own when nothing's happening |
+| `idle: true` or `idle: ['warm', 'loving']` | One of the things she does on her own when nothing's happening: `true` in any mood, a list only in those mood bands (`grudge`, `cool`, `neutral`, `warm`, `loving`, `lewd`). The pose studio's Details tab has a box for each. The debug panel shows what she'd pick from in the mood you set, with **▶ play an idle** to try one |
 | `private: true` | Never triggered from stream chat, and only offered to her in your own conversations |
 | `left: true` | Also make a mirrored copy, `<name>_left` |
 | `full: true` | It only reads with all of her on screen (her legs): offered to her, and played as an idle move, only while the portrait is framed full body. In the bust view it would be a tag that shows nothing |

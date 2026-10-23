@@ -124,7 +124,6 @@ wiki.sh
 evals/vendor/
 evals/results/
 
-# Her sounds (portrait/sounds/): bought or downloaded clips - yours to use,
-# usually not yours to share. Only the folder's README goes in git.
-portrait/sounds/*
-!portrait/sounds/README.md
+# Her sounds (portrait/sounds/): the clips she plays go in git; the full
+# recordings they're cut from stay local in portrait/sounds/source/.
+portrait/sounds/source/

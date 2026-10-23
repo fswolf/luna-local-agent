@@ -1,6 +1,6 @@
 // arch_stretch: hands go up behind her head, elbows out, and she arches her
 // back - chest out, chin up, eyes closed - leans a little each way, sighs,
-// and lets go. An idle: she does it on her own, any mood.
+// and lets go. An idle: she does it on her own.
 import { both } from './_pose.js';
 
 const HANDS = both({ rightUpperArm: [0, -0.3, -1.1], rightLowerArm: [0, 0.7, -2.2] });   // hands behind her head
@@ -9,7 +9,7 @@ const ARCH = d => ({ '+spine': [-0.12, 0, d], '+chest': [-0.08, 0, 0], '+head': 
 export default {
   keywords: ["arches her back", "hands behind her head", "stretches out"],
   about: "relaxed, stretching, arching her back with her hands behind her head",
-  idle: true,         // one of the things she does on her own
+  idle: ['neutral', 'warm', 'loving'],   // on her own, in these moods (studio: Details)
   dur: 5.0, fade: [0.9, 1.0],
   keys: [
     [0.0, { ...HANDS, ...ARCH(0) }],

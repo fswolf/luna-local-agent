@@ -3,7 +3,7 @@ import { fingers } from './_pose.js';
 
 export default {
   keywords: ["tucks her hair", "tucks a strand", "brushes her hair"],   // in what she writes, *like this*
-  idle: true,         // one of the things she does on her own
+  idle: ['cool', 'neutral', 'warm', 'loving', 'lewd'],   // on her own, in these moods (studio: Details)
   left: true,         // also a left-handed version, tuck_hair_left
   dur: 2.6, fade: [0.55, 0.6],
   keys: [

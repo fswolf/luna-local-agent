@@ -13,6 +13,11 @@ few minutes, or presence sees you at the desk. A sip waits while she's
 in the middle of a turn, so she never drinks over her own words. The day
 it happened is kept in agent/coffee.json, so a restart doesn't pour her
 a second cup.
+
+Not in the lewd row: she doesn't start a cup while she's teasing, frisky
+or heated (it waits until she's out of it, if it's still morning), and a
+morning cup in her hand when she gets there goes down. One you asked for
+with /coffee stays.
 """
 import json
 import os
@@ -99,6 +104,16 @@ def _busy():
         return False
 
 
+def _lewd():
+    """In the lewd row (teasing, frisky, heated)?"""
+    try:
+        import mood
+
+        return mood._row_of(mood.label()) == "lewd"
+    except Exception:
+        return False
+
+
 def _emit(kind, **data):
     try:
         import livefeed
@@ -113,13 +128,14 @@ def _next_sip(now):
     return now + minutes * 60 * random.uniform(0.7, 1.3)
 
 
-def begin(now=None):
-    """Pick up the mug (also /coffee). False if she's already holding it."""
+def begin(now=None, by_hand=True):
+    """Pick up the mug (/coffee; the morning routine passes by_hand=False).
+    False if she's already holding it."""
     now = time.monotonic() if now is None else now
     with _lock:
         if _state["on"]:
             return False
-        _state.update(on=True, since=now, sips=0, sip_at=now + random.uniform(*FIRST_SIP))
+        _state.update(on=True, by_hand=by_hand, since=now, sips=0, sip_at=now + random.uniform(*FIRST_SIP))
     _mark_today()
     _emit("prop", name="mug", on=True)
     logbook.info("coffee", "she picked up her coffee")
@@ -167,14 +183,14 @@ def tick(now=None):
 
     if _state["on"]:
         minutes = float(getattr(config, "PORTRAIT_COFFEE_MINUTES", 40))
-        if now - _state["since"] >= minutes * 60:
+        if now - _state["since"] >= minutes * 60 or (_lewd() and not _state.get("by_hand")):
             finish()
         elif now >= _state["sip_at"] and not _busy():
             sip(now)
         return
 
-    if (enabled() and morning() and _watching() and not had_today() and _someone_here() and not _busy()):
-        begin(now)
+    if (enabled() and morning() and _watching() and not had_today() and _someone_here() and not _busy() and not _lewd()):
+        begin(now, by_hand=False)
 
 
 def _loop():

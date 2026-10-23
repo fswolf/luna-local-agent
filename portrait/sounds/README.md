@@ -15,4 +15,10 @@ Keep a CREDITS.md here for packs that ask for credit.
 
 | File / folder | Used by |
 |---|---|
-| touch-self.mp3 | touch_self, climax |
+| moan-touch-self.mp3 | touch_self (10 s) |
+| moan-breasts.mp3 | cup_breasts (8.5 s) |
+| moan-orgasm.mp3 | masturbate (27.5 s, peaks ~19 s in) |
+| moan-climax.mp3 | climax (11 s) |
+
+Each is cut from a longer recording to fit its gesture, faded in and out and
+levelled to the same loudness, so the full recordings can live elsewhere.

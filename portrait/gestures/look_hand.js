@@ -2,7 +2,7 @@
 import { fingers } from './_pose.js';
 
 export default {
-  idle: true,         // one of the things she does on her own
+  idle: ['grudge', 'cool', 'neutral', 'warm'],   // on her own, in these moods (studio: Details)
   dur: 3.6, fade: [0.6, 0.7],
   keys: [
     [0.0, { leftUpperArm: [0, -0.85, -0.75], leftLowerArm: [0, -1.9, 0.35], leftHand: [0.6, 0, 0.2], ...fingers('left', 0.1),

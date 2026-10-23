@@ -229,7 +229,9 @@ and the next turn picks it up; a typo keeps the last good version and
 - **voice** is a speed multiplier and a pitch shift in semitones, still
   capped at ±7% and ±0.45.
 - **idle** is gestures she drifts into now and then in that mood, half
-  the time instead of the usual idle ones.
+  the time instead of the everyday idle ones (gestures marked `idle`,
+  each for the mood bands it suits: no stretching while she's heated, no
+  bouncing while she's mad). See `idle` in [Gestures](gestures.md).
 - **emote** pops up beside her head now and then in that mood (every
   3-6 minutes): `"hearts"` for loving and flirty, `"anger"` for annoyed
   and mad. See Emotes.

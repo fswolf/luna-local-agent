@@ -77,7 +77,7 @@ and stop words still work.
 | `config.json` → `"mood"` | On/off, intensity, where she rests, what shows where (see [Settings](#settings-reference)) |
 | `portrait/touch.json` | What she does when each part of her is clicked, per mood |
 | `portrait/gestures/*.js` | Every gesture: one file each, data only |
-| `portrait/sounds/` | Your sound clips (not in git) |
+| `portrait/sounds/` | Her sound clips (`source/` inside is not in git) |
 | `touches.py` | Touch talk: her one spoken line when you touch her |
 | `gestures.py` | How her replies set gestures off (tags, meaning, keywords) |
 | `portrait/viewer/` | The portrait page itself, the debug viewer and the pose studio |
@@ -430,7 +430,9 @@ A reaction can have **gestures** (one picked at random), a quick
 **face** (with `seconds` to hold it), an **emote**, and an **ears**
 twitch. **Gesture files join in on their own**: a gesture with
 `touch: ['legs']` and `moods: ['warm']` is added to that zone's choices
-in those moods, without touching `touch.json`.
+in those moods, without touching `touch.json`. It joins for the mood the
+zone answers from (in heated the chest answers from lewd, so a
+`loving`-tagged gesture stays out).
 
 - **Cooldown:** 1.5 s between touch reactions.
 - **Too much:** 5 touches within 8 s gets a "that's enough" reaction
@@ -459,8 +461,9 @@ itself in; the emote in brackets):
 
 ### Spanks
 
-In her top two rows - **very warm** (cuddly, loving, flirty) and **lewd**
-- a click on her bum is a **spank** instead of a normal touch reaction:
+From **warm** up - **warm** (sleepy, happy, excited), **very warm** (cuddly,
+loving, flirty) and **lewd** - a click on her bum is a **spank** instead of a
+normal touch reaction:
 
 - She flinches (`spank_flinch`): hips jolt, back arches, shoulders snap
   up, a gasp and a blush, a tail flick. Every click, no cooldown.
@@ -537,7 +540,7 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 | `shh` | a secret, mischief, being sly | 2.8 s | - | - | any |
 | `shrug` | don't know, oh well | 2.2 s | - | - | any |
 | `shy` | bashful, flustered by a compliment | 4.2 s | 🔒 | - | any |
-| `spank_flinch` | flinching from a spank, surprised and flustered | 0.9 s | 🔥🔒 | (bum, top two moods - see Spanks) | very warm, lewd |
+| `spank_flinch` | flinching from a spank, surprised and flustered | 0.9 s | 🔥🔒 | (bum, warm and up - see Spanks) | warm, very warm, lewd |
 | `standing_split` | bored, idly showing off: a standing split, leg held up by the ankle | 6.6 s | 🧍 | legs | neutral, calm, tired |
 | `step_back` | annoyed, backing off, not having it | 2.8 s | 🧍 | legs | cool |
 | `stretch` | tired, waking up | 4.2 s | 💤 | - | any |
@@ -578,9 +581,9 @@ rotate the live portrait - only she and chat can.
 
 ## Sounds and pronunciation
 
-**Sounds.** Put clips in `portrait/sounds/` (mp3, ogg, wav, m4a). That
-folder is **not in git**: bought or downloaded sounds are yours to use,
-usually not yours to share. A gesture names one:
+**Sounds.** Put clips in `portrait/sounds/` (mp3, ogg, wav, m4a). The clips
+there go in git; keep full recordings in `portrait/sounds/source/`, which
+git ignores. A gesture names one:
 
 ```js
 sound: 'touch-self'                                  // the file touch-self.mp3

@@ -59,7 +59,7 @@ export default {
   about: "lewd, one hand cupping her breast, one hand between her legs, blushing, panting",
   private: true,
   lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
-  sound: { name: 'touch-self', from: 'random' },   // portrait/sounds/touch-self.mp3, a random stretch of it
+  sound: 'moan-touch-self',   // portrait/sounds/moan-touch-self.mp3, a 10 s clip made for it
   dur: DUR, fade: [0.55, 0.7],
   keys: [
     [0.0, { ...BREAST, ...LEGS, ...KNEES, ...fingers('right', 0.45), ...fingers('left', 0.4),

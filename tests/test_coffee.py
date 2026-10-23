@@ -35,6 +35,7 @@ class Coffee(unittest.TestCase):
             mock.patch.object(coffee, "_busy", lambda: False),
             mock.patch.object(coffee, "morning", lambda hour=None: True),
             mock.patch("mood._nudge", lambda **kw: self.nudges.append(kw)),
+            mock.patch.object(coffee, "_lewd", lambda: False),
         ]
         for p in self.patches:
             p.start()
@@ -102,6 +103,23 @@ class Coffee(unittest.TestCase):
         self.assertFalse(coffee.holding())
         self.assertEqual(self.events[-1], ("prop", {"name": "mug", "on": False}))
 
+    def test_not_while_lewd(self):
+        with mock.patch.object(coffee, "_lewd", lambda: True):
+            coffee.tick(now=100)
+            self.assertFalse(coffee.holding())           # no cup in the lewd row
+            self.assertFalse(coffee.had_today())         # still owed one
+            coffee.begin(now=100)                        # /coffee still works
+            coffee.tick(now=110)
+            self.assertTrue(coffee.holding())
+            coffee.finish()
+        os.remove(coffee.STATE_FILE)                     # (the /coffee cup counted as today's)
+        coffee.tick(now=200)                             # out of it: the morning cup
+        self.assertTrue(coffee.holding())
+        with mock.patch.object(coffee, "_lewd", lambda: True):
+            coffee.tick(now=210)                         # into the lewd row: it goes down
+        self.assertFalse(coffee.holding())
+        self.assertEqual(self.events[-1], ("prop", {"name": "mug", "on": False}))
+
     def test_start_clears_a_stale_mug(self):
         with mock.patch("threading.Thread"):
             coffee._state["thread"] = None
@@ -160,6 +178,15 @@ class PropPlacement(unittest.TestCase):
         self.assertNotIn("hold", text)                   # only a real true
         with self.assertRaises(ValueError):
             livefeed.gesture_file({"name": "pick", "keys": [[0, {"rightHand": [0, 0, 0]}]], "prop": "a b"})
+
+    def test_idle_moods(self):
+        k = [[0, {"rightHand": [0, 0, 0]}]]
+        _n, text = livefeed.gesture_file({"name": "s", "keys": k, "idle": ["warm", "lewd", "nope"]})
+        self.assertIn('idle: ["warm", "lewd"]', text)    # only her mood bands
+        _n, text = livefeed.gesture_file({"name": "s", "keys": k, "idle": True})
+        self.assertIn("idle: true", text)
+        _n, text = livefeed.gesture_file({"name": "s", "keys": k, "idle": []})
+        self.assertNotIn("idle", text)
 
 
 if __name__ == "__main__":

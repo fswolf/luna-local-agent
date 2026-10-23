@@ -209,6 +209,42 @@ def _state(name):
     return (moods().get("states") or {}).get(name) or {}
 
 
+def preview_list():
+    """Every mood, top to bottom (lewd, very warm ... cool, grudge), each with
+    dials in the middle of its cell and its face, idle moves and emote, as the
+    portrait gets them: for the debug viewer's mood menu."""
+    m = moods()
+    grid = m.get("grid") or []
+    words = (m.get("warmth") or {}).get("words") or []
+
+    def middle(edges, i, n):
+        lo = edges[i - 1] if i > 0 else -1.0
+        hi = edges[i] if i < len(edges) else 1.0
+        if i == 0:
+            lo = max(-1.0, hi - 0.6)
+        if i == n - 1:
+            hi = min(1.0, lo + 0.6)
+        return round((lo + hi) / 2, 2)
+
+    e_edges = (m.get("energy") or {}).get("edges") or [-0.2, 0.35]
+    w_edges = (m.get("warmth") or {}).get("edges") or [-0.2, 0.35, 0.66]
+    energies = [middle(e_edges, j, len(e_edges) + 1) for j in range(len(e_edges) + 1)]
+    rows = [("lewd", _extra("lewd")["row"], 0.95, "lewd")]
+    for i in range(len(grid) - 1, -1, -1):
+        rows.append((words[i] if i < len(words) else f"row {i}", grid[i], middle(w_edges, i, len(grid)), ""))
+    rows.append(("grudge", _extra("grudge")["row"], -0.6, "grudge"))
+
+    out = []
+    for group, names, warmth, row in rows:
+        for j, name in enumerate(names):
+            spec = _state(name)
+            out.append({"name": name, "group": group, "row": row, "warmth": warmth,
+                        "energy": energies[min(j, len(energies) - 1)],
+                        "face": dict(spec.get("face") or {}), "idle": [str(g) for g in spec.get("idle") or []],
+                        "emote": str(spec.get("emote") or "")})
+    return out
+
+
 def _extra(name):
     """moods.json lewd / grudge, falling back to the built-in names."""
     spec = dict(_FALLBACK[name])

@@ -18,11 +18,13 @@
 
   "states": {
     "sad":     { "lines": ["sad and worn out", "low, and short on patience"],
-                 "face": { "sad": 0.7, "angry": 0.1 }, "voice": { "speed": 0.95, "pitch": -0.35 } },
+                 "face": { "sad": 0.7, "angry": 0.1 }, "voice": { "speed": 0.95, "pitch": -0.35 },
+                 "idle": ["hands_on_chest"] },
     "annoyed": { "lines": ["annoyed and not in the mood for much", "a bit fed up"],
-                 "face": { "angry": 0.35, "sad": 0.1 }, "emote": "anger" },
+                 "face": { "angry": 0.35, "sad": 0.1 }, "idle": ["look_hand"], "emote": "anger" },
     "mad":     { "lines": ["mad and wound up", "cross, with no patience to spare"],
-                 "face": { "angry": 0.85 }, "voice": { "speed": 1.04, "pitch": 0.2 }, "emote": "anger" },
+                 "face": { "angry": 0.85 }, "voice": { "speed": 1.04, "pitch": 0.2 },
+                 "idle": ["look_hand"], "emote": "anger" },
 
     "tired":   { "lines": ["tired, but here", "tired enough that everything takes a beat longer"],
                  "face": { "sad": 0.3, "relaxed": 0.15 }, "voice": { "speed": 0.95, "pitch": -0.3 },
@@ -37,7 +39,7 @@
                  "face": { "relaxed": 0.35, "happy": 0.15 }, "voice": { "speed": 0.95, "pitch": -0.3 },
                  "idle": ["stretch"] },
     "happy":   { "lines": ["happy, easy company", "happy and relaxed with him"],
-                 "face": { "happy": 0.3, "relaxed": 0.1 } },
+                 "face": { "happy": 0.3, "relaxed": 0.1 }, "idle": ["tuck_hair", "bounce"] },
     "excited": { "lines": ["excited and enjoying this", "wide awake, happy and talking a little fast"],
                  "face": { "happy": 0.45 }, "voice": { "speed": 1.05, "pitch": 0.35 },
                  "idle": ["bounce", "dance"] },

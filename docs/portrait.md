@@ -131,7 +131,11 @@ moods: ['warm', 'loving'],   // bands, rows (lewd, grudge) or mood names; leave 
 ```
 
 Those gestures are added to whatever the zone already lists, and one is
-picked at random. A gesture with a left-handed copy (`left: true`) plays
+picked at random. They join for the mood the zone answers from: in heated,
+a chest touch answers from `lewd` (heated is in the lewd row), so a gesture
+tagged `loving` stays out even though heated is loving-warm too. A zone
+with no entry for her mood answers from the most specific mood a tagged
+gesture has. A gesture with a left-handed copy (`left: true`) plays
 on the side you touched. The leg gestures work this way:
 
 | Gesture | What she does | Moods |
@@ -441,7 +445,7 @@ and does small things on her own:
 | Tail wag | With the happy ones, and when her mood warms up |
 | Blow a kiss, shy | Affectionate ones, for people who role-play with her: fingers to her lips then blown your way; hands together at her chest, looking away, then a peek. Only in your own conversations: never from stream chat, and never offered to her in a chat room's turn |
 | Cry | She writes `[cry]`, or she stays deeply sad for several seconds: tears well on her lower lids, streak down her cheeks with drops running along them, and the cry gesture adds a lowered head and shoulders hitching with sobs. They dry slowly. `"vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}` in luna.json moves them for a non-VRoid face |
-| Morning coffee | Once a day in the morning, the first time you're around, she picks up her mug, takes a sip every few minutes (each one wakes her up a little) and puts it down when it's finished. `/coffee` pours one now, `/coffee off` puts it down. Settings: `portrait.coffee.*` |
+| Morning coffee | Once a day in the morning, the first time you're around, she picks up her mug, takes a sip every few minutes (each one wakes her up a little) and puts it down when it's finished. Not in the lewd row: the morning cup waits until she's out of it, and goes down if she gets there mid-cup. `/coffee` pours one now (that one stays), `/coffee off` puts it down. Settings: `portrait.coffee.*` |
 | Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
 
 ### The pose studio: making gestures without code

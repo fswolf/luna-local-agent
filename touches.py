@@ -34,7 +34,7 @@ PLACES = {
     "head": "on the head", "nose": "on the nose", "mouth": "on the lips", "chest": "on the chest",
     "tummy": "on the tummy", "groin": "between the legs", "legs": "on the leg", "neck": "on the neck",
     "arms": "on the arm", "back": "on the back", "butt": "on the butt", "tail": "on the tail",
-    "spank": "with a spank on the butt",     # the portrait's spank (her top two moods): mood.note_spank
+    "spank": "with a spank on the butt",     # the portrait's spank (warm and up): mood.note_spank
 }
 WINDOW = 1.5          # seconds of pokes gathered into one touch
 MAX_TOKENS = 40       # her line, not a paragraph
