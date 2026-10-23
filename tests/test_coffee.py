@@ -36,6 +36,7 @@ class Coffee(unittest.TestCase):
             mock.patch.object(coffee, "morning", lambda hour=None: True),
             mock.patch("mood._nudge", lambda **kw: self.nudges.append(kw)),
             mock.patch.object(coffee, "_lewd", lambda: False),
+            mock.patch.object(coffee, "_walked_away", lambda: False),
         ]
         for p in self.patches:
             p.start()

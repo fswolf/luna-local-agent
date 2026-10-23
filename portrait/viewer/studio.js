@@ -296,6 +296,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     savePlace.textContent = changed ? 'save placement ●' : 'save placement';
     savePlace.classList.toggle('unsaved', changed);
     savePlace.title = changed ? 'moved since it was saved: save it, or it\'s back where it was next time' : 'where it sits, for every gesture (portrait/props/props.json)';
+    try { drawNow(); } catch (_) {}                    // the top save lights up for it too (not yet built at start-up)
   }
   const propNone = el('div', { className: 'dim', textContent: 'pick a prop to put it in her hand. (Opening a gesture made with one, like coffee_pickup, brings it out by itself.)' });
   pages.prop.append(
@@ -864,7 +865,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   // the line at the top: what you're editing and where you are in it
   function drawNow() {
     if (!now) return;
-    const unsaved = dirty && (A.keys.length > 0 || A.chain.length > 0);   // nothing in it: nothing to save
+    const unsaved = (dirty && (A.keys.length > 0 || A.chain.length > 0)) || placedNow;   // nothing in it: nothing to save; a moved prop: yes
     if (closed && !A.keys.length && !A.chain.length) {
       now.textContent = 'nothing open · pick a gesture to edit, or ✚ new gesture';
       now.classList.remove('dirty'); saveBtn.classList.remove('unsaved');
@@ -1134,6 +1135,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   // -- save ------------------------------------------------------------------------------------
   async function saveIt(asNew, chain = false) {
     formToA();
+    if (placedNow) saveProp();        // the top save saves a moved prop too (no second save to miss)
     let name = A.name;
     if (asNew || !name) {
       name = (prompt('Save as (lower-case letters, numbers and _):', name || '') || '').trim().toLowerCase();

@@ -434,6 +434,23 @@ function lengthOf(g) {
 // Is the view (or where it's heading) round the back of her?
 function facingAway() { return Math.cos(view.target ?? orbit.yaw) < -0.5; }
 
+// Her hands are full (her mug, her book): only that prop's own moves
+// (coffee_*, book_* - named like its pick-up gesture) and gestures that
+// leave her arms alone play. A wave or a hug would swing the prop about.
+const ARMS = /(UpperArm|LowerArm|Hand|Shoulder|Thumb|Index|Middle|Ring|Little)/;
+function movesArms(name, depth = 0) {
+  const g = GESTURES[name.replace(/_left$/, '')];
+  if (!g) return moves?.hasClip(name) ?? false;            // a .vrma clip: assume it does
+  if (Array.isArray(g.chain)) return depth < 4 && g.chain.some(n => movesArms(n, depth + 1));
+  return (g.keys || []).some(([, p]) => Object.keys(p).some(k => ARMS.test(k)));
+}
+function busyHands(name) {
+  const held = props?.names().find(n => props.held(n));
+  if (!held) return false;
+  const own = (props.PROPS[held]?.pickup || held + '_pickup').split('_')[0] + '_';
+  return !name.startsWith(own) && movesArms(name);
+}
+
 function gesture(name, publicOnly = false) {
   if (!moves) return;
   if (GESTURES[name] && GESTURES[name].view != null) {
@@ -442,6 +459,7 @@ function gesture(name, publicOnly = false) {
     return;
   }
   if (moves.playing().some(n => n.replace('_left', '') === name)) return;   // already doing it
+  if (busyHands(name)) return;
   if (mind.tame && GESTURES[name]?.lewd) return;
   if (name === 'wave' && !moves.hasClip('wave')) name = Math.random() < 0.7 ? 'wave' : 'wave_left';
   if (moves.play(name, publicOnly)) {
@@ -558,18 +576,27 @@ const idle = { next: 25, last: '', talkNext: 0 };
 // held (its hold) until she puts it down again, so between sips her arm
 // stays round the mug.
 // hold: true keeps the pose of its last key (the '+' torso bones are left
-// to her breathing); an object is a pose of its own
+// to her breathing; '+neck' and '+head' stay, so she keeps looking into her
+// book); an object is a pose of its own
 function heldPose(g) {
   if (g.hold && typeof g.hold === 'object') return g.hold;
   if (g.hold !== true || !g.keys?.length) return null;
   const last = g.keys[g.keys.length - 1][1];
-  return Object.fromEntries(Object.entries(last).filter(([b]) => !b.startsWith('+')));
+  return Object.fromEntries(Object.entries(last).filter(([b]) => !b.startsWith('+') || b === '+neck' || b === '+head'));
 }
 function propEvent(ev) {
   const p = props?.PROPS[ev.name];
   if (!p || !moves) return;
   if (ev.on) {
     if (props.held(ev.name)) return;
+    // one thing in her hands at a time: whatever she's holding goes down first
+    const other = props.names().find(n => n !== ev.name && props.held(n));
+    if (other) {
+      const putName = props.PROPS[other].putdown || other + '_putdown', put = GESTURES[putName];
+      if (!moves.playing().includes(putName)) propEvent({ name: other, on: false });   // (already going down: just wait)
+      setTimeout(() => propEvent(ev), ((put ? lengthOf(put) : 0) + 0.2) * 1000);
+      return;
+    }
     const g = GESTURES[p.pickup || ev.name + '_pickup'];
     if (!g) { props.show(ev.name); return; }
     gesture(p.pickup || ev.name + '_pickup');

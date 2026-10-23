@@ -9,6 +9,7 @@ starting blind each time:
     - Machine: CPU 18%, RAM 21.4 of 31.2 GB free, GPU 34% busy (VRAM 11.2/16 GB)
     - Running: minecraft, zork
     - Next reminder: tomorrow 09:00 - take the bins out (in 18 hours)
+    - In your hands: your morning coffee in your mug, 3 sips in
 
 Every line is optional and each source is cheap; anything that can't be
 read (no Hyprland, no playerctl, a Mac without /proc) is simply left
@@ -21,7 +22,7 @@ playing are his business.
     "situation": {
         "enabled": true,
         "window": true, "music": true, "machine": true,
-        "plugins": true, "reminders": true
+        "plugins": true, "reminders": true, "hands": true
     }
 
 /set situation.enabled false turns it off; /situation shows what she'd
@@ -161,8 +162,21 @@ def _reminders():
     return line
 
 
+def _hands():
+    """What she's holding on her portrait: her coffee (coffee.py) or a book (reading.py)."""
+    out = []
+    for mod in ("coffee", "reading"):
+        try:
+            line = __import__(mod).describe()
+        except Exception:
+            line = ""
+        if line:
+            out.append(line)
+    return "; ".join(out)
+
+
 SOURCES = (("window", _window), ("music", _music), ("machine", _machine),
-           ("plugins", _plugins), ("reminders", _reminders))
+           ("plugins", _plugins), ("reminders", _reminders), ("hands", _hands))
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +198,7 @@ def lines(fresh=False):
             line = ""
 
         if line:
-            out.append(line[:200])
+            out.append(line[:700 if name == "hands" else 200])   # a book needs a few words
 
     _cache.update(at=time.monotonic(), text="\n".join(out))
     return out

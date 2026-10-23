@@ -14,7 +14,7 @@ or switch it off.
 | Startup greeting | after a break, opens by picking up where you left off | the first thing she says |
 | Recipes (skill library) | saves the steps of a multi-step job that went right, and brings them back for similar jobs | `/skills` |
 | Ongoing projects | work that spans sessions: the goal, what was tried and found, the next step | `/projects` |
-| Situation block | a few live lines each turn: your focused window, music, machine load, running plugins, next reminder | `/situation` |
+| Situation block | a few live lines each turn: your focused window, music, machine load, running plugins, next reminder, what's in her hands (her coffee, the book she's reading) | `/situation` |
 
 Each one switches on and off in the tools pane's **Learning** group, or
 with `/set self.<name> false` (`/set situation.enabled false` for the

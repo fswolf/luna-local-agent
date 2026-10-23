@@ -44,7 +44,7 @@ ai-voice/
 ├── skills.py         # her recipes for multi-step jobs (agent/skills.db)
 ├── projects.py       # ongoing projects: goal, log of tried/found, next step (agent/projects.db)
 ├── grounding.py      # the grounding check: specifics in a reply that nothing she was given backs up
-├── situation.py      # the live lines at the top of each turn: window, music, load, plugins, next reminder
+├── situation.py      # the live lines at the top of each turn: window, music, load, plugins, next reminder, her hands
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── embedmem.py       # recalling facts by meaning (and reranking), when those servers are up
 ├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792 (and /portrait)

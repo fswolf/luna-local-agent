@@ -59,7 +59,9 @@ def emit(kind, **data):
     event = dict(data, t=kind, at=round(time.time(), 3))
 
     if kind in _SNAPSHOT_KINDS:
-        _snapshot[kind] = event
+        # one prop event kept per prop (her mug, her book), so a page that
+        # connects later puts each one where it should be
+        _snapshot[f"prop:{data.get('name')}" if kind == "prop" else kind] = event
 
         if kind == "turn":
             # A new turn makes the old one's tail meaningless.

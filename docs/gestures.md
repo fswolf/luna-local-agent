@@ -307,7 +307,7 @@ export default {
 | `full: true` | It only reads with all of her on screen (her legs): offered to her, and played as an idle move, only while the portrait is framed full body. In the bust view it would be a tag that shows nothing |
 | `touch: [...]` | Touch zones it answers when you click her: `['legs']`. See *Touching her* in [portrait](portrait.md) |
 | `moods: [...]` | With `touch`: the mood bands (`cool`, `neutral`, `warm`, `loving`) or mood names it suits. Leave it out for any mood |
-| `prop: 'mug'` | The prop it's made with (a `.glb` in `portrait/props/`, placed in her hand from the pose studio's *Prop* tab); opening the gesture in the studio puts it in her hand. Her morning coffee plays `coffee_pickup`, `coffee_sip` and `coffee_putdown` |
+| `prop: 'mug'` | The prop it's made with (a `.glb` in `portrait/props/`, placed in her hand from the pose studio's *Prop* tab); opening the gesture in the studio puts it in her hand. Her morning coffee plays `coffee_pickup`, `coffee_sip` and `coffee_putdown`; reading plays `book_open_pickup`, `book_read_turn`, `book_read_lookup` and `book_open_putdown` (a prop called `book_open` finds `book_open_pickup` and `book_open_putdown` by name). She holds one prop at a time: picking one up puts the other down first. While she holds one, only its own moves (named like its pick-up: `coffee_*`, `book_*`) and gestures that leave her arms alone play, so a wave or a hug from chat, a touch or her reply doesn't swing it about. Walking away puts it down |
 | `prop_at: 0.9` | With `prop`: the second the prop appears in her hand (picking up) or goes (putting down) |
 | `hold: true` | With `prop`: her last pose is held after the gesture ends, so her arm stays round the mug between sips, until it's put down |
 

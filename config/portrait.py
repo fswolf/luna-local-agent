@@ -87,6 +87,14 @@ PORTRAIT_COFFEE_TO = int(_coffee_cfg.get("to", 11))
 PORTRAIT_COFFEE_MINUTES = float(_coffee_cfg.get("minutes", 40))
 PORTRAIT_COFFEE_SIP_MINUTES = float(_coffee_cfg.get("sip_minutes", 4))
 PORTRAIT_COFFEE_WAKE = float(_coffee_cfg.get("wake", 0.03))
+# She reads a book (reading.py) when nobody has talked to her for `after`
+# minutes, turning a page now and then, and puts it down when you're back
+# (or after `minutes`).
+#   "reading": { "enabled": true, "after": 10, "minutes": 60 }
+_reading_cfg = dict(_portrait_cfg.get("reading", {}) or {})
+PORTRAIT_READING = bool(_reading_cfg.get("enabled", True))
+PORTRAIT_READING_AFTER = max(1.0, float(_reading_cfg.get("after", 10)))
+PORTRAIT_READING_MINUTES = max(1.0, float(_reading_cfg.get("minutes", 60)))
 PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume", 0.8))))
 # Hologram fans (holofan.py, docs/fans.md). An HDMI fan just shows
 # /portrait/?fan=1. A WiFi fan run by the Holoscope app (P56, PD42...) gets

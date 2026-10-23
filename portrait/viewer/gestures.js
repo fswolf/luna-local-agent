@@ -284,6 +284,7 @@ export function createGestures(THREE, vrm) {
     // After the portrait has set its own pose for the frame.
     update(dt) {
       exprNow = {};
+      const over = {};      // how much a playing gesture already drives each '+' bone (the held pose gives way)
       // oldest first, so the newest one lands on top while the old fades
       for (let i = 0; i < active.length; i++) {
         const a = active[i], g = a.g;
@@ -328,6 +329,7 @@ export function createGestures(THREE, vrm) {
           const b = bone(additive ? name.slice(1) : name);
           if (!b) continue;
           touched.add(additive ? name.slice(1) : name);
+          if (additive) over[name] = Math.max(over[name] || 0, w);
           if (additive) {
             euler(v[0] * w, v[1] * w, v[2] * w);
             b.quaternion.multiply(qa.setFromEuler(e));
@@ -359,6 +361,17 @@ export function createGestures(THREE, vrm) {
         for (const [k, v] of Object.entries(g.expr || {})) {
           exprNow[k] = Math.max(exprNow[k] || 0, sampleScalar(v, t) * w);
         }
+      }
+
+      // a held pose's head and neck ('+head', '+neck': looking down into her
+      // book), added on top like a gesture's, fading out under one that moves them
+      if (held) for (const [name, v] of Object.entries(held)) {
+        if (!name.startsWith('+')) continue;
+        const b = bone(name.slice(1)), k = 1 - (over[name] || 0);
+        if (!b || k <= 0) continue;
+        touched.add(name.slice(1));
+        euler(v[0] * k, v[1] * k, v[2] * k);
+        b.quaternion.multiply(qa.setFromEuler(e));
       }
 
       for (let i = active.length - 1; i >= 0; i--) if (active[i].gone) active.splice(i, 1);

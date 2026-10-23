@@ -104,9 +104,10 @@ SELF_PROJECTS = bool(_self_cfg.get("projects", True))
 SELF_PROJECTS_IN_PROMPT = int(_self_cfg.get("projects_in_prompt", 3))
 
 # The situation block (situation.py): focused window, music, machine load,
-# running plugins, next reminder - a few live lines in every private turn.
+# running plugins, next reminder, what's in her hands - a few live lines in
+# every private turn.
 _situation_cfg = setting("situation", {})
 SITUATION_ENABLED = bool(_situation_cfg.get("enabled", True))
 SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
-                   for k in ("window", "music", "machine", "plugins", "reminders")}
+                   for k in ("window", "music", "machine", "plugins", "reminders", "hands")}
 

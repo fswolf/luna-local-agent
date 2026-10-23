@@ -54,13 +54,14 @@ Slash commands:
 | `/camera` | Webcam: `/camera on`, `off`, `list`, `test` |
 | `/presence` | Webcam presence: `/presence on`, `off`, or status |
 | `/coffee` | Her morning coffee ([portrait.md](portrait.md#gestures)): `/coffee` pours one now, `/coffee sip`, `/coffee off` |
+| `/read` | She reads a book ([portrait.md](portrait.md#gestures)); it happens on its own when you're quiet. `/read` now, `/read off`, `/read page`, `/read look` |
 | `/people` | People she knows ([people.md](people.md)): `/people enroll face\|voice <name>`, `/people forget <name> [face\|voice]`, `/people cancel` |
 | `/log` | Tail the debug log without leaving the app |
 | `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |
 | `/skills` | Recipes she's saved: `/skills show`, `forget`, `restore <n>` |
 | `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>` |
-| `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder) |
+| `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder, what's in her hands) |
 | `/voice` | List voices, or switch: blends too |
 | `/context` | What every turn sends, in tokens, against the model's context length |
 | `/mouse` | Wheel scrolling vs. being able to select text |

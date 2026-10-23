@@ -114,6 +114,25 @@ def _lewd():
         return False
 
 
+def _walked_away():
+    try:
+        import mood
+
+        return bool(mood.away())
+    except Exception:
+        return False
+
+
+def _reading():
+    """Reading a book (reading.py)? Then the morning cup waits."""
+    try:
+        import reading
+
+        return reading.holding()
+    except Exception:
+        return False
+
+
 def _emit(kind, **data):
     try:
         import livefeed
@@ -135,6 +154,11 @@ def begin(now=None, by_hand=True):
     with _lock:
         if _state["on"]:
             return False
+    if _reading():                                     # /coffee while she reads: the book goes down first
+        import reading
+
+        reading.finish(look_up=False)
+    with _lock:
         _state.update(on=True, by_hand=by_hand, since=now, sips=0, sip_at=now + random.uniform(*FIRST_SIP))
     _mark_today()
     _emit("prop", name="mug", on=True)
@@ -177,19 +201,30 @@ def holding():
     return _state["on"]
 
 
+def describe():
+    """A line for her prompt (situation.py) while she has her coffee, or ""."""
+    if not _state["on"]:
+        return ""
+    sips = _state["sips"]
+    return ("In your hands: your " + ("morning " if not _state.get("by_hand") else "") + "coffee in your mug"
+            + (f", {sips} sip{'s' if sips != 1 else ''} in" if sips else ", just poured"))
+
+
 def tick(now=None):
     """One look at the clock; the loop calls this every few seconds."""
     now = time.monotonic() if now is None else now
 
     if _state["on"]:
         minutes = float(getattr(config, "PORTRAIT_COFFEE_MINUTES", 40))
-        if now - _state["since"] >= minutes * 60 or (_lewd() and not _state.get("by_hand")):
+        if (now - _state["since"] >= minutes * 60 or _walked_away()             # walked off: always down
+                or (_lewd() and not _state.get("by_hand"))):
             finish()
         elif now >= _state["sip_at"] and not _busy():
             sip(now)
         return
 
-    if (enabled() and morning() and _watching() and not had_today() and _someone_here() and not _busy() and not _lewd()):
+    if (enabled() and morning() and _watching() and not had_today() and _someone_here() and not _busy() and not _lewd()
+            and not _reading() and not _walked_away()):
         begin(now, by_hand=False)
 
 

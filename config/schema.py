@@ -135,6 +135,7 @@ SCHEMA = {
     "situation.machine": ("bool", "Include CPU, RAM and GPU load in the situation lines"),
     "situation.plugins": ("bool", "Include which plugins are running in the situation lines"),
     "situation.reminders": ("bool", "Include the next reminder in the situation lines"),
+    "situation.hands": ("bool", "Include what she's holding on her portrait (her coffee, the book she's reading) in the situation lines"),
 
     # --- Portrait -----------------------------------------------------------
     "portrait.model": ("text", "Her portrait model: a .vrm or Live2D file, relative to the portrait folder"),
@@ -172,6 +173,9 @@ SCHEMA = {
     "portrait.coffee.minutes": ("float", "How long her coffee lasts before she puts the mug down, in minutes"),
     "portrait.coffee.sip_minutes": ("float", "Minutes between sips, roughly"),
     "portrait.coffee.wake": ("float", "How much each sip wakes her up (energy), 0 for none"),
+    "portrait.reading.enabled": ("bool", "She reads a book while you're quiet, and puts it down when you're back"),
+    "portrait.reading.after": ("float", "Minutes nobody talks to her before she picks up her book"),
+    "portrait.reading.minutes": ("float", "Most minutes she reads before putting the book down on her own"),
     "portrait.fan.framing": ("choice", "How much of her the hologram fan shows", ("full", "bust")),
     "portrait.fan.fps": ("int", "Frames per second sent to the hologram fan, 8-25"),
     "portrait.fan.scale": ("float", "Her size in the fan's circle: 1 is normal"),

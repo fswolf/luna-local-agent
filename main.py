@@ -238,6 +238,10 @@ import coffee  # noqa: E402
 
 coffee.start()                # her morning coffee (coffee.py), on the portrait
 
+import reading  # noqa: E402
+
+reading.start()               # she reads while you're quiet (reading.py), on the portrait
+
 # Relay stations (station.py): an old phone or tablet in another room,
 # when switched on in the settings
 import station  # noqa: E402
@@ -1541,6 +1545,21 @@ def handle_input(text):
             ui.add_message("system", "She puts her mug down." if coffee.finish() else "She isn't holding one.")
         elif word == "sip":
             ui.add_message("system", "A sip." if coffee.sip() else "She has no coffee - /coffee first.")
+        return
+
+    if text == "/read" or text.startswith("/read "):
+        import reading
+
+        word = text[len("/read"):].strip().lower()
+
+        if word in ("", "on", "now"):
+            ui.add_message("system", "She picks up her book." if reading.begin() else "She's already reading.")
+        elif word in ("off", "done", "stop"):
+            ui.add_message("system", "She puts her book down." if reading.finish() else "She isn't reading.")
+        elif word in ("page", "turn"):
+            ui.add_message("system", "She turns a page." if reading.page(lookup=False) else "She isn't reading - /read first.")
+        elif word in ("look", "up"):
+            ui.add_message("system", "She looks up at you." if reading.page(lookup=True) else "She isn't reading - /read first.")
         return
 
     if text == "/presence" or text.startswith("/presence "):

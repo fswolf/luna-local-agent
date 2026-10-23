@@ -93,7 +93,7 @@ Everything the README only touches on, one subject per page.
 - Notes on every conversation, and a greeting that picks up where you left off
 - Recipes: the steps of jobs that went right, saved and brought back when a similar job comes up
 - Ongoing projects that carry across sessions: what was tried, what was found, what's next
-- A live situation block each turn: your focused window, music, machine load, what's running
+- A live situation block each turn: your focused window, music, machine load, what's running, what's in her hands
 - Duplicate and contradicting facts merged or retired, never deleted
 - Says when she's unsure, measured from her own token probabilities
 - Checks every script she writes for syntax errors, without running it
