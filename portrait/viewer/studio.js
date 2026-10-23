@@ -68,7 +68,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   const tabsRow = el('div', { className: 'tabs' });
   const pages = {}, tabBtn = {};
   let tabNow = 'pose';
-  let ph, phDrag, phHot, phFrame;                     // the prop's handles (see below)
+  let ph, phDrag, phHot, phFrame;
+  let closed = false;                                 // "✕ close" picked: nothing open                     // the prop's handles (see below)
   function showTab(name) {
     if (!pages[name]) return;
     tabNow = name;
@@ -101,7 +102,11 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   const zoom = (f, label) => btn(label, () => { if (orbit) orbit.zoom = Math.max(0.25, Math.min(4, orbit.zoom * f)); }, 'zoom');
   const openSel = loadSel();
   // blur after picking: a focused menu turns ← → into "open the next gesture"
-  openSel.onchange = () => { const v = openSel.value; openSel.blur(); if (v === '__new') newGesture(); else if (v) open(v); drawOpen(); };
+  openSel.onchange = () => {
+    const v = openSel.value; openSel.blur();
+    if (v === '__new') newGesture(); else if (v === '__close') closeGesture(); else if (v) open(v);
+    drawOpen();
+  };
   const now = el('div', { className: 'now' });         // what you're editing, and where you are in it
   const saveBtn = btn('save', () => saveIt(false), 'save it (over the file if it has one)');
   const head = el('div', { className: 'shead' },
@@ -295,12 +300,23 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     propNone, propBox,
     el('div', { className: 'dim', textContent: 'on her: drag an arrow to move it, a ring to turn it (red x, green y, blue z, like the sliders) · or the sliders: x y z move it in the hand (metres), turn spins it, size scales it' }),
     el('div', { className: 'row' }, savePlace,
-       btn('put it away', () => { propSel.value = ''; pickProp(); })),
+       btn('put it away', () => putAway())),
     el('h4', { textContent: 'this gesture (saved with it)' }),
     el('div', { className: 'row' }, el('label', {}, propUses, ' made with it (in her hand when it\'s opened)')),
     row('at', propAt, el('span', { className: 'dim', textContent: ' s, when it appears or goes ' }), btn('now', () => { propAt.value = st.t; propAt.onchange(); }, 'the time on the timeline')),
     el('div', { className: 'row' }, el('label', {}, propHold, ' hold her last pose while she carries it')));
-  propSel.onchange = () => pickProp();
+  // picking "nothing in her hand" is you saying so: away it goes, even one the studio
+  // didn't get out itself (a mug left in her hand by the coffee routine or a refresh)
+  propSel.onchange = () => (propSel.value ? pickProp() : putAway());
+  function putAway() {
+    const pr = P();
+    propSel.value = '';
+    let any = false;
+    if (pr) for (const n of pr.names()) if (pr.held(n)) { pr.hide(n); any = true; }
+    if (any && !st.on) moves.hold?.(null);              // and let go of the "carrying it" pose
+    pp.shown = '';
+    pickProp();
+  }
   handSel.onchange = () => { if (pp.name) { remember(false); P().set(pp.name, { hand: handSel.value }); placed(true); } };
   async function fillProps() {
     const pr = P();
@@ -844,6 +860,12 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   // the line at the top: what you're editing and where you are in it
   function drawNow() {
     if (!now) return;
+    if (closed && !A.keys.length && !A.chain.length && !dirty) {
+      now.textContent = 'nothing open · pick a gesture to edit, or ✚ new gesture';
+      now.classList.remove('dirty'); saveBtn.classList.remove('unsaved');
+      return;
+    }
+    closed = false;
     const name = A.name || 'a new gesture';
     let text;
     if (A.chain.length && !A.keys.length) text = `editing ${name} · a chain of ${A.chain.length}`;
@@ -990,7 +1012,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       const cur = s.value;
       s.textContent = '';
       s.add(new Option(s === linkSel ? 'a gesture…' : 'pick one to edit…', ''));
-      if (s !== linkSel) s.add(new Option('✚ new gesture', '__new'));
+      if (s !== linkSel) { s.add(new Option('✚ new gesture', '__new')); s.add(new Option('✕ close (nothing open)', '__close')); }
       for (const n of names) if (s !== linkSel || !GESTURES[n].chain) s.add(new Option(n + (GESTURES[n].chain ? ' ⛓' : ''), n));
       s.value = cur;
     }
@@ -998,6 +1020,14 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   }
   // the open menu shows what you're editing
   function drawOpen() { const s = loadSel.el; if (s) s.value = A.name && GESTURES[A.name] ? A.name : ''; }
+  // nothing open: she's let go, the studio's prop is put away, the menu says so
+  function closeGesture() {
+    if (dirty && !confirm(`Close ${A.name || 'this gesture'}? What isn't saved is lost.`)) return;
+    stop(); remember(false); A = fresh(); refreshAll(); dirty = false; closed = true;
+    putAway();
+    drawNow(); drawOpen(); showTab('pose');
+    say('nothing open', 3000);
+  }
   function newGesture() {
     if (dirty && !confirm('Start a new gesture? What isn\'t saved is lost.')) return;
     stop(); remember(); A = fresh(); refreshAll(); dirty = false; drawNow(); showTab('pose');
@@ -1141,7 +1171,8 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       showTab(typeof d.tab === 'string' ? d.tab : 'pose');
       dirty = !!d.dirty; drawOpen(); drawNow();
       if (d.on) start();
-      if (A.extra.prop && propSel) { pp.name = A.extra.prop; fillProps().then(() => { propSel.value = A.extra.prop; pickProp(); }); }
+      // (open() above already brought out a reopened gesture's prop)
+      if (A.extra.prop && propSel && !P()?.held(A.extra.prop)) { pp.name = A.extra.prop; fillProps().then(() => { propSel.value = A.extra.prop; pickProp(); }); }
       if (d.prop) {                                     // where you'd dragged it, still not saved
         const { name, ...where } = d.prop;
         Promise.resolve(P()?.ready).then(() => { if (P()?.PROPS[name]) { P().set(name, where); if (pp.name === name) drawProp(); placed(true); } });

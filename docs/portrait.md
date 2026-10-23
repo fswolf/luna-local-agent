@@ -466,7 +466,7 @@ into the dock at the bottom left (–); they remember where they were.
 **First steps: make a new one**: *✚ new gesture* in the same menu, pose her,
 move along the timeline, pose her again, play, *save* (it asks for a name).
 
-**At the top, always:** the gesture menu, *save*, *save as…*, undo ↶ / redo ↷,
+**At the top, always:** the gesture menu (*✕ close* in it lets go of the gesture and puts any prop away), *save*, *save as…*, undo ↶ / redo ↷,
 a line saying what you're editing and where you are ("editing coffee_pickup ·
 1.60 s of 2.2 · on key 3 of 4", with *not saved* when it's changed), the
 camera (*front*, *¾*, *side*, *back*, zoom), the timeline, *▶ play* and

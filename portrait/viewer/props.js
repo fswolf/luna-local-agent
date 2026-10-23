@@ -34,6 +34,7 @@ export const PROPS = {
 export function createProps({ THREE, GLTFLoader, vrm, fx }) {
   const models = {};      // name -> Promise<Object3D>
   const live = {};        // name -> { obj, scale, target }
+  const making = {};      // name -> Promise while its copy is being made
   const loader = new GLTFLoader();
   // where you put them in the pose studio, over the defaults above
   const json = url => fetch(url, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
@@ -72,11 +73,15 @@ export function createProps({ THREE, GLTFLoader, vrm, fx }) {
       side = side || p.hand || 'right';
       const hand = vrm.humanoid.getNormalizedBoneNode(side + 'Hand');
       if (!hand) return false;
-      let one = live[name];
-      if (!one) {
-        const obj = (await model(name)).clone(true);
-        one = live[name] = { obj, scale: 0, target: 1 };
+      // two shows at once (a refresh, the coffee routine and the studio) must make one
+      // prop, not two: the second waits for the first's copy instead of cloning its own
+      if (!live[name]) {
+        making[name] = making[name] || model(name).then(m => { live[name] = live[name] || { obj: m.clone(true), scale: 0, target: 1 }; });
+        await making[name];
+        delete making[name];
       }
+      const one = live[name];
+      if (!one) return false;
       place(one.obj, p, side);
       hand.add(one.obj);
       one.side = side;
