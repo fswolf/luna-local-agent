@@ -68,9 +68,20 @@ open portrait straight away:
 - **a colour**: pick one with the swatch.
 - **a picture**: any `.png`, `.jpg` or `.webp` you put in
   `portrait/backgrounds/`. It fills the window and is cropped to fit.
+- **seasonal**: a picture from `portrait/backgrounds/seasonal/` picked by the
+  date and the time of day, changing on its own with a slow fade. A holiday
+  wins on its days (Halloween Oct 24-31, Christmas Dec 15-26, New Year's Eve
+  and Day, Valentine's Feb 13-14), otherwise the season; `-night` pictures
+  take over after dark (sunrise and sunset are set for about 52°N, so a bit
+  early or late far from there). South of the equator the seasons flip; the
+  page guesses which side you're on from your time zone. Missing pictures fall back: night to day, a
+  holiday to its season, nothing to her gradient. The folder's README lists
+  the names. The debug panel's background menu previews any of them, and
+  `&bgdate=2026-12-24T21:00` on the address shows what a date would pick.
 
-It's `portrait.background` in config.json (`""`, `"none"`, `"#1a1025"` or a
-file name). It only ever changes when you change it. The OBS page
+It's `portrait.background` in config.json (`""`, `"none"`, `"seasonal"`,
+`"#1a1025"` or a file name). Apart from seasonal, it only ever changes when
+you change it. The OBS page
 (`?bg=transparent`) stays see-through and the hologram fans stay black
 whatever it's set to.
 
@@ -379,18 +390,25 @@ Luna's robot model has LED paint at her joints, a light on each side of her
 chest, one in her belt and one low on her front. With light strips on, they
 glow and react:
 
-- **at rest** they breathe, slowly.
-- **listening**: a little brighter, her ears most of all.
+- **at rest** they're dark: they only light up for something, then go out.
+- **listening**: her ears glow.
 - **thinking**: a sweep runs down her, ears to tail.
 - **talking**: they pulse with her voice.
 - **a tool fails**: they flicker.
 - **you click a part of her**: that part lights up.
+- **a gesture with `lights`** (touch_self, cup_breasts, masturbate, climax): they throb
+  with it, faster and brighter as it builds, then fade (see `lights` in
+  [Gestures](gestures.md)).
 - **her mood** picks the colour (unless you pick one): her own pink when
   she's fine, blue when she's low, red when she's cross, violet when she's
   tired.
 
 Switch them with `/lights` (or `/lights on`, `/lights off`), the **light
 strips** row in the tools pane, or `/settings`, Portrait. All of it is live.
+To try them without Luna running, open the viewer with `&lights=1` on the
+address, or use the debug panel's **light strips** buttons: *light tour* (every reaction in turn, with a caption saying which; press again to stop), *lights on/off*,
+*throb* (a 10 s build and release, dark between beats) and *flicker*. Her state buttons (talk,
+listen, think) and moods drive them too.
 
 | Setting | What it does |
 |---|---|

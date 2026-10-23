@@ -36,8 +36,9 @@ PORTRAIT_TOUCH_TALK = bool(_portrait_cfg.get("touch_talk", True))
 PORTRAIT_TOUCH_TALK_COOLDOWN = float(_portrait_cfg.get("touch_talk_cooldown", 12))
 PORTRAIT_FRAME = str(_portrait_cfg.get("frame", "bust")).lower()
 # What's behind her: "" her usual dark gradient, "none" see-through, a colour
-# ("#1a1025"), or a picture's file name in portrait/backgrounds/. Your pick only:
-# nothing changes it on its own. OBS (?bg=transparent) and the fans ignore it.
+# ("#1a1025"), a picture's file name in portrait/backgrounds/, or "seasonal" (a
+# picture from portrait/backgrounds/seasonal/ by the date and time of day - the
+# one thing that changes on its own). OBS (?bg=transparent) and the fans ignore it.
 PORTRAIT_BACKGROUND = str(_portrait_cfg.get("background", "") or "").strip()
 if PORTRAIT_FRAME not in FRAMES + ("face",):
     PORTRAIT_FRAME = "bust"

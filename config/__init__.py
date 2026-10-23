@@ -454,6 +454,16 @@ def backgrounds():
         return []
 
 
+def seasonal_backgrounds():
+    """The pictures in portrait/backgrounds/seasonal/ (winter-day.png, halloween-night.png ...)."""
+    folder = os.path.join(BASE_DIR, "portrait", "backgrounds", "seasonal")
+    try:
+        return sorted(f for f in os.listdir(folder)
+                      if f.lower().endswith(BACKGROUND_TYPES) and not f.startswith("."))
+    except OSError:
+        return []
+
+
 def background_value(text):
     """portrait.background, checked: "" (her usual gradient), "none"
     (see-through), a #rgb / #rrggbb colour, or a picture that's really in
@@ -464,11 +474,13 @@ def background_value(text):
         return ""
     if low in ("none", "transparent", "see-through"):
         return "none"
+    if low in ("seasonal", "seasons"):
+        return "seasonal"
     if re.fullmatch(r"#[0-9a-f]{3}([0-9a-f]{3})?", low):
         return low
     if text in backgrounds():
         return text
-    raise ValueError(f"portrait.background is default, none, a colour like #1a1025, or a picture in "
+    raise ValueError(f"portrait.background is default, none, seasonal, a colour like #1a1025, or a picture in "
                      f"portrait/backgrounds/ ({', '.join(backgrounds()) or 'none there yet'}), not {text!r}")
 
 

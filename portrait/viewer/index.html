@@ -15,6 +15,7 @@
   body.custom-bg.solid { background: var(--user-bg); }
   body.custom-bg.clear { background: transparent; }
   body.transparent { background: transparent !important; }
+  body.transparent .bgfade { display: none; }
   body.fan { background: #000 !important; cursor: none; }
   body.fan #note { display: none; }
   canvas { display: block; width: 100vw; height: 100vh; }
@@ -72,7 +73,11 @@
   .panel .tabs button.on { background: #2a2040; color: var(--accent); border-color: #4a3a70; font-weight: 600;
                            position: relative; top: 1px; }
   .page { padding-top: 6px; }
-  .panel button.unsaved { border-color: #ffd36b; color: #ffd36b; }   /* something waiting to be saved */
+  /* something waiting to be saved: filled orange-red and pulsing, hard to miss */
+  .panel button.unsaved { background: #e8553a; border-color: #ff8a5c; color: #fff; font-weight: 600;
+                          animation: unsaved 1.6s ease-in-out infinite; }
+  @keyframes unsaved { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 110, 70, 0.7); } 50% { box-shadow: 0 0 0 5px rgba(255, 110, 70, 0); } }
+  @media (prefers-reduced-motion: reduce) { .panel button.unsaved { animation: none; } }
   .page > .dim:first-child { margin-bottom: 6px; }
   .keys { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; }
   .keys button.on { background: var(--accent); color: #120d1c; }

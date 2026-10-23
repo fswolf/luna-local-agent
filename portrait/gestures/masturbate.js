@@ -5,6 +5,7 @@
 export default {
   chain: ['touch_self', 'touch_self', 'pant'],
   sound: 'moan-orgasm',
+  lights: [[0, 0], [3, 0.3], [12, 0.6], [17.5, 1.0], [19.3, 1.4], [21, 0.5], [26, 0.15]],   // her light strips throb with it (build, peak, fade)
   emote: [{ name: 'sweat', at: 20 }, { name: 'hearts', at: 23.2 }],   // hearts once the sweat drop is gone
   keywords: ["masturbates", "pleasures herself", "gets herself off", "touches herself until"],
   about: "lewd, heated: touches herself until she's spent, then out of breath",

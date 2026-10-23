@@ -405,6 +405,7 @@ function control(s) {
     const opt = (val, label, on) => `<option value="${esc(val)}" ${on ? "selected" : ""}>${esc(label)}</option>`;
     return `<select id="${id}" data-path="${esc(s.path)}" data-bg="pick">` +
       opt("", "default (her dark gradient)", !v) + opt("none", "none (see-through)", v === "none") +
+      opt("seasonal", "seasonal (by the date and time of day)", v === "seasonal") +
       opt("colour", "a colour", colour) +
       (s.choices.length ? `<optgroup label="pictures (portrait/backgrounds/)">` +
         s.choices.map(c => opt(c, c, c === v)).join("") + `</optgroup>` : "") +

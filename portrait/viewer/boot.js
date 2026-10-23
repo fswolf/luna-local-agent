@@ -2,22 +2,66 @@
 //   *.model3.json  -> Live2D (live2d.js)
 //   *.vrm / *.glb  -> 3D (portrait.js)
 
+import { seasonalPick } from './seasonal.js';
+
 const cfg = await fetch('config.json' + location.search).then(r => r.json()).catch(() => ({}));
 const model = cfg.model || '';
 
 // What's behind her (portrait.background): your pick in /settings, live.
 // "" her usual gradient, "none" see-through, a colour, or a picture in
 // portrait/backgrounds/. ?bg=transparent (OBS) and the fans keep their own.
-window.lunaBackground = value => {
-  const b = document.body, v = String(value || '').trim();
-  b.classList.remove('custom-bg', 'solid', 'clear');
+// "seasonal": a picture from portrait/backgrounds/seasonal/ by the date and
+// time of day (seasonal.js), changing on its own with a slow fade.
+let seasonTimer = null, bgWant = '';
+let bgSet = cfg.background;              // the setting, as last sent (the debug menu's previews don't change it)
+window.lunaBackground = (value, preview = false) => {
+  if (!preview) bgSet = value;
+  const b = document.body, v = String(value || '').trim(), prev = b.style.getPropertyValue('--user-bg');
+  clearInterval(seasonTimer); seasonTimer = null; bgWant = '';
+  b.classList.remove('solid', 'clear');
+  if (v === 'seasonal' || v.startsWith('seasonal/')) {
+    // the old picture stays up until the new one has loaded, then fades out
+    const fixed = v.startsWith('seasonal/') ? v.slice(9) : '';            // the debug panel's preview: one picture
+    const at = () => { const q = new URLSearchParams(location.search).get('bgdate'); return q ? new Date(q) : new Date(); };
+    if (!/^url/.test(prev)) { b.classList.remove('custom-bg'); b.style.removeProperty('--user-bg'); }
+    const show = () => {
+      const f = fixed || seasonalPick(cfg.seasonal || [], at());
+      if (!f) { bgWant = ''; b.classList.remove('custom-bg'); b.style.removeProperty('--user-bg'); return; }
+      bgFade(`url("backgrounds/seasonal/${encodeURIComponent(f)}")`);
+    };
+    show();
+    if (!fixed) seasonTimer = setInterval(show, 60 * 1000);
+    return;
+  }
+  b.classList.remove('custom-bg');
   b.style.removeProperty('--user-bg');
+  for (const f of document.querySelectorAll('.bgfade')) f.remove();     // no seasonal picture fading over the new pick
   if (!v) return;
   b.classList.add('custom-bg');
   if (v === 'none') b.classList.add('clear');
   else if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) { b.classList.add('solid'); b.style.setProperty('--user-bg', v); }
   else b.style.setProperty('--user-bg', `url("backgrounds/${encodeURIComponent(v)}")`);
 };
+// Swap in a picture once it has loaded (no dark flash), the old one fading out on top.
+function bgFade(next) {
+  const b = document.body, old = b.classList.contains('custom-bg') ? b.style.getPropertyValue('--user-bg') : '';
+  bgWant = next;
+  if (old === next) return;
+  const img = new Image();
+  img.onload = img.onerror = () => {
+    if (bgWant !== next) return;                                 // something else was picked meanwhile
+    b.classList.add('custom-bg');
+    b.style.setProperty('--user-bg', next);
+    if (!/^url/.test(old) || b.classList.contains('transparent')) return;
+    const f = Object.assign(document.createElement('div'), { className: 'bgfade' });
+    Object.assign(f.style, { position: 'fixed', inset: 0, zIndex: -1, pointerEvents: 'none',
+                             background: `${old} center / cover no-repeat`, transition: 'opacity 3s ease', opacity: 1 });
+    b.prepend(f);
+    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = 0; }));
+    setTimeout(() => f.remove(), 3500);
+  };
+  img.src = next.slice(5, -2);                                   // url("...") -> ...
+}
 window.lunaBackground(cfg.background);
 const note = document.getElementById('note');
 
@@ -67,6 +111,17 @@ if (new URLSearchParams(location.search).get('debug')) {
     b.onclick = () => setParam(key, on ? '' : (key === 'bg' ? 'transparent' : '1'));
     box.appendChild(b);
   };
+  // what's behind her, just on this page: the setting, the seasonal pick, or any one seasonal picture
+  const bg = document.createElement('select');
+  bg.add(new Option('background: as set', ''));
+  if ((cfg.seasonal || []).length) {
+    bg.add(new Option('seasonal: today, now', 'seasonal'));
+    const og = document.createElement('optgroup'); og.label = 'seasonal pictures';
+    for (const f of cfg.seasonal) og.append(new Option(f.replace(/\.[a-z]+$/i, ''), 'seasonal/' + f));
+    bg.add(og);
+  }
+  bg.onchange = () => window.lunaBackground(bg.value || bgSet, !!bg.value);
+  box.appendChild(bg);
   toggle('hologram', 'holo', q.get('holo') === '1');
   toggle('see-through', 'bg', q.get('bg') === 'transparent');
   toggle('demo', 'demo', !!q.get('demo'));

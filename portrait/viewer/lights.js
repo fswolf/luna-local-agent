@@ -1,5 +1,5 @@
 // Her light strips: the LED paint on a robot model glows, in her mood's
-// colour, and reacts - breathing at rest, pulsing with her voice, a sweep
+// colour, and reacts - dark at rest, pulsing with her voice, a sweep
 // down her body while she thinks, a flicker when a tool fails, the part
 // you touch lighting up.
 //
@@ -155,7 +155,7 @@ export async function createLights(THREE, vrm, modelUrl, settings = {}) {
   // shared by every lit material: one update a frame
   const color = { value: Array.from({ length: N }, () => new THREE.Color(0, 0, 0)) };
   const level = { value: new Array(N).fill(0) };
-  const looks = { lunaCore: { value: 4 }, lunaHalo: { value: 3.5 }, lunaWhite: { value: 0.55 }, lunaDarken: { value: 1 },
+  const looks = { lunaCore: { value: 2.4 }, lunaHalo: { value: 1.8 }, lunaWhite: { value: 0.35 }, lunaDarken: { value: 1 },
                   lunaTint: { value: 5 } };
 
   const done = new Map(), patched = [];
@@ -184,16 +184,16 @@ export async function createLights(THREE, vrm, modelUrl, settings = {}) {
 
   // ---- what drives them ----------------------------------------------------
   let cfg = {};
-  const st = { t: 0, on: 0, tint: own.clone(), flicker: 0, pulse: new Array(N).fill(0), think: 0 };
+  const st = { t: 0, on: 0, tint: own.clone(), flicker: 0, pulse: new Array(N).fill(0), think: 0, phase: 0 };
   const target = new THREE.Color();
   const pick = new THREE.Color();
 
   function set(s) {
     cfg = { enabled: false, color: '', brightness: 1, voice: true, private: true, style: 'neon', ...(s || {}) };
     const plain = cfg.style === 'plain';
-    looks.lunaWhite.value = plain ? 0.15 : 0.55;
-    looks.lunaCore.value = plain ? 2.5 : 4;
-    looks.lunaHalo.value = plain ? 1.5 : 3.5;
+    looks.lunaWhite.value = plain ? 0.1 : 0.35;          // toned down 2026-10-23: was 0.55 / 4 / 3.5
+    looks.lunaCore.value = plain ? 1.8 : 2.4;
+    looks.lunaHalo.value = plain ? 1.0 : 1.8;
   }
   set(settings);
 
@@ -205,7 +205,7 @@ export async function createLights(THREE, vrm, modelUrl, settings = {}) {
     return pick.copy(own);
   }
 
-  // m: { stage, energy, warmth, row, tame, talking (0..1) }
+  // m: { stage, energy, warmth, row, tame, talking (0..1), glow (0..~1.5: a gesture's lights curve) }
   function update(dt, m) {
     st.t += dt;
     st.on += ((cfg.enabled ? 1 : 0) - st.on) * Math.min(1, dt * 3);           // fade in and out
@@ -217,11 +217,17 @@ export async function createLights(THREE, vrm, modelUrl, settings = {}) {
     st.tint.lerp(target, Math.min(1, dt * 1.5));
 
     const bright = Math.max(0, Math.min(2, +cfg.brightness || 0));
-    const breathe = 0.5 + 0.5 * Math.sin(st.t * (m.stage === 'thinking' ? 2.2 : 1.25));
-    let base = 0.5 + 0.12 * breathe;
-    if (m.stage === 'listening') base += 0.15;
+    // Off at rest (Ryan, 2026-10-23: a glow that stays on looks rough): they
+    // only light for something - her voice, a think sweep, her ears while she
+    // listens, a touch, a failed tool, a gesture's throb - and go dark after.
+    let base = 0;
     if (m.stage === 'speaking' && cfg.voice !== false) base += 0.55 * (m.talking || 0);
     if (m.energy < -0.45) base *= 0.75;                                       // low: dimmer
+    // a gesture throbs them: a slow beat, brighter and a little quicker as it
+    // builds (about 1.5 a second at a peak), dark between beats and after
+    const glow = Math.min(1.5, Math.max(0, m.glow || 0));
+    st.phase += dt * Math.PI * 2 * (0.45 + glow * 0.7);
+    if (glow) base += 0.9 * glow * (0.5 + 0.5 * Math.sin(st.phase)) ** 2;   // on, off, on: fully dark between beats
     st.think = m.stage === 'thinking' ? st.think + dt : 0;
     st.flicker = Math.max(0, st.flicker - dt);
     const flick = st.flicker > 0 ? (Math.random() < 0.35 ? 0.1 : 1) : 1;
@@ -235,7 +241,7 @@ export async function createLights(THREE, vrm, modelUrl, settings = {}) {
         const pos = ((st.think * 0.9) % 1.4) * SWEEP.length;
         if (k >= 0) v += 0.6 * Math.max(0, 1 - Math.abs(pos - k) / 2.2);
       }
-      if (name === 'ears' && m.stage === 'listening') v += 0.25;
+      if (name === 'ears' && m.stage === 'listening') v += 0.35;
       st.pulse[z] = Math.max(0, st.pulse[z] - dt * 0.9);
       v += st.pulse[z];
       if (dark && manifest.private.includes(name)) v = 0;

@@ -114,7 +114,7 @@ class Page(unittest.TestCase):
             entry = settings_web.entry("portrait.background")
             self.assertEqual((entry["kind"], entry["choices"]), ("background", ["night room.png"]))
             for value, stored in (("#1A1025", "#1a1025"), ("none", "none"), ("night room.png", "night room.png"),
-                                  ("default", "")):
+                                  ("Seasonal", "seasonal"), ("default", "")):
                 code, out = self._post(key=settings_web.KEY, action="set", path="portrait.background", value=value)
                 self.assertEqual(code, 200, out)
                 self.assertEqual(self._file()["portrait"]["background"], stored)
@@ -122,6 +122,10 @@ class Page(unittest.TestCase):
                 code, _out = self._post(key=settings_web.KEY, action="set", path="portrait.background", value=bad)
                 self.assertEqual(code, 400, bad)
             self.assertEqual(self._file()["portrait"]["background"], "")
+            os.makedirs(os.path.join(bg, "seasonal"))
+            for f in ("winter-day.png", "winter-night.jpg", "notes.json"):
+                open(os.path.join(bg, "seasonal", f), "wb").close()
+            self.assertEqual(config.seasonal_backgrounds(), ["winter-day.png", "winter-night.jpg"])
 
     def test_switches_and_choices(self):
         self._post(key=settings_web.KEY, action="set", path="plugins.twitch.lewd", value=True)

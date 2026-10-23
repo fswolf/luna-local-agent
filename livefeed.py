@@ -196,6 +196,8 @@ def gesture_file(data):
         g["prop_at"] = _num(data["prop_at"], 0, 600)
     if data.get("hold") is True:
         g["hold"] = True
+    if isinstance(data.get("lights"), list):        # her light strips' throb: [[seconds, level], ...]
+        g["lights"] = [[_num(t, 0, 600), _num(v, 0, 2)] for t, v in data["lights"][:40]]
     if data.get("add"):
         g["add"] = {b: [_num(x, -7, 7) for x in v[:4]] for b, v in data["add"].items() if _BONE.match(str(b)) and isinstance(v, list)}
 
@@ -827,6 +829,7 @@ def portrait_config(preview=None):
             "lights": lights_config(),
             "moods": _mood_list(),
             "background": str(getattr(config, "PORTRAIT_BACKGROUND", "") or ""),
+            "seasonal": config.seasonal_backgrounds(),
             "fan": dict(getattr(config, "PORTRAIT_FAN", {}) or {},
                         cast=bool(getattr(config, "PORTRAIT_FAN_CAST", False))),
             "clips": portrait_clips(),

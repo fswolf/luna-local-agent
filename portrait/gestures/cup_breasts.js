@@ -87,6 +87,7 @@ export default {
   private: false,
   lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
   sound: 'moan-breasts',   // portrait/sounds/moan-breasts.mp3, 8.5 s, as long as the gesture
+  lights: [[0, 0], [2, 0.3], [6.5, 0.5], [8.5, 0.3]],   // her light strips throb with it (build, peak, fade)
   dur: DUR, fade: [0.6, 0.8],
   keys,
   expr: {

@@ -60,6 +60,7 @@ export default {
   private: true,
   lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
   sound: 'moan-touch-self',   // portrait/sounds/moan-touch-self.mp3, a 10 s clip made for it
+  lights: [[0, 0], [2, 0.35], [8, 0.7], [10, 0.5]],   // her light strips throb with it (build, peak, fade)
   dur: DUR, fade: [0.55, 0.7],
   keys: [
     [0.0, { ...BREAST, ...LEGS, ...KNEES, ...fingers('right', 0.45), ...fingers('left', 0.4),

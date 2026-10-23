@@ -5,6 +5,7 @@
 export default {
   chain: ['touch_self', 'pant'],
   sound: 'moan-climax',
+  lights: [[0, 0], [3, 0.4], [8, 0.9], [9.5, 1.4], [11, 0.5], [16, 0.15]],   // her light strips throb with it (build, peak, fade)
   keywords: ["climaxes", "orgasm", "comes undone", "shudders and moans"],
   about: "lewd, heated: peaks, then left out of breath",
   private: true,      // never from stream chat

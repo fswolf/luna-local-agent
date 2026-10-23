@@ -1,40 +1,21 @@
-// look_back: she turns away from you, bends forward from the hips, and looks
-// back over her shoulder - a slow sway while she holds it, then she
-// straightens and turns back. Lewd idle; her butt comes into touch range
-// while it plays (and her tail swishes).
-//
-// Turning: '+hips' spins her whole body round its own axis. The bend is all
-// above the hips (spine, chest, upper chest), which already face the way she
-// turned, so it tips her forward away from you; a hip tilt would tip her
-// toward you instead. The upper body twists back and the head turns to you.
-const TURN = 2.0;                  // radians: back mostly to you, room to look over her shoulder
-const BEND = {
-  '+hips': [0, TURN, 0],
-  // twisting back toward you is negative y (positive turns her further away)
-  '+spine': [0.78, -0.3, 0], '+chest': [0.5, -0.25, 0], '+upperChest': [0.25, -0.2, 0],
-  '+neck': [-0.4, -0.45, 0], '+head': [-0.5, -0.7, 0.12],             // chin up, looking back at you
-  // arms hang straight down from the bent body - toward her knees - which in
-  // the bent chest's frame is a forward swing (x)
-  rightUpperArm: [-0.9, 0, 1.4], rightLowerArm: [0, 0.25, 0],
-  leftUpperArm: [-0.9, 0, -1.4], leftLowerArm: [0, -0.25, 0],
-};
-const SWAY = d => ({ '+hips': [0, TURN + d, d * 0.6] });
-
+// look_back: made in the pose studio (portrait/viewer/studio.js).
+// teasing, turns around and bends over, looking back at you. Bends with her
+// hands on her thighs, then slides them in where Ryan posed them (by 2.4 s) and holds.
 export default {
+  dur: 7.0,
+  fade: [1.2, 1.4],
+  keys: [
+    [0, {"+hips": [0, 2.3, 0], "+spine": [0.85, 0, 0], "+chest": [0.25, 0, 0], "+upperChest": [0.2, -0.25, 0], "+neck": [-0.3, -0.45, 0], "+head": [-0.35, -0.75, 0.15], "rightUpperLeg": [0, 0, -0.06], "leftUpperLeg": [0, 0, 0.06], "rightUpperArm": [-0.966, -0.123, 1.614], "rightLowerArm": [-0.217, -0.158, 0], "rightHand": [-0.157, 0.002, 0.708], "rightIndexProximal": [0, 0, 0.18], "rightIndexIntermediate": [0, 0, 0.28], "rightIndexDistal": [0, 0, 0.144], "rightMiddleProximal": [0, 0, 0.22], "rightMiddleIntermediate": [0, 0, 0.32], "rightMiddleDistal": [0, 0, 0.176], "rightRingProximal": [0, 0, 0.26], "rightRingIntermediate": [0, 0, 0.36], "rightRingDistal": [0, 0, 0.208], "rightLittleProximal": [0, 0, 0.3], "rightLittleIntermediate": [0, 0, 0.4], "rightLittleDistal": [0, 0, 0.24], "leftUpperArm": [-0.966, 0.123, -1.614], "leftLowerArm": [-0.217, 0.158, 0], "leftHand": [-0.157, -0.002, -0.708], "leftIndexProximal": [0, 0, -0.18], "leftIndexIntermediate": [0, 0, -0.28], "leftIndexDistal": [0, 0, -0.144], "leftMiddleProximal": [0, 0, -0.22], "leftMiddleIntermediate": [0, 0, -0.32], "leftMiddleDistal": [0, 0, -0.176], "leftRingProximal": [0, 0, -0.26], "leftRingIntermediate": [0, 0, -0.36], "leftRingDistal": [0, 0, -0.208], "leftLittleProximal": [0, 0, -0.3], "leftLittleIntermediate": [0, 0, -0.4], "leftLittleDistal": [0, 0, -0.24]}],
+    [2.4, {"+hips": [0, 2.38, 0.048], "rightUpperArm": [-0.59, -0.123, 1.51], "rightLowerArm": [-0.217, -0.158, 0], "rightHand": [-0.157, 0.002, 0.708], "rightIndexProximal": [0, 0, 0.18], "rightIndexIntermediate": [0, 0, 0.28], "rightIndexDistal": [0, 0, 0.144], "rightMiddleProximal": [0, 0, 0.22], "rightMiddleIntermediate": [0, 0, 0.32], "rightMiddleDistal": [0, 0, 0.176], "rightRingProximal": [0, 0, 0.26], "rightRingIntermediate": [0, 0, 0.36], "rightRingDistal": [0, 0, 0.208], "rightLittleProximal": [0, 0, 0.3], "rightLittleIntermediate": [0, 0, 0.4], "rightLittleDistal": [0, 0, 0.24], "leftUpperArm": [-0.966, -0.73, -1.614], "leftLowerArm": [0.35, 0.158, -0.42], "leftHand": [-0.157, -0.002, -0.708], "leftIndexProximal": [0, 0, -0.18], "leftIndexIntermediate": [0, 0, -0.28], "leftIndexDistal": [0, 0, -0.144], "leftMiddleProximal": [0, 0, -0.22], "leftMiddleIntermediate": [0, 0, -0.32], "leftMiddleDistal": [0, 0, -0.176], "leftRingProximal": [0, 0, -0.26], "leftRingIntermediate": [0, 0, -0.36], "leftRingDistal": [0, 0, -0.208], "leftLittleProximal": [0, 0, -0.3], "leftLittleIntermediate": [0, 0, -0.4], "leftLittleDistal": [0, 0, -0.24]}],
+    [3.2, {"+hips": [0, 2.22, -0.048]}],
+    [4, {"+hips": [0, 2.38, 0.048]}],
+    [4.8, {"+hips": [0, 2.24, -0.036]}],
+    [7, {"+hips": [0, 2.3, 0], "+spine": [0.85, 0, 0], "+chest": [0.25, 0, 0], "+upperChest": [0.2, -0.25, 0], "+neck": [-0.3, -0.45, 0], "+head": [-0.35, -0.75, 0.15], "rightUpperLeg": [0, 0, -0.06], "leftUpperLeg": [0, 0, 0.06], "rightUpperArm": [-0.59, -0.123, 1.51], "rightLowerArm": [-0.217, -0.158, 0], "rightHand": [-0.157, 0.002, 0.708], "rightIndexProximal": [0, 0, 0.18], "rightIndexIntermediate": [0, 0, 0.28], "rightIndexDistal": [0, 0, 0.144], "rightMiddleProximal": [0, 0, 0.22], "rightMiddleIntermediate": [0, 0, 0.32], "rightMiddleDistal": [0, 0, 0.176], "rightRingProximal": [0, 0, 0.26], "rightRingIntermediate": [0, 0, 0.36], "rightRingDistal": [0, 0, 0.208], "rightLittleProximal": [0, 0, 0.3], "rightLittleIntermediate": [0, 0, 0.4], "rightLittleDistal": [0, 0, 0.24], "leftUpperArm": [-0.966, -0.73, -1.614], "leftLowerArm": [0.35, 0.158, -0.42], "leftHand": [-0.157, -0.002, -0.708], "leftIndexProximal": [0, 0, -0.18], "leftIndexIntermediate": [0, 0, -0.28], "leftIndexDistal": [0, 0, -0.144], "leftMiddleProximal": [0, 0, -0.22], "leftMiddleIntermediate": [0, 0, -0.32], "leftMiddleDistal": [0, 0, -0.176], "leftRingProximal": [0, 0, -0.26], "leftRingIntermediate": [0, 0, -0.36], "leftRingDistal": [0, 0, -0.208], "leftLittleProximal": [0, 0, -0.3], "leftLittleIntermediate": [0, 0, -0.4], "leftLittleDistal": [0, 0, -0.24]}],
+  ],
+  expr: {"blush": [[0, 0.3], [1.2, 0.85], [5.5, 0.9], [7.0, 0.5]], "happy": [[0, 0], [1.4, 0.3], [5.5, 0.3], [7.0, 0.1]], "relaxed": [[0, 0], [1.4, 0.35], [5.5, 0.35], [7.0, 0.1]]},
   about: "teasing, turns around and bends over, looking back at you",
   keywords: ["bends over", "turns around and bends", "looks back over her shoulder", "wiggles her butt"],
-  private: true,      // never from stream chat
-  lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
-  full: true,         // a deep bend drops her head out of the bust framing: full body only
-  dur: 7.0, fade: [1.2, 1.4],
-  keys: [
-    [0.0, BEND],
-    [2.4, SWAY(0.08)], [3.2, SWAY(-0.08)], [4.0, SWAY(0.08)], [4.8, SWAY(-0.06)],
-    [7.0, BEND],
-  ],
-  expr: {
-    blush:   [[0, 0.3], [1.2, 0.85], [5.5, 0.9], [7, 0.5]],
-    happy:   [[0, 0], [1.4, 0.3], [5.5, 0.3], [7, 0.1]],
-    relaxed: [[0, 0], [1.4, 0.35], [5.5, 0.35], [7, 0.1]],
-  },
+  private: true,
+  lewd: true,
+  full: true,
 };

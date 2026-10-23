@@ -201,10 +201,28 @@ export function createGestures(THREE, vrm) {
       if (!vs.length && !g) return false;
       for (const a of active) if (!a.out) a.out = a.t;          // let the old one go
       if (vs.length) active.push(startClip(name, vs[Math.floor(Math.random() * vs.length)]));
-      else active.push({ g, name, t: 0, out: 0, ch: channels(g), next });
+      else active.push({ g, name, t: 0, ct: 0, out: 0, ch: channels(g), next });
       return true;
     },
     stop() { for (const a of active) if (!a.out) a.out = a.t; },
+    // How hard her light strips throb for what's playing: a gesture's
+    // lights: [[seconds, level], ...] (a chain's over the whole chain), 0 when none.
+    glow() {
+      let v = 0;
+      for (const a of active) {
+        const c = GESTURES[a.name]?.lights;
+        if (a.gone || !Array.isArray(c) || !c.length) continue;
+        const t = (a.ct || 0) + a.t;
+        let x = c[c.length - 1][1];
+        for (let i = 0; i < c.length; i++) {
+          if (t < c[i][0]) { x = i ? c[i - 1][1] + (c[i][1] - c[i - 1][1]) * (t - c[i - 1][0]) / ((c[i][0] - c[i - 1][0]) || 1) : c[0][1]; break; }
+        }
+        const fo = (a.g.fade || [0.3, 0.4])[1];
+        if (a.out) x *= Math.max(0, 1 - (a.t - a.out) / fo);
+        v = Math.max(v, x);
+      }
+      return v;
+    },
     // The pose studio (studio.js): a gesture that never ends, edited in place.
     // pose is {bone: [x, y, z, twist?]} like any key; expr {blush: 0.6, ...}.
     studio(pose, expr) {
@@ -279,7 +297,7 @@ export function createGestures(THREE, vrm) {
         if (nx && !a.out && !a.chained && a.t >= g.dur - fo && GESTURES[nx]) {
           a.chained = true;
           const n = GESTURES[nx], inChain = !!a.next?.length;
-          active.push({ g: n, name: inChain ? a.name : nx, t: 0, out: 0, ch: channels(n), next: inChain ? a.next.slice(1) : [] });
+          active.push({ g: n, name: inChain ? a.name : nx, t: 0, ct: inChain ? (a.ct || 0) + a.t : 0, out: 0, ch: channels(n), next: inChain ? a.next.slice(1) : [] });
         }
         const wIn = Math.min(1, a.t / fi);
         const wOut = a.out ? 1 - (a.t - a.out) / fo : Math.min(1, (g.dur - a.t) / fo);

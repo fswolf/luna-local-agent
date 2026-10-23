@@ -953,7 +953,7 @@ function animate() {
     closeMouth(talking);
     updateEars(now, dt);   // after update: spring bones won't overwrite a twitch
     lights?.update(dt, { stage: mind.stage, energy: mind.energy, warmth: mind.warmth, row: mind.row,
-                         tame: mind.tame, talking });
+                         tame: mind.tame, talking, glow: Math.max(moves?.glow?.() || 0, throbTest(now)) });
   }
 
   if (holo && holo.isOn()) holo.render(scene, camera);
@@ -1286,8 +1286,57 @@ function updateBrows() {
   l.mesh.visible = l.mat.opacity > 0.01;
 }
 
+// the debug panel's "throb": a 10 s build and release, as a lewd gesture would drive them
+let throbAt = -99;
+function throbTest(now) {
+  const t = now - throbAt;
+  return t < 0 || t > 10 ? 0 : t < 7 ? 0.2 + t / 7 * 1.2 : 1.4 * (1 - (t - 7) / 3);
+}
+
+// The debug panel's "light tour": every way her light strips react, one
+// after another, with a caption saying what you're looking at. Press again to stop.
+let tourRun = 0, tourWas = null;
+async function lightTour(toggle) {
+  const run = ++tourRun;
+  const cap = document.getElementById('lighttour') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'lighttour' });
+  Object.assign(cap.style, { position: 'fixed', left: '50%', bottom: '18px', transform: 'translateX(-50%)', zIndex: 50,
+    background: 'rgba(20,10,30,0.85)', color: '#ffd6ef', padding: '8px 14px', borderRadius: '8px', font: '14px sans-serif', pointerEvents: 'none' });
+  const running = !!cap.dataset.on;
+  if (!running) tourWas = { on: !!lights?.enabled, e: mind.energy, w: mind.warmth, label: mind.label, row: mind.row };
+  const was = tourWas;
+  const done = () => { cap.remove(); handle({ t: 'stage', status: 'Idle' }); throbAt = -99;
+    handle({ t: 'mood', energy: was.e, warmth: was.w, label: was.label, row: was.row });
+    if (!was.on && lights?.enabled) toggle(); };
+  if (running) { tourRun++; done(); return; }                        // pressed while running: stop
+  cap.dataset.on = '1';
+  if (!lights?.enabled) toggle();
+  const wait = s => new Promise(ok => setTimeout(ok, s * 1000));
+  const step = async (text, s, fn) => { if (run !== tourRun) throw 0; cap.textContent = text; fn?.(); await wait(s); };
+  const mood = (energy, warmth, row = '') => handle({ t: 'mood', energy, warmth, row, label: row ? 'heated' : '' });
+  try {
+    await step('light tour · at rest: dark', 2.5, () => { mood(0, 0.2); handle({ t: 'stage', status: 'Idle' }); });
+    await step('listening: her ears glow', 3, () => handle({ t: 'stage', status: 'Listening...' }));
+    await step('thinking: a sweep runs down her', 4.5, () => handle({ t: 'stage', status: 'Thinking...' }));
+    await step('talking: they pulse with her voice', 3.5, () => { handle({ t: 'stage', status: 'Speaking...' }); fakeVoice(3.2); });
+    await step('back to idle: dark again', 2, () => handle({ t: 'stage', status: 'Idle' }));
+    for (const z of ['head', 'chest', 'arms', 'tummy', 'legs', 'tail'])
+      await step(`a touch lights that part: ${z}`, 1.3, () => lights?.touched(z));
+    await step('a tool failed: flicker', 2, () => lights?.failed());
+    for (const [name, e, w, row] of [['sad: blue', -0.8, -0.1], ['mad: red', 0.2, -0.9], ['tired: violet', -0.8, 0.5], ['lewd: hot pink', 0.3, 0.9, 'lewd']])
+      await step(`her mood picks the colour · ${name}`, 3, () => { mood(e, w, row); handle({ t: 'stage', status: 'Speaking...' }); fakeVoice(2.6); });
+    await step('a lewd gesture: the throb builds, peaks, fades', 10.5, () => { handle({ t: 'stage', status: 'Idle' }); mood(0.3, 0.9, 'lewd'); throbAt = clock.elapsedTime; });
+    await step('end of the tour', 1.5);
+  } catch (_) { return; }
+  if (run === tourRun) done();
+}
+
 function debugPanel() {
   const buttons = {
+    'light tour': () => lightTour(buttons['lights on/off']),
+    'lights on/off': () => { const on = !(lights?.enabled ?? lightsCfg(cfg.lights || {}).enabled);
+                             params.delete('lights'); setLights({ ...(cfg.lights || {}), enabled: on }); },
+    throb: () => { if (!lights?.enabled) buttons['lights on/off'](); throbAt = clock.elapsedTime; },
+    flicker: () => lights?.failed(),
     blink: () => { blink.next = 0; },
     twitch: () => twitch(0, 1),
     'left ear': () => twitch(1, 1),
@@ -1363,6 +1412,7 @@ function debugPanel() {
     ['looking', ['you: ahead', 'you: left', 'you: right']],
     ['body', ['left ear', 'twitch', 'wag tail']],
     ['effects', ['glitch', 'holo on/off']],
+    ['light strips (also: her state, mood, clicking her)', ['flicker', 'light tour', 'lights on/off', 'throb']],
     ['emotes', ['anger', 'hearts', 'question', 'sweat drop']],
   ];
   const grouped = new Set(GROUPS.flatMap(([, l]) => l));
