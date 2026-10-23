@@ -162,3 +162,24 @@ def _search_history(about):
         "coincidence. If none of them actually answers the question, "
         "say you don't recall rather than stretching one to fit.)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Meeting people (people.py's ladder)
+# ---------------------------------------------------------------------------
+@tool(
+    "meet_guest",
+    "Someone new told you their name (or the user introduced them: 'this is "
+    "my friend Mike'). Puts the name to the face and voice you just saw and "
+    "heard, so you know them for the rest of this session. Nothing is saved: "
+    "only the user can keep them for good.",
+    {
+        "name": {"type": "string", "description": "Their name, as they said it."},
+    },
+    required=("name",),
+)
+def _meet_guest(name):
+    import people
+
+    _ok, said = people.meet(name)
+    return said

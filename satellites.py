@@ -156,7 +156,8 @@ def answer(name, wav):
         text = speech.transcribe(path)
         if not text:
             return "", "", None
-        speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None)
+        speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None,
+                                at_desk=False)      # another room: the desk camera can't tell
         who = f"{speaker}, " if speaker else ""
         logbook.info("turn", "satellite %s%s: %s", name, f" ({speaker})" if speaker else "", text[:200])
         ui.add_message("user", f"[{who}{name}] {text}")

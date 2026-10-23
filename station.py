@@ -365,7 +365,8 @@ def _run(turn, audio):
         if not text:
             return
         turn.state = "thinking"
-        speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None)
+        speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None,
+                                at_desk=False)      # another room: the desk camera can't tell
         logbook.info("turn", "station %s%s: %s", turn.room, f" ({speaker})" if speaker else "", text[:200])
         who = f"{speaker}, " if speaker else ""
         ui.add_message("user", f"[{who}{turn.room}] {text}")

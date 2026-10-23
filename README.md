@@ -37,7 +37,7 @@ What she does:
 - **Talks:** push-to-talk in three modes including hands free, replies that start a sentence in, and barge-in (talk over her and she stops)
 - **Sees:** your screen, and your webcam when you switch it on
 - **Notices you:** with the webcam watching, she says hi when you come back, looks at you instead of the screen, and keeps quiet in an empty room ([details](docs/vision.md#presence-noticing-youre-there))
-- **Knows who's talking:** tells the people in your house apart by voice or face, uses their name and pronouns, and keeps each person's memories to themselves ([details](docs/people.md))
+- **Knows who's talking:** tells the people in your house apart by voice or face, uses their name and pronouns, and keeps each person's memories to themselves ([below](#she-knows-who-shes-talking-to))
 - **Talk from another room:** an old phone or tablet becomes a relay station, paired by QR code, nothing to install. Dedicated voice devices (ESPHome satellites) are experimental ([details](docs/stations.md))
 - **Reminders and real alarms:** she wakes you up, and nags until you're up
 - **Email:** checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
@@ -92,6 +92,35 @@ Most AI companions are endlessly agreeable: be nice or be cruel, you get the sam
 - **She never stops doing her job.** Alarms, reminders, safety and anything urgent always get done, in any mood. Mood changes how she sounds, never what she'll do for you.
 
 Why build it this way? Because warmth from something that can't be anything else doesn't mean much. When Luna is glad to see you, it's because of how the last hour went. You can see it on her face too: she blushes, sulks, crosses her arms and turns away. Every number behind it is in one file you can edit ([how it all works](docs/companion.md)).
+
+## She knows who she's talking to
+
+Luna lives in a house, not a single-user chat window. Before every
+reply she works out who said it, and that answer decides whose name she
+uses, whose memories she sees and what she'll do.
+
+- **By voice.** Everyone enrolls by reading five short lines. From then
+  on each spoken turn is matched by its voice print while it's being
+  transcribed, so it costs no time.
+- **By face.** With the webcam watching, she knows who's at the desk.
+  Rather keep the camera shut? The face check takes one quick picture
+  only when it's needed: when someone types, or when she isn't sure of a
+  voice.
+- **Each person is their own person.** Shannon's facts go in Shannon's
+  file, her prompt shows only Shannon's facts, and nothing of yours
+  leaks into Shannon's turns (or the other way round).
+- **Strangers aren't you.** Someone she doesn't know gets a guest's turn:
+  friendly, but none of your memories and none of the tools that reach
+  your files, mail or home. Tell her your name and she knows you for the
+  session; only the owner can make that permanent.
+- **Private by design.** Voices and faces are kept as numbers, never as
+  recordings or pictures. No picture is ever saved, nothing leaves your
+  machine, and a camera that fails just means she decides the usual
+  way.
+
+How every kind of turn is decided, from the desk to a phone in the
+kitchen to Discord: [who she's talking to](docs/who.md). Enrolling
+people: [people in the house](docs/people.md).
 
 ## Watch her play
 
@@ -198,6 +227,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Email](docs/email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](docs/vision.md): looking at your screen, the webcam, noticing you're there
 - [People in the house](docs/people.md): she knows who's talking, by voice or face
+- [Who she's talking to](docs/who.md): how every turn is matched to a person, the face check, privacy
 - [Relay stations](docs/stations.md): talk to her from another room on an old phone or tablet
 - [Reminders and alarms](docs/reminders.md)
 - [Knowledge](docs/knowledge.md): your notes, manuals and PDFs as something she can look things up in

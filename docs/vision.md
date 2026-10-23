@@ -170,6 +170,33 @@ reads from it instead of fighting over `/dev/video0`.
 On every system, a camera that OBS or Discord is already using may
 refuse to open. She'll say so rather than guess.
 
+### The camera light, and hooks
+
+The webcam's light comes on whenever she opens the camera. On most
+webcams it's wired to the sensor, so nothing can switch it off, and
+that's the honest signal for anyone else in the room. Some cameras let
+software set it, and for those (or anything else you want done around
+the camera) there are hooks:
+
+```json
+"camera": { "before": "v4l2-ctl -d /dev/video0 -c led1_mode=0",
+            "after":  "v4l2-ctl -d /dev/video0 -c led1_mode=3" }
+```
+
+- `before` runs each time she opens the webcam herself: a picture,
+  the [face check](people.md#the-face-check), presence starting.
+  `{device}` in the command becomes the camera.
+- `after` runs when she's done with it, even if the picture failed.
+- A hook that isn't installed, fails or hangs (3 seconds) goes in the
+  logbook and the camera carries on without it.
+
+Plugins can do the same with `on_camera_open(device)` and
+`on_camera_close(device)`. `plugins/camera_led.py` is a worked one for
+Linux cameras with a V4L2 LED control (many Logitech ones): install
+`v4l-utils`, then `/camera_led on`. It tells you if your camera has no
+such control. For those, a strip of tape over the light (not the lens)
+always works.
+
 ## Presence: noticing you're there
 
 A separate switch, off by default: the webcam stays open and she checks

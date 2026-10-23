@@ -177,7 +177,7 @@ _GROUPS = (
     ("Reminders", ("set_reminder", "set_alarm", "list_reminders",
                    "cancel_reminder")),
     ("Memory", ("remember_fact", "recall_facts", "forget_fact",
-                "update_fact", "search_history")),
+                "update_fact", "search_history", "meet_guest")),
     ("Files", ("list_files", "read_file", "write_file", "edit_file")),
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",
                  "focus_window")),

@@ -260,6 +260,12 @@ presence.set_model(MODEL)
 if getattr(config, "PRESENCE_ENABLED", False) and not presence.start():
     ui.add_message("system", "Presence didn't start: " + " ".join(presence.status()))
 
+# The face check (facecheck.py, people.face_check): start the face models
+# loading now, so the first typed turn doesn't find them missing.
+import facecheck  # noqa: E402
+
+facecheck.warm()
+
 
 # -------------------------
 # Turn handling
@@ -271,8 +277,11 @@ def _process(text, stop):
     last reply to finish still cancels it."""
     try:
         with interrupts.using(stop):        # closed however this ends
-            ui.add_message("user", text)
-            assistant.respond(text, MODEL, source="typed")
+            import people
+
+            speaker = people.typed_speaker()     # you, unless the face check sees someone else
+            ui.add_message("user", f"[{speaker}] {text}" if speaker else text)
+            assistant.respond(text, MODEL, source="typed", speaker=speaker)
         ui.set_status("Idle")
         mood.note_turn()
     except Exception as e:
@@ -1582,6 +1591,7 @@ def handle_input(text):
         return
 
     if text == "/people" or text.startswith("/people "):
+        import facecheck
         import people
         import presence
         import voices
@@ -1590,6 +1600,10 @@ def handle_input(text):
 
         if len(words) >= 4 and words[1] == "enroll" and words[2] in ("face", "voice"):
             name = " ".join(words[3:])
+
+            if name.strip().lower() == people.STRANGER:
+                ui.add_message("system", f"\"{people.STRANGER}\" is what she calls someone she doesn't know: pick a name.")
+                return
 
             if not config.USER_NAME:
                 ui.add_message("system", "Put your own name in agent.json's user block first "
@@ -1609,6 +1623,28 @@ def handle_input(text):
             threading.Thread(target=_enroll, daemon=True, name="people-enroll").start()
             return
 
+        if len(words) >= 3 and words[1] in ("guest", "meet"):
+            _ok, said = people.meet(" ".join(words[2:]))
+            ui.add_message("system", said)
+            return
+
+        if len(words) >= 3 and words[1] == "keep":
+            _ok, said = people.keep(" ".join(words[2:]))
+            ui.add_message("system", said)
+            return
+
+        if len(words) == 2 and words[1] == "check":
+            if not facecheck.enabled():
+                ui.add_message("system", "The face check is off: /set people.face_check true to try it.")
+                return
+
+            def _look():
+                name = facecheck.check("asked", force=True)
+                ui.add_message("system", f"Face check: {name}." if name else facecheck.status())
+
+            threading.Thread(target=_look, daemon=True, name="facecheck-asked").start()
+            return
+
         if len(words) == 2 and words[1] == "cancel":
             job = voices.cancel()
             ui.add_message("system", f"Stopped taking {job['name']}'s voice prints." if job
@@ -1618,7 +1654,7 @@ def handle_input(text):
         if len(words) >= 3 and words[1] == "forget":
             kind = words[-1] if words[-1] in ("face", "voice") and len(words) >= 4 else None
             name = " ".join(words[2:-1] if kind else words[2:])
-            gone = people.forget(name, kind)
+            gone = people.forget(name, kind) or (kind is None and people.forget_guest(name))
             ui.add_message("system", (f"Forgot {name}'s {kind} prints." if kind else f"Forgot {name}.")
                            if gone else f"Nobody called {name} (or no {kind} prints).")
             return
@@ -1629,8 +1665,13 @@ def handle_input(text):
                                        f"{len(p.get('face') or [])} face, {len(p.get('voice') or [])} voice prints, "
                                        f"{len(p.get('facts') or [])} facts"
                                        for n, p in found.items()] if found else ["Nobody enrolled yet."])
-            + ["  " + voices.status(), "  " + presence.status()[0],
-               "  /people enroll face|voice <name> | /people forget <name> [face|voice] | /people cancel"]))
+            + ([f"Met this session (forgotten on restart; /people keep <name> to keep): "
+                + ", ".join(f"{g['name']} ({', '.join(k for k in ('face', 'voice') if g.get(k)) or 'no prints'}, "
+                            f"{len(g.get('facts') or [])} facts)" for g in people.session_guests())]
+               if people.session_guests() else [])
+            + ["  " + voices.status(), "  " + presence.status()[0], "  " + facecheck.status(),
+               "  /people enroll face|voice <name> | /people forget <name> [face|voice] | /people cancel"
+               " | /people check | /people guest <name> | /people keep <name>"]))
         return
 
     if text == "/situation":

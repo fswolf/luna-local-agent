@@ -215,6 +215,8 @@ SCHEMA = {
     "camera.device": ("text", "Which camera: a number (0 is the first), a /dev/video path, or a camera server's URL"),
     "camera.width": ("int", "Camera pictures are scaled down to this width, in pixels"),
     "camera.warmup": ("int", "Frames thrown away first, because a webcam's first frame is nearly black"),
+    "camera.before": ("text", "A command run each time she opens the webcam ({device} is the camera), e.g. to switch its light off where the camera allows"),
+    "camera.after": ("text", "A command run each time she's done with the webcam, even if the picture failed"),
     "camera.presence.enabled": ("bool", "Keep the webcam watching so she notices when someone is there (nothing is saved or sent)"),
     "camera.presence.fps": ("float", "Checks a second for a face; 2-5 is plenty and costs a few percent of one core"),
     "camera.presence.greet": ("bool", "Say hi when someone shows up after being away a while"),
@@ -226,6 +228,9 @@ SCHEMA = {
     "camera.presence.match": ("float", "How alike a face must be to an enrolled one to count, 0-1 (0.36 is OpenCV's advice)"),
     "people.voice": ("bool", "Tell people apart by voice on spoken turns (needs the voices extra and /people enroll voice)"),
     "people.voice_match": ("float", "How alike a voice must be to an enrolled one to count, 0-1: higher is stricter"),
+    "people.face_check": ("bool", "With presence off: one quick camera look to see who's typing, or who's talking when the voice match isn't sure (needs /people enroll face)"),
+    "people.face_check_minutes": ("float", "How long one look counts before she looks again, in minutes"),
+    "people.face_check_seconds": ("float", "How long a look may take before the turn goes on without it, in seconds"),
 
     # --- Relay stations ------------------------------------------------------
     "station.enabled": ("bool", "Talk to her from another room on an old phone or tablet: she listens on your home network (pair each device below)"),

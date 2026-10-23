@@ -104,6 +104,11 @@ _cam = _camera_cfg.get("device", 0)
 CAMERA_DEVICE = int(_cam) if isinstance(_cam, (int, float)) or str(_cam).strip().lstrip("-").isdigit() else str(_cam).strip()
 CAMERA_WIDTH = int(_camera_cfg.get("width", 1280))
 CAMERA_WARMUP = int(_camera_cfg.get("warmup", 5))
+# Commands run when she opens the webcam and when she's done with it
+# (camera.hooks); {device} becomes the camera. Empty: nothing runs.
+#   "camera": { "before": "v4l2-ctl -d /dev/video0 -c led1_mode=0", "after": "..." }
+CAMERA_BEFORE = str(_camera_cfg.get("before", "") or "")
+CAMERA_AFTER = str(_camera_cfg.get("after", "") or "")
 
 # Presence (presence.py): the webcam kept open at a few checks a second to
 # notice someone in front of it. Greets you when you come back after
@@ -128,6 +133,12 @@ PRESENCE_MATCH = float(_presence_cfg.get("match", 0.36))
 _people_cfg = setting("people", {})
 PEOPLE_VOICE = bool(_people_cfg.get("voice", True))
 PEOPLE_VOICE_MATCH = float(_people_cfg.get("voice_match", 0.3))
+# face_check (facecheck.py): with presence off, one quick camera look to see
+# who's typing, or who's talking when the voice match isn't sure. Counts for
+# face_check_minutes; a look gets face_check_seconds before the turn goes on.
+PEOPLE_FACE_CHECK = bool(_people_cfg.get("face_check", False))
+PEOPLE_FACE_CHECK_MINUTES = float(_people_cfg.get("face_check_minutes", 10))
+PEOPLE_FACE_CHECK_SECONDS = float(_people_cfg.get("face_check_seconds", 2))
 
 # Relay stations (station.py): talk to her from another room on an old phone
 # or tablet. Off until switched on; then she listens on your home network only

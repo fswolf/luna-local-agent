@@ -24,6 +24,9 @@ A plugin is a module with a NAME and whichever of these it needs:
                            stream chat and Discord without memory
     on_user_text(text)     sees each of your messages before she does
     panic()                you interrupted her (HOME): stop anything physical
+    on_camera_open(device) she's about to open the webcam (a picture, the
+                           face check, presence starting); keep it quick
+    on_camera_close(device) she's done with it, even when the picture failed
 
 Only NAME is required; anything missing gets a sensible default, so a
 plugin that only needs start() is four lines long. `plugins/example.py`
@@ -87,6 +90,8 @@ class Plugin:
         self._prompt_line = _default(module, "prompt_line", None)
         self._on_user_text = _default(module, "on_user_text", None)
         self._panic = _default(module, "panic", None)
+        self._on_camera_open = _default(module, "on_camera_open", None)
+        self._on_camera_close = _default(module, "on_camera_close", None)
 
     def available(self):
         try:
@@ -175,6 +180,24 @@ def user_text(text):
             hook(text)
         except Exception as e:
             logbook.warn("plugins", "%s on_user_text failed: %s", plugin.name, e)
+
+
+def _camera(attribute, device):
+    for plugin, hook in _each_running(attribute):
+        try:
+            hook(device)
+        except Exception:
+            logbook.exception("plugins", "%s %s failed", plugin.name, attribute.lstrip("_"))
+
+
+def camera_open(device):
+    """The webcam is about to open (camera.hooks calls this, with a time limit)."""
+    _camera("_on_camera_open", device)
+
+
+def camera_close(device):
+    """The webcam has closed again."""
+    _camera("_on_camera_close", device)
 
 
 def panic():

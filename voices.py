@@ -168,8 +168,9 @@ def print_of(audio):
 
 
 def identify(audio):
-    """(name, score) for whoever said this, (None, best score) when it's
-    nobody enrolled, or (None, None) when no comparison could be made. Also takes the
+    """(name, score) for whoever said this, (people.STRANGER, best score)
+    when it clearly isn't the owner, (None, best score) when it's nobody
+    she can place, or (None, None) when no comparison could be made. Also takes the
     turn as an enrolment print when one is running."""
     job = _state["enroll"]
     if not job and not wanted():
@@ -201,7 +202,8 @@ def identify(audio):
         _tell(f"Voice print {job['got']}/{job['need']} for {job['name']} ({total} stored)."
               + (f" Next, read: \"{_line(job)}\"" if left > 0 else f" Done: she'll know {job['name']}'s voice now."))
         return job["name"], 1.0
-    return people.match("voice", vector, float(getattr(config, "PEOPLE_VOICE_MATCH", 0.3)))
+    # a name, people.STRANGER (clearly not the owner), or None (can't tell)
+    return people.verdict("voice", vector, float(getattr(config, "PEOPLE_VOICE_MATCH", 0.3)))
 
 
 def enroll(name, turns=ENROLL_TURNS):
