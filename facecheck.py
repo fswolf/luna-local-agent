@@ -139,12 +139,14 @@ def warm():
         logbook.info("facecheck", "couldn't start the face models: %s", e)
 
 
-def check(reason="turn", force=False):
+def check(reason="turn", force=False, fresh=False):
     """Who's at the desk: a name, people.STRANGER (a face that clearly
     isn't the owner's), or None (the owner, nobody there, can't place
-    them, or couldn't check). Never raises."""
+    them, or couldn't check). fresh: don't reuse the last answer (a
+    voice just said it's someone else); paused and back-off still hold.
+    Never raises."""
     try:
-        return _check(reason, force)
+        return _check(reason, force, fresh)
     except Exception as e:                      # a bug here must not cost a turn
         logbook.exception("facecheck", "face check failed")
         _failed(f"{type(e).__name__}: {e}")
@@ -161,7 +163,7 @@ def _remote_or_job():
         return False
 
 
-def _check(reason, force):
+def _check(reason, force, fresh=False):
     if not enabled() or _remote_or_job():
         return None
     try:
@@ -178,7 +180,8 @@ def _check(reason, force):
         _state["turn_at"] = now
         if force:
             _state["paused"], _state["fails"], _state["retry_at"] = "", 0, 0.0
-        elif _state["at"] is not None and now - _state["at"] < _fresh_for(_state["name"]) and not quiet:
+        elif (_state["at"] is not None and not quiet and not fresh
+              and now - _state["at"] < _fresh_for(_state["name"])):
             return _state["name"]               # still fresh, same conversation
         inflight = _state["inflight"] if _state["busy"] else None
         if inflight is None:
@@ -332,6 +335,12 @@ def status():
         last = f"last look {ago} min ago: {_state['what']}"
     error = f"; last failure: {_state['last_error']}" if _state["fails"] else ""
     return f"Face check: on, {last}{error}"
+
+
+def forget_last():
+    """Drop the cached answer (someone was just met): the next turn looks again."""
+    with _lock:
+        _state.update(at=None, name=None, score=None)
 
 
 def reset():

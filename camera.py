@@ -74,27 +74,29 @@ def _cv2():
     by the code here in its own words."""
     import os
 
-    # read once, when cv2 is first imported; a level you set yourself stays
+    # the variable is read when cv2 is first imported; something else may
+    # have imported it first, so the level is also set directly below.
+    # A level you set yourself (OPENCV_LOG_LEVEL=WARNING) is left alone.
     os.environ.setdefault("OPENCV_LOG_LEVEL", "SILENT")
-    os.environ.setdefault("OPENCV_VIDEOIO_DEBUG", "0")
     try:
         import cv2
     except Exception:
         return None
     if not _quiet["done"]:
         _quiet["done"] = True
-        try:
-            if os.environ.get("OPENCV_LOG_LEVEL", "").upper() == "SILENT":
-                cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
-        except Exception:
+        if not _quiet["yours"]:
             try:
-                cv2.setLogLevel(0)
+                cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
             except Exception:
-                pass
+                try:
+                    cv2.setLogLevel(0)
+                except Exception:
+                    pass
     return cv2
 
 
-_quiet = {"done": False}
+# whether OPENCV_LOG_LEVEL was set before Luna started (yours, so kept)
+_quiet = {"done": False, "yours": "OPENCV_LOG_LEVEL" in __import__("os").environ}
 
 
 def _remote_or_job():

@@ -43,7 +43,7 @@ FOLDER = os.path.join(config.BASE_DIR, "agent", "people")
 _lock = threading.Lock()
 MAX_PRINTS = 40            # per kind per person: plenty of angles, bounded file
 
-STRANGER = "guest"         # the speaker on a stranger's turn; not a name anyone can enroll
+STRANGER = "someone new"  # the speaker on a stranger's turn; not a name anyone can enroll
 # How far under the match line the owner's own best score must be before a
 # face or a voice counts as clearly someone else. Between the two lines she
 # isn't sure, and not sure is the owner.
@@ -171,9 +171,12 @@ def verdict(kind, vector, threshold):
                 owner_best = score if owner_best is None else max(owner_best, score)
     if best >= threshold:
         return best_name, best
-    with _lock:
-        _unknown[kind] = ([float(x) for x in vector], time.monotonic())
     if owner_best is not None and owner_best < threshold - MARGIN.get(kind, 0.1):
+        # only a print that's clearly not the owner can be met later: a near
+        # miss might be the owner, and naming it "Mike" would teach her that
+        # the owner's own voice is Mike's
+        with _lock:
+            _unknown[kind] = ([float(x) for x in vector], time.monotonic())
         return STRANGER, best
     return None, best
 
@@ -212,24 +215,36 @@ def meet(name):
     name = _clean_name(name)
     if not name or name.lower() == STRANGER:
         return False, "That isn't a name."
-    if is_owner(name):
-        return False, f"{name} is the owner: enroll with /people enroll, not as a guest."
-    if load(name) is not None:
-        return False, f"{name} is already enrolled; she'll know them by their own prints."
+    if is_owner(name) or load(name) is not None:
+        # never a hint about who's enrolled: a name alone proves nothing
+        return False, (f"Not met: {name} is someone she already knows by face or voice, "
+                       "and saying a name doesn't make someone that person.")
     now = time.monotonic()
     with _lock:
         fresh = {kind: vec for kind, (vec, at) in _unknown.items() if now - at <= MEET_WINDOW}
         if not fresh:
             return False, ("She hasn't seen or heard anyone new in the last few minutes, "
-                           "so there's nothing to put the name to.")
+                           "so there's nothing to put the name to. (She can only tell someone "
+                           "is new once the owner is enrolled by face or voice.)")
         guest = next((g for k, g in _session.items() if k.lower() == name.lower()), None)
         if guest is None:
             guest = _session[name] = {"name": name, "face": [], "voice": [], "facts": []}
         for kind, vector in fresh.items():
             guest[kind] = (guest[kind] + [vector])[-MAX_PRINTS:]
             _unknown.pop(kind, None)
+    _forget_last_look()
     kinds = " and ".join(sorted(fresh))
     return True, f"Met {name} (by {kinds}), for this session only."
+
+
+def _forget_last_look():
+    """The face check's cached answer predates this: look again next turn."""
+    try:
+        import facecheck
+
+        facecheck.forget_last()
+    except Exception:
+        pass
 
 
 def keep(name):
@@ -317,7 +332,9 @@ def decide(voice_name=None, voice_checked=False, voice_score=None, at_desk=True)
             if not voice_checked or voice == STRANGER or unsure:
                 reason = ("no voice prints" if not voice_checked
                           else "voice says someone new" if voice == STRANGER else "voice not sure")
-                face = _face(reason)
+                # a voice that's clearly someone else outweighs a cached
+                # "it's the owner": look again rather than reuse it
+                face = _face(reason, fresh=voice == STRANGER)
                 if face:
                     return _not_owner(face)
         return STRANGER if voice == STRANGER else None
@@ -343,9 +360,10 @@ def typed_speaker():
         return None
 
 
-def _face(reason):
+def _face(reason, fresh=False):
     """The face at the desk: presence's when it's watching, otherwise one
-    look (facecheck, when it's on). A name, STRANGER, or None."""
+    look (facecheck, when it's on; fresh skips its cached answer). A
+    name, STRANGER, or None."""
     try:
         import presence
 
@@ -357,7 +375,7 @@ def _face(reason):
     try:
         import facecheck
 
-        return facecheck.check(reason)
+        return facecheck.check(reason, fresh=fresh)
     except Exception:
         return None
 

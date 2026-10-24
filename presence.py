@@ -525,6 +525,9 @@ def _greet(gap):
     import ui
     from speech import speak
 
+    if _state.get("stranger"):
+        assistant._turn.release()         # someone she doesn't know: not the owner coming back
+        return
     name = _state["who"] if _tracker.present else None
     person = name or getattr(config, "USER", "the user")
     try:
