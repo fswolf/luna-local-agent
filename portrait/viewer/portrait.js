@@ -271,16 +271,17 @@ function handle(ev) {
     case 'tok':         // her reply as it streams: act out *hugs*, *waves*... (the fallback)
       if (ev.p === 'a' && ev.s && gmode.mode !== 'off') { said.text = (said.text + ev.s).slice(-400); actOut(said.text); }
       break;
-    case 'gesture':     // a [tag] she wrote, the meaning check, or /portrait wave
-      if (ev.src === 'tag' || ev.src === 'meaning') {
+    case 'gesture':     // a [tag] she wrote, a move she described, the meaning check, or /portrait wave
+      if (ev.src === 'tag' || ev.src === 'meaning' || ev.src === 'aside') {
         if (gmode.mode === 'off') break;
         if (ev.src === 'meaning' && said.done.size) break;   // keywords already caught it
+        if (ev.src === 'aside' && said.done.has(ev.name)) break;   // *waves*: the keyword fallback got there first
         said.done.add(ev.name);
         if (ev.src === 'tag') said.tagged = true;
       }
       gesture(ev.name);
       break;
-    case 'gesture_mode':   // switched in the tools pane or /portrait gestures
+    case 'gesture_mode':   // switched in the settings pane or /portrait gestures
       gmode.mode = ev.mode; gmode.chat = ev.chat !== false;
       break;
     case 'chat':        // stream chat and Discord: !hug, hi, lol...

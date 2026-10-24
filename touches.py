@@ -20,7 +20,7 @@ Kept quick and small, so it never feels like waiting:
     remembers it, her mood reads it like any exchange, and her idle
     notes pick it up
 
-portrait.touch_talk (the tools pane's "touch talk") turns it off.
+portrait.touch_talk (the settings pane's "touch talk") turns it off.
 """
 import re
 import threading

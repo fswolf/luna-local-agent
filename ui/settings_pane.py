@@ -94,6 +94,17 @@ def describe(path):
 
     entry = SCHEMA.get(path)
 
+    if path == "portrait.model" and entry:
+        # whatever is in portrait/models: space steps through them
+        try:
+            import livefeed
+
+            found = tuple(livefeed.portrait_models())
+        except Exception:
+            found = ()
+        if found:
+            return "choice", entry[1], found
+
     if entry:
         return entry[0], entry[1], tuple(entry[2]) if len(entry) > 2 and entry[2] else ()
 
@@ -201,6 +212,10 @@ def _show(path, value, kind):
         return f"{{{len(value)} entries}}" if value else "{}"
     if value == "":
         return '""'
+    if path == "portrait.model":
+        # models/sigewinne/sigewinne.model3.json -> sigewinne; models/foo.vrm -> foo.vrm
+        parts = str(value).split("/")
+        return parts[1] if len(parts) > 2 else parts[-1]
 
     return str(value)
 

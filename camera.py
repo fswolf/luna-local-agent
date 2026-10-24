@@ -66,12 +66,35 @@ HOOK_SECONDS = 3.0        # longest a hook may take before the camera goes on wi
 
 
 def _cv2():
+    """OpenCV, or None. Its own log is switched off first: OpenCV writes
+    warnings straight to the terminal from C++ ("[ WARN:0@0.4] global
+    net_impl_backend.cpp:345 setPreferableTarget ..." when YuNet starts,
+    V4L2 notes when a webcam opens), and those land on top of Luna's
+    screen and in the input line. Every failure that matters is reported
+    by the code here in its own words."""
+    import os
+
+    # read once, when cv2 is first imported; a level you set yourself stays
+    os.environ.setdefault("OPENCV_LOG_LEVEL", "SILENT")
+    os.environ.setdefault("OPENCV_VIDEOIO_DEBUG", "0")
     try:
         import cv2
-
-        return cv2
     except Exception:
         return None
+    if not _quiet["done"]:
+        _quiet["done"] = True
+        try:
+            if os.environ.get("OPENCV_LOG_LEVEL", "").upper() == "SILENT":
+                cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
+        except Exception:
+            try:
+                cv2.setLogLevel(0)
+            except Exception:
+                pass
+    return cv2
+
+
+_quiet = {"done": False}
 
 
 def _remote_or_job():

@@ -15,14 +15,25 @@ loudness is sent to the page as it starts playing. Her mood shows as a
 smile, a blush or a frown. A failed tool gets a moment of spiral eyes,
 and a big jump in warmth gets a flustered ><.
 
-It's served by the live monitor, so `monitor.enabled` has to be on. It
-opens as an app-style Chromium window (its own process, so `/portrait`
-can close it again), or in your normal browser if there's no Chromium.
-On Hyprland, float and pin it by title:
+It's served by the live monitor, so `monitor.enabled` has to be on.
+`/portrait` opens it in a window of its own with no address bar or tabs,
+in its own process so `/portrait` can close it again:
+
+1. A Chromium-style browser's app window (Chromium, Chrome, Brave, Edge,
+   Vivaldi), on the PATH or installed as a Flatpak.
+2. Otherwise Firefox (also as a Flatpak), on a profile of her own
+   (`~/.cache/luna-portrait-firefox`) whose `userChrome.css` hides every
+   toolbar. Firefox has no app mode, so this is the nearest thing.
+3. Otherwise your normal browser, as a tab.
+
+`portrait.browser` sets the command yourself (`{url}`, `{w}`, `{h}` are
+filled in). Whatever opens it, the browser's own messages go nowhere, so
+they can't print over Luna's screen. On Hyprland, float and pin it by
+title (Firefox adds its name to the title):
 
 ```
-windowrulev2 = float, title:^(Luna)$
-windowrulev2 = pin, title:^(Luna)$
+windowrulev2 = float, title:^Luna( . Mozilla Firefox)?$
+windowrulev2 = pin, title:^Luna( . Mozilla Firefox)?$
 ```
 
 **She looks at the conversation.** On Hyprland the live monitor checks
@@ -42,8 +53,8 @@ towards the side she's looking, and her brow lifts a little. It's the
 same for the Live2D and the 3D portrait (`portrait/viewer/look.js`).
 
 **Framing**: how much of her shows, *bust* (head and shoulders, the
-default) or *full* (all of her). Switch it on the **framing** row of the
-tools pane's Portrait section; an open portrait reframes straight away,
+default) or *full* (all of her). Switch it on the **frame** row in the
+settings pane's Portrait section (Tab three times); an open portrait reframes straight away,
 and it's saved as `portrait.frame` in config.json. It's set in metres on the model, not in pixels, so a 1080p,
 1440p or 4K screen of the same shape shows the same amount of her, only
 sharper. A tall, narrow window (a monitor in portrait) shows more of her
@@ -165,7 +176,7 @@ shot, so they aren't offered and cost no prompt tokens.
 file is read when the portrait opens, so reload it after an edit;
 `"enabled": false` turns touching off.
 
-**She answers, too.** With **touch talk** on (the tools pane's Portrait
+**She answers, too.** With **touch talk** on (the settings pane's Portrait
 section, or `portrait.touch_talk` in config.json; on by default), Luna
 hears about each touch and answers it out loud a moment later, in one
 short line, in character: she knows her mood and what you were just
@@ -341,7 +352,7 @@ Live2D, `portrait/viewer/hologram3d.js` for VRM), so blinking, talking, the
 hair and ear physics and everything else come through it unchanged.
 
 Switch it with `/holo` (or `/holo on`, `/holo off`), or the **hologram
-look** row in the tools pane's Portrait group. Either one saves the
+enabled** row in the settings pane's Portrait section. Either one saves the
 choice and flips an open portrait straight away. `?holo=1` on the
 portrait address forces it for that page (the `?debug=1` page gets
 glitch and on/off buttons). The rest of the look is set in config.json:
@@ -363,7 +374,7 @@ glitch and on/off buttons). The rest of the look is set in config.json:
 | `base` | `true` | The projector glow and beam under her |
 
 It works in OBS too: with `?bg=transparent` she floats over the stream
-as a projection. `/holo` and the tools pane switch it live there as
+as a projection. `/holo` and the settings pane switch it live there as
 well; `&holo=1` or `&holo=0` on the URL only sets how the page starts.
 
 ### When something's off
@@ -374,7 +385,7 @@ well; `&holo=1` or `&holo=0` on the URL only sets how the page starts.
 | She doesn't react | Open `http://127.0.0.1:8792/portrait/?debug=1`. Its buttons fire each reaction by hand, so you can tell the model from the events. |
 | Too much or too little of her shows | Add `"crop": {"top": 0.02, "height": 0.42}` under `portrait.live2d`. A bigger `height` shows more; `crop_face` does the same for `?frame=face`. |
 | Ears don't twitch | The debug panel lists the ear parameters it found. Name them in `portrait.live2d.ear_params` if it found none. |
-| The window doesn't float on Hyprland | `windowrulev2 = float, title:^(Luna)$`, plus `pin` to keep it on every workspace. |
+| The window doesn't float on Hyprland | `windowrulev2 = float, title:^Luna( . Mozilla Firefox)?$`, plus `pin` to keep it on every workspace. |
 
 ## VRM (3D) models
 
@@ -403,8 +414,8 @@ glow and react:
   she's fine, blue when she's low, red when she's cross, violet when she's
   tired.
 
-Switch them with `/lights` (or `/lights on`, `/lights off`), the **light
-strips** row in the tools pane, or `/settings`, Portrait. All of it is live.
+Switch them with `/lights` (or `/lights on`, `/lights off`), the **lights
+enabled** row in the settings pane's Portrait section, or `/settings`. All of it is live.
 To try them without Luna running, open the viewer with `&lights=1` on the
 address, or use the debug panel's **light strips** buttons: *light tour* (every reaction in turn, with a caption saying which; press again to stop), *lights on/off*,
 *throb* (a 10 s build and release, dark between beats) and *flicker*. Her state buttons (talk,
@@ -637,12 +648,12 @@ add-on keyframes and exports them; VRoid publishes free samples. Check a
 clip's licence before it goes in a public repo.
 
 **How her replies set them off** is up to you: the **gestures** row in
-the tools pane's Portrait group (space cycles it), or `/portrait
+the settings pane's Portrait section (space cycles it), or `/portrait
 gestures <mode>`.
 
 | Mode | How | Cost |
 |------|-----|------|
-| `tags` (default) | She picks. A line in her prompt lets her put one hidden tag like `[hug]` where it fits; it's cut out before anything is shown, spoken or saved, and sent to the portrait. Keywords catch what she forgets | About 60 prompt tokens (cached by llama.cpp, so read once) and a few output tokens when she uses one. No extra time |
+| `tags` (default) | She picks. A line in her prompt lets her put one hidden tag like `[hug]` where it fits; it's cut out before anything is shown, spoken or saved, and sent to the portrait. Keywords catch what she forgets | About 80 prompt tokens for a few gestures that fit her mood (`portrait.gestures_offered`) and a few output tokens when she uses one. No extra time |
 | `meaning` | After she answers, the embedding model compares what was said with a short description of each gesture, and plays the one that clearly beats "an ordinary reply". Keywords as a fallback | One embedding call per reply, 10 to 30 ms, off the turn's path. Needs the embedding server; without it this is keywords only |
 | `keywords` | Only `*hugs*`, `*waves*`, 🤗 and the like in what she writes, and your hi or hug request | Nothing |
 | `off` | Nothing from the conversation. Idle moves and chat still work | Nothing |
@@ -685,7 +696,7 @@ YouTube, IRC, pomf) and Discord reaches the portrait, answered or not:
 
 Chat triggers are rate-limited (five seconds between commands, twelve
 between the rest) so a busy chat doesn't keep her flailing.
-The **chat gestures** row in the tools pane turns them off, or
+The **chat gestures** row in the settings pane turns them off, or
 `"portrait": {"chat_gestures": false}`.
 
 `/portrait wave` (or `hug`, `jump`, `bounce`, `shrug`, `stretch`, `kiss`, `shy`,

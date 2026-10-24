@@ -24,38 +24,6 @@ _FEATURES = (
     ("warmth sensing", "MOOD_AFFECTION", "mood.affection", "1 call/turn"),
 )
 
-# How the portrait looks - nothing to do with the prompt, so no cost.
-_PORTRAIT_FEATURES = (
-    ("hologram look", "PORTRAIT_HOLOGRAM_ENABLED", "portrait.hologram.enabled", "/holo, live"),
-    ("light strips", "PORTRAIT_LIGHTS_ENABLED", "portrait.lights.enabled", "/lights, robot model, live"),
-    ("chat gestures", "PORTRAIT_CHAT_GESTURES", "portrait.chat_gestures", "!hug, hi, lol in chat"),
-    ("touch talk", "PORTRAIT_TOUCH_TALK", "portrait.touch_talk", "click her: she answers out loud, 1 short line"),
-)
-
-# How her replies set off gestures (gestures.py); space cycles.
-_GESTURE_NOTES = {
-    "tags": "she picks, ~60 cached tokens + keywords",
-    "meaning": "embedding model, 1 call/reply + keywords",
-    "keywords": "*hugs*, *waves* in what she writes",
-    "off": "none from the conversation",
-}
-
-
-def _gesture_note():
-    import gestures
-
-    m = gestures.mode()
-    note = _GESTURE_NOTES[m]
-    if m == "meaning":
-        try:
-            import embedmem
-
-            # the last known state - drawing the pane mustn't wait on a server
-            if embedmem._state.get("up") is False:
-                note = "embeddings off - keywords only"
-        except Exception:
-            pass
-    return m, note
 
 # Costs nothing in context - it records what the model already produced
 # - so it carries no token figure, just what it does.
@@ -157,46 +125,6 @@ def _thoughts_group():
     return ("Thoughts", members, 0, 0)
 
 
-def _model_name(path):
-    """models/sigewinne/sigewinne.model3.json -> sigewinne; models/foo.vrm -> foo"""
-    parts = str(path or "").split("/")
-    return parts[1] if len(parts) > 2 else parts[-1].rsplit(".", 1)[0]
-
-
-_FRAME_NOTES = {"bust": "head and shoulders", "full": "all of her", "face": "close on her face"}   # face: /set only
-
-
-def _portrait_group():
-    try:
-        import config
-    except Exception:
-        return None
-
-    # the model: space steps through whatever is in portrait/models
-    try:
-        import livefeed
-
-        found = livefeed.portrait_models()
-    except Exception:
-        found = []
-
-    current = getattr(config, "PORTRAIT_MODEL", "")
-    where = f"{found.index(current) + 1} of {len(found)}" if current in found else f"{len(found)} found"
-    members = [("model", True, bool(found), f"{where} in portrait/models - space: next" if found
-                else "drop a model into portrait/models", 0, "pick:portrait.model")]
-    members.append(("framing", True, True, _FRAME_NOTES.get(getattr(config, "PORTRAIT_FRAME", "bust"), "")
-                    + " - space: next", 0, "pick:portrait.frame"))
-    try:
-        _, note = _gesture_note()
-        members.append(("gestures", True, True, f"{note} - space: next", 0, "pick:portrait.gestures"))
-    except Exception:
-        pass
-    members += [(label, bool(getattr(config, key, False)), True, note, 0, path)
-                for label, key, path, note in _PORTRAIT_FEATURES]
-
-    return ("Portrait", members, 0, 0)
-
-
 def _feature_group():
     """The Mood group: same shape as a tool group, so the cursor, the
     scrolling and the line map don't need to know the difference."""
@@ -238,7 +166,8 @@ def _tool_groups():
         groups = []
 
     groups = _with_plugin_switches(groups)
-    extra = [g for g in (_feature_group(), _thoughts_group(), _self_group(), _portrait_group()) if g]
+    # the portrait's settings live in the settings pane (Tab three times), not here
+    extra = [g for g in (_feature_group(), _thoughts_group(), _self_group()) if g]
     perms = _perm_group()
 
     return ([perms] if perms else []) + groups + extra
@@ -429,8 +358,6 @@ def _spent(label, live, total):
     turns "which of these 22 do I not need" into "do I need the desktop ones"."""
     if label == "Permissions":
         return "space cycles, saved"
-    if label == "Portrait":
-        return "space switches, saved, live"
     return f"{live} tok" if live == total else f"{live} of {total} tok"
 
 
@@ -479,19 +406,6 @@ def _tool_fragments():
         for name, on, ready, why, cost, setting in members:
             selected = index == view.tool_cursor
             pointer = " >" if selected else "  "
-
-            if setting and setting.startswith("pick:"):
-                import config
-
-                mark = (_gesture_note()[0] if setting == "pick:portrait.gestures"
-                        else getattr(config, "PORTRAIT_FRAME", "bust") if setting == "pick:portrait.frame"
-                        else _model_name(getattr(config, "PORTRAIT_MODEL", "")))[:12]
-                fragments.append(("class:key" if selected else "class:dim", pointer))
-                fragments.append(("class:ok", f" {mark:<12} "))
-                fragments.append(("class:agent bold" if selected else "class:agent", f"{name:<7}"))
-                fragments.append(("class:dim", f"  {why}\n"))
-                index += 1
-                continue
 
             if setting and setting.startswith("perm:"):
                 mark = _perm_value(name)
@@ -586,36 +500,7 @@ def _tool_toggle():
         return
 
     try:
-        if setting == "pick:portrait.model":
-            import config
-            import livefeed
-
-            found = livefeed.portrait_models()
-            current = getattr(config, "PORTRAIT_MODEL", "")
-            nxt = found[(found.index(current) + 1) % len(found)] if current in found else found[0]
-            config.save_setting("portrait.model", nxt)
-            livefeed.emit("reload")
-            add_message("system", f"Portrait model: {_model_name(nxt)} ({nxt}) - an open portrait reloads now.")
-        elif setting == "pick:portrait.frame":
-            import config
-            import livefeed
-
-            frames = config.FRAMES
-            now = getattr(config, "PORTRAIT_FRAME", "bust")
-            nxt = frames[(frames.index(now) + 1) % len(frames)] if now in frames else frames[0]
-            config.save_setting("portrait.frame", nxt)
-            livefeed.emit("frame", frame=nxt)
-            add_message("system", f"Portrait framing: {nxt} ({_FRAME_NOTES[nxt]}) - an open portrait reframes now.")
-        elif setting == "pick:portrait.gestures":
-            import config
-            import gestures
-            import livefeed
-
-            nxt = gestures.MODES[(gestures.MODES.index(gestures.mode()) + 1) % len(gestures.MODES)]
-            config.save_setting("portrait.gestures", nxt)
-            livefeed.gesture_mode_changed()
-            add_message("system", f"Portrait gestures: {nxt} - {_gesture_note()[1]}.")
-        elif setting and setting.startswith("plugin:"):
+        if setting and setting.startswith("plugin:"):
             _toggle_plugin(setting[len("plugin:"):], on)
         elif setting and setting.startswith("mcpserver:"):
             _toggle_server(setting[len("mcpserver:"):], on)
@@ -650,20 +535,6 @@ def _tool_toggle():
                 import mood
 
                 mood._announce()
-
-            # an open portrait switches straight away
-            if setting == "portrait.hologram.enabled":
-                import livefeed
-
-                livefeed.emit("holo", on=not on)
-            if setting == "portrait.lights.enabled":
-                import livefeed
-
-                livefeed.lights_changed()
-            if setting == "portrait.chat_gestures":
-                import livefeed
-
-                livefeed.gesture_mode_changed()
         else:
             import tools
 
@@ -729,8 +600,8 @@ def _toggle_server(name, on):
 
 def _tool_group_toggle():
     """Switch every row in the selected row's group at once: all off if
-    they're all on, otherwise all on. Rows that cycle (Permissions) or
-    pick (the portrait model) are left alone."""
+    they're all on, otherwise all on. Rows that cycle (Permissions) are
+    left alone."""
     position = 0
 
     for label, members, _live, _total in _tool_groups():
@@ -740,7 +611,7 @@ def _tool_group_toggle():
     else:
         return
 
-    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "pick:", "plugin:", "mcpserver:"))]
+    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "plugin:", "mcpserver:"))]
 
     if not rows:
         add_message("system", f"{label}: nothing here switches as a group")
@@ -757,15 +628,7 @@ def _tool_group_toggle():
                 continue
             if setting:
                 config.save_setting(setting, "true" if turn_on else "false")
-                if setting == "portrait.hologram.enabled":
-                    import livefeed
-
-                    livefeed.emit("holo", on=turn_on)
-                elif setting == "portrait.lights.enabled":
-                    import livefeed
-
-                    livefeed.lights_changed()
-                elif setting.startswith("mood."):
+                if setting.startswith("mood."):
                     import mood
 
                     mood._announce()

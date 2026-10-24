@@ -47,6 +47,8 @@ import logbook
 FOLDER = os.path.expanduser("~/.config/ai-voice/station")
 DEVICES_FILE = os.path.join(FOLDER, "devices.json")
 COOKIE = "luna_station"
+COOKIE_LIFE = 10 * 365 * 24 * 3600   # a paired device stays paired: renewed on every visit, until you unpair it
+KEEP_KEY = "luna_station"          # the page's own copy of the token (localStorage), for a browser that drops cookies
 PAIR_MINUTES = 15
 MAX_AUDIO = 6 * 1024 * 1024        # about 3 minutes of 16 kHz mono
 ASK_SECONDS = 120                  # how long a permission question waits on the tablet
@@ -240,15 +242,34 @@ def forget(key):
     return True
 
 
-def _device(cookie_header):
-    """The paired device sending this cookie (with its key), or None."""
+def _token(cookie_header):
+    """The station token in a Cookie header, or ''."""
     for part in str(cookie_header or "").split(";"):
         k, _, v = part.strip().partition("=")
         if k == COOKIE and v:
-            key = _hash(v)
-            found = devices().get(key)
-            return dict(found, key=key) if found else None
-    return None
+            return v
+    return ""
+
+
+def _by_token(token):
+    """The paired device with this token (with its key), or None."""
+    if not token:
+        return None
+    key = _hash(token)
+    found = devices().get(key)
+    return dict(found, key=key) if found else None
+
+
+def _device(cookie_header):
+    """The paired device sending this cookie (with its key), or None."""
+    return _by_token(_token(cookie_header))
+
+
+def _cookie(token):
+    # Lax, not Strict: pairing arrives from the http setup page, a different
+    # site, and Strict would hide the cookie on the way in. Posts are guarded
+    # by the Origin check instead.
+    return ("Set-Cookie", f"{COOKIE}={token}; Max-Age={COOKIE_LIFE}; Path=/; Secure; HttpOnly; SameSite=Lax")
 
 
 # ---------------------------------------------------------------------------
@@ -510,23 +531,28 @@ class _Station(_Base):
         if not self._allowed():
             return
         url = urlsplit(self.path)
+        device = self._who()
         if url.path == "/pair":
             got = _use_code((parse_qs(url.query).get("code") or [""])[0])
             if not got:
-                return self._send(403, _message_page("That pairing code is used up or too old.",
-                                                     "Make a new one on the PC: settings page, Relay stations."))
+                if device:
+                    # an old pairing link opened again (from history, the QR
+                    # scanner) on a device that's already paired: just go in
+                    return self._send(303, "", headers=[("Location", "/"), _cookie(_token(self.headers.get("Cookie")))])
+                return self._send(403, _message_page(
+                    "That pairing code is used up or too old.",
+                    "Make a new one on the PC: settings page, Relay stations.", _RESUME))
             token, name = got
-            # Lax, not Strict: pairing arrives from the http setup page, a
-            # different site, and Strict would hide the cookie on the way in.
-            # Posts are guarded by the Origin check instead.
-            cookie = f"{COOKIE}={token}; Max-Age=31536000; Path=/; Secure; HttpOnly; SameSite=Lax"
-            return self._send(303, "", headers=[("Location", "/"), ("Set-Cookie", cookie)])
-        device = self._who()
+            return self._send(303, "", headers=[("Location", "/"), _cookie(token)])
         if url.path == "/":
             if not device:
-                return self._send(401, _message_page("This device isn't paired yet.",
-                                                     "On the PC: settings page, Relay stations, Add a phone or tablet."))
-            return self._send(200, _station_page(device["name"]))
+                return self._send(401, _message_page(
+                    "This device isn't paired yet.",
+                    "On the PC: settings page, Relay stations, Add a phone or tablet.", _RESUME))
+            # renewed on every visit, so a station in use never expires, and the
+            # page keeps a copy for a browser that throws cookies away on close
+            token = _token(self.headers.get("Cookie"))
+            return self._send(200, _station_page(device["name"], token), headers=[_cookie(token)])
         if not device:
             return self._json(401, {"error": "not paired"})
         if url.path.startswith("/turn/"):
@@ -553,14 +579,26 @@ class _Station(_Base):
         # read before answering: hanging up on a body still arriving resets
         # the connection, and the device sees an error instead of the reply
         body = self.rfile.read(length)
-        device = self._who()
-        if not device:
-            return self._json(401, {"error": "not paired"})
         # same-origin only: another page on the tablet can't post here
         origin = self.headers.get("Origin")
         if origin and urlsplit(origin).netloc != self.headers.get("Host"):
             return self._json(403, {"error": "wrong origin"})
         url = urlsplit(self.path)
+        if url.path == "/resume":
+            # the cookie is gone but the page kept the token: if it's still a
+            # paired device's, hand the cookie back
+            try:
+                token = str(json.loads(body or b"{}").get("token") or "")[:200]
+            except (ValueError, AttributeError):
+                token = ""
+            found = _by_token(token)
+            if not found:
+                return self._json(401, {"error": "not paired"})
+            logbook.info("station", "%s came back without its cookie: restored", found["name"])
+            return self._send(200, json.dumps({"ok": True}), "application/json", headers=[_cookie(token)])
+        device = self._who()
+        if not device:
+            return self._json(401, {"error": "not paired"})
 
         if url.path == "/talk":
             if not body.startswith(b"RIFF") or (self.headers.get("Content-Type") or "") != "audio/wav":
@@ -721,10 +759,30 @@ def _esc(text):
             .replace('"', "&quot;"))
 
 
-def _message_page(title, line):
+def _message_page(title, line, extra=""):
     return (f"<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport "
             f"content='width=device-width,initial-scale=1'><title>Luna</title><style>{_STYLE}</style></head>"
-            f"<body><main><h1>{_esc(title)}</h1><p>{_esc(line)}</p></main></body></html>")
+            f"<body><main><h1>{_esc(title)}</h1><p>{_esc(line)}</p>{extra}</main></body></html>")
+
+
+# On a "not paired" page: if this browser kept a token from an earlier visit
+# (the cookie was thrown away when the browser closed), trade it back for the
+# cookie and go in. A token that was unpaired on the PC is dropped.
+_RESUME = """<p id=resume></p><script>
+(async () => {
+  let t = null;
+  try { t = localStorage.getItem('""" + KEEP_KEY + """'); } catch (e) {}
+  if (!t) return;
+  document.getElementById('resume').textContent = 'This device was paired before: reconnecting...';
+  try {
+    const r = await fetch('/resume', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                      body: JSON.stringify({token: t})});
+    if (r.ok) { location.replace('/'); return; }
+    if (r.status === 401) { try { localStorage.removeItem('""" + KEEP_KEY + """'); } catch (e) {} }
+  } catch (e) {}
+  document.getElementById('resume').textContent = 'It was unpaired on the PC: pair it again.';
+})();
+</script>"""
 
 
 def _setup_page(code):
@@ -753,8 +811,10 @@ addresses on a home network, never for a real website.</p>
 </main></body></html>"""
 
 
-def _station_page(room):
-    return _PAGE.replace("__STYLE__", _STYLE).replace("__ROOM__", _esc(room))
+def _station_page(room, token=""):
+    keep = json.dumps(token or "").replace("<", "\\u003c")
+    return (_PAGE.replace("__STYLE__", _STYLE).replace("__ROOM__", _esc(room))
+            .replace("__KEEP__", keep).replace("__KEEP_KEY__", KEEP_KEY))
 
 
 _PAGE = r"""<!doctype html><html lang=en><head><meta charset=utf-8>
@@ -785,6 +845,8 @@ border-radius:8px;padding:8px;font-size:13px;color:var(--dim)}
 <div id=ask class=card><b id=asktitle></b><pre id=askbody></pre>
 <div class=row><button class=btn id=allow>Allow</button><button class="btn no" id=deny>Deny</button></div></div>
 </main><script>
+// a copy of this device's token, for a browser that drops the cookie on close
+try { const k = __KEEP__; if (k) localStorage.setItem('__KEEP_KEY__', k); } catch (e) {}
 const $ = s => document.querySelector(s);
 const talk = $('#talk'), status = $('#status');
 let ctx = null, stream = null, node = null, chunks = [], rec = false, busy = false, rate = 48000;

@@ -16,6 +16,7 @@ import interrupts
 import livefeed
 import lmstudio
 import logbook
+import replystyle
 
 def _chat_completion(payload, narrator=None):
     """POST to LM_URL and return the reply *message* (not just its text,
@@ -272,8 +273,9 @@ def _visible(raw):
     if opened:
         text = text[:opened.start()]
 
-    # A gesture tag ([hug]) goes to the portrait, not the screen or the voice.
-    text = gestures.strip(text)
+    # A gesture tag ([hug]) goes to the portrait, not the screen or the voice,
+    # and a bracketed action is written the role-play way (replystyle.py)
+    text = replystyle.tidy(gestures.strip(text))
 
     return re.sub(r"<[a-z_/=]{0,12}$", "", text, flags=re.IGNORECASE)
 
@@ -391,7 +393,7 @@ class _Narrator:
             self._shown = self._spoken = 0
             self._prefix_len = None
 
-        if "]" in piece:
+        if "]" in piece or ")" in piece or "*" in piece:      # a tag, or a described move, just closed
             answer = _THINK_BLOCK.sub("", self.raw)
             gestures.from_tags(re.split(r"<think>", answer, maxsplit=1, flags=re.IGNORECASE)[0])
 
@@ -669,4 +671,4 @@ def _content(message):
     if "<think>" in content:
         content = content.split("<think>", 1)[0]
 
-    return gestures.strip(content).strip()
+    return replystyle.tidy(gestures.strip(content)).strip()

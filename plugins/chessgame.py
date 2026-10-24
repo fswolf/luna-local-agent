@@ -622,9 +622,10 @@ def board_url():
 def _open_board():
     if not getattr(config, "MONITOR_ENABLED", True):
         return "The board page needs the live monitor - set monitor.enabled to true and restart."
-    import webbrowser
+    import portrait_window
 
-    threading.Thread(target=webbrowser.open, args=(board_url(),), daemon=True).start()
+    # a browser's own output kept off Luna's screen
+    threading.Thread(target=portrait_window.quiet_open, args=(board_url(),), daemon=True).start()
     return f"The board: {board_url()}"
 
 
