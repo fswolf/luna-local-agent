@@ -32,7 +32,7 @@ she shares and what she'll do:
 | **Owner** | You | Yours | All of yours | All of them |
 | **Registered** | Enrolled with `/people enroll` (Shannon) | Theirs | Their own file, kept for good | All of them |
 | **Guest** | Someone she met this session ("I'm Mike") | Theirs | Kept in memory only, gone on restart | A short safe list, plus their own facts |
-| **Stranger** | Someone who clearly isn't you, and she doesn't know | None | Nothing kept | A short safe list |
+| **Stranger** | Someone who clearly isn't you, and she doesn't know (`[someone new]` in the chat) | None | Nothing kept | A short safe list |
 
 The safe list is the clock, sums, web search, the system status, her
 manual and `meet_guest`. Nothing that reads your files, screen, mail,
@@ -52,7 +52,10 @@ and by voice.
 introduce them ("this is my friend Mike"), she calls `meet_guest` and
 puts that name to the face and voice she just saw and heard. For the
 rest of the session she knows Mike: his name, and what he tells her, all
-in memory only. `/people guest Mike` does the same from the keyboard.
+in memory only. Only a face or voice that was clearly not yours can be
+given a name, so your own voice on a bad day never becomes "Mike". And
+a name alone proves nothing: nobody becomes Shannon, or you, by saying
+so. `/people guest Mike` does the same from the keyboard.
 Nothing about a guest touches the disk unless you keep them:
 `/people keep Mike` makes him registered, with his prints and facts in
 his own file. That's always your call, never hers.
@@ -90,7 +93,8 @@ name as a stranger's, whatever it claims.
    face comes from presence, or from a face check. A face she knows wins,
    so your face overrules a stranger-sounding voice (a cold, a bad mic).
 3. **A stranger,** if the voice or the face clearly isn't you and nothing
-   says otherwise.
+   says otherwise. A voice that's clearly someone else always gets a
+   fresh look, rather than an earlier "it's Ryan" from the face check.
 4. **Otherwise it's you.**
 
 A relay station or satellite skips step 2. Its microphone is in
@@ -168,8 +172,10 @@ On anyone else's turn:
   aren't kept. Her prompt shows their facts, never yours, and none of
   your preferences. "Forget that" only touches theirs.
 - **Guests and strangers get the short tool list** ([the ladder](#the-ladder)).
+- **No "welcome back" for a stranger.** Presence greets people she knows
+  when they come back; someone new walking up isn't greeted as you.
 - **The conversation shows it:** `[Shannon] what's for dinner?`,
-  `[guest] hi!`, and history and the transcript keep the label, so later
+  `[someone new] hi!`, and history and the transcript keep the label, so later
   turns don't put their words in your mouth.
 - **One shared history.** She's in one room, so everyone sees the same
   conversation. That includes a stranger's turn: she's told not to share

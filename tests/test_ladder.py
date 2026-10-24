@@ -180,6 +180,67 @@ class SessionGuests(_Folder):
         self.assertFalse(people.meet("Mike")[0])
 
 
+class SecondPass(_Folder):
+    def test_a_near_miss_cant_be_met(self):
+        people.add_prints("Ryan", "face", [RYAN])
+        people.verdict("face", EDGE, LINE)               # might be Ryan: not meetable
+        self.assertFalse(people.meet("Mike")[0])
+
+    def test_without_owner_prints_nobody_is_meetable(self):
+        people.verdict("face", MIKE, LINE)
+        ok, said = people.meet("Mike")
+        self.assertFalse(ok)
+        self.assertIn("enrolled", said)
+
+    def test_refusals_dont_say_who_is_enrolled(self):
+        people.add_prints("Ryan", "face", [RYAN])
+        people.add_prints("Shannon", "voice", [SHANNON])
+        people.verdict("face", MIKE, LINE)
+        for name in ("Ryan", "Shannon"):
+            ok, said = people.meet(name)
+            self.assertFalse(ok)
+            self.assertNotIn("owner", said)
+            self.assertEqual(said.replace(name, "X"), people.meet("Shannon")[1].replace("Shannon", "X"))
+
+    def test_meeting_drops_the_cached_look(self):
+        people.add_prints("Ryan", "face", [RYAN])
+        people.verdict("face", MIKE, LINE)
+        facecheck._state.update(at=1e12, name=people.STRANGER)
+        people.meet("Mike")
+        self.assertIsNone(facecheck._state["at"])
+
+    def test_a_stranger_voice_asks_for_a_fresh_look(self):
+        with mock.patch.object(people, "_face", return_value=None) as face:
+            people.decide(people.STRANGER, True, 0.05)
+            people.decide(None, True, 0.25)
+        self.assertEqual([c.kwargs.get("fresh") for c in face.call_args_list], [True, False])
+
+    def test_fresh_skips_the_cache(self):
+        with mock.patch.object(facecheck, "enabled", return_value=True), \
+                mock.patch.object(facecheck, "_remote_or_job", return_value=False), \
+                mock.patch.object(presence, "running", return_value=False), \
+                mock.patch.object(facecheck, "why_not", return_value="test: not looking"):
+            facecheck._state.update(at=__import__("time").monotonic(), turn_at=__import__("time").monotonic(),
+                                    name="Ryan")
+            self.assertEqual(facecheck.check(), "Ryan")              # cached
+            self.assertIsNone(facecheck.check(fresh=True))           # looks (here: can't)
+
+    def test_no_welcome_back_for_a_stranger(self):
+        import assistant
+        import llm
+
+        with mock.patch.dict(presence._state, {"stranger": True, "who": None, "model": "m"}), \
+                mock.patch.object(presence.time, "sleep"), \
+                mock.patch.object(assistant, "busy", return_value=False), \
+                mock.patch("interrupts.recording", return_value=False), \
+                mock.patch("mood.away", return_value=False), \
+                mock.patch.object(llm, "ask") as ask:
+            presence._greet(3600)
+        ask.assert_not_called()
+        self.assertTrue(assistant._turn.acquire(blocking=False))   # the turn lock was given back
+        assistant._turn.release()
+
+
 class FaceCheckFreshness(_Folder):
     def test_someone_else_is_looked_at_again_sooner(self):
         with mock.patch.object(config, "PEOPLE_FACE_CHECK_MINUTES", 10, create=True):

@@ -303,7 +303,6 @@ def _toggle_portrait(obs=False):
     import shlex
     import subprocess
 
-    import livefeed
     import portrait_window
 
     if not config.MONITOR_ENABLED:
@@ -364,7 +363,6 @@ def handle_input(text):
         ui.stop()
         return
 
-    import firstrun
 
     if firstrun.handle(text):           # the first-start questions (firstrun.py)
         return
@@ -386,7 +384,6 @@ def handle_input(text):
         return
 
     if text.startswith("/facts"):
-        import longterm
 
         argument = text[6:].strip().lower()
         which = longterm.backend()
@@ -865,7 +862,6 @@ def handle_input(text):
             it and invisible from here, so listing a hardcoded set would
             be wrong the moment anyone added one."""
             try:
-                import requests
 
                 data = requests.get(
                     f"{config.TTS_URL}/voices", timeout=5
@@ -970,7 +966,6 @@ def handle_input(text):
         )
 
         def repair():
-            import reminders
 
             def show(line):
                 if line.strip():
@@ -1186,7 +1181,6 @@ def handle_input(text):
 
     if text == "/monitor":
 
-        import livefeed
 
         if not config.MONITOR_ENABLED:
             ui.add_message("system", "The live monitor is off - set monitor.enabled "
@@ -1200,7 +1194,6 @@ def handle_input(text):
         return
 
     if text in ("/holo", "/holo on", "/holo off"):
-        import livefeed
 
         word = text.split()[1] if " " in text else ("off" if config.PORTRAIT_HOLOGRAM_ENABLED else "on")
         config.save_setting("portrait.hologram.enabled", "true" if word == "on" else "false")
@@ -1209,7 +1202,6 @@ def handle_input(text):
         return
 
     if text in ("/lights", "/lights on", "/lights off"):
-        import livefeed
 
         word = text.split()[1] if " " in text else ("off" if config.PORTRAIT_LIGHTS_ENABLED else "on")
         config.save_setting("portrait.lights.enabled", "true" if word == "on" else "false")
@@ -1218,7 +1210,6 @@ def handle_input(text):
         return
 
     if text == "/portrait models" or text.startswith("/portrait use"):
-        import livefeed
 
         found = livefeed.portrait_models()
         want = text[len("/portrait use"):].strip().lower() if text.startswith("/portrait use") else ""
@@ -1246,7 +1237,6 @@ def handle_input(text):
 
     if text == "/portrait gestures" or text.startswith("/portrait gestures "):
         import gestures
-        import livefeed
 
         want = text[len("/portrait gestures"):].strip().lower()
         if want in gestures.MODES:
@@ -1261,7 +1251,6 @@ def handle_input(text):
         return
 
     if text == "/portrait frame" or text.startswith("/portrait frame "):
-        import livefeed
 
         want = text[len("/portrait frame"):].strip().lower()
         if want in config.FRAMES or want == "face":
@@ -1288,7 +1277,6 @@ def handle_input(text):
     _GESTURES = tuple(_g.all_names())
     if text.startswith("/portrait ") and len(text.split()) == 2 and text.split()[1] not in (
             "models", "obs", "gestures"):
-        import livefeed
 
         name = text.split()[1].replace("-", "_")
         if name not in _GESTURES and name not in {c["name"] for c in livefeed.portrait_clips()}:
@@ -1329,7 +1317,6 @@ def handle_input(text):
 
         page = text[1:]
         if config.MONITOR_ENABLED:
-            import livefeed
 
             url = f"{livefeed.url()}/{page}/"
             import portrait_window
@@ -1355,7 +1342,6 @@ def handle_input(text):
         return
 
     if text == "/reflect":
-        import reflect
 
         def run():
             ui.set_status("Reflecting...")
@@ -1526,7 +1512,6 @@ def handle_input(text):
 
     if text == "/camera" or text.startswith("/camera "):
         import camera
-        import config
         import tools
 
         word = text[len("/camera"):].strip().lower()
@@ -1559,7 +1544,6 @@ def handle_input(text):
         return
 
     if text == "/coffee" or text.startswith("/coffee "):
-        import coffee
 
         word = text[len("/coffee"):].strip().lower()
 
@@ -1573,7 +1557,6 @@ def handle_input(text):
         return
 
     if text == "/read" or text.startswith("/read "):
-        import reading
 
         word = text[len("/read"):].strip().lower()
 
@@ -1588,7 +1571,6 @@ def handle_input(text):
         return
 
     if text == "/presence" or text.startswith("/presence "):
-        import presence
 
         word = text[len("/presence"):].strip().lower()
 
@@ -1607,9 +1589,7 @@ def handle_input(text):
         return
 
     if text == "/people" or text.startswith("/people "):
-        import facecheck
         import people
-        import presence
         import voices
 
         words = text.split()
