@@ -231,6 +231,7 @@ _HELP_SECTIONS = [
         ("/people", "who she knows: enroll face|voice <name>, forget <name>, check (a face check now), guest <name> (name who she just met), keep <name>"),
         ("/allow", "is allow-all on for file changes? /allow off ends it"),
         ("/log", "tail the debug log without leaving the app"),
+        ("/log stderr", "what libraries printed past her (OpenCV, sound, a browser), kept off the screen"),
         ("/context", "how big every prompt is vs the model's context"),
         ("/scroll", "why the wheel isn't scrolling, if it isn't"),
         "",

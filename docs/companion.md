@@ -499,7 +499,7 @@ mood and what you were talking about:
 - saved to her history as `*touches you on the head*` and her line, so
   she remembers it and her mood reads it like any exchange.
 
-`portrait.touch_talk false` (the tools pane's "touch talk") turns it
+`portrait.touch_talk false` (the settings pane's "touch talk") turns it
 off.
 
 ## Every gesture

@@ -24,7 +24,7 @@ PORTRAIT_EAR_BONES = list(_portrait_cfg.get("ear_bones", []) or [])
 PORTRAIT_BROWSER = str(_portrait_cfg.get("browser", ""))
 PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 # How much of her the camera fits: "bust" (head and shoulders, the
-# default) or "full" (all of her), switched from the tools pane; an open
+# default) or "full" (all of her), switched from the settings pane; an open
 # portrait reframes at once. "face" (a close crop) is still accepted
 # here and as ?frame=face. A page with ?frame= on its URL keeps that
 # framing whatever this says, so an OBS source can keep its own.
@@ -71,6 +71,8 @@ PORTRAIT_LIGHTS_STYLE = "plain" if str(PORTRAIT_LIGHTS.get("style", "neon")).low
 PORTRAIT_GESTURES = str(_portrait_cfg.get("gestures", "tags"))
 PORTRAIT_CHAT_GESTURES = bool(_portrait_cfg.get("chat_gestures", True))
 PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
+# tags mode: how many gesture names she's offered at once (fitting her mood)
+PORTRAIT_GESTURES_OFFERED = int(_portrait_cfg.get("gestures_offered", 8))
 # Little sounds with her gestures (portrait/sounds/, yours - not in git): a
 # gesture file names one, sound: 'touch-self'. No file there, no sound.
 # sound_volume 0-1.

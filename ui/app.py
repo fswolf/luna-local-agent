@@ -3,6 +3,9 @@ run() / stop(). run() owns the main thread until she quits.
 
 Part of the ui package (it was one ui.py); see ui/__init__.py.
 """
+import os
+import sys
+
 from prompt_toolkit.application import Application
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.key_binding import KeyBindings
@@ -627,7 +630,65 @@ def run(on_submit, on_hotkey=None):
 
     view.app.after_render += _prime
 
-    view.app.run()
+    saved = _stderr_to_file()
+    try:
+        view.app.run()
+    finally:
+        _stderr_back(saved)
+
+
+# Libraries write to the terminal from native code, past Python entirely:
+# OpenCV's "[ WARN:0@0.4] ...", ALSA, ffmpeg, a browser started from here,
+# a C++ crash message. Any of it lands on top of the screen and in the
+# input line. While the screen is up, the process's stderr (file
+# descriptor 2, which those write to, and Python's sys.stderr with it) goes
+# to a file instead; it comes back when the app closes, so a crash on the
+# way out is still printed.
+STDERR_FILE = "stderr.log"
+STDERR_MAX = 1024 * 1024          # bytes; a bigger file starts over
+
+
+def stderr_path():
+    import logbook
+
+    return os.path.join(logbook.LOG_DIR, STDERR_FILE)
+
+
+def _stderr_to_file():
+    """Point fd 2 at stderr.log. The saved fd to restore, or None."""
+    import time
+
+    try:
+        where = stderr_path()
+        os.makedirs(os.path.dirname(where), exist_ok=True)
+        mode = "w" if os.path.exists(where) and os.path.getsize(where) > STDERR_MAX else "a"
+        log = open(where, mode, buffering=1, encoding="utf-8", errors="replace")
+        log.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} Luna started ===\n")
+        log.flush()
+        try:
+            sys.stderr.flush()
+        except Exception:
+            pass
+        saved = os.dup(2)
+        os.dup2(log.fileno(), 2)
+        log.close()                  # fd 2 holds the file open now
+        return saved
+    except Exception:
+        return None                  # no file: things print as before, nothing breaks
+
+
+def _stderr_back(saved):
+    if saved is None:
+        return
+    try:
+        sys.stderr.flush()
+    except Exception:
+        pass
+    try:
+        os.dup2(saved, 2)
+        os.close(saved)
+    except OSError:
+        pass
 
 
 def _cols():

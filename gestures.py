@@ -3,8 +3,9 @@
 portrait.gestures picks how her own replies turn into movement:
 
   tags      she picks: one hidden tag like [hug] where it fits, cut out
-            before anything is shown or spoken. About 60 cached prompt
-            tokens and a few output tokens. Keywords as a fallback.
+            before anything is shown or spoken. She's offered a few names
+            that fit her mood (BAND_PICKS, portrait.gestures_offered),
+            about 70 prompt tokens. Keywords as a fallback.
   meaning   the embedding model compares the exchange with a short
             description of each gesture after she answers. One embedding
             call, off the turn's path. Needs the embedding server;
@@ -111,7 +112,7 @@ def _tag():
                                      re.IGNORECASE)
     return _tag_cache[key]
 
-_turn = {"sent": set()}
+_turn = {"sent": set(), "asides": set()}   # gestures sent; asides already read
 
 
 def mode():
@@ -124,28 +125,76 @@ def _three_d():
 
 
 # -- tags ----------------------------------------------------------------
+# The short list she's offered in tags mode, by her mood band (the same
+# bands as the portrait's idles: grudge, cool, neutral, warm, loving, lewd).
+# Offering all forty-odd gestures with descriptions cost hundreds of prompt
+# tokens and read to a small model as an invitation to narrate a move in
+# every line. A handful of names that fit the moment does the job. Names
+# that aren't gesture files here are skipped; if a band comes up short,
+# other gestures fill the gap. Every gesture still plays from an aside she
+# writes, the keyword fallback and meaning mode.
+BAND_PICKS = {
+    "grudge": ["huff", "sulk", "step_back", "shrug"],
+    "cool": ["shrug", "huff", "explain", "wave", "step_back"],
+    "neutral": ["wave", "shrug", "explain", "bounce", "surprise", "giggle", "shy"],
+    "warm": ["wave", "hug", "giggle", "bounce", "shy", "wink", "surprise", "shrug"],
+    "loving": ["hug", "blow_kiss", "giggle", "shy", "wink", "beckon_kiss", "bounce", "wave"],
+    "lewd": ["sultry_beckon", "beckon_kiss", "blow_kiss", "look_back", "bend_over", "touch_self",
+             "wink", "shy"],
+}
+SAD_PICKS = ["cry", "hands_on_chest"]      # a sad mood, whatever the band
+
+
+def _band():
+    """(band, mood name): the band the portrait uses, from the mood."""
+    try:
+        import mood
+
+        st = mood.portrait_state()
+        w = float(st.get("warmth") or 0.0)
+        band = st.get("row") or ("cool" if w < -0.2 else "neutral" if w < 0.35 else "warm" if w < 0.66 else "loving")
+        return band, str(st.get("label") or "")
+    except Exception:
+        return "neutral", ""
+
+
+def offered(private=True, limit=None):
+    """The gesture names she's offered right now, at most limit
+    (portrait.gestures_offered), fitting her mood."""
+    import mood
+
+    tame = bool(mood.tame())      # live on a stream with lewd off: don't offer the lewd ones
+    ok = {n for n, g in builtin().items()
+          if g["about"] and (private or not g["private"]) and not (tame and g.get("lewd")) and _shown(g)}
+    ok |= {c["name"] for c in clips() if c.get("about") and (private or not c.get("private"))}
+    if limit is None:
+        try:
+            limit = int(getattr(config, "PORTRAIT_GESTURES_OFFERED", 8))
+        except (TypeError, ValueError):
+            limit = 8
+    limit = max(0, limit)
+    band, label = _band()
+    picks = (SAD_PICKS if "sad" in label.lower() or "hurt" in label.lower() else []) + BAND_PICKS.get(band, [])
+    out = list(dict.fromkeys(n for n in picks if n in ok))
+    out += sorted(n for n in ok if n not in out)        # only reached when a band comes up short
+    return out[:limit]
+
+
 def prompt_line(private=True):
     """The system prompt's line about her body, in tags mode, for a 3D
-    model. Empty otherwise, so it costs nothing when it can't be used.
-    A clip with an "about" in clips.json is offered too (or describes the
-    built-in it replaces); private clips only in your own turns."""
+    model: a few gesture names that fit her mood (offered()). Empty
+    otherwise, so it costs nothing when it can't be used."""
     if mode() != "tags" or not _three_d():
         return ""
-
-    import mood
-    tame = bool(mood.tame())      # live on a stream with lewd off: don't offer the lewd ones
-    about = {n: g["about"] for n, g in builtin().items()
-             if g["about"] and (private or not g["private"]) and not (tame and g.get("lewd")) and _shown(g)}
-    for c in clips():
-        if c.get("about") and (private or not c.get("private")):
-            about[c["name"]] = str(c["about"])[:60]
-
-    offered = ", ".join(f"[{n}] ({a})" for n, a in about.items())
-
-    return ("Body: you have an animated 3D body on screen. When a gesture fits what you "
-            f"say, put one tag where it happens: {offered}. At most one per reply, most "
-            "replies need none. Tags are hidden from the screen and the voice; never "
-            "mention them.\n")
+    names = offered(private)
+    if not names:
+        return ""
+    # names only: with "(what it's for)" beside each, small models copied
+    # the descriptions into the reply as stage directions
+    return ("Body: you have an animated body on screen. To move, write one tag where it "
+            f"happens: {' '.join(f'[{n}]' for n in names)}. Most replies need none, never "
+            "more than one. The tag is the move: don't describe moves in words, *asterisks* "
+            "or (parentheses). Tags are hidden; never mention them.\n")
 
 
 def strip(text):
@@ -164,13 +213,19 @@ def strip(text):
 
 def new_turn():
     _turn["sent"] = set()
+    _turn["asides"] = set()
 
 
 def from_tags(answer_text):
     """Send any tag she's written so far, once each per turn. Runs in
     every mode, so a tag never does nothing - but only tags mode asks for
-    them."""
-    if "[" not in answer_text or mode() == "off":
+    them. A move she described instead, "(beckons you over and blows a
+    kiss)", plays too (from_asides)."""
+    if mode() == "off":
+        return
+    if "(" in answer_text or "*" in answer_text:
+        from_asides(answer_text)
+    if "[" not in answer_text:
         return
 
     for m in _tag().finditer(answer_text):
@@ -180,6 +235,94 @@ def from_tags(answer_text):
         if name.lower() not in _turn["sent"]:
             _turn["sent"].add(name.lower())
             _emit(name, "tag")
+
+
+# -- described moves -------------------------------------------------------
+# Small models often narrate a move, "(bends forward, looking back over her
+# shoulder)", rather than tagging it. An aside that clearly describes one
+# gesture plays it; the words stay as she wrote them.
+_ASIDE = re.compile(r"\(([^()\n]{3,120})\)|\*([^*\n]{3,120})\*")
+_STOP = frozenset("a an and the you your her his him she he it its to of over at in on with "
+                  "then what is are for from up as".split()) - {"over"}
+ASIDE_MIN_WORDS = 2        # words an aside must share with a gesture's description
+ASIDE_MIN_SHARE = 0.5      # and the share of the aside's own words they make up
+
+
+def _stems(text):
+    out = set()
+    for w in re.findall(r"[a-z]+", text.lower().replace("_", " ")):
+        if w in _STOP or len(w) < 3:
+            continue
+        if w.endswith("ing") and len(w) > 5:
+            w = w[:-3]                       # looking -> look
+        elif w.endswith("sses"):
+            w = w[:-2]                       # kisses -> kiss
+        elif w.endswith("s") and not w.endswith("ss") and len(w) > 3:
+            w = w[:-1]                       # waves -> wave, blows -> blow
+        out.add(w)
+    return out
+
+
+def _offered_now():
+    """{name: description} she could be offered on this turn: private ones
+    only in private turns, lewd ones not while tame, full-body ones only
+    when she's framed full."""
+    try:
+        import turnctx
+
+        private = turnctx.current().private
+    except Exception:
+        private = True
+    try:
+        import mood
+
+        tame = bool(mood.tame())
+    except Exception:
+        tame = False
+    found = {n: g["about"] for n, g in builtin().items()
+             if g["about"] and (private or not g["private"]) and not (tame and g.get("lewd")) and _shown(g)}
+    for c in clips():
+        if c.get("about") and (private or not c.get("private")):
+            found[c["name"]] = str(c["about"])
+    return found
+
+
+def match_aside(aside, offered=None):
+    """The gesture an aside describes, or None."""
+    words = _stems(aside)
+    if len(words) < ASIDE_MIN_WORDS:
+        return None
+    best, best_score = None, (0.0, 0.0)
+    for name, about in (offered if offered is not None else _offered_now()).items():
+        theirs = _stems(about) | _stems(name)
+        shared = len(words & theirs)
+        # how much of the aside it explains, then (a tie) how much of the
+        # gesture the aside covers: "blows you a kiss" is blow_kiss, not
+        # the beckon that ends in one
+        score = (shared / len(words), shared / len(theirs))
+        if shared >= ASIDE_MIN_WORDS and score[0] >= ASIDE_MIN_SHARE and score > best_score:
+            best, best_score = name, score
+    return best
+
+
+def from_asides(answer_text):
+    """Play each gesture her (asides) and *asides* describe, once per turn."""
+    if not _three_d():
+        return
+    offered = None
+    for m in _ASIDE.finditer(answer_text):
+        aside = m.group(1) or m.group(2)
+        key = aside.strip().lower()
+        if key in _turn["asides"]:
+            continue
+        # apart from "sent": an aside that matched nothing mustn't make
+        # meaning mode think a gesture already played
+        _turn["asides"].add(key)
+        offered = _offered_now() if offered is None else offered
+        name = match_aside(aside, offered)
+        if name and name.lower() not in _turn["sent"]:
+            _turn["sent"].add(name.lower())
+            _emit(name, "aside")
 
 
 def _emit(name, src):

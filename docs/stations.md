@@ -31,6 +31,12 @@ and tools. Nothing to install on the device, no account, no internet needed.
 The pairing code works once, for 15 minutes. Paired devices are listed
 under Relay stations, each with **Unpair**.
 
+A paired device stays paired until you unpair it. Its cookie is renewed
+every time it opens Luna, and the page keeps its own copy of the device's
+token, so a browser that throws cookies away when it closes (Firefox can)
+reconnects by itself. Opening the old pairing link again on a paired
+device just goes straight in.
+
 ## Talking
 
 Tap the big button and talk. She stops listening after a short pause (or
@@ -77,7 +83,9 @@ stations wait: read the enrolment lines at the PC.
 - Off until you switch it on. When on, it answers home-network addresses
   only (private, link-local, loopback), never the internet.
 - A device needs a pairing code made on this PC. After pairing it keeps a
-  token, stored on the PC only as a hash. Unpairing removes it.
+  token (a cookie, and a copy in the page's own storage), stored on the PC
+  only as a hash. Unpairing removes it: a device that comes back with an
+  unpaired token is told to pair again, and its copy is dropped.
 - Luna's certificate authority is made on your PC and its key never leaves
   it (`~/.config/ai-voice/station/`). It can only vouch for home-network
   addresses and `.local` names, so even someone with the key couldn't pass

@@ -295,19 +295,16 @@ def _process(text, stop):
 
 
 _portrait = {"proc": None}
-_APP_BROWSERS = ("chromium", "chromium-browser", "google-chrome-stable", "google-chrome",
-                 "brave-browser", "brave", "microsoft-edge", "vivaldi")
 
 
 def _toggle_portrait(obs=False):
     """/portrait opens her portrait in a small window of its own, and
     closes it again. /portrait obs prints the URL for a browser source."""
     import shlex
-    import shutil
     import subprocess
-    import webbrowser
 
     import livefeed
+    import portrait_window
 
     if not config.MONITOR_ENABLED:
         ui.add_message("system", "The portrait is served by the live monitor, which is off - "
@@ -334,29 +331,31 @@ def _toggle_portrait(obs=False):
     except ValueError:
         w, h = 420, 560
 
-    if config.PORTRAIT_BROWSER:
-        cmd = shlex.split(config.PORTRAIT_BROWSER.format(url=url, w=w, h=h))
-    else:
-        found = next((b for b in _APP_BROWSERS if shutil.which(b)), None)
-        # Its own profile, so it's its own process: one we can close again,
-        # rather than a tab handed to a browser that's already open.
-        profile = os.path.join(os.path.expanduser("~"), ".cache", "luna-portrait")
-        cmd = [found, f"--app={url}", f"--window-size={w},{h}", f"--user-data-dir={profile}",
-               "--no-first-run", "--no-default-browser-check"] if found else None
+    try:
+        if config.PORTRAIT_BROWSER:
+            cmd = shlex.split(config.PORTRAIT_BROWSER.format(url=url, w=w, h=h))
+        else:
+            cmd = portrait_window.command(url, w, h)
+    except (OSError, ValueError, KeyError) as e:
+        ui.add_message("system", f"Couldn't set up the portrait window ({e}).")
+        cmd = None
 
     if not cmd:
-        webbrowser.open(url)
-        ui.add_message("system", f"Portrait: {url} (no Chromium-style browser found for a "
-                       "window of its own - set portrait.browser to choose one)")
+        portrait_window.quiet_open(url)
+        ui.add_message("system", f"Portrait: {url} (no browser found for a window of its own "
+                       "- set portrait.browser to choose one)")
         return
 
     try:
+        # its output goes nowhere: a browser's warnings written to Luna's
+        # terminal land on top of the screen (and in the input line)
         _portrait["proc"] = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                                             stderr=subprocess.DEVNULL)
+                                             stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                                             start_new_session=True)
         ui.add_message("system", f"Portrait open - /portrait again closes it. ({url})")
     except OSError as e:
         ui.add_message("system", f"Couldn't start {cmd[0]}: {e} - opening it in your browser.")
-        webbrowser.open(url)
+        portrait_window.quiet_open(url)
 
 
 def handle_input(text):
@@ -586,7 +585,6 @@ def handle_input(text):
         return
 
     if text == "/settings":
-        import webbrowser
 
         import settings_web
 
@@ -595,7 +593,9 @@ def handle_input(text):
                            "to true in config.json and restart. Tab three times has the everyday ones.")
             return
 
-        webbrowser.open(settings_web.url())
+        import portrait_window
+
+        portrait_window.quiet_open(settings_web.url())     # its output kept off her screen
         ui.add_message("system", f"Settings: {settings_web.url()}")
         return
 
@@ -1110,6 +1110,20 @@ def handle_input(text):
         )
         return
 
+    if text.startswith("/log stderr"):
+        # what libraries printed past Python (OpenCV, ALSA, a browser...),
+        # caught in a file so it doesn't scribble on the screen (ui/app.py)
+        from ui import app as ui_app
+
+        where = ui_app.stderr_path()
+        try:
+            with open(where, encoding="utf-8", errors="replace") as f:
+                lines = f.read().splitlines()[-40:]
+        except OSError:
+            lines = ["(nothing caught yet)"]
+        ui.add_message("system", "{}\n{}".format(where, "\n".join("  " + l[:300] for l in lines)))
+        return
+
     if text.startswith("/log"):
         count = text[4:].strip()
         count = int(count) if count.isdigit() else 20
@@ -1171,7 +1185,6 @@ def handle_input(text):
         return
 
     if text == "/monitor":
-        import webbrowser
 
         import livefeed
 
@@ -1180,7 +1193,9 @@ def handle_input(text):
                            "to true in config.json and restart.")
             return
 
-        webbrowser.open(livefeed.url())
+        import portrait_window
+
+        portrait_window.quiet_open(livefeed.url())
         ui.add_message("system", f"Live monitor: {livefeed.url()}")
         return
 
@@ -1309,7 +1324,6 @@ def handle_input(text):
         # Both pages live on the live monitor's server while she runs -
         # one port, no extra process. With the monitor off, the old
         # standalone servers still work.
-        import webbrowser
 
         import thoughtlog
 
@@ -1318,7 +1332,9 @@ def handle_input(text):
             import livefeed
 
             url = f"{livefeed.url()}/{page}/"
-            webbrowser.open(url)
+            import portrait_window
+
+            portrait_window.quiet_open(url)
         else:
             import subprocess
 
@@ -1665,7 +1681,7 @@ def handle_input(text):
                                        f"{len(p.get('face') or [])} face, {len(p.get('voice') or [])} voice prints, "
                                        f"{len(p.get('facts') or [])} facts"
                                        for n, p in found.items()] if found else ["Nobody enrolled yet."])
-            + ([f"Met this session (forgotten on restart; /people keep <name> to keep): "
+            + (["Met this session (forgotten on restart; /people keep <name> to keep): "
                 + ", ".join(f"{g['name']} ({', '.join(k for k in ('face', 'voice') if g.get(k)) or 'no prints'}, "
                             f"{len(g.get('facts') or [])} facts)" for g in people.session_guests())]
                if people.session_guests() else [])

@@ -312,6 +312,7 @@ SETTINGS = {
     "portrait.gestures":          ("PORTRAIT_GESTURES",            True),
     "portrait.chat_gestures":     ("PORTRAIT_CHAT_GESTURES",       True),
     "portrait.meaning_margin":    ("PORTRAIT_MEANING_MARGIN",      True),
+    "portrait.gestures_offered":  ("PORTRAIT_GESTURES_OFFERED",    True),
     "portrait.sounds":            ("PORTRAIT_SOUNDS",              True),
     "portrait.sound_volume":      ("PORTRAIT_SOUND_VOLUME",        True),
 }

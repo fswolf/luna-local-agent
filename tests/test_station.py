@@ -129,6 +129,41 @@ class Stations(unittest.TestCase):
         self.assertEqual([d["name"] for d in devices.values()], ["kitchen"])
         self.assertNotIn(cookie.split("=", 1)[1], json.dumps(devices))     # stored hashed
 
+    def test_a_paired_device_stays_paired(self):
+        code, cookie = self._pair()
+        token = cookie.split("=", 1)[1]
+        status, headers, page = self._open("/", cookie=cookie)
+        self.assertIn(f"Max-Age={station.COOKIE_LIFE}", headers["Set-Cookie"])     # renewed each visit
+        self.assertIn(token.encode(), page)                                       # the page keeps a copy
+        # the old pairing link again, on the paired device: straight in
+        status, headers, _ = self._open(f"/pair?code={code}", cookie=cookie)
+        self.assertEqual((status, headers["Location"]), (303, "/"))
+
+    def test_a_lost_cookie_comes_back_from_the_page(self):
+        _code, cookie = self._pair()
+        token = cookie.split("=", 1)[1]
+        status, _h, page = self._open("/")                                         # cookie gone
+        self.assertEqual(status, 401)
+        self.assertIn(b"/resume", page)
+        status, headers, _ = self._open("/resume", data=json.dumps({"token": token}).encode(),
+                                        kind="application/json")
+        self.assertEqual(status, 200)
+        self.assertIn(token, headers["Set-Cookie"])
+        self.assertEqual(self._open("/resume", data=b'{"token": "guess"}', kind="application/json")[0], 401)
+        key = next(iter(station.devices()))
+        station.forget(key)                                                        # unpaired on the PC
+        self.assertEqual(self._open("/resume", data=json.dumps({"token": token}).encode(),
+                                    kind="application/json")[0], 401)
+
+    def test_resume_checks_the_origin(self):
+        _code, cookie = self._pair()
+        req = urllib.request.Request(self.base + "/resume", data=json.dumps({"token": cookie.split("=", 1)[1]}).encode())
+        req.add_header("Origin", "https://evil.example")
+        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=self.ctx))
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            opener.open(req, timeout=10)
+        self.assertEqual(e.exception.code, 403)
+
     def test_old_code_refused(self):
         code, _url = station.new_pairing("hall")
         station._state["codes"][code]["until"] = time.time() - 1

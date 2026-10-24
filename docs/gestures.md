@@ -85,7 +85,7 @@ is enough.
 
 | Trigger | How |
 |---------|-----|
-| She chooses | In `tags` mode (the default) her prompt lists every gesture that has an `about:` line, and she writes the tag where it fits. Private ones are only offered in your own conversations |
+| She chooses | In `tags` mode (the default) her prompt offers a few gestures that fit her mood (names only), and she writes the tag where it fits. Private ones are only offered in your own conversations |
 | Meaning | In `meaning` mode the embedding model compares what was said with each gesture's description |
 | Keywords | A word from a gesture's `keywords` inside an action she writes (`*beckons you closer*`), or its emoji anywhere. Also you saying hi or asking for a hug |
 | Chat | Viewers' `!wave`, `!hug`, a first "hi", "lol" (never private gestures) |
@@ -93,14 +93,14 @@ is enough.
 | On her own | Gestures with `idle`, every 25 to 55 seconds while she's idle, in the moods they're marked for |
 | Events | She waves when she wakes up and shrugs when a tool fails |
 
-`/portrait gestures <mode>`, or the **gestures** row in the tools pane,
+`/portrait gestures <mode>`, or the **gestures** row in the settings pane,
 switches between `tags`, `meaning`, `keywords` and `off`. See
 [Portrait](portrait.md#gestures) for the details of each.
 
 ## How she picks one
 
 There are three ways, and you choose which with `/portrait gestures <mode>`
-or the **gestures** row in the tools pane. Every gesture file and clip
+or the **gestures** row in the settings pane. Every gesture file and clip
 takes part in all three; the same two lines in a file feed them:
 
 ```js
@@ -110,12 +110,27 @@ keywords: ["beckon", "come hither", "crooks a finger"],  // keyword fallback
 
 ### Tags (the default): she decides
 
-Her system prompt gets one line listing every gesture that has an `about`:
+Her system prompt gets one short line offering a few gestures that fit
+her mood right now, names only:
 
-> Body: you have an animated 3D body on screen. When a gesture fits what
-> you say, put one tag where it happens: [wave] (hello, goodbye), [hug]
-> (affection, comfort), [sultry_beckon] (sultry come-hither, teasing,
-> inviting), ... At most one per reply, most replies need none.
+> Body: you have an animated body on screen. To move, write one tag where
+> it happens: [hug] [blow_kiss] [giggle] [shy] [wink] [beckon_kiss]
+> [bounce] [wave]. Most replies need none, never more than one. The tag is
+> the move: don't describe moves in words, \*asterisks\* or (parentheses).
+
+About 80 tokens. Which names come up depends on her mood band (grudge,
+cool, neutral, warm, loving, lewd; a sad mood puts `cry` first), from
+`BAND_PICKS` in `gestures.py`, and `portrait.gestures_offered` (8) sets how
+many. Lewd ones are only offered in the lewd band, and never while she's
+tame on stream.
+
+It used to list every gesture with what it's for. With forty-odd gestures
+that was hundreds of tokens, and a small model read it as an invitation to
+narrate a move in every line: "(giggles softly) ... (beckons him over)".
+Written `[name] (what it's for)`, models also copied the descriptions
+instead of writing the tag. A handful of names does the job; every gesture
+still plays from a described move (below), the keyword fallback and
+meaning mode.
 
 The language model reads the conversation and, when it fits, writes the
 tag into its reply like any other word. Nothing else chooses: it's the
@@ -127,6 +142,17 @@ sight.
 As the reply streams in, the tag is cut out before anything is shown,
 spoken or saved, and the portrait is told to play it. Private gestures are
 left out of the line in chat rooms, so she can't pick them there.
+
+**A move she describes plays too.** If she still narrates one, an aside in
+parentheses or asterisks that clearly matches a gesture's `about` (and
+name) plays that gesture: "(beckons you over and blows a kiss)" is
+`beckon_kiss`, "(bends forward, looking back over her shoulder)" is
+`bend_forward`, "*waves hello*" is `wave`. The words stay as she wrote
+them. An aside has to share at least two words with the gesture and be
+mostly about it, so "(poses, shifting between a few animations)" or
+"*giggles, realizing what he's doing*" play nothing. Each gesture plays
+once per reply, and only gestures she could be offered on that turn
+(nothing private in chat, nothing lewd while tame).
 
 The `about` text is the whole interface: write it as "when to use this",
 short and concrete. A vague `about` gets picked at odd times; no `about`
