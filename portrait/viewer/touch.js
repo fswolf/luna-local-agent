@@ -17,6 +17,13 @@
 // face is split using her eyes (VRoid has eye bones; without them they're
 // guessed a little above the head bone), measured in her head's own frame
 // so it still works with her head turned.
+//
+// Speed: three.js poses a skinned mesh vertex by vertex for every triangle
+// it tests, so one ray through a VRoid model (~40k triangles) re-posed each
+// vertex about six times over and stalled a frame or more on every click.
+// Here each vertex is posed once into a cache and the ray is tested against
+// that: a click re-poses (she's moving), a resting cursor reuses a pose up
+// to a quarter second old, which is plenty to name a zone.
 
 // humanoid bone -> part of her
 const PART = {
@@ -41,6 +48,9 @@ export function createTouch(THREE, camera, canvas) {
   const v = Array.from({ length: 8 }, () => new THREE.Vector3());
   const q = new THREE.Quaternion();
   let cache = null;          // per model: its meshes, and raw bone -> humanoid name
+  const posed = new Map();   // skinned mesh -> { pos (her posed vertices, mesh space), at, center, radius }
+  const inv = new THREE.Matrix4(), lray = new THREE.Ray(), tri = new THREE.Triangle();
+  const hitP = new THREE.Vector3(), sphere = new THREE.Sphere();
 
   function prepare(vrm) {
     if (cache?.vrm === vrm) return cache;
@@ -49,7 +59,57 @@ export function createTouch(THREE, camera, canvas) {
     const meshes = [];
     // her meshes, not the blush/tear overlays (the emotes aren't in her scene)
     vrm.scene.traverse(m => { if (m.isMesh && !m.userData.overlay) meshes.push(m); });
+    posed.clear();
     return (cache = { vrm, names, meshes, fx: vrm.meta?.metaVersion === '0' ? -1 : 1 });
+  }
+
+  // Each vertex of a skinned mesh where it is right now (bones and
+  // expressions, exactly what three.js would use), once, plus a bounding
+  // sphere so a ray that misses the mesh costs nothing.
+  function pose(m, maxAge) {
+    const now = performance.now(), n = m.geometry.attributes.position.count;
+    let c = posed.get(m);
+    if (c && now - c.at <= maxAge) return c;
+    const pos = c && c.pos.length === n * 3 ? c.pos : new Float32Array(n * 3);
+    let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+    for (let i = 0, j = 0; i < n; i++, j += 3) {
+      const p = m.getVertexPosition(i, v[0]);
+      pos[j] = p.x; pos[j + 1] = p.y; pos[j + 2] = p.z;
+      if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+      if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
+      if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z;
+    }
+    const center = new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    const radius = Math.hypot(x1 - x0, y1 - y0, z1 - z0) / 2;
+    c = { pos, at: now, center, radius };
+    posed.set(m, c);
+    return c;
+  }
+
+  // The nearest hit on her skinned meshes, against the posed vertices:
+  // { object, face: {a, b, c}, point, distance } like three.js gives.
+  function castSkinned(meshes, maxAge) {
+    let best = null;
+    for (const m of meshes) {
+      const c = pose(m, maxAge);
+      inv.copy(m.matrixWorld).invert();
+      lray.copy(ray.ray).applyMatrix4(inv);
+      if (!lray.intersectsSphere(sphere.set(c.center, c.radius))) continue;
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      const cull = mats.every(x => x && x.side === THREE.FrontSide);     // one-sided: skip faces turned away
+      const idx = m.geometry.index?.array, pos = c.pos;
+      const count = idx ? idx.length : pos.length / 3;
+      for (let k = 0; k < count; k += 3) {
+        const a = idx ? idx[k] : k, b = idx ? idx[k + 1] : k + 1, d = idx ? idx[k + 2] : k + 2;
+        tri.a.fromArray(pos, a * 3); tri.b.fromArray(pos, b * 3); tri.c.fromArray(pos, d * 3);
+        if (!lray.intersectTriangle(tri.a, tri.b, tri.c, cull, hitP)) continue;
+        const world = hitP.clone().applyMatrix4(m.matrixWorld);
+        const dist = ray.ray.origin.distanceTo(world);
+        if (dist < ray.near || dist > ray.far || (best && dist >= best.distance)) continue;
+        best = { object: m, face: { a, b, c: d }, point: world, distance: dist };
+      }
+    }
+    return best;
   }
 
   // p in a bone's own frame: the normalized bones point the way the world
@@ -143,15 +203,18 @@ export function createTouch(THREE, camera, canvas) {
 
   // The zone under a point on the canvas (client pixels): { zone, point,
   // side } (side: 'left' or 'right', hers, for one-sided gestures), or null.
-  // fresh: recompute her bounds first - for a click, not every hover.
+  // fresh: pose her again first (a click); a resting cursor reuses a pose
+  // up to a quarter second old.
   function at(vrm, clientX, clientY, fresh = false) {
     if (!vrm) return null;
     const c = prepare(vrm);
-    if (fresh) for (const m of c.meshes) if (m.isSkinnedMesh) { m.boundingSphere = null; m.boundingBox = null; }
     const box = canvas.getBoundingClientRect();
     ndc.set(((clientX - box.left) / box.width) * 2 - 1, -((clientY - box.top) / box.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObjects(c.meshes.filter(m => m.visible), false)[0];
+    const shown = c.meshes.filter(m => m.visible);
+    const skin = castSkinned(shown.filter(m => m.isSkinnedMesh), fresh ? 0 : 250);
+    const rigid = ray.intersectObjects(shown.filter(m => !m.isSkinnedMesh), false)[0];
+    const hit = !rigid ? skin : !skin ? rigid : rigid.distance < skin.distance ? rigid : skin;
     if (!hit) return null;
     const bone = skinBone(hit) || nearestBone(vrm, hit.point);
     const zone = bone && zoneOf(vrm, bone, hit.point);
