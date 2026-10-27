@@ -46,13 +46,15 @@ _RATING = {1: 0.08, 2: 0.18, 3: 0.30}
 #   energy  - = +                    did the exchange liven her up or wear her down
 #   warmth  - = +                    "-" only for real hostility: bluntness is not it
 #   a feeling from moods.json        shown on her face for a few seconds
+#   flirt 0-2                        the lewd row's desire
+#   heaviness normal/rough/heavy     heavy moments (mind/mood/heavy.py)
 #
 # Still one call, still off the turn's path, still off with
 # mood.affection false.
 _APPRAISE_PROMPT = (
     "Read this moment from a conversation between {user} and {their} assistant, {name}.\n\n"
     "User: {said}\n{name}: {answer}\n\n"
-    "Answer with one line of four fields separated by spaces, nothing else:\n"
+    "Answer with one line of six fields separated by spaces, nothing else:\n"
     "1. how warm or affectionate the USER's message is toward her: 0 neutral, businesslike "
     "or blunt (swearing is not unfriendly by itself), 1 polite warmth (thanks, a friendly "
     "greeting), 2 clear affection or praise of her, 3 strong affection\n"
@@ -62,8 +64,11 @@ _APPRAISE_PROMPT = (
     "4. the one feeling she shows right now, from: none {feelings}\n"
     "5. how flirtatious or intimate the USER's message is: 0 not at all, 1 flirting or "
     "suggestive, 2 openly intimate or sexual\n"
-    "When unsure: 0 = = none 0\n"
-    "Example: 2 + + laughing 1"
+    "6. how heavy the USER's message is: normal (everyday, even annoyed or joking), rough (a bad "
+    "day, stress, feeling down), heavy (really not okay: despair, can't cope, wanting to hurt "
+    "themselves). The heaviest thing in the message counts, even said in passing\n"
+    "When unsure: 0 = = none 0 normal\n"
+    "Example: 2 + + laughing 1 normal"
 )
 
 
@@ -75,6 +80,8 @@ def _appraise(said, answer, model):
     from config import LM_URL, LLM_HEADERS
 
     feelings = list((moods().get("feelings") or {}).keys())
+    from mind.mood import heavy
+    yours = heavy.owner_turn()      # read now: the next turn may be someone else's
 
     try:
         from core import lmstudio
@@ -97,7 +104,20 @@ def _appraise(said, answer, model):
 
         return 0, 0, 0, None, 0
 
+    if yours:
+        try:
+            heavy.note(_parse_heaviness(reply))
+        except Exception:
+            pass
+
     return _parse_appraisal(reply, feelings)
+
+
+def _parse_heaviness(reply):
+    """"normal", "rough", "heavy", or None when the line didn't say."""
+    reply = re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL)
+    found = re.findall(r"\b[0-3]\s+[-=+]\s+[-=+]\s+[A-Za-z_]+(?:\s+[0-2])?\s+(normal|rough|heavy)\b", reply, re.I)
+    return found[-1].lower() if found else None
 
 
 def _parse_appraisal(reply, feelings):

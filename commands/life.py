@@ -52,6 +52,10 @@ def handle(text):
                 + (f", she felt {feeling}" if feeling else "")
             )
 
+        from mind.mood import heavy
+        if heavy.describe():
+            lines.append(heavy.describe())
+
         if config.MOOD_INTENSITY != 1.0:
             lines.append(f"Intensity {config.MOOD_INTENSITY:g} (0 flat, 1 normal, 2 very visible)")
 

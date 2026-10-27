@@ -12,6 +12,7 @@ from core import history
 from life import gestures
 from core import logbook
 from mind import mood
+from mind.mood import heavy
 from mind import longterm
 from senses import people
 from core import timeutil
@@ -279,7 +280,7 @@ time_until instead.
 
 Personality:
 {PERSONALITY}
-{mood.line(private)}
+{mood.line(private)}{heavy.line(private)}
 Tone:
 {TONE}
 

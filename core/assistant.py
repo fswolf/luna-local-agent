@@ -46,6 +46,16 @@ def _plugins_hear(text):
         pass
 
 
+def _heavy_from(speaker):
+    """Heavy moments are about you: a guest's rough day isn't read as yours."""
+    try:
+        from mind.mood import heavy
+
+        heavy.listening(speaker is None)
+    except Exception:
+        pass
+
+
 def _note_mood(text, answer, model):
     """Her mood hears what Ryan says and what she answered. Deliberately
     not wired into respond_to_chat: a stranger in stream chat being sweet
@@ -384,6 +394,7 @@ def _respond(text, model, source, stop, speaker=None, sink=None, approver=None):
         ui.end_message()
         # Read now, while she's still speaking, so a laugh or a blush
         # lands with the words rather than after them.
+        _heavy_from(speaker)
         _note_mood(text, answer, model)
         if player is not None:
             player.wait()
