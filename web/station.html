@@ -1,39 +1,99 @@
 <!doctype html><html lang=en><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <meta name=theme-color content="#120d1c"><title>Luna</title><style>__STYLE__
-main{display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh;justify-content:center;gap:18px}
-#talk{width:min(62vw,260px);height:min(62vw,260px);border-radius:50%;border:3px solid var(--accent);
-background:radial-gradient(circle at 50% 40%,#3a2357,#1a1328 70%);color:var(--text);font-size:22px;font-weight:700;
-box-shadow:0 0 0 0 #ff87d755;transition:box-shadow .15s, transform .1s;touch-action:manipulation}
-#talk.rec{box-shadow:0 0 0 18px #ff87d733;border-color:#ff5fb0}
-#talk.busy{border-color:var(--dim);opacity:.85}
-#talk:active{transform:scale(.97)}
-#status{color:var(--dim);min-height:1.5em}
-#you{color:var(--dim);font-style:italic;min-height:1.5em}
-#her{font-size:19px;min-height:3em;max-width:520px}
-#ask{display:none;text-align:left;width:100%}
-#ask pre{white-space:pre-wrap;max-height:30vh;overflow:auto;background:#0e0a16;border:1px solid var(--line);
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+header{flex:none;display:flex;align-items:baseline;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 8px;
+border-bottom:1px solid var(--line)}
+header b{color:var(--accent)}
+#status{color:var(--dim);font-size:13px;margin-left:auto;text-align:right}
+#log{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:12px 12px 6px;display:flex;flex-direction:column;gap:8px;
+-webkit-overflow-scrolling:touch}
+#log .hint{color:var(--dim);text-align:center;margin:auto 10px;font-size:15px}
+.msg{max-width:85%;padding:9px 12px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;line-height:1.4;font-size:16px}
+.you{align-self:flex-end;background:#3a2357;border-bottom-right-radius:5px}
+.you.spoken::before{content:"🎙 ";opacity:.7}
+.her{align-self:flex-start;background:#1f1830;border:1px solid var(--line);border-bottom-left-radius:5px}
+.her.wait{color:var(--dim);font-style:italic}
+.her.cut::after{content:" (stopped)";color:var(--dim);font-size:13px}
+.note{align-self:center;color:var(--dim);font-size:13px;text-align:center}
+.ask{align-self:stretch;text-align:left}
+.ask pre{white-space:pre-wrap;max-height:30vh;overflow:auto;background:#0e0a16;border:1px solid var(--line);
 border-radius:8px;padding:8px;font-size:13px;color:var(--dim)}
-.row{display:flex;gap:10px;justify-content:center}
+.ask .row{display:flex;gap:10px}
 .no{background:#2a2040;color:var(--text)}
-#room{color:var(--dim);font-size:14px}
-</style></head><body><main>
-<div id=room>Luna · __ROOM__</div>
-<button id=talk>Tap to talk</button>
-<div id=status>tap, talk, she answers here</div>
-<div id=you></div>
-<div id=her></div>
-<div id=ask class=card><b id=asktitle></b><pre id=askbody></pre>
-<div class=row><button class=btn id=allow>Allow</button><button class="btn no" id=deny>Deny</button></div></div>
-</main><script>
+#bar{flex:none;display:flex;gap:8px;align-items:center;padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+border-top:1px solid var(--line);background:#120d1c}
+#talk{flex:none;width:52px;height:52px;border-radius:50%;border:2px solid var(--accent);font-size:22px;padding:0;
+background:radial-gradient(circle at 50% 40%,#3a2357,#1a1328 70%);color:var(--text);touch-action:manipulation}
+#talk.rec{border-color:#ff5fb0;box-shadow:0 0 0 8px #ff87d733}
+#talk:disabled{opacity:.4}
+#text{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--text);background:#0e0a16;border:1px solid var(--line);
+border-radius:22px;padding:11px 14px}
+#text:focus{outline:none;border-color:var(--accent)}
+#send{flex:none;border-radius:22px;padding:11px 16px;font-size:15px}
+#send.stop{background:#2a2040;color:var(--text);border:1px solid #ff5fb0}
+#down{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));display:none;border-radius:50%;
+width:38px;height:38px;padding:0;font-size:18px;opacity:.9}
+</style></head><body>
+<header><b>Luna</b><span>· __ROOM__</span><div id=status></div></header>
+<div id=log><div class=hint>Tap 🎙 to talk, or type.<br>Her answers are spoken here.</div></div>
+<button class=btn id=down title="newest">↓</button>
+<div id=bar>
+  <button id=talk title="talk">🎙</button>
+  <input id=text placeholder="Message Luna" autocomplete=off enterkeyhint=send maxlength=2000>
+  <button class=btn id=send>Send</button>
+</div>
+<script>
 // a copy of this device's token, for a browser that drops the cookie on close
 try { const k = __KEEP__; if (k) localStorage.setItem('__KEEP_KEY__', k); } catch (e) {}
 const $ = s => document.querySelector(s);
-const talk = $('#talk'), status = $('#status');
+const log = $('#log'), talk = $('#talk'), text = $('#text'), send = $('#send'), down = $('#down');
 let ctx = null, stream = null, node = null, chunks = [], rec = false, busy = false, rate = 48000;
 let heardAt = 0, quietSince = 0, startedAt = 0, playing = Promise.resolve(), turnId = null, lock = null;
-const say = t => status.textContent = t;
+let round = 0, source = null;          // round: bumped by Stop, so queued clips from before don't play
+const status = t => $('#status').textContent = t || '';
+const HISTORY = 'luna-station-history', KEEP = 40;
 
+// --- the conversation -----------------------------------------------------
+// Follow the newest message only if you're already looking at it: reading
+// back up, the view stays where you put it.
+const atBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+function show(fn) {
+  const stick = atBottom();
+  fn();
+  if (stick) log.scrollTop = log.scrollHeight;
+  down.style.display = atBottom() ? 'none' : 'block';
+}
+log.addEventListener('scroll', () => { down.style.display = atBottom() ? 'none' : 'block'; });
+down.onclick = () => { log.scrollTop = log.scrollHeight; down.style.display = 'none'; };
+
+function bubble(cls, words) {
+  const hint = log.querySelector('.hint'); if (hint) hint.remove();
+  const el = document.createElement('div');
+  el.className = 'msg ' + cls; el.textContent = words || '';
+  if (cls.startsWith('you')) { log.appendChild(el); log.scrollTop = log.scrollHeight; down.style.display = 'none'; }
+  else show(() => log.appendChild(el));   // yours always goes to the bottom; hers only if you're there
+  return el;
+}
+function note(words) { bubble('note', words); }
+
+function remember() {
+  try {
+    const kept = [...log.querySelectorAll('.you,.her')].slice(-KEEP)
+      .map(el => ({c: el.className.replace('msg ', '').replace(' wait', ''), t: el.textContent}));
+    localStorage.setItem(HISTORY, JSON.stringify(kept));
+  } catch (e) {}
+}
+function recall() {
+  try {
+    const kept = JSON.parse(localStorage.getItem(HISTORY) || '[]');
+    for (const m of kept) bubble(m.c, m.t);
+    log.scrollTop = log.scrollHeight;
+  } catch (e) {}
+}
+
+// --- sound ----------------------------------------------------------------
 async function unlock() {
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
   if (ctx.state === 'suspended') await ctx.resume();
@@ -41,11 +101,29 @@ async function unlock() {
   try { if ('wakeLock' in navigator && !lock) { lock = await navigator.wakeLock.request('screen'); lock.onrelease = () => lock = null; } } catch (e) {}
 }
 
+function queue(id, n) {
+  const mine = round;
+  const clip = fetch(`/clip/${id}/${n}`).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b));
+  playing = playing.then(() => clip).then(buf => new Promise(res => {
+    if (mine !== round) return res();
+    const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination);
+    s.onended = () => { if (source === s) source = null; res(); };
+    source = s; s.start();
+  })).catch(() => {});
+}
+
+function hush() {
+  round++;
+  if (source) { try { source.stop(); } catch (e) {} source = null; }
+  playing = Promise.resolve();
+}
+
+// --- talking --------------------------------------------------------------
 async function start() {
   await unlock();
   // the microphone only while recording: the phone's mic light goes off between turns
   try { stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}}); }
-  catch (e) { say('no microphone: ' + e.message); return; }
+  catch (e) { note('no microphone: ' + e.message); return; }
   const src = ctx.createMediaStreamSource(stream);
   node = ctx.createScriptProcessor(4096, 1, 1);
   chunks = []; heardAt = 0; quietSince = 0; startedAt = performance.now();
@@ -60,7 +138,7 @@ async function start() {
     if (!heardAt && now - startedAt > 8000) { finish(true); }
   };
   src.connect(node); node.connect(ctx.destination);
-  rec = true; talk.classList.add('rec'); talk.textContent = 'Listening'; say('talk now, tap to send');
+  rec = true; talk.classList.add('rec'); status('listening - tap 🎙 to send');
 }
 
 function wav(buffers, from) {
@@ -82,58 +160,98 @@ async function finish(silent) {
   rec = false; talk.classList.remove('rec');
   try { node.disconnect(); } catch (e) {}
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  if (silent || !heardAt) { talk.textContent = 'Tap to talk'; say('didn\'t hear anything'); return; }
-  busy = true; talk.classList.add('busy'); talk.textContent = '…'; say('sending');
-  $('#you').textContent = ''; $('#her').textContent = '';
+  if (silent || !heardAt) { status('didn\'t hear anything'); return; }
+  setBusy(true);
+  const you = bubble('you spoken wait', '…');
+  begin('/talk', {'Content-Type': 'audio/wav'}, wav(chunks, rate), you);
+}
+
+async function typed() {
+  const words = text.value.trim();
+  if (!words || busy) return;
+  setBusy(true);                        // at once: a second tap mustn't send it twice
+  text.value = '';
+  await unlock();                       // the tap on Send is what lets her voice play
+  const you = bubble('you', words);
+  begin('/say', {'Content-Type': 'application/json'}, JSON.stringify({text: words}), you);
+}
+
+async function begin(path, headers, body, you) {
+  status('sending');
   try {
-    const r = await fetch('/talk', {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: wav(chunks, rate)});
+    const r = await fetch(path, {method: 'POST', headers, body});
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.status);
-    turnId = j.turn; follow(j.turn);
-  } catch (e) { done('couldn\'t reach Luna: ' + e.message); }
+    turnId = j.turn; follow(j.turn, you);
+  } catch (e) { you.classList.remove('wait'); setBusy(false); note('couldn\'t reach Luna: ' + e.message); remember(); }
 }
 
-function done(msg) {
-  busy = false; talk.classList.remove('busy'); talk.textContent = 'Tap to talk'; if (msg) say(msg);
+function setBusy(on) {
+  busy = on; talk.disabled = on;
+  send.textContent = on ? 'Stop' : 'Send'; send.classList.toggle('stop', on);
+  if (!on) { status(''); turnId = null; }
 }
 
-async function follow(id) {
-  let played = 0, lost = 0;
+async function follow(id, you) {
+  let played = 0, lost = 0, her = null;
   for (;;) {
     await new Promise(r => setTimeout(r, 350));
     let t;
     try { t = await (await fetch('/turn/' + id)).json(); lost = 0; }
-    catch (e) { if (++lost > 40) { done('lost touch with Luna - is the PC awake?'); return; } continue; }
-    if (t.error && !t.error.startsWith('no voice')) { done(t.error); return; }
-    if (t.heard !== null && t.heard !== undefined) $('#you').textContent = t.heard ? '“' + t.heard + '”' : 'didn\'t catch that';
-    $('#her').textContent = t.reply || '';
-    say({hearing: 'listening to you', thinking: 'thinking', speaking: 'speaking', done: ''}[t.state] || '');
+    catch (e) { if (++lost > 40) { setBusy(false); note('lost touch with Luna - is the PC awake?'); remember(); return; } continue; }
+    show(() => {
+      if (t.heard !== null && t.heard !== undefined && you.classList.contains('wait')) {
+        you.classList.remove('wait'); you.textContent = t.heard || 'didn\'t catch that';
+      }
+      if (t.reply || t.state === 'thinking') {
+        her = her || bubble('her wait', '…');
+        if (t.reply) { her.classList.remove('wait'); her.textContent = t.reply; }
+      }
+      if (t.stopped && her) her.classList.add('cut');
+    });
+    if (t.error && !t.error.startsWith('no voice')) { setBusy(false); note(t.error); remember(); return; }
+    status({hearing: 'listening to you', thinking: 'thinking', speaking: 'speaking', done: ''}[t.state] || '');
     showAsk(t.ask, id);
-    while (played < t.clips) queue(id, played++);
-    if (t.state === 'done' && played >= t.clips) { await playing; done(t.error || (t.heard === '' ? 'didn\'t catch that' : '')); return; }
+    if (!t.stopped) while (played < t.clips) queue(id, played++);
+    if (t.state === 'done' && (t.stopped || played >= t.clips)) {
+      if (her && her.classList.contains('wait')) her.remove();
+      if (!t.stopped) await playing;
+      setBusy(false); remember(); return;
+    }
   }
 }
 
-function queue(id, n) {
-  const clip = fetch(`/clip/${id}/${n}`).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b));
-  playing = playing.then(() => clip).then(buf => new Promise(res => {
-    const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination); s.onended = res; s.start();
-  })).catch(() => {});
-}
-
+let asked = null;
 function showAsk(ask, id) {
-  const box = $('#ask');
-  if (!ask) { box.style.display = 'none'; return; }
-  if (box.style.display === 'block') return;
-  $('#asktitle').textContent = 'Luna asks: ' + ask.title; $('#askbody').textContent = ask.body;
-  box.style.display = 'block';
-  const send = allow => { box.style.display = 'none';
+  if (!ask) { if (asked) { asked.remove(); asked = null; } return; }
+  if (asked) return;
+  asked = document.createElement('div'); asked.className = 'card ask';
+  const title = document.createElement('b'); title.textContent = 'Luna asks: ' + ask.title;
+  const body = document.createElement('pre'); body.textContent = ask.body;
+  const row = document.createElement('div'); row.className = 'row';
+  const yes = document.createElement('button'); yes.className = 'btn'; yes.textContent = 'Allow';
+  const no = document.createElement('button'); no.className = 'btn no'; no.textContent = 'Deny';
+  row.append(yes, no); asked.append(title, body, row);
+  show(() => log.appendChild(asked));
+  const answer = allow => { if (asked) { asked.remove(); asked = null; }
     fetch('/answer/' + id, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({allow})}); };
-  $('#allow').onclick = () => send(true); $('#deny').onclick = () => send(false);
+  yes.onclick = () => answer(true); no.onclick = () => answer(false);
 }
 
+// --- the controls ---------------------------------------------------------
 talk.onclick = () => { if (busy) return; rec ? finish() : start(); };
+send.onclick = () => {
+  if (busy) {                           // Stop: she stops writing and talking
+    hush();
+    if (turnId) fetch('/stop/' + turnId, {method: 'POST'}).catch(() => {});
+    status('stopping');
+    return;
+  }
+  typed();
+};
+text.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); if (!busy) typed(); } });
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible' && !lock && ctx) { try { lock = await navigator.wakeLock.request('screen'); } catch (e) {} }
 });
+recall();
 </script></body></html>

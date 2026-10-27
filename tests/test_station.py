@@ -242,6 +242,74 @@ class Stations(unittest.TestCase):
             self.assertEqual(self._open("/talk", data=_wav(), cookie=kitchen, kind="audio/wav")[0], 409)
             release.set()
 
+    def _wait_done(self, turn, cookie):
+        for _ in range(100):
+            view = json.loads(self._open(f"/turn/{turn}", cookie=cookie)[2])
+            if view["state"] == "done":
+                return view
+            time.sleep(0.05)
+        self.fail("the turn never finished")
+
+    def test_a_typed_turn(self):
+        _code, cookie = self._pair()
+        import numpy as np
+
+        seen = {}
+
+        def respond(text, model, source, speaker, sink, approver):
+            seen.update(text=text, source=source, speaker=speaker)
+            sink("Sunny all day.")
+
+        with mock.patch("voice.speech.transcribe", side_effect=AssertionError("nothing to transcribe")), \
+             mock.patch("voice.speech._synthesize", return_value=(np.zeros(2400, dtype=np.float32), 24000)), \
+             mock.patch("core.assistant.respond", respond), mock.patch("ui.add_message"):
+            r = self._open("/say", data=json.dumps({"text": " what's the weather? "}).encode(),
+                           cookie=cookie, kind="application/json")
+            self.assertEqual(r[0], 200)
+            view = self._wait_done(json.loads(r[2])["turn"], cookie)
+        self.assertEqual(seen, {"text": "what's the weather?", "source": "station", "speaker": None})
+        self.assertEqual((view["heard"], view["typed"], view["reply"], view["clips"]),
+                         ("what's the weather?", True, "Sunny all day.", 1))
+
+    def test_typed_checks(self):
+        _code, cookie = self._pair()
+        say = lambda body, c=cookie: self._open("/say", data=body, cookie=c, kind="application/json")[0]
+        self.assertEqual(say(b'{"text": "hi"}', None), 401)                       # not paired
+        self.assertEqual(say(b'{"text": "   "}'), 400)                            # nothing to say
+        self.assertEqual(say(b'not json'), 400)
+        self.assertEqual(say(json.dumps({"text": "x" * (station.MAX_TYPED + 1)}).encode()), 413)
+
+    def test_stop(self):
+        _code, cookie = self._pair()
+        import numpy as np
+        import threading
+        from core import interrupts
+
+        stopped = threading.Event()
+
+        def respond(text, model, source, speaker, sink, approver):
+            stop = interrupts.current()        # the station turn's own Stop
+            sink("First.")
+            for _ in range(200):               # "generating" until told to stop
+                if stop.generating.is_set():
+                    stopped.set()
+                    break
+                time.sleep(0.02)
+            sink("Never spoken.")
+
+        with mock.patch("voice.speech._synthesize", return_value=(np.zeros(2400, dtype=np.float32), 24000)), \
+             mock.patch("core.assistant.respond", respond), mock.patch("ui.add_message"):
+            turn = json.loads(self._open("/say", data=b'{"text": "tell me a long story"}',
+                                         cookie=cookie, kind="application/json")[2])["turn"]
+            time.sleep(0.2)
+            _c, other = self._pair("hall")
+            self.assertEqual(self._open(f"/stop/{turn}", data=b"", cookie=other)[0], 404)   # not the hall's
+            self.assertEqual(self._open(f"/stop/{turn}", data=b"", cookie=cookie)[0], 200)
+            view = self._wait_done(turn, cookie)
+        self.assertTrue(stopped.is_set())
+        self.assertTrue(view["stopped"])
+        self.assertEqual(view["reply"], "First.")
+
     def test_unpair(self):
         _code, cookie = self._pair()
         key = next(iter(station.devices()))

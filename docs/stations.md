@@ -41,10 +41,29 @@ device just goes straight in.
 
 ## Talking
 
-Tap the big button and talk. She stops listening after a short pause (or
-tap again). What she heard shows under the button, her reply appears as
-she writes it, and her voice plays on the device, sentence by sentence.
-The PC shows the turn too, marked with the room: `[kitchen] ...`.
+The page is a conversation, like a messaging app: your words on the right,
+hers on the left, the newest at the bottom.
+
+- **Talk:** tap 🎙 and speak. She stops listening after a short pause (or
+  tap 🎙 again). What she heard appears as your message.
+- **Type:** write in the box and press Enter or **Send**.
+- Her reply appears as she writes it, and her voice plays on the device,
+  sentence by sentence.
+- **Stop:** while she's answering, **Send** becomes **Stop**. It stops her
+  writing and talking; the reply so far stays, marked "stopped".
+- Scroll back to read: the view stays where you put it while she writes,
+  and ↓ takes you back to the newest. Your own message always jumps to the
+  bottom.
+- The last 40 messages are kept on the device, so the conversation is still
+  there next time you open the page.
+
+The PC shows each turn too, marked with the room: `[kitchen] ...`.
+
+A typed message has no voice to check, so it counts as yours, the same as
+typing at the PC: only pair devices you'd let use your keyboard. A spoken
+one is checked against the voice prints as usual (a guest gets the short
+list of tools). Typing a `/command` at a station just sends the words to
+her; commands only work at the PC.
 
 If she wants to do something that needs your OK (write a file, run a
 command), the question appears on the device that asked, with **Allow**

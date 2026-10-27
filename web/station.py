@@ -51,6 +51,7 @@ COOKIE_LIFE = 10 * 365 * 24 * 3600   # a paired device stays paired: renewed on 
 KEEP_KEY = "luna_station"          # the page's own copy of the token (localStorage), for a browser that drops cookies
 PAIR_MINUTES = 15
 MAX_AUDIO = 6 * 1024 * 1024        # about 3 minutes of 16 kHz mono
+MAX_TYPED = 2000                   # characters typed in the station's box
 ASK_SECONDS = 120                  # how long a permission question waits on the tablet
 TURN_KEEP = 300                    # finished turns are forgotten after this
 
@@ -286,6 +287,9 @@ class Turn:
         self.clips = []
         self.ask = None
         self.error = ""
+        self.typed = False                 # typed in the station's box, not spoken
+        self.stopped = False               # the station's Stop button
+        self.stopper = None                # the turn's Stop (core/interrupts), once it runs
         self.done_at = 0.0
         self._answer = None
         self._asked = threading.Event()
@@ -296,7 +300,7 @@ class Turn:
     # her sentences as they're written, to be spoken on the tablet
     def sentence(self, text):
         text = str(text or "").strip()
-        if not text:
+        if not text or self.stopped:
             return
         with self._more:
             self.reply.append(text)
@@ -306,6 +310,16 @@ class Turn:
     def close(self):
         with self._more:
             self._closed = True
+            self._more.notify()
+
+    def stop(self):
+        """The station's Stop: she stops writing and talking, and nothing
+        not yet turned into speech is spoken."""
+        self.stopped = True
+        if self.stopper is not None:
+            self.stopper.stop(speaking=True, generating=True)
+        with self._more:
+            self._sentences.clear()
             self._more.notify()
 
     def speaker(self):
@@ -343,7 +357,8 @@ class Turn:
 
     def view(self):
         return {"state": self.state, "heard": self.heard, "reply": " ".join(self.reply),
-                "clips": len(self.clips), "ask": self.ask, "error": self.error}
+                "clips": len(self.clips), "ask": self.ask, "error": self.error,
+                "typed": self.typed, "stopped": self.stopped}
 
 
 def _wav(samples, rate):
@@ -363,16 +378,43 @@ def _model():
     return getattr(sys.modules.get("__main__"), "MODEL", None)
 
 
-def _run(turn, audio):
+def _respond(turn, text, speaker):
+    """Her answer to what was said (or typed) at a station, spoken back there."""
+    from core import assistant, interrupts
+    import ui
+
+    turn.state = "thinking"
+    logbook.info("turn", "station %s%s%s: %s", turn.room, " (typed)" if turn.typed else "",
+                 f" ({speaker})" if speaker else "", text[:200])
+    who = f"{speaker}, " if speaker else ""
+    ui.add_message("user", f"[{who}{turn.room}] {text}")
+    # The turn's own Stop, held here so the station's Stop button can reach it
+    # (respond() runs as it: interrupts.ensure).
+    with interrupts.using(kind="station") as stop:
+        turn.stopper = stop
+        if turn.stopped:
+            stop.stop(speaking=True, generating=True)
+        assistant.respond(text, _model(), source="station", speaker=speaker,
+                          sink=turn.sentence, approver=turn.approver)
+
+
+def _run(turn, audio=None, text=None):
+    """One station turn: a recording (transcribed, voice checked) or typed text."""
     from core import assistant
     from senses import people
     from voice import speech
-    import ui
 
     path = None
     voice = threading.Thread(target=turn.speaker, daemon=True, name="station-voice")
     voice.start()
     try:
+        if text is not None:
+            # Typed on a paired device: no voice to check, so it counts as the
+            # owner's, the same as typing at the desk.
+            turn.typed = True
+            turn.heard = text
+            _respond(turn, text, people.decide(None, voice_checked=False, at_desk=False))
+            return
         fd, path = tempfile.mkstemp(suffix=".wav", prefix="luna-station-")
         with os.fdopen(fd, "wb") as f:
             f.write(audio)
@@ -381,18 +423,13 @@ def _run(turn, audio):
         if heard.get("enroll"):
             turn.error = "a voice enrolment is running on the PC - read its lines there"
             return
-        text = speech.transcribe(path)
-        turn.heard = text
-        if not text:
+        said = speech.transcribe(path)
+        turn.heard = said
+        if not said or turn.stopped:
             return
-        turn.state = "thinking"
         speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None,
                                 at_desk=False)      # another room: the desk camera can't tell
-        logbook.info("turn", "station %s%s: %s", turn.room, f" ({speaker})" if speaker else "", text[:200])
-        who = f"{speaker}, " if speaker else ""
-        ui.add_message("user", f"[{who}{turn.room}] {text}")
-        assistant.respond(text, _model(), source="station", speaker=speaker,
-                          sink=turn.sentence, approver=turn.approver)
+        _respond(turn, said, speaker)
     except Exception as e:
         turn.error = str(e)[:300]
         logbook.exception("station", "station turn failed")
@@ -600,9 +637,21 @@ class _Station(_Base):
         if not device:
             return self._json(401, {"error": "not paired"})
 
-        if url.path == "/talk":
-            if not body.startswith(b"RIFF") or (self.headers.get("Content-Type") or "") != "audio/wav":
-                return self._json(400, {"error": "send a WAV recording"})
+        if url.path in ("/talk", "/say"):
+            if url.path == "/talk":
+                if not body.startswith(b"RIFF") or (self.headers.get("Content-Type") or "") != "audio/wav":
+                    return self._json(400, {"error": "send a WAV recording"})
+                args = (body, None)
+            else:
+                try:
+                    text = str(json.loads(body or b"{}").get("text") or "").strip()
+                except (ValueError, AttributeError):
+                    text = ""
+                if not text:
+                    return self._json(400, {"error": "nothing to say"})
+                if len(text) > MAX_TYPED:
+                    return self._json(413, {"error": f"keep it under {MAX_TYPED} characters"})
+                args = (None, text)
             if not getattr(config, "STATION_ENABLED", False):
                 return self._json(503, {"error": "relay stations are switched off"})
             _tidy()
@@ -611,8 +660,14 @@ class _Station(_Base):
                     return self._json(409, {"error": "she's still answering the last one"})
                 turn = Turn(device["name"], device["key"])
                 _turns[turn.id] = turn
-            threading.Thread(target=_run, args=(turn, body), daemon=True, name="station-turn").start()
+            threading.Thread(target=_run, args=(turn,) + args, daemon=True, name="station-turn").start()
             return self._json(200, {"turn": turn.id})
+        if url.path.startswith("/stop/"):
+            turn = self._turn(url.path[6:], device)
+            if not turn:
+                return self._json(404, {"error": "no such turn"})
+            turn.stop()
+            return self._json(200, {"ok": True})
         if url.path.startswith("/answer/"):
             turn = self._turn(url.path[8:], device)
             try:
