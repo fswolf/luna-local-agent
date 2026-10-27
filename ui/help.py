@@ -91,6 +91,14 @@ _HELP_SECTIONS = [
         "never how much she helps.",
         "/set mood.enabled false turns it off.",
     ]),
+    ("Patches", [
+        ("/good", "keep her last reply as an example of how she should talk"),
+        ("/fix <reply>", "keep your better version of her last reply instead"),
+        ("/examples", "how many examples there are, and the page to look through them"),
+        "examples train her patches: small add-ons that teach a habit,",
+        "like where gestures go. She never sees these commands, and the",
+        "examples stay in agent/dataset/, never committed. docs/patches.md",
+    ]),
     ("Memory", [
         ("/facts", "what she remembers, and which backend holds it"),
         ("/facts all", "the whole table, not just the newest"),

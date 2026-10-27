@@ -402,6 +402,19 @@ def _ask(text, model, on_text=None, on_sentence=None,
             # thought log should show, not the vote's empty exchanges.
             second = None
 
+    if remember and source is None and turn.private and not turn.speaker and not turn.job \
+            and not turn.remote:
+        # Your own turn, offered for /good and /fix (training/dataset.py):
+        # held in memory only, written nowhere unless you keep it.
+        try:
+            from training import dataset
+
+            dataset.note_turn(base_messages[0]["content"], replayed, base_messages[-1], answer,
+                              model=payload.get("model", ""),
+                              used_tools=bool(_last_raw.get("exchanges")) or bool(turn.exchanges))
+        except Exception:
+            logbook.exception("llm", "couldn't note the turn for /good")
+
     if remember:
         # The hash is of the system prompt as sent, so a changed persona,
         # rule or memory selection is a different hash - and a flag rate

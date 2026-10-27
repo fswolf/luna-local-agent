@@ -45,6 +45,7 @@ ai-voice/
 │   ├── livefeed.py   #   the server and event stream for the monitor and the portrait (python -m web.livefeed)
 │   ├── portrait_config.py, gesture_files.py, gaze.py  # what the portrait loads, gesture files, where she looks
 │   ├── settings_web.py, help_web.py  # /settings/ and /help/
+│   ├── dataset_web.py  #   /dataset/: examples for her patches
 │   ├── portrait_window.py  # /portrait's window of its own (no address bar)
 │   ├── holofan.py    #   hologram fans (python -m web.holofan sim)
 │   ├── station.py, satellites.py  # relay stations in other rooms, ESPHome satellites
@@ -69,7 +70,7 @@ ai-voice/
 │   └── session.py    #   session switches (are tools working?)
 ├── main.py           # startup and the main loop; typed /commands go to commands/
 ├── commands/         # every /command, one module per area (app, reminders, settings,
-│                     #   voice, life, portrait, memory, people, plugins); handle(text)
+│                     #   voice, life, portrait, memory, people, patches, plugins); handle(text)
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── portrait/         # her animated portrait
 │   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
@@ -81,6 +82,7 @@ ai-voice/
 │   ├── models/       #   Live2D folders and .vrm files
 │   ├── animations/   #   .vrma clips (clips.json)
 │   └── add_live2d.py
+├── training/         # patches (LoRA): dataset.py keeps the examples (/good, /fix) - docs/patches.md
 ├── introspection/    # injected-thought experiments - make_vectors, trial, report, blind
 ├── memory-manager/
 │   ├── manager.py
