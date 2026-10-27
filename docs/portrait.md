@@ -71,6 +71,8 @@ nothing else). Hologram fans, HDMI and WiFi: [fans.md](fans.md).
 
 ## What's behind her
 
+<img width="1210" alt="Luna in the terminal beside her portrait, with an autumn room picked by the seasonal background" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/portrait-seasonal.jpg" />
+
 `/settings`, Portrait, **background**, picks what's behind her and changes an
 open portrait straight away:
 
@@ -479,6 +481,8 @@ and does small things on her own:
 | Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
 
 ### The pose studio: making gestures without code
+
+<img width="1210" alt="The debug viewer: the gesture list on the left, her full-body model in the middle, and the pose studio on the right with a timeline, view buttons and sliders to turn each bone" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/pose-studio.jpg" />
 
 The debug viewer (`?debug=1`) has two windows. The **portrait debug** one on
 the left *plays* things; the **pose studio** on the right *makes and changes*

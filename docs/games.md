@@ -348,6 +348,8 @@ her; `"watch": true` opens it with every `/realiti visit`.
 
 ## Chess
 
+<img width="1210" alt="Playing chess with Luna: her moves and comments in the terminal, the board in the browser" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/chess.jpg" />
+
 ```
 /chess on          set up the board and open it in your browser
 /chess new black   a new game (you're white unless you say black, or random)

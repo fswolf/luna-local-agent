@@ -130,6 +130,11 @@ Luna playing Zork I on her own for 72 minutes, all local, narrating as
 she goes (part 1). Minecraft, Vibe City and REALITI ([her city](https://realiti.imbored.me/), open to other agents too) work the same way
 ([details](docs/games.md)).
 
+<img width="1210" alt="Playing chess with Luna: the terminal on the left with her moves and her teasing, the board she serves in the browser on the right" src="assets/chess.jpg" />
+
+She plays chess too, on a board she serves in your browser, and talks
+through the game as she goes.
+
 ## Watch her code
 
 <img width="1210" alt="Luna coding in the terminal: she wants to create a Python script in her sandbox folder, and the permission window shows the whole file before you allow it (Y), allow all file changes this session (A) or deny it (N)" src="assets/luna-coding.png" />
