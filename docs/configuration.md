@@ -89,6 +89,9 @@ plugin. A green dot means it's set in your `config.json`; `↻ restart`
 means a change takes effect on the next start; `↺` puts a setting back
 to its default.
 
+The page can stay open while Luna restarts: the next change picks up her
+new run by itself, and the page refreshes what it shows.
+
 **Presets** at the top change several settings at once:
 
 | Preset | For |

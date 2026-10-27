@@ -209,7 +209,13 @@ find yours. `LLAMA_ENV=<file>` picks a settings file by hand.
 `start.sh` reads `llama/server.env`, which holds the same load settings
 as LM Studio's model page: context 16384, every layer on the GPU, 9
 threads, batch 4096/2048, 4 parallel slots sharing one KV cache, 32
-context checkpoints. Edit it there. With `MODEL` left empty it finds the
+context checkpoints. Edit it there.
+
+llama.cpp keeps copies of recent prompts in system RAM to reuse them, up
+to 8 GB per server unless told otherwise. `CACHE_RAM` (MiB, default
+2048) caps the chat server's; the embedding and reranker servers keep
+none, since every text they get is new. Older llama.cpp builds that
+don't know the setting simply start without it. With `MODEL` left empty it finds the
 GGUF in LM Studio's own model folders (the Flatpak's included), so there's no second 10 GB copy.
 If LM Studio still has a model loaded it says so, because two copies
 won't fit in 16 GB of VRAM. Eject it in LM Studio first.
@@ -347,6 +353,7 @@ everything else, these lines in `llama/server.env` free the most:
 | `MMPROJ=off` | about 0.6 to 1 GB | screenshots, the webcam and Vibe City pictures |
 | `CTX=8192` | half the context memory | shorter conversations before old turns drop |
 | `PARALLEL=1` | slot overhead | jobs and chat wait for each other |
+| `CACHE_RAM=512` | up to 1.5 GB of system RAM | reusing old prompts, so some turns start slower |
 
 A smaller quant of the chat model (Q4 instead of Q6 or Q8) saves the
 most of all.

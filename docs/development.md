@@ -205,6 +205,18 @@ package's public names.
 its constant, `BASE_DIR` is the repo, and `/set` and plugin switches change
 the value everyone reads (against a temporary config.json).
 
+`tests/test_mood_day.py` plays a recorded day of her moods (cold morning,
+compliments, flirting into the lewd row, a grudge, walking away, making
+up, a restart...) at three intensities and checks every label, dial,
+prompt line and portrait event against `tests/data/mood_day.json`. It's
+what lets `mind/mood/` be reorganised without changing who she is. When
+you change her moods on purpose, record it again and read the diff:
+`MOOD_DAY_RECORD=1 python -m unittest tests.test_mood_day`.
+
+`tests/test_settings_web.py` also checks that no live setting is copied
+at startup (`from config import X`), which made the settings page say
+"saved" while nothing changed.
+
 `tests/offline.py` keeps every test away from real servers; import it
 first in a new test file.
 
