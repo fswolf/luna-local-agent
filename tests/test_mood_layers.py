@@ -18,7 +18,7 @@ from mind import mood  # noqa: E402
 
 
 def appraised(rating=0, energy=0, warmth=0, feeling=None, flirt=0):
-    return mock.patch.object(mood, "_appraise", return_value=(rating, energy, warmth, feeling, flirt))
+    return mock.patch("mind.mood.appraise._appraise", return_value=(rating, energy, warmth, feeling, flirt))
 
 
 class Layers(unittest.TestCase):
@@ -28,10 +28,10 @@ class Layers(unittest.TestCase):
             mock.patch.object(config, "MOOD_ENABLED", True),
             mock.patch.object(config, "MOOD_INTENSITY", 1.0, create=True),
             mock.patch.object(config, "MOOD_WALK_AWAY", False, create=True),
-            mock.patch.object(mood, "STATE_FILE", os.path.join(self.tmp.name, "mood.json")),
-            mock.patch.object(mood, "_announce", lambda: None),
-            mock.patch.object(mood, "_feel", lambda f: None),
-            mock.patch.object(mood, "_compliment", lambda r, f: None),
+            mock.patch("mind.mood.saving.STATE_FILE", os.path.join(self.tmp.name, "mood.json")),
+            mock.patch("mind.mood.show._announce", lambda: None),
+            mock.patch("mind.mood.exchange._feel", lambda f: None),
+            mock.patch("mind.mood.exchange._compliment", lambda r, f: None),
         ]
         for p in self.patches:
             p.start()
@@ -144,7 +144,7 @@ class Layers(unittest.TestCase):
 
     def test_making_up_while_shes_away_ends_the_grudge(self):
         mood.set_mood(warmth=-0.5, grudge_minutes=20)
-        with appraised(rating=2, warmth=1), mock.patch.object(mood, "_back", lambda why: None):
+        with appraised(rating=2, warmth=1), mock.patch("mind.mood.walkaway._back", lambda why: None):
             self.assertTrue(mood.heard_while_away("I'm sorry, Luna", "model"))
         self.assertEqual(mood.layers()["grudge"], 0)
 
@@ -163,7 +163,7 @@ class Layers(unittest.TestCase):
 
     def test_a_polite_hello_brings_her_back_but_doesnt_end_the_grudge(self):
         mood.set_mood(warmth=-0.5, grudge_minutes=20)
-        with appraised(rating=1), mock.patch.object(mood, "_back", lambda why: None):
+        with appraised(rating=1), mock.patch("mind.mood.walkaway._back", lambda why: None):
             self.assertTrue(mood.heard_while_away("hi", "model"))
         self.assertGreater(mood.layers()["grudge"], 0)
 

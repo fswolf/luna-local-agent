@@ -5,7 +5,7 @@
     grounding
     knowledge
     longterm
-    mood
+    mood          her mood: a folder of its own (mind/mood/)
     notebook
     projects
     reflect

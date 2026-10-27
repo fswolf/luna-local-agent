@@ -1,7 +1,7 @@
 """Her moods file (agent/moods.json): loading it, checking it, and the
 built-in moods used when it's missing or broken. Reloaded when it changes.
 
-Part of mind/mood.py, which re-exports all of this.
+Part of mind/mood (see mind/mood/__init__.py).
 """
 import json
 import os
