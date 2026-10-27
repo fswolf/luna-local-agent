@@ -26,6 +26,7 @@ and stop words still work.
 - [The lewd row: desire](#the-lewd-row-desire)
 - [The grudge row](#the-grudge-row)
 - [Walking away](#walking-away)
+- [Heavy moments](#heavy-moments)
 - [Streams where lewd isn't allowed](#streams-where-lewd-isnt-allowed)
 - [Every mood](#every-mood)
 - [Quick feelings](#quick-feelings)
@@ -324,6 +325,20 @@ an hour without another hostile one wipes it.
 - She comes back when the time's up, or sooner if what you say reads as
   making up. `/mood reset` brings her back at once.
 - `mood.walk_away false` turns it off.
+
+## Heavy moments
+
+When you're having a really hard time, she notices and knows. The
+exchange reading's sixth word (`normal`, `rough`, `heavy`) is read by
+meaning; `heavy` counts at once, `rough` after two in a row, and two
+normal messages step it back down. While it lasts she gets one line
+about being present: listen more than fix, no advice or lectures unless
+asked, follow your lead. Nothing else changes: the dials, the lewd row,
+the grudge and walking away carry on as they are, and she decides what
+to do with it. Only your own messages count, never in front of a guest,
+never in stream chat. `/mood` shows it, `/mood reset` clears it, and the
+wording and switch are the `"heavy"` block in `agent/moods.json`
+([Moods](moods.md#heavy-moments)).
 
 ## Streams where lewd isn't allowed
 

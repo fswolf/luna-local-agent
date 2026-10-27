@@ -380,6 +380,8 @@ def reset():
 
     with _away_lock:
         S.away_state.update(until=0.0, said=False, hostile=0)
+    from mind.mood import heavy
+    heavy.reset()
     saving._save()
     show._announce()
 

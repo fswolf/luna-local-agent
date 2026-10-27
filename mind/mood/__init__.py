@@ -132,6 +132,7 @@ from mind.mood.appraise import (  # noqa: F401
     _RATING,
     _appraise,
     _parse_appraisal,
+    _parse_heaviness,
 )
 from mind.mood.saving import (  # noqa: F401
     STATE_FILE,

@@ -252,7 +252,7 @@ the only one that costs anything: after her reply, a short background
 call reads what you said and what she answered and returns one line:
 
 ```
-2 + + laughing
+2 + + laughing 1 normal
 ```
 
 - **how warm your message was**, 0-3, the warmth rating below
@@ -269,6 +269,44 @@ if it has one), then gives the slow dials a small push:
 
 Add a feeling to the file and the model is offered it on the next turn.
 It runs while she's still speaking, so a laugh lands with the words.
+
+### Heavy moments
+
+The same line ends with one more word: how heavy your message was.
+
+- `normal`: everyday, even annoyed or joking ("this bug is killing me")
+- `rough`: a bad day, stress, feeling down
+- `heavy`: really not okay
+
+It's read by meaning, not a word list, and the heaviest thing in the
+message counts, even when it's said in passing at the end. `heavy`
+counts at once; `rough` needs two in a row; two normal messages step it
+down a level, and six quiet hours clear it.
+
+While it lasts, she gets one more line in her prompt next to her mood
+line, about being present: listen more than fix, no advice or lectures
+unless asked, follow your lead, it's fine to just keep you company. No
+helplines, no canned safety text, no checklist of questions.
+
+**Nothing else changes.** Her dials, the lewd row, the grudge and
+walking away all carry on as they are; the line only tells her what's
+going on, and she decides. Only your own messages count, not a
+guest's, it never shows while a guest is talking, and stream chat never
+sees it. A touch on the portrait doesn't count as a message. `/mood`
+shows it and `/mood reset` clears it.
+
+Both lines and the switch can be changed in `agent/moods.json`
+(`{user}`, `{them}` and `{their}` are filled in):
+
+```json
+"heavy": {
+  "enabled": true,
+  "rough": "{user} has had a rough time today. ...",
+  "heavy": "{user} is having a really hard time right now. ..."
+}
+```
+
+`"enabled": false` and she's exactly as she was.
 
 ### Being nice to her
 
