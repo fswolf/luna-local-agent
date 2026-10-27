@@ -135,6 +135,12 @@ stop_sides() {
 trap stop_sides EXIT
 trap 'stop_sides; exit 130' INT TERM
 
+# llama.cpp keeps recent prompts in system RAM to reuse them, up to 8 GB
+# per server unless told otherwise - the reranker alone filled 7 GB that
+# way. Older builds don't know the flag, so it's only passed when they do.
+cache_ram=()
+"$BIN" --help 2>&1 | grep -q -- '--cache-ram' && cache_ram=(--cache-ram)
+
 # side_server LABEL SWITCH MODEL MATCH PORT LOG FALLBACK -- server args...
 # MODEL may be empty (found by MATCH). FALLBACK is what Luna does
 # without it, for the "off" line.
@@ -167,6 +173,7 @@ side_server() {
     "$BIN" -m "$model" --alias "$(basename "$model" .gguf)" \
         --host "$HOST" --port "$port" -ngl "$NGL" -t "$THREADS" \
         --api-key-file .api_key --cors-origins localhost \
+        ${cache_ram[@]:+"${cache_ram[@]}" 0} \
         "$@" > "$log" 2>&1 &
     side_pids+=($!)
     echo "$label: $(basename "$model" .gguf) on http://$HOST:$port (log: llama/$log)"
@@ -205,6 +212,7 @@ args=(
 )
 
 [ "$KV_UNIFIED" = 1 ] && args+=(--kv-unified)
+[ "${#cache_ram[@]}" -gt 0 ] && args+=("${cache_ram[@]}" "${CACHE_RAM:-2048}")
 [ -n "$MMPROJ" ] && args+=(--mmproj "$MMPROJ")
 
 # shellcheck disable=SC2206
