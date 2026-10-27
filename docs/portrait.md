@@ -439,7 +439,9 @@ the setting for that page (an OBS source, say).
 **The maps.** The lights come from a `lights/` folder beside the model:
 for each lit texture, a glow map (white where it glows, grey for dimmer)
 and a zone map (which part of her each pixel is, as flat colours; the
-legend is in `lights.json`). `portrait/lights.py` makes them:
+legend is in `lights.json`). The maps belong to the model they were made
+from: other models in the same folder, like the human ones beside the
+robot, get no lights. `portrait/lights.py` makes them:
 
 ```
 python3 portrait/lights.py models/luna/robot_default.vrm \
