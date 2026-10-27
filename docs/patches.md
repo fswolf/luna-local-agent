@@ -38,11 +38,13 @@ A first patch wants **300 to 500** examples. There's no rush: they keep.
 
 ## The examples page
 
-`http://127.0.0.1:8792/dataset/` (also in the Pages pane, and linked from `/examples`).
+`http://127.0.0.1:8792/examples/` (also in the Pages pane, and linked from `/examples`).
 Newest first, each with what you said, her reply, and your version if you fixed it.
 
 - **Approve** or **Drop**: a dropped example stays on the page but is never trained on.
 - **Edit** the reply in place; her original is kept beside it.
+- Each reply can be kept once: `/good` twice keeps it once, and `/fix` after `/good` turns
+  that example into your version.
 - Switch an example between **habit** and **gesture**.
 - **Delete** it for good.
 - Fold out the conversation before it and the prompt she was answering.

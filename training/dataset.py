@@ -75,6 +75,14 @@ def keep(source="good", reply=None, kind="habit"):
         raise ValueError("that turn called tools; examples are plain replies for now")
 
     corrected = reply is not None and str(reply).strip() != turn["reply"].strip()
+
+    # One example per reply: /good twice keeps it once, and /fix after /good
+    # turns that same example into your version.
+    if turn.get("kept"):
+        if not corrected:
+            raise ValueError("you already kept that one")
+        update(turn["kept"], reply=reply, source="fix")
+        return next((r for r in examples() if r.get("id") == turn["kept"]), None) or {}
     example = {
         "id": uuid.uuid4().hex[:12],
         "when": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -91,22 +99,30 @@ def keep(source="good", reply=None, kind="habit"):
         os.makedirs(FOLDER, exist_ok=True)
         with open(FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(example, ensure_ascii=False) + "\n")
+        if _last.get("at") == turn["at"]:
+            _last["kept"] = example["id"]
 
     return example
+
+
+def _read():
+    """Every row. Caller holds _lock."""
+    try:
+        with open(FILE, encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+    except FileNotFoundError:
+        return []
 
 
 def examples(kind=None):
     """Every example, oldest first (optionally one kind)."""
     with _lock:
-        try:
-            with open(FILE, encoding="utf-8") as f:
-                rows = [json.loads(line) for line in f if line.strip()]
-        except FileNotFoundError:
-            return []
+        rows = _read()
     return [r for r in rows if kind is None or r.get("kind") == kind]
 
 
 def _rewrite(rows):
+    """Caller holds _lock - from its read to here, so nothing kept meanwhile is lost."""
     os.makedirs(FOLDER, exist_ok=True)
     tmp = FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -116,30 +132,31 @@ def _rewrite(rows):
 
 
 def update(example_id, **changes):
-    """Change one example (approved, reply, kind). False if there's no such id."""
-    allowed = {k: v for k, v in changes.items() if k in ("approved", "reply", "kind")}
+    """Change one example (approved, reply, kind, source). False if there's no such id."""
+    allowed = {k: v for k, v in changes.items() if k in ("approved", "reply", "kind", "source")}
     if "kind" in allowed and allowed["kind"] not in KINDS:
         raise ValueError(f"no such kind {allowed['kind']!r}")
-    rows = examples()
-    for r in rows:
-        if r.get("id") == example_id:
-            if "reply" in allowed and str(allowed["reply"]).strip() != r["reply"]:
-                r["original"] = r.get("original") or r["reply"]
-                allowed["reply"] = str(allowed["reply"]).strip()
-            r.update(allowed)
-            with _lock:
+    with _lock:
+        rows = _read()
+        for r in rows:
+            if r.get("id") == example_id:
+                if "reply" in allowed:
+                    allowed["reply"] = str(allowed["reply"]).strip()
+                    if allowed["reply"] != r["reply"]:
+                        r["original"] = r.get("original") or r["reply"]
+                r.update(allowed)
                 _rewrite(rows)
-            return True
+                return True
     return False
 
 
 def remove(example_id):
     """Delete an example for good. False if there's no such id."""
-    rows = examples()
-    kept = [r for r in rows if r.get("id") != example_id]
-    if len(kept) == len(rows):
-        return False
     with _lock:
+        rows = _read()
+        kept = [r for r in rows if r.get("id") != example_id]
+        if len(kept) == len(rows):
+            return False
         _rewrite(kept)
     return True
 

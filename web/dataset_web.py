@@ -1,6 +1,6 @@
 """The examples page: look through what her patches will learn from.
 
-    http://127.0.0.1:8792/dataset/      (or /examples in the terminal)
+    http://127.0.0.1:8792/examples/      (or /examples in the terminal)
 
 Every example kept with /good or /fix (and, later, the gesture-tagged
 ones), newest first: your message, her reply, your version if you fixed
@@ -17,7 +17,7 @@ import secrets
 
 from core import logbook
 
-NAME = "dataset"
+NAME = "examples"
 KEY = secrets.token_urlsafe(24)       # this run's; the page re-reads it after a restart
 
 
@@ -32,7 +32,7 @@ def _row(r):
 
 
 def handle(method, sub, body):
-    """(status, content type, body) for /dataset/<sub>."""
+    """(status, content type, body) for /examples/<sub>."""
     from training import dataset
 
     sub = sub or "/"
@@ -86,7 +86,7 @@ def register():
 def url():
     from web import livefeed
 
-    return livefeed.url() + "/dataset/"
+    return livefeed.url() + "/examples/"
 
 
 def _web_page(name):
