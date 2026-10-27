@@ -46,7 +46,7 @@ and stop words still work.
  agent.json (who she is) ─────────────────────────────┐
                                                       ▼
  the clock, the day, how long you've been  ──►  MOOD ENGINE  ──► one line in her system prompt
- at it, how long you were gone, the GPU,        (mind/mood.py,        a tint on her voice (speed, pitch)
+ at it, how long you were gone, the GPU,        (mind/mood/,          a tint on her voice (speed, pitch)
  stream chat, errors, barge-ins                 moods.json)      her face, idle moves, emotes ──► PORTRAIT
                                                    ▲  ▲                                          │
  after every reply: one small model call  ─────────┘  │                                          │
@@ -73,9 +73,9 @@ and stop words still work.
 | `agent/agent.json` | Her name, personality, tone, traits, rules, who you are, and how to pronounce her cat sounds |
 | `agent/moods.json` | Every mood: its name, what she's told, face, voice, idle moves, emote; the lewd and grudge rows; quick feelings; walk-away lines |
 | `agent/mood.json` | Where the dials are right now (saved after every turn, so a restart picks up where she was) |
-| `mind/mood.py` | The engine: signals, drift, desire, grudge, walk-away |
-| `mind/appraise.py` | The exchange reading: the one side question that asks how a turn landed |
-| `mind/mood_files.py` | Loads and checks `agent/moods.json`, with built-in moods if it's broken |
+| `mind/mood/` | The engine, one file per job: `core.py` her state, `drift.py` the dials moving, `exchange.py` what a turn did (desire, grudge, spanks), `walkaway.py`, `show.py` (label, prompt line, face, portrait), `saving.py` |
+| `mind/mood/appraise.py` | The exchange reading: the one side question that asks how a turn landed |
+| `mind/mood/files.py` | Loads and checks `agent/moods.json`, with built-in moods if it's broken |
 | `config.json` → `"mood"` | On/off, intensity, where she rests, what shows where (see [Settings](#settings-reference)) |
 | `portrait/touch.json` | What she does when each part of her is clicked, per mood |
 | `portrait/gestures/*.js` | Every gesture: one file each, data only |
@@ -483,7 +483,7 @@ normal touch reaction:
   on her bum is an ordinary touch.
 
 The numbers are `SPANK_LIMIT`, `SPANK_FORGET`, `SPANK_WARMTH` and
-`SPANK_DESIRE` in `mind/mood.py`, and `SPANK_STEP` / `SPANK_FORGET` in
+`SPANK_DESIRE` in `mind/mood/exchange.py`, and `SPANK_STEP` / `SPANK_FORGET` in
 `portrait/viewer/portrait.js`.
 
 ### Touch talk: she says something
@@ -691,7 +691,7 @@ engine as everything else, so what you see is what she does. Details in
 | `twitch.lewd`, `youtube.lewd` | false | Allow the lewd row while that stream is live |
 
 In `agent/moods.json`: `lewd.enter` (0.6), `grudge.minutes` (20),
-`compliment.rating` (3), and every mood and feeling. In `mind/mood.py`: the
+`compliment.rating` (3), and every mood and feeling. In `mind/mood/exchange.py`: the
 desire and hostility weights (`DESIRE_FLIRT`, `DESIRE_AFFECTION`,
 `DESIRE_FADE`, `HOSTILE_HIT`).
 

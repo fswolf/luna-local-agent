@@ -24,8 +24,8 @@ ai-voice/
 │   ├── reflect.py    #   what she does while idle: session notes, the dream pass, fact cleanup, the greeting
 │   ├── grounding.py  #   specifics in a reply that nothing she was given backs up
 │   ├── situation.py  #   the live lines at the top of each turn: window, music, load, her hands
-│   ├── mood.py       #   how she feels, and what moves it
-│   ├── appraise.py, mood_files.py  # how a turn landed; agent/moods.json
+│   ├── mood/         #   how she feels, and what moves it (mood.X works from the folder):
+│   │                 #     core (her state, S), drift, exchange, appraise, walkaway, show, saving, files
 │   └── webpage.py, websearch.py  # reading pages and searching, for research
 ├── senses/           # what she perceives:
 │   ├── camera.py, vision.py, desktop.py  # the webcam, the screen, the desktop

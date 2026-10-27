@@ -39,10 +39,9 @@ class WalkAway(unittest.TestCase):
         self.patches = [mock.patch.object(config, "MOOD_ENABLED", True),
                         mock.patch.object(config, "MOOD_WALK_AWAY", True, create=True),
                         mock.patch.object(config, "MOOD_WALK_AWAY_AFTER", 3, create=True),
-                        mock.patch.object(mood, "_announce"),
-                        mock.patch.object(mood, "_save")]
-        for p in self.patches:
-            p.start()
+                        mock.patch("mind.mood.show._announce"),
+                        mock.patch("mind.mood.saving._save")]
+        self.announce = [p.start() for p in self.patches][3]
         mood._away.update(until=0.0, said=False, hostile=0, last=0.0)
 
     def tearDown(self):
@@ -52,7 +51,7 @@ class WalkAway(unittest.TestCase):
 
     def test_two_appraisals_finishing_together_walk_her_out_once(self):
         self.mood._away.update(hostile=2, last=__import__("time").time())
-        with mock.patch.object(self.mood, "_withdraw") as withdraw:
+        with mock.patch("mind.mood.walkaway._withdraw") as withdraw:
             _race(lambda: self.mood._count_hostility(0, -1))
         self.assertEqual(withdraw.call_count, 1)
         self.assertTrue(self.mood._away["until"])
@@ -60,7 +59,7 @@ class WalkAway(unittest.TestCase):
     def test_coming_back_happens_once(self):
         self.mood._away.update(until=1.0)                    # long past
         _race(self.mood.away)
-        self.assertEqual(self.mood._announce.call_count, 1)
+        self.assertEqual(self.announce.call_count, 1)
 
     def test_one_leaving_line(self):
         self.mood._away.update(until=9e12)

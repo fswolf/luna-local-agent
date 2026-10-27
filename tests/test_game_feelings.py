@@ -107,7 +107,7 @@ class Mood(unittest.TestCase):
     def test_how_a_session_moves_her(self):
         from mind import mood
 
-        with mock.patch.object(mood, "_nudge") as nudge:
+        with mock.patch("mind.mood.drift._nudge") as nudge:
             mood.note_play("enjoyed", "Zork I")
             mood.note_play("mixed", "Zork I")
             mood.note_play("frustrated", "Zork I")

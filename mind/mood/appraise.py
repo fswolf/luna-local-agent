@@ -2,12 +2,12 @@
 turn landed (a rating, energy, warmth, a feeling, flirting) and the parser
 for its answer.
 
-Part of mind/mood.py, which re-exports all of this.
+Part of mind/mood (see mind/mood/__init__.py).
 """
 import re
 import config
 from core import logbook
-from mind.mood_files import moods
+from mind.mood.files import moods
 
 
 # ---------------------------------------------------------------------------
