@@ -1,4 +1,4 @@
-"""The first-start questions (firstrun.py): name, pronouns, a preset,
+"""The first-start questions (core/firstrun.py): name, pronouns, a preset,
 written to a temporary agent.json (yours is never touched).
 
     python -m unittest discover tests        (from the repo folder)
@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import firstrun  # noqa: E402
+from core import firstrun  # noqa: E402
 from config import base  # noqa: E402
 
 KEYS = ("USER_NAME", "USER_THEY", "USER_THEM", "USER_THEIR", "_USER_GAVE_PRONOUNS", "USER")
@@ -35,7 +35,7 @@ class FirstRun(unittest.TestCase):
         self.said = []
         self.patches = [mock.patch.object(config, "AGENT_FILE", self.file),
                         mock.patch("ui.add_message", lambda who, text: self.said.append((who, text))),
-                        mock.patch("settings_web.preset", return_value=(True, "Companion: 8 settings changed", None))]
+                        mock.patch("web.settings_web.preset", return_value=(True, "Companion: 8 settings changed", None))]
         self.preset = self.patches[2]
         for p in self.patches:
             p.start()
@@ -67,7 +67,7 @@ class FirstRun(unittest.TestCase):
         self.assertEqual(saved["personality"], "kind")          # the rest of agent.json kept
         self.assertEqual(config.USER_NAME, "Shannon")
         self.assertIn("Shannon (she/her", base.user_line())
-        import settings_web
+        from web import settings_web
         settings_web.preset.assert_called_once_with("companion")
         self.assertFalse(firstrun.needed())
 
@@ -77,7 +77,7 @@ class FirstRun(unittest.TestCase):
         firstrun.handle("xe/xem/xyr")
         firstrun.handle("skip")
         self.assertEqual(self._file()["user"]["pronouns"], "xe/xem/xyr")
-        import settings_web
+        from web import settings_web
         settings_web.preset.assert_not_called()
 
     def test_skip_writes_an_empty_user_so_it_never_asks_again(self):

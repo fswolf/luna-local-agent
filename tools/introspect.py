@@ -18,7 +18,7 @@ viewer keeps the raw numbers next to it.
 """
 from datetime import datetime
 
-import timeutil
+from core import timeutil
 
 from . import tool
 
@@ -27,7 +27,7 @@ def _private():
     """Is the turn in flight Ryan's own? These tools answer about him and
     about her history with him; a stream-chat turn gets nothing, even if
     a model names a tool it wasn't offered."""
-    import turnctx
+    from core import turnctx
 
     return turnctx.current().private
 
@@ -37,7 +37,7 @@ _NOT_HERE = "Not available on a stream-chat turn."
 
 def _available():
     try:
-        import thoughtlog
+        from mind import thoughtlog
 
         return thoughtlog.enabled()
     except Exception:
@@ -67,7 +67,7 @@ def _introspect(turns_back=1):
         return _NOT_HERE
 
     import config
-    import thoughtlog
+    from mind import thoughtlog
 
     try:
         back = max(1, min(int(turns_back or 1), 50))
@@ -150,7 +150,7 @@ def _self_status():
     lines = []
 
     try:
-        import lmstudio
+        from core import lmstudio
 
         backend = {"llama": "llama-server", "lmstudio": "LM Studio"}.get(
             getattr(config, "LLM_BACKEND", ""), "an unknown server")
@@ -170,14 +170,14 @@ def _self_status():
         pass
 
     try:
-        import reflect
+        from mind import reflect
 
         lines.append(f"Started {timeutil.relative(reflect.START, datetime.now())}.")
     except Exception:
         pass
 
     try:
-        import mood
+        from mind import mood
 
         label, energy, warmth, why = mood.state()
 
@@ -189,7 +189,7 @@ def _self_status():
         pass
 
     try:
-        import reflect
+        from mind import reflect
 
         t = reflect.today()
 
@@ -218,8 +218,8 @@ def _self_status():
         pass
 
     try:
-        import longterm
-        import notebook
+        from mind import longterm
+        from mind import notebook
 
         n = notebook.counts()
         known = [f"{len(longterm.get_facts())} facts about the user", f"{n['lessons']} lessons about yourself",
@@ -244,7 +244,7 @@ def _self_status():
 
 
 # ---------------------------------------------------------------------------
-# Her notebook, from her side (notebook.py / reflect.py)
+# Her notebook, from her side (mind/notebook.py / mind/reflect.py)
 # ---------------------------------------------------------------------------
 def _show(line):
     try:
@@ -286,7 +286,7 @@ def _recall_episodes(query=""):
     if not _private():
         return _NOT_HERE
 
-    import notebook
+    from mind import notebook
 
     found = notebook.search_episodes(query, limit=3)
 
@@ -318,12 +318,12 @@ MAX_NOTED_PER_SESSION = 3
 
 def _approve(text):
     import config
-    import turnctx
+    from core import turnctx
     import ui
 
     if turnctx.current().source == "voice":
         try:
-            from speech import speak
+            from voice.speech import speak
 
             speak("Can I remember a lesson from that? It's on screen.")
         except Exception:
@@ -361,7 +361,7 @@ def _note_lesson(lesson):
         return _NOT_HERE
 
     import config
-    import notebook
+    from mind import notebook
 
     try:
         import llm
@@ -427,28 +427,28 @@ def _reflect_now():
     if not _private():
         return _NOT_HERE
 
-    import lmstudio
-    import reflect
+    from core import lmstudio
+    from mind import reflect
 
     return reflect.reflect_soon(lmstudio.model, show=_show)
 
 
 # ---------------------------------------------------------------------------
-# Skills: recipes for multi-step jobs that went right (skills.py)
+# Skills: recipes for multi-step jobs that went right (mind/skills.py)
 # ---------------------------------------------------------------------------
 _saved_skills = {"n": 0}
 MAX_SKILLS_PER_SESSION = 5
 
 
 def _skills_on():
-    import skills
+    from mind import skills
 
     return skills.enabled()
 
 
 def _approve_skill(name, when, steps, warn=""):
     import config
-    import turnctx
+    from core import turnctx
     import ui
 
     body = [f"name: {name}", f"use when: {when}", ""] + [f"{i}. {s}" for i, s in enumerate(steps, 1)]
@@ -463,7 +463,7 @@ def _approve_skill(name, when, steps, warn=""):
 
     if turnctx.current().source == "voice":
         try:
-            from speech import speak
+            from voice.speech import speak
 
             speak("Can I save how I did that? It's on screen.")
         except Exception:
@@ -500,7 +500,7 @@ def _save_skill(name, when, steps):
     if not _private():
         return _NOT_HERE
 
-    import skills
+    from mind import skills
 
     if _saved_skills["n"] >= MAX_SKILLS_PER_SESSION:
         return "You've saved enough recipes for one session - the rest can wait."
@@ -538,13 +538,13 @@ def _save_skill(name, when, steps):
 
 
 # ---------------------------------------------------------------------------
-# Ongoing projects (projects.py)
+# Ongoing projects (mind/projects.py)
 # ---------------------------------------------------------------------------
 MAX_ACTIVE_PROJECTS = 6
 
 
 def _projects_on():
-    import projects
+    from mind import projects
 
     return projects.enabled()
 
@@ -566,7 +566,7 @@ def _start_project(title, goal=""):
     if not _private():
         return _NOT_HERE
 
-    import projects
+    from mind import projects
 
     if len(" ".join(str(title or "").split())) < 4:
         return "Not started: give it a name, a few words."
@@ -605,7 +605,7 @@ def _update_project(project, tried="", found="", decided="", next="", status="")
     if not _private():
         return _NOT_HERE
 
-    import projects
+    from mind import projects
 
     p = projects.find(project)
 
@@ -651,7 +651,7 @@ def _project_notes(project):
     if not _private():
         return _NOT_HERE
 
-    import projects
+    from mind import projects
 
     p = projects.find(project)
 
@@ -674,7 +674,7 @@ def _project_notes(project):
 def _game_project():
     """The project of the game turn in flight, or None outside one. Set
     only by assistant.respond_to_job for a game plugin, on its turn."""
-    import turnctx
+    from core import turnctx
 
     return turnctx.current().project_id
 
@@ -698,7 +698,7 @@ def _game_note(found="", tried="", decided="", next=""):
     if not pid:
         return "Only during a game turn."
 
-    import projects
+    from mind import projects
 
     wrote = []
 

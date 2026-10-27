@@ -52,7 +52,7 @@ with `_` are helpers or notes and are never loaded as gestures.
  you: "I missed you"
         │
         ▼
- Luna's prompt offers her the tags     (gestures.py reads every gesture
+ Luna's prompt offers her the tags     (life/gestures.py reads every gesture
  [wave] [hug] [wink] ...                file with an "about" line)
         │
         ▼
@@ -85,7 +85,7 @@ is enough.
 
 | Trigger | How |
 |---------|-----|
-| She chooses | In `tags` mode (the default) her prompt offers a few gestures that fit her mood (names only), and she writes the tag where it fits. Private ones are only offered in your own conversations |
+| She chooses | In `tags` mode her prompt offers a few gestures that fit her mood (names only), and she writes the tag where it fits. Private ones are only offered in your own conversations |
 | Meaning | In `meaning` mode the embedding model compares what was said with each gesture's description |
 | Keywords | A word from a gesture's `keywords` inside an action she writes (`*beckons you closer*`), or its emoji anywhere. Also you saying hi or asking for a hug |
 | Chat | Viewers' `!wave`, `!hug`, a first "hi", "lol" (never private gestures) |
@@ -108,19 +108,24 @@ about: "sultry come-hither, teasing, inviting",          // tags and meaning
 keywords: ["beckon", "come hither", "crooks a finger"],  // keyword fallback
 ```
 
-### Tags (the default): she decides
+### Tags: she decides
+
+Not the default. Any line in her prompt about her body changes how a
+small model talks (more narrated actions, a different rhythm), so
+`keywords` is the default: gestures come from the actions she writes
+anyway, and her prompt stays exactly as her persona has it. Switch to
+`tags` for a bigger model that handles it well.
 
 Her system prompt gets one short line offering a few gestures that fit
-her mood right now, names only:
+her mood right now, names only, and nothing about how to write:
 
-> Body: you have an animated body on screen. To move, write one tag where
-> it happens: [hug] [blow_kiss] [giggle] [shy] [wink] [beckon_kiss]
-> [bounce] [wave]. Most replies need none, never more than one. The tag is
-> the move: don't describe moves in words, \*asterisks\* or (parentheses).
+> You can move on screen: put one of these where it fits: [hug]
+> [blow_kiss] [giggle] [shy] [wink] [beckon_kiss] [bounce] [wave]. Most
+> replies need none.
 
-About 80 tokens. Which names come up depends on her mood band (grudge,
+About 50 tokens. Which names come up depends on her mood band (grudge,
 cool, neutral, warm, loving, lewd; a sad mood puts `cry` first), from
-`BAND_PICKS` in `gestures.py`, and `portrait.gestures_offered` (8) sets how
+`BAND_PICKS` in `life/gestures.py`, and `portrait.gestures_offered` (8) sets how
 many. Lewd ones are only offered in the lewd band, and never while she's
 tame on stream.
 

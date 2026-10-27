@@ -15,7 +15,7 @@ from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 class PortraitWindow(unittest.TestCase):
     def setUp(self):
-        import portrait_window
+        from web import portrait_window
 
         self.m = portrait_window
         self.home = tempfile.mkdtemp()

@@ -8,7 +8,7 @@ import os
 from datetime import datetime as _datetime
 
 # When this run started - config is the first thing everything imports.
-# reflect.py uses it to tell this session's turns from the last one's.
+# mind/reflect.py uses it to tell this session's turns from the last one's.
 STARTED = _datetime.now()
 
 
@@ -81,7 +81,7 @@ RULES = agent.get("rules", [])
 
 # How her voice says the words Kokoro gets wrong ("nya" spelled out N-Y-A):
 # agent.json "pronounce": {"nya": "/njˈɑ/"}, phonemes in Kokoro's own set.
-# speech.py sends them as Kokoro's [word](/phonemes/) override; the screen
+# voice/speech.py sends them as Kokoro's [word](/phonemes/) override; the screen
 # never sees it.
 PRONOUNCE = agent.get("pronounce", {}) if isinstance(agent.get("pronounce"), dict) else {}
 
@@ -113,7 +113,7 @@ def _who(block):
 
 USER_NAME, (USER_THEY, USER_THEM, USER_THEIR), _USER_GAVE_PRONOUNS = _who(agent.get("user"))
 USER = USER_NAME or "the user"          # the subject of a prompt line: "when {USER} asks"
-# Others in the house (people.py): [{"name": "Shannon", "pronouns": "she/her"}]
+# Others in the house (senses/people.py): [{"name": "Shannon", "pronouns": "she/her"}]
 PEOPLE = [p for p in (agent.get("people") or []) if isinstance(p, dict) and p.get("name")]
 
 

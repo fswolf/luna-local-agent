@@ -48,7 +48,7 @@ _json_lock = threading.Lock()
 
 
 def _factstore():
-    import factstore
+    from mind import factstore
 
     return factstore
 
@@ -137,7 +137,7 @@ def state():
 
 
 def _notebook():
-    import notebook
+    from mind import notebook
 
     return notebook
 

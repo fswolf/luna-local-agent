@@ -6,10 +6,40 @@ ai-voice/
 ├── installer/        # install.sh, install.ps1, install.py, uninstall.py, requirements.txt
 ├── launch.py         # what start.sh / luna / luna.cmd run: voice server, then Luna
 ├── ai-voice-ctl.py
-├── alarm.py
-├── assistant.py
-├── chatroom.py
 ├── config.json
+├── core/             # the core loop:
+│   ├── assistant.py  #   one turn, typed or spoken, start to finish
+│   ├── turnctx.py    #   the running turn: who started it, its passes (job, Discord), what it has seen
+│   ├── interrupts.py #   stopping her: each turn's own Stop; HOME, barge-in, !stop
+│   ├── history.py, transcript.py  # the conversation, and the full record summaries never touch
+│   ├── logbook.py    #   the debug log (/log)
+│   ├── lmstudio.py, mcpclient.py, chatroom.py, control.py, machine.py, firstrun.py, timeutil.py
+├── mind/             # what she knows and how she thinks about it:
+│   ├── longterm.py, factstore.py, embedmem.py  # facts, the sqlite store, recall by meaning
+│   ├── knowledge.py  #   your notes, manuals and PDFs
+│   ├── notebook.py   #   her lessons and conversation notes (agent/notebook.db)
+│   ├── skills.py, projects.py  # recipes for multi-step jobs, ongoing projects
+│   ├── thoughtlog.py #   her reasoning, per turn (agent/thoughts.db)
+│   ├── reflect.py    #   what she does while idle: session notes, the dream pass, fact cleanup, the greeting
+│   ├── grounding.py  #   specifics in a reply that nothing she was given backs up
+│   ├── situation.py  #   the live lines at the top of each turn: window, music, load, her hands
+│   ├── mood.py       #   how she feels, and what moves it
+│   └── webpage.py, websearch.py  # reading pages and searching, for research
+├── senses/           # what she perceives:
+│   ├── camera.py, vision.py, desktop.py  # the webcam, the screen, the desktop
+│   ├── presence.py   #   the webcam watching: arrivals, where you are, an empty room
+│   ├── facecheck.py  #   one quick look to see who's at the desk
+│   ├── voices.py     #   whose voice it is, by SpeechBrain's speaker model
+│   └── people.py     #   who's who: owner, registered, guests, strangers; their own facts
+├── voice/            # hearing and speaking: speech.py, ptt.py (push to talk), wakeword.py
+├── life/             # her own days: coffee.py, reading.py, touches.py, gestures.py, reminders.py, alarm.py
+├── web/              # her pages, served on 127.0.0.1:8792:
+│   ├── livefeed.py   #   the live monitor and the portrait (python -m web.livefeed opens one alone)
+│   ├── settings_web.py, help_web.py  # /settings/ and /help/
+│   ├── portrait_window.py  # /portrait's window of its own (no address bar)
+│   ├── holofan.py    #   hologram fans (python -m web.holofan sim)
+│   ├── station.py, satellites.py  # relay stations in other rooms, ESPHome satellites
+│   └── live.html, settings.html, station.html  # the pages themselves
 ├── config/           # every setting, one namespace (config.X); one file per area:
 │   ├── __init__.py   #   the namespace itself, plus /set (current, save_setting) and plugin_settings
 │   ├── base.py       #   where things are read from, and her persona
@@ -18,11 +48,7 @@ ai-voice/
 │   ├── permissions.py, chat.py, mind.py, portrait.py, actions.py
 │   ├── schema.py     #   what every setting is: its kind, choices and the line explaining it; BASIC
 │   └── presets.py    #   Assistant, Companion, Streamer: several settings at once
-├── control.py
-├── desktop.py
 ├── diagnose.py
-├── factstore.py
-├── history.py
 ├── kokoro-say.py
 ├── llm/              # the conversation engine, one job per file:
 │   ├── prompts.py    #   the system prompt and generation parameters
@@ -32,28 +58,10 @@ ai-voice/
 │   ├── second_look.py#   adaptive thinking, rethink, vote, calibration, grounding
 │   ├── turns.py      #   ask(): one turn end to end; prompt_budget() for /context
 │   └── session.py    #   session switches (are tools working?)
-├── lmstudio.py
-├── logbook.py
-├── longterm.py
-├── machine.py
-├── mcpclient.py      # MCP servers' tools as hers - config.json "mcp", /mcp
-├── main.py
-├── mood.py
-├── notebook.py       # her lessons and conversation notes (agent/notebook.db)
-├── reflect.py        # what she does while idle - session notes, the dream pass, fact cleanup, the greeting
-├── skills.py         # her recipes for multi-step jobs (agent/skills.db)
-├── projects.py       # ongoing projects: goal, log of tried/found, next step (agent/projects.db)
-├── grounding.py      # the grounding check: specifics in a reply that nothing she was given backs up
-├── situation.py      # the live lines at the top of each turn: window, music, load, plugins, next reminder, her hands
+├── main.py           # startup and the main loop; typed /commands go to commands/
+├── commands/         # every /command, one module per area (app, reminders, settings,
+│                     #   voice, life, portrait, memory, people, plugins); handle(text)
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
-├── embedmem.py       # recalling facts by meaning (and reranking), when those servers are up
-├── livefeed.py       # the live monitor - /monitor, 127.0.0.1:8792 (and /portrait)
-├── settings_web.py   # the settings page - /settings, 127.0.0.1:8792/settings/
-├── firstrun.py       # the first start: your name, pronouns and a preset
-├── presence.py       # the webcam watching: arrivals, where you are, an empty room
-├── people.py         # who's who: face and voice prints, each person's own facts (agent/people/)
-├── voices.py         # whose voice it is, by SpeechBrain's speaker model
-├── holofan.py        # hologram fans: the Holoscope WiFi protocol, and a pretend fan to test with
 ├── portrait/         # her animated portrait
 │   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
 │   │                 #   look.js (where she looks), emotes.js (hearts, sweat drop...),
@@ -67,7 +75,6 @@ ai-voice/
 ├── memory-manager/
 │   ├── manager.py
 │   └── start.sh
-├── thoughtlog.py     # her reasoning, per turn (agent/thoughts.db)
 ├── thought-viewer/
 │   ├── viewer.py
 │   └── start.sh
@@ -86,13 +93,7 @@ ai-voice/
 │   ├── chessgame.py  # chess against her on a board page - /chess
 │   ├── realiti.py    # she lives in a REALITI city of AI agents
 │   └── discord.py    # remote access for the owner over Discord
-├── ptt.py
-├── reminders.py
-├── speech.py
-├── interrupts.py     # stopping her: each turn's own Stop (speaking, generating, listening); HOME, barge-in, !stop
-├── turnctx.py        # the running turn: who started it, its passes (job, Discord), what it has seen
 ├── tests/            # python -m unittest discover tests - turn safety, stopping her
-├── timeutil.py
 ├── tools/
 │   ├── __init__.py   # the registry - @tool, specs, the on/off switches
 │   ├── time.py       # one module per group, matching the tools pane
@@ -104,22 +105,17 @@ ai-voice/
 │   ├── shell.py      # run_command - every command asks
 │   ├── introspect.py # the Self group - introspect, self_status, recall_episodes, note_lesson, reflect_now
 │   └── manual.py     # read_manual - her own docs, so she can say how to use her
-├── transcript.py
 ├── ui/               # the TUI (prompt_toolkit), one job per file:
 │   ├── shared.py     #   the conversation, the status fields, where the view is
 │   ├── messages.py   #   what the rest of Luna calls: add_message, set_status...
 │   ├── text.py       #   widths, wrapping, frames
 │   ├── conversation_pane.py # the conversation pane and the status bar
-│   ├── help.py       #   the help pane
+│   ├── launcher.py   #   the pages pane: opens portrait, settings, memory... in the browser
+│   ├── help.py       #   what the help says (the /help/ page, help_web.py)
 │   ├── tools_pane.py #   the tools pane
 │   ├── settings_pane.py # the settings pane: the everyday settings, `a` for all
 │   ├── approval.py   #   the permission popup (ask_approval)
 │   └── app.py        #   style, keys, run(), stop()
-├── vision.py
-├── voice_loop_kokoro.py
-├── wakeword.py
-├── webpage.py
-├── websearch.py
 │
 ├── agent/
 │   ├── agent.json

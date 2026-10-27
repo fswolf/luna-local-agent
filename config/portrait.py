@@ -31,7 +31,7 @@ PORTRAIT_SIZE = str(_portrait_cfg.get("size", "420x560"))
 FRAMES = ("bust", "full")
 # Touching her portrait (portrait/touch.json): she reacts there at once,
 # and with touch_talk on she also answers out loud in one short line
-# (touches.py), at most once every touch_talk_cooldown seconds.
+# (life/touches.py), at most once every touch_talk_cooldown seconds.
 PORTRAIT_TOUCH_TALK = bool(_portrait_cfg.get("touch_talk", True))
 PORTRAIT_TOUCH_TALK_COOLDOWN = float(_portrait_cfg.get("touch_talk_cooldown", 12))
 PORTRAIT_FRAME = str(_portrait_cfg.get("frame", "bust")).lower()
@@ -63,12 +63,14 @@ PORTRAIT_LIGHTS_BRIGHTNESS = max(0.0, min(2.0, float(PORTRAIT_LIGHTS.get("bright
 PORTRAIT_LIGHTS_VOICE = bool(PORTRAIT_LIGHTS.get("voice", True))
 PORTRAIT_LIGHTS_PRIVATE = bool(PORTRAIT_LIGHTS.get("private", True))
 PORTRAIT_LIGHTS_STYLE = "plain" if str(PORTRAIT_LIGHTS.get("style", "neon")).lower() == "plain" else "neon"
-# Gestures on a 3D model (gestures.py, portrait/viewer/gestures.js). How her
-# replies set them off: "tags" (she picks, keywords as fallback),
-# "meaning" (the embedding model, keywords as fallback), "keywords",
-# "off". chat_gestures: viewers' !hug, hi, lol. meaning_margin: how far
+# Gestures on a 3D model (life/gestures.py, portrait/viewer/gestures.js). How her
+# replies set them off: "keywords" (the default: actions she writes
+# anyway, *hugs* or (waves hello), nothing added to her prompt), "tags"
+# (her prompt offers a few [tags] to write), "meaning" (the embedding
+# model), "off". Keywords is the default because anything in her prompt
+# about her body changes how a small model talks. chat_gestures: viewers' !hug, hi, lol. meaning_margin: how far
 # a gesture must beat an ordinary reply in meaning mode.
-PORTRAIT_GESTURES = str(_portrait_cfg.get("gestures", "tags"))
+PORTRAIT_GESTURES = str(_portrait_cfg.get("gestures", "keywords"))
 PORTRAIT_CHAT_GESTURES = bool(_portrait_cfg.get("chat_gestures", True))
 PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
 # tags mode: how many gesture names she's offered at once (fitting her mood)
@@ -77,7 +79,7 @@ PORTRAIT_GESTURES_OFFERED = int(_portrait_cfg.get("gestures_offered", 8))
 # gesture file names one, sound: 'touch-self'. No file there, no sound.
 # sound_volume 0-1.
 PORTRAIT_SOUNDS = bool(_portrait_cfg.get("sounds", True))
-# Her morning coffee (coffee.py): once a day, between from and to (hours,
+# Her morning coffee (life/coffee.py): once a day, between from and to (hours,
 # 24h clock), the first time you're around she picks up her mug, takes a
 # sip every few minutes, and puts it down after `minutes`. Each sip wakes
 # her up a little (energy, 0 for none).
@@ -89,7 +91,7 @@ PORTRAIT_COFFEE_TO = int(_coffee_cfg.get("to", 11))
 PORTRAIT_COFFEE_MINUTES = float(_coffee_cfg.get("minutes", 40))
 PORTRAIT_COFFEE_SIP_MINUTES = float(_coffee_cfg.get("sip_minutes", 4))
 PORTRAIT_COFFEE_WAKE = float(_coffee_cfg.get("wake", 0.03))
-# She reads a book (reading.py) when nobody has talked to her for `after`
+# She reads a book (life/reading.py) when nobody has talked to her for `after`
 # minutes, turning a page now and then, and puts it down when you're back
 # (or after `minutes`).
 #   "reading": { "enabled": true, "after": 10, "minutes": 60 }
@@ -98,7 +100,7 @@ PORTRAIT_READING = bool(_reading_cfg.get("enabled", True))
 PORTRAIT_READING_AFTER = max(1.0, float(_reading_cfg.get("after", 10)))
 PORTRAIT_READING_MINUTES = max(1.0, float(_reading_cfg.get("minutes", 60)))
 PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume", 0.8))))
-# Hologram fans (holofan.py, docs/fans.md). An HDMI fan just shows
+# Hologram fans (web/holofan.py, docs/fans.md). An HDMI fan just shows
 # /portrait/?fan=1. A WiFi fan run by the Holoscope app (P56, PD42...) gets
 # her live with cast on: Luna listens on TCP 6666 and announces herself on
 # UDP 8988. framing "full" or "bust"; scale/x/y move her in the circle;
@@ -113,13 +115,13 @@ if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
     # Its three expressions, so moods show on her face out of the box.
     PORTRAIT_LIVE2D = {"expressions": {"sad": "tears", "flustered": "x_eyes", "confused": "spiral_eyes"}}
 
-# MCP servers whose tools she can use (mcpclient.py). Read at startup.
+# MCP servers whose tools she can use (core/mcpclient.py). Read at startup.
 #   "mcp": { "enabled": true, "servers": { "obs": {"command": "...", "args": [...]} } }
 _mcp_cfg = setting("mcp", {})
 MCP_ENABLED = bool(_mcp_cfg.get("enabled", True))
 MCP_SERVERS = dict(_mcp_cfg.get("servers", {}) or {})
 
-# The live monitor (livefeed.py): a page served by the assistant on
+# The live monitor (web/livefeed.py): a page served by the assistant on
 # 127.0.0.1, showing each turn as it happens. Read at startup.
 #   "monitor": { "enabled": true, "port": 8792 }
 _monitor_cfg = setting("monitor", {})

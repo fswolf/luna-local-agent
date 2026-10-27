@@ -60,7 +60,7 @@ import urllib.error
 import urllib.request
 
 import config
-import logbook
+from core import logbook
 
 from plugins import _toys
 

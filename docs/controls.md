@@ -5,14 +5,17 @@
 | Home | Push to talk: depends on the voice mode below |
 | Home *(while she's thinking or talking)* | Cancel the turn |
 | Enter | Send typed message |
-| Tab | Open / close the help panel |
-| PgUp / PgDn | Scroll the conversation, or the help when it's open |
-| Tab | Cycle conversation → help → tools → settings; the input bar names the next stop |
+| PgUp / PgDn | Scroll the conversation, or move in an open pane |
+| Tab | Cycle conversation → pages → tools → settings; the input bar names the next stop |
 | F2 | Toggle mouse capture: see below |
 | End | Jump back to the newest message |
 | Esc | Quit |
 
-<img width="1210" alt="Help panel" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-help.png" />
+**Pages** (Tab once) opens her pages in your browser: the portrait, the
+OBS address, settings, the live monitor, her thoughts, her memory, the
+help (every command and key, searchable) and any page a plugin adds, like
+the chess board. Up/down or the wheel picks one; Enter, space or a click
+opens it. `/help` opens the help page straight away.
 
 ## Selecting text
 

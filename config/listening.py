@@ -101,7 +101,7 @@ STT_BARGE_IN_BOOST = float(_stt_cfg.get("barge_in_boost", 0.25))
 #
 # model is either a path to one you trained with openWakeWord, or the
 # name of one of theirs (hey_jarvis, alexa, hey_mycroft, hey_rhasspy).
-# There is no pretrained "hey Luna" - see wakeword.py.
+# There is no pretrained "hey Luna" - see voice/wakeword.py.
 _wake_cfg = setting("wake_word", {})
 WAKE_WORD_ENABLED = bool(_wake_cfg.get("enabled", False))
 WAKE_WORD_MODEL = _wake_cfg.get("model", "hey_jarvis")

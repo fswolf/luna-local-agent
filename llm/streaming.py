@@ -11,12 +11,11 @@ import requests
 
 import config
 from config import LM_URL, LLM_HEADERS
-import gestures
-import interrupts
-import livefeed
-import lmstudio
-import logbook
-import replystyle
+from life import gestures
+from core import interrupts
+from web import livefeed
+from core import lmstudio
+from core import logbook
 
 def _chat_completion(payload, narrator=None):
     """POST to LM_URL and return the reply *message* (not just its text,
@@ -273,9 +272,8 @@ def _visible(raw):
     if opened:
         text = text[:opened.start()]
 
-    # A gesture tag ([hug]) goes to the portrait, not the screen or the voice,
-    # and a bracketed action is written the role-play way (replystyle.py)
-    text = replystyle.tidy(gestures.strip(text))
+    # A gesture tag ([hug]) goes to the portrait, not the screen or the voice.
+    text = gestures.strip(text)
 
     return re.sub(r"<[a-z_/=]{0,12}$", "", text, flags=re.IGNORECASE)
 
@@ -671,4 +669,4 @@ def _content(message):
     if "<think>" in content:
         content = content.split("<think>", 1)[0]
 
-    return replystyle.tidy(gestures.strip(content)).strip()
+    return gestures.strip(content).strip()

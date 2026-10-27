@@ -1,70 +1,10 @@
-"""The help pane (Tab, once): what it says and how it scrolls.
+"""What the help says: every command and key, in sections. Shown as a page
+in the browser (web/help_web.py, /help, or Help in the launcher pane), not in
+the terminal any more.
 
 Part of the ui package (it was one ui.py); see ui/__init__.py.
 """
-from prompt_toolkit.data_structures import Point
-from prompt_toolkit.layout.controls import FormattedTextControl
-from prompt_toolkit.mouse_events import MouseEventType
-
-from .shared import _events, _refresh, state, view
-from .conversation_pane import WHEEL_LINES
-from .text import _keyed, _rendered_lines
-
-
-# ---------------------------------------------------------------------------
-# Scrolling the help window
-#
-# Same machinery as the conversation, measured from the other end: the
-# conversation counts back from the newest line because that is where
-# you live, help counts down from the top because it's a document. Both
-# route the wheel through their own counter for the reason documented on
-# _ConversationControl - Window's own wheel handling is overwritten by
-# get_vertical_scroll on every render.
-# ---------------------------------------------------------------------------
-def _help_line_count():
-    return _rendered_lines(_help_fragments())
-
-
-def _help_height():
-    if view.help_window is not None and view.help_window.render_info is not None:
-        return max(1, view.help_window.render_info.window_height)
-
-    return 10
-
-
-def _help_scroll_by(lines):
-    """Positive is further down the page."""
-
-    view.help_scroll = max(0, min(
-        view.help_scroll + lines,
-        max(0, _help_line_count() - _help_height()),
-    ))
-    _refresh()
-
-
-def _help_scroll_position(window):
-    return view.help_scroll
-
-
-def _help_cursor():
-    return Point(x=0, y=view.help_scroll)
-
-
-class _HelpControl(FormattedTextControl):
-    def mouse_handler(self, mouse_event):
-        if mouse_event.event_type == MouseEventType.SCROLL_UP:
-            _events["help_wheel"] += 1
-            _help_scroll_by(-WHEEL_LINES)
-            return None
-
-        if mouse_event.event_type == MouseEventType.SCROLL_DOWN:
-            _events["help_wheel"] += 1
-            _help_scroll_by(WHEEL_LINES)
-            return None
-
-        _events["other_mouse"] += 1
-
-        return super().mouse_handler(mouse_event)
+from .shared import state
 
 
 # What HOME does depends on the recording mode, so the help says what
@@ -97,11 +37,11 @@ _HELP_SECTIONS = [
     ("Keys", [
         ("(HOME)", None),  # filled in from the current mode
         ("(Enter)", "send message"),
-        ("(PgUp/PgDn)", "scroll the pane - conversation or this help"),
+        ("(PgUp/PgDn)", "scroll the conversation, or move in a pane"),
         ("(wheel)", "same - arrow keys too"),
         ("(F2)", "mouse capture: wheel scroll vs selecting text"),
-        ("(End)", "back to newest / top of help"),
-        ("(Tab)", "cycle: conversation, help, tools, settings"),
+        ("(End)", "back to the newest line"),
+        ("(Tab)", "cycle: conversation, launcher (open a page), tools, settings"),
         ("(ESC)", "quit"),
     ]),
     ("Voice modes", [
@@ -257,42 +197,22 @@ _HELP_SECTIONS = [
 ]
 
 
-def _help_fragments():
-    mode = state.get("mode", "auto")
-    fragments = [("", "\n")]  # breathing room under the title
-
-    for section, rows in _HELP_SECTIONS:
-        fragments.append(("class:label bold", f" {section}\n"))
-
+def sections(mode=None):
+    """[(title, [(command, description) | note string])] with the rows that
+    depend on the voice mode filled in."""
+    mode = mode or state.get("mode", "auto")
+    out = []
+    for title, rows in _HELP_SECTIONS:
+        filled = []
         for entry in rows:
-            # A bare string is a note line - dim, indented, no column.
             if isinstance(entry, str):
-                fragments.append(
-                    ("class:footer", f"   {entry}\n" if entry else "\n")
-                )
+                filled.append(entry)
                 continue
-
             key, description = entry
-
             if key == "(HOME)":
                 description = _HOME_BY_MODE.get(mode, _HOME_BY_MODE["auto"])
             elif key == "/mode":
                 description = f"auto | manual | open   (now: {mode})"
-
-            style = "class:key" if key.startswith("(") else "class:agent"
-            # Pad to the column, but never glue a long command straight
-            # onto its description.
-            fragments.append((style, f"   {key:<15}"))
-            fragments.append(
-                ("class:text", f" {description}\n" if description else "\n")
-            )
-
-        fragments.append(("", "\n"))
-
-    note = state.get("controls")
-
-    if note:
-        fragments.extend(_keyed(f" {note}", "class:footer"))
-        fragments.append(("", "\n"))
-
-    return fragments
+            filled.append((key, description or ""))
+        out.append((title, filled))
+    return out

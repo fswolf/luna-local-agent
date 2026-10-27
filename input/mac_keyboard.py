@@ -2,11 +2,11 @@ import os
 import ui
 
 from pynput import keyboard
-from ptt import toggle
+from voice.ptt import toggle
 
 
 def _handle_home(model):
-    # The same HOME as every other input path (ptt.py): start, finish a
+    # The same HOME as every other input path (voice/ptt.py): start, finish a
     # manual recording, or stop - and hands-free in open mode.
     toggle(model)
 

@@ -117,7 +117,7 @@ class Settings(unittest.TestCase):
         self.assertEqual(coerce("portrait.lights.brightness", "5"), 2.0)
 
     def test_page_gets_them(self):
-        import livefeed
+        from web import livefeed
 
         with mock.patch.object(config, "PORTRAIT_LIGHTS_ENABLED", True, create=True), \
              mock.patch.object(config, "PORTRAIT_LIGHTS_COLOR", "#22e0ff", create=True):

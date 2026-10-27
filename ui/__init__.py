@@ -21,7 +21,8 @@ The package, one job per file:
   messages.py           what the rest of Luna calls: add_message, set_status...
   text.py               widths, wrapping, frames
   conversation_pane.py  the conversation pane and the status bar
-  help.py               the help pane
+  launcher.py           the launcher pane: open her pages in the browser
+  help.py               what the help says (shown as a page, web/help_web.py)
   tools_pane.py         the tools pane: switches, groups, permissions
   approval.py           the permission popup (ask_approval)
   app.py                the application itself: style, keys, run(), stop()

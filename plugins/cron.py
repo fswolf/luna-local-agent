@@ -29,7 +29,7 @@ import threading
 from datetime import datetime
 
 import config
-import logbook
+from core import logbook
 import tools
 
 NAME = "cron"
@@ -188,7 +188,7 @@ def _tools():
 # Running them
 # ---------------------------------------------------------------------------
 def _fire(job):
-    import assistant
+    from core import assistant
 
     prompt = (f'(Scheduled job "{job["name"]}", set up earlier by the user. '
               f"Do it now: {job['task']}\n"

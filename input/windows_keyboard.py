@@ -2,13 +2,13 @@ import os
 import ui
 
 from pynput import keyboard
-from ptt import toggle
+from voice.ptt import toggle
 
 
 def on_press(key, model):
     try:
         if key == keyboard.Key.home:
-            # The same HOME as every other input path (ptt.py): start,
+            # The same HOME as every other input path (voice/ptt.py): start,
             # finish a manual recording, or stop - and hands-free in open mode.
             toggle(model)
 

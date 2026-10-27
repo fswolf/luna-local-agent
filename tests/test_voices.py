@@ -1,5 +1,5 @@
-"""Telling people apart by voice (voices.py), deciding who's talking
-(people.decide), and a guest's own memories (people.py + longterm.py).
+"""Telling people apart by voice (senses/voices.py), deciding who's talking
+(people.decide), and a guest's own memories (senses/people.py + mind/longterm.py).
 No speaker model here: voice prints are faked, files go to a temp folder.
 
     python -m unittest discover tests        (from the repo folder)
@@ -18,11 +18,11 @@ from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 import numpy as np  # noqa: E402
 
 import config  # noqa: E402
-import longterm  # noqa: E402
-import people  # noqa: E402
-import presence  # noqa: E402
-import turnctx  # noqa: E402
-import voices  # noqa: E402
+from mind import longterm  # noqa: E402
+from senses import people  # noqa: E402
+from senses import presence  # noqa: E402
+from core import turnctx  # noqa: E402
+from senses import voices  # noqa: E402
 
 SHANNON, RYAN = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]
 

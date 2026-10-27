@@ -78,7 +78,7 @@ if isinstance(_old_enabled, (list, tuple)):
 # The webcam, for look_at_camera. The switch is the tool's row in the
 # tools pane; these only say which camera and how big.
 #   "camera": { "device": 0, "width": 1280, "warmup": 5 }
-# Her knowledge base (knowledge.py): folders of your notes, manuals,
+# Her knowledge base (mind/knowledge.py): folders of your notes, manuals,
 # PDFs and docs she can look things up in. The index is a cache outside
 # the repo (~/.cache/ai-voice/knowledge.db). The default folder is
 # agent/knowledge/ beside her other files. It ships with the repo as a
@@ -110,7 +110,7 @@ CAMERA_WARMUP = int(_camera_cfg.get("warmup", 5))
 CAMERA_BEFORE = str(_camera_cfg.get("before", "") or "")
 CAMERA_AFTER = str(_camera_cfg.get("after", "") or "")
 
-# Presence (presence.py): the webcam kept open at a few checks a second to
+# Presence (senses/presence.py): the webcam kept open at a few checks a second to
 # notice someone in front of it. Greets you when you come back after
 # greet_after_minutes, looks at you while you're there, stays quiet when
 # nobody has been there for quiet_after_minutes, and knows faces enrolled
@@ -127,20 +127,20 @@ PRESENCE_QUIET_AFTER = float(_presence_cfg.get("quiet_after_minutes", 5))
 PRESENCE_RECOGNISE = bool(_presence_cfg.get("recognise", True))
 PRESENCE_MATCH = float(_presence_cfg.get("match", 0.36))
 
-# People (people.py, voices.py): telling the people in the house apart.
+# People (senses/people.py, senses/voices.py): telling the people in the house apart.
 # voice: match each spoken turn's voice against enrolled voice prints
 # (needs the voices extra). voice_match: how alike a voice must be, 0-1.
 _people_cfg = setting("people", {})
 PEOPLE_VOICE = bool(_people_cfg.get("voice", True))
 PEOPLE_VOICE_MATCH = float(_people_cfg.get("voice_match", 0.3))
-# face_check (facecheck.py): with presence off, one quick camera look to see
+# face_check (senses/facecheck.py): with presence off, one quick camera look to see
 # who's typing, or who's talking when the voice match isn't sure. Counts for
 # face_check_minutes; a look gets face_check_seconds before the turn goes on.
 PEOPLE_FACE_CHECK = bool(_people_cfg.get("face_check", False))
 PEOPLE_FACE_CHECK_MINUTES = float(_people_cfg.get("face_check_minutes", 10))
 PEOPLE_FACE_CHECK_SECONDS = float(_people_cfg.get("face_check_seconds", 2))
 
-# Relay stations (station.py): talk to her from another room on an old phone
+# Relay stations (web/station.py): talk to her from another room on an old phone
 # or tablet. Off until switched on; then she listens on your home network only
 # (port, and port + 1 for the setup page), each device paired by QR code.
 _station_cfg = setting("station", {})

@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import knowledge  # noqa: E402
+from mind import knowledge  # noqa: E402
 
 GUIDE = """# A game: map
 Audience: Luna
@@ -130,7 +130,7 @@ class GuideSearch(unittest.TestCase):
 
 class OlderNotesAboutHere(unittest.TestCase):
     def setUp(self):
-        import projects
+        from mind import projects
         self.projects = projects
         self.tmp = tempfile.mkdtemp()
         self.patch = mock.patch.object(projects, "DB_FILE", os.path.join(self.tmp, "projects.db"),

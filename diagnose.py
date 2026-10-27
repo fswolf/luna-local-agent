@@ -273,7 +273,7 @@ def _layers():
     """Cumulative prompt layers, bare to real. Returns (label, messages,
     extra_params) tuples."""
     import config
-    import history
+    from core import history
     import llm
 
     text, _wanted = BISECT_PROBE
@@ -348,8 +348,8 @@ def _unrecorded_claims():
     """How many stored turns answered a reminder request without calling
     anything. Counted rather than guessed at, because "history breaks
     it" and "these five turns break it" call for different fixes."""
-    import history
-    import reminders
+    from core import history
+    from life import reminders
 
     messages = history.get_messages_full()
     count = 0

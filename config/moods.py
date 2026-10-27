@@ -1,11 +1,11 @@
-"""Her moods (mood.py): on/off, how far they swing, where they show,
+"""Her moods (mind/mood.py): on/off, how far they swing, where they show,
 walking away.
 
 Part of the config package (it was one config.py); see config/__init__.py.
 """
 from .base import setting
 
-# How she happens to be feeling - see mood.py. Colours tone only, mostly
+# How she happens to be feeling - see mind/mood.py. Colours tone only, mostly
 # from free signals (clock, session length, errors, barge-ins), plus one
 # small model call after your turn (mood.affection). The names, lines,
 # faces and voices of the moods themselves are in agent/moods.json.

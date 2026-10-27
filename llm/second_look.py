@@ -6,8 +6,8 @@ Part of the llm package (it was one llm.py); see llm/__init__.py.
 import re
 
 import config
-import livefeed
-import logbook
+from web import livefeed
+from core import logbook
 
 from .prompts import _calibration_note
 from .replay import _strip_leading_timestamps
@@ -44,7 +44,7 @@ def _same_answer(a, b):
         return a == b
 
     try:
-        import embedmem
+        from mind import embedmem
 
         if embedmem.available():
             va, vb = embedmem._embed([a, b])
@@ -139,7 +139,7 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
     """A deeper second look at a shaky reply. Returns None when the
     first reply was sure enough, otherwise a dict with both passes'
     thinking and tokens, the outcome, and what (if anything) was said."""
-    import thoughtlog
+    from mind import thoughtlog
 
     first = {"thinking": _last_raw.get("thinking") or [],
              "tokens": _last_raw.get("tokens") or [],
@@ -263,7 +263,7 @@ def _calibrate(answer, second, remember, on_text, on_sentence):
         return answer
 
     try:
-        import thoughtlog
+        from mind import thoughtlog
 
         if second:
             shape = thoughtlog.confidence(second["second" if second["corrected"] else "first"]["tokens"])
@@ -343,7 +343,7 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
     alone, so the vote changes what she knows, never how she sounds.
 
     Returns the same shape _rethink does, so ask() treats them alike."""
-    import thoughtlog
+    from mind import thoughtlog
 
     first = {"thinking": _last_raw.get("thinking") or [],
              "tokens": _last_raw.get("tokens") or [],
@@ -473,7 +473,7 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
 
 
 # ---------------------------------------------------------------------------
-# Grounding: specifics she stated with nothing behind them (grounding.py)
+# Grounding: specifics she stated with nothing behind them (mind/grounding.py)
 # ---------------------------------------------------------------------------
 def _evidence(payload):
     """What she had in front of her this turn: the system prompt, every
@@ -501,7 +501,7 @@ def _ground(answer, first_answer, second, payload, base_messages, model, on_text
     """(answer, first_answer, extra_flags, checked) after the grounding
     check - `checked` when it sent her back to verify with a tool."""
     try:
-        import grounding
+        from mind import grounding
 
         loose, strong = grounding.check(answer, _evidence(payload))
     except Exception:

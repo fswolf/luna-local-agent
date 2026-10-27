@@ -475,7 +475,7 @@ and does small things on her own:
 | Blow a kiss, shy | Affectionate ones, for people who role-play with her: fingers to her lips then blown your way; hands together at her chest, looking away, then a peek. Only in your own conversations: never from stream chat, and never offered to her in a chat room's turn |
 | Cry | She writes `[cry]`, or she stays deeply sad for several seconds: tears well on her lower lids, streak down her cheeks with drops running along them, and the cry gesture adds a lowered head and shoulders hitching with sobs. They dry slowly. `"vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}` in luna.json moves them for a non-VRoid face |
 | Morning coffee | Once a day in the morning, the first time you're around, she picks up her mug, takes a sip every few minutes (each one wakes her up a little) and puts it down when it's finished. Not in the lewd row: the morning cup waits until she's out of it, and goes down if she gets there mid-cup. It also waits while she's reading. `/coffee` pours one now (that one stays), `/coffee off` puts it down. Settings: `portrait.coffee.*` |
-| Reading | When nobody has talked to her for 10 minutes and her portrait is open, she brings up a book (*The Moonlit Library*; up close you can read the page) and reads, turning a page or looking up at you over it every minute or so. When you talk to her, or presence sees you come back, she looks up and puts it down. Not in the lewd or grudge row, not with her coffee in hand (one thing in her hands at a time). She knows what she's reading (`reading.py` BOOK, the story drawn on the pages), so you can ask her about it. `/read` starts it now, `/read off` stops, `/read page` and `/read look` for the moves. Settings: `portrait.reading.*` (`after` minutes of quiet, at most `minutes` of reading) |
+| Reading | When nobody has talked to her for 10 minutes and her portrait is open, she brings up a book (*The Moonlit Library*; up close you can read the page) and reads, turning a page or looking up at you over it every minute or so. When you talk to her, or presence sees you come back, she looks up and puts it down. Not in the lewd or grudge row, not with her coffee in hand (one thing in her hands at a time). She knows what she's reading (`life/reading.py` BOOK, the story drawn on the pages), so you can ask her about it. `/read` starts it now, `/read off` stops, `/read page` and `/read look` for the moves. Settings: `portrait.reading.*` (`after` minutes of quiet, at most `minutes` of reading) |
 | Blush | Rises with a hug, a kiss or shy, when her warmth jumps (flustered, then fading over a few seconds), and a little while warmth stays high |
 
 ### The pose studio: making gestures without code
@@ -553,7 +553,7 @@ touching a slider starts it). Then the tabs:
   carries it. A `.glb` dropped in `portrait/props/` shows up in the list
   as a new prop; name its gestures `<prop>_pickup` and `<prop>_putdown` and
   they're the ones that pick it up and put it down. What sets that off is
-  still code: `coffee.py` is the example to copy.
+  still code: `life/coffee.py` is the example to copy.
 
 **save** writes `portrait/gestures/<name>.js` - plain data, the same shape as the
 hand-written files - and it plays straight away (other menus show it after
@@ -653,9 +653,9 @@ gestures <mode>`.
 
 | Mode | How | Cost |
 |------|-----|------|
-| `tags` (default) | She picks. A line in her prompt lets her put one hidden tag like `[hug]` where it fits; it's cut out before anything is shown, spoken or saved, and sent to the portrait. Keywords catch what she forgets | About 80 prompt tokens for a few gestures that fit her mood (`portrait.gestures_offered`) and a few output tokens when she uses one. No extra time |
+| `keywords` (default) | Only `*hugs*`, `*waves*`, 🤗, a move she describes like "(waves hello)", and your hi or hug request. Nothing is added to her prompt, so it never changes how she talks | Nothing |
+| `tags` | She picks. A line in her prompt lets her put one hidden tag like `[hug]` where it fits; it's cut out before anything is shown, spoken or saved, and sent to the portrait. Keywords catch what she forgets | About 50 prompt tokens for a few gestures that fit her mood (`portrait.gestures_offered`) and a few output tokens when she uses one. No extra time |
 | `meaning` | After she answers, the embedding model compares what was said with a short description of each gesture, and plays the one that clearly beats "an ordinary reply". Keywords as a fallback | One embedding call per reply, 10 to 30 ms, off the turn's path. Needs the embedding server; without it this is keywords only |
-| `keywords` | Only `*hugs*`, `*waves*`, 🤗 and the like in what she writes, and your hi or hug request | Nothing |
 | `off` | Nothing from the conversation. Idle moves and chat still work | Nothing |
 
 The tag line only goes in her prompt while the portrait model is a 3D

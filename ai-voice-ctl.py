@@ -9,7 +9,7 @@ runs outside the assistant's virtualenv.
     python3 ai-voice-ctl.py quit
 
 Linux and macOS: a unix socket. Windows: a localhost port and a key,
-read from %LOCALAPPDATA%\\ai-voice\\control.json (see control.py).
+read from %LOCALAPPDATA%\\ai-voice\\control.json (see core/control.py).
 """
 import json
 import os

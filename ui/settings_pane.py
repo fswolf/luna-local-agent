@@ -2,7 +2,7 @@
 section, each with its value, a line saying what it does and whether a
 change applies now or on a restart. `a` shows every setting config.json
 can hold; a filter always searches all of them. The full list is nicer
-in a browser: the settings page (settings_web.py, /settings).
+in a browser: the settings page (web/settings_web.py, /settings).
 
     up/down, PgUp/PgDn   pick a setting
     space                flip an on/off, step through a choice
@@ -97,7 +97,7 @@ def describe(path):
     if path == "portrait.model" and entry:
         # whatever is in portrait/models: space steps through them
         try:
-            import livefeed
+            from web import livefeed
 
             found = tuple(livefeed.portrait_models())
         except Exception:
@@ -298,7 +298,7 @@ def _web():
     if not getattr(config, "MONITOR_ENABLED", True):
         return ""
     try:
-        import settings_web
+        from web import settings_web
 
         return settings_web.url()
     except Exception:
@@ -388,27 +388,27 @@ def _after(path, value):
     /set and the tools pane have."""
     try:
         if path == "stt.mode":
-            import ptt
+            from voice import ptt
 
             ptt.set_mode(value)
         elif path.startswith("mood."):
-            import mood
+            from mind import mood
 
             mood._announce()
         elif path == "portrait.hologram.enabled":
-            import livefeed
+            from web import livefeed
 
             livefeed.emit("holo", on=bool(value))
         elif path.startswith("portrait.lights."):
-            import livefeed
+            from web import livefeed
 
             livefeed.lights_changed()
         elif path == "portrait.frame":
-            import livefeed
+            from web import livefeed
 
             livefeed.emit("frame", frame=value)
         elif path == "station.enabled":
-            import station
+            from web import station
 
             if value:
                 ok, said = station.start()
@@ -417,19 +417,19 @@ def _after(path, value):
                 station.stop()
                 add_message("system", "Relay stations: off")
         elif path == "portrait.background":
-            import livefeed
+            from web import livefeed
 
             livefeed.emit("background", value=value)
         elif path == "portrait.model":
-            import livefeed
+            from web import livefeed
 
             livefeed.emit("reload")
         elif path in ("portrait.gestures", "portrait.chat_gestures"):
-            import livefeed
+            from web import livefeed
 
             livefeed.gesture_mode_changed()
         elif path == "camera.presence.enabled":
-            import presence
+            from senses import presence
 
             if value:
                 if not presence.start():

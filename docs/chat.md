@@ -8,7 +8,7 @@ plugins work in general, and how to write one, is on [Plugins](plugins.md).
 YouTube, Twitch, IRC and every stream site's own chat differ entirely
 in how you connect and not at all in what the messages mean afterwards. Every one is: a name, a
 line of text, someone you don't know, in public, in real time. So the
-transport is the plugin's job and the rest is `chatroom.py`:
+transport is the plugin's job and the rest is `core/chatroom.py`:
 
 ```python
 _room = chatroom.ChatRoom(NAME, owner=channel, settings=settings())

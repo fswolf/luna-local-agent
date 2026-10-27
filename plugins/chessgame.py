@@ -53,7 +53,7 @@ import threading
 import time
 
 import config
-import logbook
+from core import logbook
 
 from plugins import _game
 
@@ -109,7 +109,7 @@ def _score():
 
 def _emit():
     try:
-        import livefeed
+        from web import livefeed
 
         livefeed.emit("chess")
     except Exception:
@@ -450,7 +450,7 @@ REACT_PROMPT = (
 
 
 def _step():
-    import assistant
+    from core import assistant
 
     s = settings()
     react = bool(_g["result"]) and not _g["reacted"]
@@ -587,7 +587,7 @@ def _nudge():
 
 
 try:
-    import livefeed
+    from web import livefeed
 
     livefeed.add_page(NAME, "chess", page, visible=lambda: _on)
 except Exception:
@@ -614,7 +614,7 @@ def running():
 
 
 def board_url():
-    import livefeed
+    from web import livefeed
 
     return livefeed.url() + "/chess/"
 
@@ -622,7 +622,7 @@ def board_url():
 def _open_board():
     if not getattr(config, "MONITOR_ENABLED", True):
         return "The board page needs the live monitor - set monitor.enabled to true and restart."
-    import portrait_window
+    from web import portrait_window
 
     # a browser's own output kept off Luna's screen
     threading.Thread(target=portrait_window.quiet_open, args=(board_url(),), daemon=True).start()

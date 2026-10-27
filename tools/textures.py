@@ -13,7 +13,7 @@ import time
 import urllib.request
 
 import config
-import logbook
+from core import logbook
 
 from . import tool
 

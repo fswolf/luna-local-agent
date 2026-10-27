@@ -241,7 +241,7 @@ each turn was decided as (`heard (Shannon): ...`, `checked (typed): ...`).
   (never raises); `camera.opened(device)` wraps any open of the webcam
   in the hooks.
 - The tuning constants (the grey zone, the 5-minute gap, retry and
-  pause counts) are at the top of `facecheck.py`.
+  pause counts) are at the top of `senses/facecheck.py`.
   `tests/test_facecheck.py` fakes each failure; `tests/test_ladder.py`
   covers the rungs.
 - Plugins can hear the webcam open and close with

@@ -7,10 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 import config
-import turnctx
-import logbook
-import webpage
-import websearch
+from core import turnctx
+from core import logbook
+from mind import webpage
+from mind import websearch
 
 from . import tool
 

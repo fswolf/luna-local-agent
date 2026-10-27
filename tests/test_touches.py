@@ -1,4 +1,4 @@
-"""Touch talk: a click on her portrait reaches touches.py, and she
+"""Touch talk: a click on her portrait reaches life/touches.py, and she
 answers it in one short line - gathered, rate-limited, never over you."""
 import http.client
 import json
@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import tests.offline  # noqa: F401,E402
 
 import config  # noqa: E402
-import touches  # noqa: E402
+from life import touches  # noqa: E402
 
 
 class Gathering(unittest.TestCase):
@@ -61,17 +61,17 @@ class Answering(unittest.TestCase):
     """_answer with the model, screen and voice stood in."""
 
     def run_answer(self, reply, busy=False):
-        import assistant
+        from core import assistant
 
         added = []
         with mock.patch.object(touches, "_quiet_now", return_value=not busy), \
              mock.patch.object(touches, "_request", return_value=reply) as request, \
-             mock.patch("history.get_messages_full", return_value=[]), \
-             mock.patch("history.add_message", side_effect=lambda r, c, **k: added.append((r, c))), \
-             mock.patch("history.save"), mock.patch("transcript.add"), \
-             mock.patch("mood.note_exchange") as mood_heard, \
+             mock.patch("core.history.get_messages_full", return_value=[]), \
+             mock.patch("core.history.add_message", side_effect=lambda r, c, **k: added.append((r, c))), \
+             mock.patch("core.history.save"), mock.patch("core.transcript.add"), \
+             mock.patch("mind.mood.note_exchange") as mood_heard, \
              mock.patch("llm.build_system_prompt", return_value="SYSTEM"), \
-             mock.patch("speech.Player") as player, \
+             mock.patch("voice.speech.Player") as player, \
              mock.patch("ui.add_message"), mock.patch("ui.begin_message"), mock.patch("ui.extend_message"), \
              mock.patch("ui.end_message"), mock.patch("ui.set_status"):
             touches._state.update(model="m", last=0.0)
@@ -97,7 +97,7 @@ class Endpoint(unittest.TestCase):
     """POST /portrait/touch on the live monitor."""
 
     def setUp(self):
-        import livefeed
+        from web import livefeed
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), livefeed._Handler)
         self.port = self.server.server_address[1]

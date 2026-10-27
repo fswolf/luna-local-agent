@@ -528,7 +528,7 @@ function fromChat(ev) {
 // She acts out what she writes: *hugs*, *waves*, *jumps*, 🤗, 👋 ...
 const said = { text: '', done: new Set(), tagged: false };
 // How her replies set gestures off (gestures.py): tags, meaning, keywords, off.
-const gmode = { mode: cfg.gestures || 'tags', chat: cfg.chat_gestures !== false };
+const gmode = { mode: cfg.gestures || 'keywords', chat: cfg.chat_gestures !== false };
 // Built from each gesture file's "keywords" (and clips.json's): a word
 // inside an action she writes (*beckons you closer*) or an emoji anywhere.
 // A keyword matches as the start of a word, so "hug" also catches hugs,

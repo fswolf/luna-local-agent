@@ -23,13 +23,13 @@ LONG_TERM_MEMORY_MAX_FACTS = _memory_cfg.get("max_facts", 40)
 # do; over it, the ones relevant to what was just said.
 LONG_TERM_MEMORY_CONTEXT_FACTS = _memory_cfg.get("context_facts", 25)
 # "json" is the original capped list in memory.json; "sqlite" is the
-# experimental permanent table (factstore.py) - uncapped, searched with
+# experimental permanent table (mind/factstore.py) - uncapped, searched with
 # FTS5, and able to retire a fact that stops being true instead of
 # keeping both versions. Live: /set long_term_memory.backend json to
 # fall back, and nothing is lost in either direction.
 LONG_TERM_MEMORY_BACKEND = str(_memory_cfg.get("backend", "json"))
 
-# The reasoning log - see thoughtlog.py. Every turn from the keyboard
+# The reasoning log - see mind/thoughtlog.py. Every turn from the keyboard
 # or the mic keeps the model's scratchpad (<think> blocks, or the
 # reasoning_content field) in agent/thoughts.db for review with
 # /thoughts. Capped by record count; the oldest go first.
@@ -63,7 +63,7 @@ ADAPTIVE_SPEAK_CORRECTIONS = bool(_adaptive_cfg.get("speak_corrections", True))
 ADAPTIVE_MODE = str(_adaptive_cfg.get("mode", "vote")).lower()
 ADAPTIVE_VOTES = int(_adaptive_cfg.get("votes", 2))
 
-# The grounding check (grounding.py): specifics she stated with nothing
+# The grounding check (mind/grounding.py): specifics she stated with nothing
 # behind them. mode: "flag", "hedge" (default) or "check".
 _grounding_cfg = setting("grounding", {})
 GROUNDING_ENABLED = bool(_grounding_cfg.get("enabled", True))
@@ -76,7 +76,7 @@ FOLLOW_THROUGH = bool(_adaptive_cfg.get("follow_through", True))
 ADAPTIVE_PREFIX = str(_adaptive_cfg.get("correction_prefix",
                                         "Hang on, let me correct that."))
 
-# Growing up a little (reflect.py, notebook.py): lessons from her own
+# Growing up a little (mind/reflect.py, mind/notebook.py): lessons from her own
 # mistakes, notes on each conversation, fact cleanup, saying when she's
 # unsure, and picking up where the last session left off.
 #   "self": { "lessons": true, "episodes": true, "tidy_facts": true,
@@ -95,15 +95,15 @@ SELF_HEDGE_BELOW = float(_self_cfg.get("hedge_below", 0.6))
 SELF_HEDGE_LINE = str(_self_cfg.get("hedge_line",
                                     "I'm not totally sure about that one, though."))
 SELF_GREET = bool(_self_cfg.get("greet", True))
-# Recipes for multi-step jobs she's done well (skills.py).
+# Recipes for multi-step jobs she's done well (mind/skills.py).
 SELF_SKILLS = bool(_self_cfg.get("skills", True))
 SELF_SKILLS_IN_PROMPT = int(_self_cfg.get("skills_in_prompt", 2))
 SELF_MAX_SKILLS = int(_self_cfg.get("max_skills", 60))
-# Ongoing projects (projects.py): work that spans sessions.
+# Ongoing projects (mind/projects.py): work that spans sessions.
 SELF_PROJECTS = bool(_self_cfg.get("projects", True))
 SELF_PROJECTS_IN_PROMPT = int(_self_cfg.get("projects_in_prompt", 3))
 
-# The situation block (situation.py): focused window, music, machine load,
+# The situation block (mind/situation.py): focused window, music, machine load,
 # running plugins, next reminder, what's in her hands - a few live lines in
 # every private turn.
 _situation_cfg = setting("situation", {})

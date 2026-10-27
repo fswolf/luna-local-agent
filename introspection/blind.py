@@ -130,7 +130,7 @@ def reveal(args):
     labelled = 0
 
     try:
-        import thoughtlog
+        from mind import thoughtlog
 
         label = f"[blind session: {truth}" + (f" x{c['scale']:g} {c['band']}" if c["concept"] else "") + "]"
 

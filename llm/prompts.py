@@ -8,14 +8,14 @@ from datetime import datetime
 import config
 from config import AGENT_NAME, PERSONALITY, TONE, TRAITS, RULES, GENERATION
 from config import memory
-import history
-import gestures
-import logbook
-import mood
-import longterm
-import people
-import timeutil
-import turnctx
+from core import history
+from life import gestures
+from core import logbook
+from mind import mood
+from mind import longterm
+from senses import people
+from core import timeutil
+from core import turnctx
 
 from . import session
 
@@ -44,10 +44,10 @@ def build_memory_prompt(query=""):
             prompt += f"- {fact}\n"
 
     # Passages from his knowledge folder that match closely enough to
-    # come along unasked (knowledge.py). Private turns only: this is
+    # come along unasked (mind/knowledge.py). Private turns only: this is
     # only called for them.
     try:
-        import knowledge
+        from mind import knowledge
 
         prompt += knowledge.prompt_block(query)
     except Exception:
@@ -67,12 +67,12 @@ def build_self_prompt(query=""):
     """What she knows about herself rather than about him: lessons from
     her own mistakes, what happened last time, older conversations that
     bear on this one, and how sure her last reply measured. Everything
-    in it comes from reflect.py / notebook.py; "" when it's all off."""
+    in it comes from mind/reflect.py / mind/notebook.py; "" when it's all off."""
     blocks = []
 
     try:
-        import notebook
-        import timeutil
+        from mind import notebook
+        from core import timeutil
 
         if getattr(config, "SELF_LESSONS", True):
             lessons = notebook.relevant_lessons(query)
@@ -113,7 +113,7 @@ def build_self_prompt(query=""):
         logbook.exception("llm", "self prompt failed")
 
     try:
-        import projects
+        from mind import projects
 
         ongoing = projects.prompt_block(query)
 
@@ -123,7 +123,7 @@ def build_self_prompt(query=""):
         logbook.exception("llm", "projects prompt failed")
 
     try:
-        import skills
+        from mind import skills
 
         recipes, ids = skills.prompt_block(query)
         turnctx.current().skills = ids
@@ -240,7 +240,7 @@ def _plugin_lines(private):
 def _mcp_lines(private):
     """Connected MCP servers' own notes (config.json: mcp.servers.<name>.prompt)."""
     try:
-        import mcpclient
+        from core import mcpclient
 
         return mcpclient.prompt_lines(private)
     except Exception:
@@ -261,7 +261,7 @@ def build_system_prompt(query="", timing="", private=True):
 
     if private:
         try:
-            import situation
+            from mind import situation
 
             situation_block = situation.block()
         except Exception:

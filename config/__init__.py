@@ -122,7 +122,7 @@ SETTINGS = {
     "tts.player":                 ("TTS_PLAYER",                   True),
     "tts.pitch":                  ("TTS_PITCH",                    True),
     "tts.strip_tilde":            ("TTS_STRIP_TILDE",              True),
-    # Live now, where it used to need a restart: speech.py reads
+    # Live now, where it used to need a restart: voice/speech.py reads
     # config.VOICE per request rather than importing the value, so
     # /voice can audition a blend while she's mid-conversation. The
     # name goes to the server untouched and the server resolves it -

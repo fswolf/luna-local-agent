@@ -162,7 +162,7 @@ class Game(unittest.TestCase):
 @unittest.skipIf(chess is None, "pip install chess")
 class LivePage(unittest.TestCase):
     def test_registered_and_linked_only_while_on(self):
-        import livefeed
+        from web import livefeed
         self.assertIn("chess", livefeed.PAGES)
         with mock.patch.object(cg, "_on", False):
             self.assertNotIn("/chess/", livefeed.with_switcher("<body></body>", "live"))

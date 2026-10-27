@@ -1,4 +1,4 @@
-"""Relay stations (station.py): the certificates, pairing, and a whole turn
+"""Relay stations (web/station.py): the certificates, pairing, and a whole turn
 from a phone, over real HTTPS on this machine. Her thinking and voice are
 faked; the certificates and devices live in a temporary folder.
 
@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import station  # noqa: E402
+from web import station  # noqa: E402
 
 
 def _free_port():
@@ -179,10 +179,10 @@ class Stations(unittest.TestCase):
             self.assertTrue(approver("write", "write notes.txt", ["hello"], False))
             sink("Want a jacket anyway?")
 
-        with mock.patch("speech.transcribe", return_value="what's the weather"), \
-             mock.patch("speech._synthesize", return_value=(np.zeros(2400, dtype=np.float32), 24000)), \
-             mock.patch("assistant._whose_voice", lambda path, heard: None), \
-             mock.patch("assistant.respond", respond), mock.patch("ui.add_message"):
+        with mock.patch("voice.speech.transcribe", return_value="what's the weather"), \
+             mock.patch("voice.speech._synthesize", return_value=(np.zeros(2400, dtype=np.float32), 24000)), \
+             mock.patch("core.assistant._whose_voice", lambda path, heard: None), \
+             mock.patch("core.assistant.respond", respond), mock.patch("ui.add_message"):
             req = self._open("/talk", data=_wav(), cookie=cookie, kind="audio/wav")
             self.assertEqual(req[0], 200)
             turn = json.loads(req[2])["turn"]
@@ -233,9 +233,9 @@ class Stations(unittest.TestCase):
         def respond(text, model, source, speaker, sink, approver):
             release.wait(5)
 
-        with mock.patch("speech.transcribe", return_value="hi"), \
-             mock.patch("assistant._whose_voice", lambda path, heard: None), \
-             mock.patch("assistant.respond", respond), mock.patch("ui.add_message"):
+        with mock.patch("voice.speech.transcribe", return_value="hi"), \
+             mock.patch("core.assistant._whose_voice", lambda path, heard: None), \
+             mock.patch("core.assistant.respond", respond), mock.patch("ui.add_message"):
             turn = json.loads(self._open("/talk", data=_wav(), cookie=kitchen, kind="audio/wav")[2])["turn"]
             self.assertEqual(self._open(f"/turn/{turn}", cookie=hall)[0], 404)          # not the hall's
             self.assertEqual(self._open(f"/turn/{turn}", cookie=kitchen)[0], 200)

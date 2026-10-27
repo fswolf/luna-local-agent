@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import turnctx  # noqa: E402
+from core import turnctx  # noqa: E402
 from tools import routing  # noqa: E402
 
 GROUPS = {"get_time": "Time", "calc": "Math", "a1": "Games", "b1": "Chess", "c1": "Email", "d1": "Web"}

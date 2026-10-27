@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import mood  # noqa: E402
+from mind import mood  # noqa: E402
 
 
 def appraised(rating=0, energy=0, warmth=0, feeling=None, flirt=0):

@@ -7,11 +7,11 @@ Luna can show on two kinds of fan.
 | Fan | How she gets there | Live? |
 |---|---|---|
 | **HDMI fan** (Holofan HDMI and others) | It's a screen: open `/portrait/?fan=1` on it | Yes |
-| **WiFi fan run by the Holoscope app** (P56, PD42, P42, HS56...) | Luna streams to it over WiFi (`holofan.py`) | Yes, about 15 frames a second |
+| **WiFi fan run by the Holoscope app** (P56, PD42, P42, HS56...) | Luna streams to it over WiFi (`web/holofan.py`) | Yes, about 15 frames a second |
 | Any other WiFi fan (3D LED FAN, 3D Circle, 5D Displayer, Spin Display apps...) | Not supported: those only play clips from their own card | No |
 
 Status: built against the protocol and tested with the pretend fan
-(`python3 holofan.py sim`, below), not yet on a real fan.
+(`python3 -m web.holofan sim`, below), not yet on a real fan.
 
 ## Buying one
 
@@ -100,7 +100,7 @@ and it connects again by itself when it comes back.
 ### Trying it without a fan
 
 ```bash
-python3 holofan.py sim        # a pretend P56; "sim 15" for a PD42
+python3 -m web.holofan sim        # a pretend P56; "sim 15" for a PD42
 ```
 
 It acts as a fan on this machine: it hears Luna, connects and takes the
@@ -120,7 +120,7 @@ and reports its model. To cast, she sends `5A 26 26 F5`, the fan answers
 its centre into one strip per LED arm, outside-in (688×240 for a P56's four
 arms of 172 LEDs, 960 angles). The page does that unrolling on the GPU
 (`portrait/viewer/fan.js`) and posts the JPEG to `/portrait/fan/frame`;
-`holofan.py` relays it to the fan.
+`web/holofan.py` relays it to the fan.
 
 Luna never sends the fan's format, factory-reset, delete or Bluetooth
 commands. On these fans WiFi and Bluetooth share one radio, and with

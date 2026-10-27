@@ -31,9 +31,9 @@ state = {
 }
 conversation = []  # list of (speaker, text) tuples
 
-# Which overlay can be up: None, "help", "tools" or "settings". Tab
+# Which overlay can be up: None, "launch", "tools" or "settings". Tab
 # cycles through them and back to the conversation.
-_panes = (None, "help", "tools", "settings")
+_panes = (None, "launch", "tools", "settings")
 
 view = SimpleNamespace(
     app=None,             # the running prompt_toolkit Application, or None (headless)
@@ -41,9 +41,8 @@ view = SimpleNamespace(
     on_hotkey=None,       # what HOME calls
     conv_window=None,
     scrollback=0,         # lines scrolled up from the bottom; 0 = pinned to latest
-    pane=None,            # the overlay that's up: None, "help" or "tools"
-    help_scroll=0,        # lines scrolled down from the top of the help text
-    help_window=None,
+    pane=None,            # the overlay that's up: None, "launch", "tools" or "settings"
+    launch_cursor=0,      # selected page in the launcher pane (ui/launcher.py)
     tool_cursor=0,        # selected row in the tools pane
     tool_scroll=0,
     tool_window=None,
@@ -80,7 +79,7 @@ _approval_lock = threading.Lock()  # one question at a time
 
 # Counters for /scroll, so "the wheel doesn't work" can be split into
 # "the terminal never sent it" and "it arrived and nothing moved".
-_events = {"conv_wheel": 0, "help_wheel": 0, "other_mouse": 0,
+_events = {"conv_wheel": 0, "other_mouse": 0,
            "page_keys": 0, "arrow_keys": 0}
 
 

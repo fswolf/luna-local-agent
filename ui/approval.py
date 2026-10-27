@@ -11,7 +11,7 @@ from prompt_toolkit.data_structures import Point
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEventType
 
-import logbook
+from core import logbook
 
 from .shared import _approval_lock, _lock, _refresh, state, view
 from .conversation_pane import WHEEL_LINES

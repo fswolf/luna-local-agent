@@ -222,7 +222,7 @@ def _note(mac):
 def _remembered(words):
     """MACs and IPs from long-term memory facts that mention these words."""
     try:
-        import longterm
+        from mind import longterm
 
         facts = longterm.get_facts()
     except Exception:

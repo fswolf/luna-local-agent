@@ -1,4 +1,4 @@
-"""Stopping her (interrupts.py): what a stop reaches, what it never does,
+"""Stopping her (core/interrupts.py): what a stop reaches, what it never does,
 and how fast it lands. No audio, no model, no UI.
 
     python -m unittest discover tests        (from the repo folder)
@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.offline import FAKE  # noqa: F401  (first: no real servers)
 
-import interrupts  # noqa: E402
+from core import interrupts  # noqa: E402
 
 
 class Lifetime(unittest.TestCase):
@@ -87,7 +87,7 @@ class WhatHomeReaches(unittest.TestCase):
             self.assertTrue(interrupts.busy(kinds=None))
 
     def test_alarm_off_cuts_the_line_short(self):
-        import alarm
+        from life import alarm
         with interrupts.using(kind="alarm") as ringing:
             alarm._ring_stop[0] = ringing
             alarm._ringing.set()

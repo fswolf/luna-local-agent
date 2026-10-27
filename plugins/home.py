@@ -59,7 +59,7 @@ import urllib.parse
 import urllib.request
 
 import config
-import logbook
+from core import logbook
 
 NAME = "home"
 SUMMARY = "your smart home, through Home Assistant on your own network"
@@ -233,7 +233,7 @@ def _as_list(value):
 # Plugin interface
 # ---------------------------------------------------------------------------
 def why_unavailable():
-    import mcpclient
+    from core import mcpclient
 
     if not mcpclient.available():
         return "pip install mcp"
@@ -258,7 +258,7 @@ def running():
 
 
 def start(model):
-    import mcpclient
+    from core import mcpclient
 
     if _state["connected"]:
         return True, "home: already connected"
@@ -300,7 +300,7 @@ def start(model):
 
 
 def stop():
-    import mcpclient
+    from core import mcpclient
 
     mcpclient.disconnect_server(SERVER)
     _state["connected"] = False

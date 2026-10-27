@@ -1,4 +1,4 @@
-"""Experimental ESPHome satellites (satellites.py): when she decides you've
+"""Experimental ESPHome satellites (web/satellites.py): when she decides you've
 stopped talking, and one request from start to reply against a fake device.
 No hardware here: the device and her thinking are faked.
 
@@ -17,7 +17,7 @@ from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 import numpy as np  # noqa: E402
 
 import config  # noqa: E402
-import satellites  # noqa: E402
+from web import satellites  # noqa: E402
 
 CHUNK = 0.032                                     # seconds per chunk, as ESPHome sends
 

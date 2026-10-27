@@ -34,7 +34,7 @@ _THOUGHT_FEATURES = (
 )
 
 
-# Learning and continuity (reflect.py). Each costs a little context -
+# Learning and continuity (mind/reflect.py). Each costs a little context -
 # a few lines of lessons and notes - or a model call while she's idle.
 _SELF_FEATURES = (
     ("lessons (dream pass)", "SELF_LESSONS", "self.lessons", "/reflect, /lessons"),
@@ -130,7 +130,7 @@ def _feature_group():
     scrolling and the line map don't need to know the difference."""
     try:
         import config
-        import mood
+        from mind import mood
     except Exception:
         return None
 
@@ -218,7 +218,7 @@ def _with_plugin_switches(groups):
     # and every server of your own (config.json's mcp.servers) gets one too:
     # off disconnects it and takes its tools out of the prompt, saved
     try:
-        import mcpclient
+        from core import mcpclient
 
         servers = getattr(config, "MCP_SERVERS", {}) or {}
     except Exception:
@@ -532,7 +532,7 @@ def _tool_toggle():
             # The mood line leaves the prompt with it, and the header
             # row goes with it too.
             if setting.startswith("mood."):
-                import mood
+                from mind import mood
 
                 mood._announce()
         else:
@@ -587,7 +587,7 @@ def _toggle_plugin(name, on):
 def _toggle_server(name, on):
     """Connect or disconnect one of your own MCP servers, saved. In a
     thread, like a plugin: connecting can take a few seconds."""
-    import mcpclient
+    from core import mcpclient
 
     def go():
         _ok, message = mcpclient.set_server(name, not on)
@@ -629,7 +629,7 @@ def _tool_group_toggle():
             if setting:
                 config.save_setting(setting, "true" if turn_on else "false")
                 if setting.startswith("mood."):
-                    import mood
+                    from mind import mood
 
                     mood._announce()
             else:

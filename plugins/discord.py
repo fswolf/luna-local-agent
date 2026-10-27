@@ -3,7 +3,7 @@
     /discord on           /discord off           /discord    (status)
 
 Not a chat plugin. Stream chat is strangers, so it goes through
-chatroom.py and its tool ceiling. This is the owner: messages from the
+core/chatroom.py and its tool ceiling. This is the owner: messages from the
 ids in the credentials file get a normal private turn with the full
 tool list, and everyone else is ignored. Anyone you add to owner_ids
 has the same reach as the person at the keyboard.
@@ -44,8 +44,8 @@ import os
 import threading
 
 import config
-import interrupts
-import logbook
+from core import interrupts
+from core import logbook
 
 NAME = "discord"
 SUMMARY = "remote access - the owner talks to her from Discord"
@@ -141,7 +141,7 @@ def running():
 # The turn - runs on a worker thread, never on the Discord event loop
 # ---------------------------------------------------------------------------
 def _turn(text, who, channel=None):
-    import assistant
+    from core import assistant
 
     s = settings()
     tools = s.get("tools")
@@ -371,7 +371,7 @@ def _run(token, owners):
                                        "!shrug", "!stretch", "!turn", "!side", "!front",
                                        "!kiss", "!blowkiss", "!bashful", "!blush"):
             try:
-                import chatroom
+                from core import chatroom
 
                 chatroom._show(message.author.display_name, text, NAME)
                 await message.add_reaction("✨")

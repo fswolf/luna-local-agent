@@ -32,7 +32,7 @@ class Loop(unittest.TestCase):
     def setUp(self):
         self.state, self.turns, self.playing = {}, [], [True]
         self.finished = []
-        self.patches = [mock.patch("reflect.idle_seconds", return_value=999),
+        self.patches = [mock.patch("mind.reflect.idle_seconds", return_value=999),
                         mock.patch("plugins._playlog.finished", side_effect=self.finished.append),
                         mock.patch.object(_game, "ERROR_PAUSE", 0.05)]
         for p in self.patches:
@@ -60,7 +60,7 @@ class Loop(unittest.TestCase):
         self.assertFalse(self.state["busy"])
 
     def test_waits_for_quiet(self):
-        with mock.patch("reflect.idle_seconds", return_value=3):
+        with mock.patch("mind.reflect.idle_seconds", return_value=3):
             self.make(quiet=lambda: 10).start()
             self.loop.wake()
             time.sleep(0.2)

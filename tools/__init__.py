@@ -365,7 +365,7 @@ def call(name, arguments):
 def _mark_outside(name):
     """After it runs, so its own request isn't held up by it - and in a
     finally, so one that fails halfway still counts."""
-    import turnctx
+    from core import turnctx
 
     turn = turnctx.current()
 

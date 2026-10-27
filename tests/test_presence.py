@@ -1,4 +1,4 @@
-"""Presence (presence.py) and the people she knows (people.py), without a
+"""Presence (senses/presence.py) and the people she knows (senses/people.py), without a
 camera: arrivals and absences, where she looks, matching face prints,
 and the quiet room. Prints go to a temporary folder.
 
@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import people  # noqa: E402
-import presence  # noqa: E402
+from senses import people  # noqa: E402
+from senses import presence  # noqa: E402
 
 
 class Tracker(unittest.TestCase):
@@ -150,7 +150,7 @@ class Arrivals(unittest.TestCase):
         presence._state.update(self.saved)
 
     def _arrive(self, gap, now=10_000):
-        import reflect
+        from mind import reflect
 
         with mock.patch.object(presence.threading, "Thread") as thread, \
                 mock.patch.object(reflect, "idle_seconds", return_value=1e9), \
@@ -191,7 +191,7 @@ class GreetingRules(unittest.TestCase):
         presence._state.update(self.saved)
 
     def test_talking_to_her_out_of_view_isnt_being_away(self):
-        import reflect
+        from mind import reflect
 
         with mock.patch.object(presence.threading, "Thread") as thread, \
                 mock.patch.object(reflect, "idle_seconds", return_value=30), \
@@ -201,7 +201,7 @@ class GreetingRules(unittest.TestCase):
         self.assertFalse(thread.called)
 
     def test_held_startup_greeting_skips_once_anyone_talked(self):
-        import reflect
+        from mind import reflect
 
         greeted = []
         with mock.patch.object(presence, "running", return_value=True), \
