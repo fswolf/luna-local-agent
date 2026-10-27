@@ -6,6 +6,8 @@ Luna serves on your home network, you tap and talk, and she answers through
 its speaker. It's the same Luna as at the desk: same memory, mood, people
 and tools. Nothing to install on the device, no account, no internet needed.
 
+<img width="300" alt="A phone as a relay station in the kitchen: one big Tap to talk button, what you said, and her answer underneath" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/relay-station.jpg" />
+
 ## Set it up
 
 1. Install the extra once (it makes the certificates and the QR codes):
