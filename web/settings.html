@@ -105,7 +105,7 @@ section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;m
 </main>
 <div id="toast"></div>
 <script>
-const KEY = "__KEY__";
+let KEY = "__KEY__";        // this run of Luna's; a restart makes a new one (see send)
 let data = null, view = "basic", query = "", closed = new Set();
 try { closed = new Set(JSON.parse(localStorage.getItem("luna.settings.closed") || "[]")); } catch (e) {}
 const $ = s => document.querySelector(s);
@@ -122,11 +122,30 @@ async function load() {
   presets(); render();
 }
 
+const post = body => fetch("api", {method: "POST", headers: {"Content-Type": "application/json"},
+                                   body: JSON.stringify(Object.assign({}, body, {key: KEY}))});
+
+// Luna was restarted since this page loaded, so its key is stale: read the
+// new one from the page itself (only a page on this server can) and go on.
+async function freshKey() {
+  try {
+    const page = await (await fetch("./", {cache: "no-store"})).text();
+    const m = page.match(/KEY = "([A-Za-z0-9_-]+)"/);
+    if (m) { KEY = m[1]; return true; }
+  } catch (e) {}
+  return false;
+}
+
 async function send(body) {
-  const r = await fetch("api", {method: "POST", headers: {"Content-Type": "application/json"},
-                                body: JSON.stringify(Object.assign({key: KEY}, body))});
-  let out = {};
-  try { out = await r.json(); } catch (e) { out = {ok: false, message: "no answer from Luna"}; }
+  let r, out = {};
+  try {
+    r = await post(body);
+    if (r.status === 403 && await freshKey()) {
+      r = await post(body);
+      load();                                   // she restarted: show what's set now
+    }
+    out = await r.json();
+  } catch (e) { out = {ok: false, message: "no answer from Luna - is she running?"}; }
   return out;
 }
 
@@ -292,7 +311,7 @@ $("#list").addEventListener("click", async e => {
   }
   if (e.target.dataset.unpair) {
     if (!confirm("Unpair this device? It will need a new pairing code.")) return;
-    const out = await send({action: "station_forget", key: e.target.dataset.unpair});
+    const out = await send({action: "station_forget", device: e.target.dataset.unpair});
     data.station = out.station || data.station; render(); toast(out.message, !out.ok);
     return;
   }

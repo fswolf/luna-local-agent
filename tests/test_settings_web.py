@@ -181,6 +181,23 @@ class Page(unittest.TestCase):
         self.assertTrue(active["companion"])
         self.assertFalse(active["assistant"])
 
+    def test_unpairing_a_station_uses_its_own_field(self):
+        # The device went in "key" once, the same field as the page's key,
+        # so every unpair was refused as "out of date" and the phone stayed.
+        forgotten = []
+        with mock.patch("web.station.forget", lambda d: forgotten.append(d) or True), \
+             mock.patch("web.station.panel", lambda: {"devices": []}):
+            code, out = self._post(key=settings_web.KEY, action="station_forget", device="abc123")
+        self.assertEqual(code, 200, out)
+        self.assertTrue(out["ok"])
+        self.assertEqual(forgotten, ["abc123"])
+
+    def test_the_page_never_lets_a_body_replace_its_key(self):
+        _code, _kind, html = settings_web.handle("GET", "/", b"")
+        self.assertIn("Object.assign({}, body, {key: KEY})", html)   # the key goes last
+        self.assertNotIn("station_forget\", key:", html)
+        self.assertIn("freshKey", html)                             # recovers after a restart
+
     def test_pages_cant_be_framed_by_other_sites(self):
         from web import livefeed
 
@@ -206,6 +223,41 @@ class TerminalPane(unittest.TestCase):
             self.assertTrue(any("lewd" in r[0] for r in settings_pane._rows()))
         finally:
             view.set_filter, view.set_all = "", False
+
+
+class LiveSettings(unittest.TestCase):
+    """A setting marked as applying at once must be read from config each
+    time. `from config import X` (or X = config.X at the top of a file)
+    takes a copy at startup, so the page says "saved" and nothing changes."""
+
+    def test_nothing_copies_a_live_setting(self):
+        import ast
+
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        live = {name: path for path, (name, now) in config.SETTINGS.items() if name and now}
+        startup_only = {("main.py", "VOICE"), ("voice/ptt.py", "STT_MODE"),     # a banner; /mode's own copy
+                        ("voice/listen.py", "STT_MODE")}                    # /mic's first reading, then kept up
+        found = []
+        for folder, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in (".git", "tests", "llama", "vendor", "node_modules", ".venv", "evals")]
+            for name in files:
+                if not name.endswith(".py"):
+                    continue
+                path = os.path.join(folder, name)
+                rel = os.path.relpath(path, root).replace(os.sep, "/")
+                try:
+                    tree = ast.parse(open(path, encoding="utf-8").read())
+                except (SyntaxError, UnicodeDecodeError):
+                    continue
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.ImportFrom) and node.module == "config":
+                        found += [(rel, a.name) for a in node.names if a.name in live]
+                for node in tree.body:
+                    if isinstance(node, ast.Assign):
+                        found += [(rel, n.attr) for n in ast.walk(node.value)
+                                  if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+                                  and n.value.id == "config" and n.attr in live]
+        self.assertEqual([f for f in found if f not in startup_only], [])
 
 
 if __name__ == "__main__":

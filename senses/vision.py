@@ -24,7 +24,7 @@ import config
 # Read as config.X at each use, not imported by value - otherwise
 # /set vision.enabled false changes config and this module keeps a
 # stale copy, so the setting silently does nothing.
-from config import VISION_SCALE, VISION_MAX_BYTES
+from config import VISION_MAX_BYTES
 
 # Set by capture() (or camera.capture), consumed once by llm._tool_rounds.
 _pending = None
@@ -384,8 +384,8 @@ def capture(region="auto", window=None):
 
     command = ["grim", "-t", "png"]
 
-    if VISION_SCALE and VISION_SCALE != 1.0:
-        command += ["-s", str(VISION_SCALE)]
+    if config.VISION_SCALE and config.VISION_SCALE != 1.0:
+        command += ["-s", str(config.VISION_SCALE)]
 
     if region == "auto":
         region = default_region()

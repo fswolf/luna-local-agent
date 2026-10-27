@@ -33,7 +33,6 @@ from config import (
     LM_URL,
     LLM_HEADERS,
     AGENT_NAME,
-    REMINDERS_ENABLED,
     REMINDER_CHECK_INTERVAL_SECONDS,
     BASE_DIR,
 )
@@ -502,7 +501,7 @@ def repair_history(model, report=None):
 
 
 def extract_in_background(model, text):
-    if not REMINDERS_ENABLED or not _looks_like_reminder(text):
+    if not config.REMINDERS_ENABLED or not _looks_like_reminder(text):
         return
 
     threading.Thread(
@@ -686,7 +685,7 @@ def run_scanner(model):
     first_pass = True
 
     while True:
-        if REMINDERS_ENABLED:
+        if config.REMINDERS_ENABLED:
             due = _due_now()
 
             if due:

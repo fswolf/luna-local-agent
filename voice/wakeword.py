@@ -23,11 +23,11 @@ import os
 
 import numpy as np
 
+import config
 from config import (
     SAMPLE_RATE,
     WAKE_WORD_ENABLED,
     WAKE_WORD_MODEL,
-    WAKE_WORD_THRESHOLD,
     WAKE_WORD_COOLDOWN,
 )
 
@@ -149,7 +149,7 @@ def heard(block):
     scores["last"] = best
     scores["best"] = max(scores["best"], best)
 
-    if best < WAKE_WORD_THRESHOLD:
+    if best < config.WAKE_WORD_THRESHOLD:
         return False
 
     scores["detections"] += 1
