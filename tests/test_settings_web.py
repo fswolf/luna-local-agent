@@ -225,6 +225,19 @@ class TerminalPane(unittest.TestCase):
             view.set_filter, view.set_all = "", False
 
 
+def _own_code(root):
+    """Luna's own .py files: the root's scripts and her packages - never a
+    virtualenv, a model folder or anything else that happens to sit here."""
+    for name in sorted(os.listdir(root)):
+        path = os.path.join(root, name)
+        if name.endswith(".py"):
+            yield path
+        elif name != "tests" and os.path.isfile(os.path.join(path, "__init__.py")):
+            for folder, dirs, files in os.walk(path):
+                dirs[:] = [d for d in dirs if not d.startswith((".", "_")) and d != "vendor"]
+                yield from (os.path.join(folder, f) for f in files if f.endswith(".py"))
+
+
 class LiveSettings(unittest.TestCase):
     """A setting marked as applying at once must be read from config each
     time. `from config import X` (or X = config.X at the top of a file)
@@ -238,25 +251,20 @@ class LiveSettings(unittest.TestCase):
         startup_only = {("main.py", "VOICE"), ("voice/ptt.py", "STT_MODE"),     # a banner; /mode's own copy
                         ("voice/listen.py", "STT_MODE")}                    # /mic's first reading, then kept up
         found = []
-        for folder, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in (".git", "tests", "llama", "vendor", "node_modules", ".venv", "evals")]
-            for name in files:
-                if not name.endswith(".py"):
-                    continue
-                path = os.path.join(folder, name)
-                rel = os.path.relpath(path, root).replace(os.sep, "/")
-                try:
-                    tree = ast.parse(open(path, encoding="utf-8").read())
-                except (SyntaxError, UnicodeDecodeError):
-                    continue
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.ImportFrom) and node.module == "config":
-                        found += [(rel, a.name) for a in node.names if a.name in live]
-                for node in tree.body:
-                    if isinstance(node, ast.Assign):
-                        found += [(rel, n.attr) for n in ast.walk(node.value)
-                                  if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
-                                  and n.value.id == "config" and n.attr in live]
+        for path in _own_code(root):
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            try:
+                tree = ast.parse(open(path, encoding="utf-8").read())
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module == "config":
+                    found += [(rel, a.name) for a in node.names if a.name in live]
+            for node in tree.body:
+                if isinstance(node, ast.Assign):
+                    found += [(rel, n.attr) for n in ast.walk(node.value)
+                              if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+                              and n.value.id == "config" and n.attr in live]
         self.assertEqual([f for f in found if f not in startup_only], [])
 
 
