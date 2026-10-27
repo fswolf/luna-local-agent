@@ -148,6 +148,8 @@ ai-voice/
 │   ├── thought-viewer.png
 │   ├── ui-conversation.png
 │   ├── ui-help.png
+│   ├── ui-pages.png
+│   ├── ui-settings.png
 │   └── ui-tools.png
 │
 ├── history/

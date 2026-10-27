@@ -7,13 +7,35 @@
 <title>Chess with Luna</title>
 <style>
 :root{--bg:#120d1c;--panel:#1b1429;--line:#3a2d55;--text:#e6dcff;--dim:#a99cc8;--accent:#c49dff;
-  --light:#e9def7;--dark:#8d6fbd;--last:rgba(255,214,102,.55);--check:rgba(255,70,110,.75);--dot:rgba(30,10,50,.35)}
+  --light:#e9def7;--dark:#8d6fbd;--last:rgba(255,135,215,.42);--check:rgba(255,70,110,.75);--dot:rgba(30,10,50,.35);
+  --size:min(calc(100vw - 32px), calc(100vh - 200px), 820px)}
+@media (min-width:1150px){:root{--size:min(calc(100vw - 360px), calc(100vh - 150px), 820px)}}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}
-main{display:flex;gap:22px;padding:18px;min-height:100%;align-items:flex-start;align-content:flex-start;justify-content:center;flex-wrap:wrap}
-#wrap{width:min(92vmin,640px);flex:0 0 auto}
-#board{position:relative;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);aspect-ratio:1;border-radius:8px;overflow:hidden;
-  box-shadow:0 0 0 2px var(--line),0 10px 40px #0008;touch-action:none;user-select:none}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}
+/* bottom padding: the page links pill sits bottom right */
+main{display:flex;gap:20px;padding:14px 16px 56px;justify-content:center;align-items:flex-start}
+#play{width:var(--size);flex:0 0 auto;display:flex;flex-direction:column;gap:8px}
+
+/* the two players, above and below the board */
+.player{display:flex;align-items:center;gap:10px;min-height:28px}
+.player .name{font-weight:600}
+.player .name.turn{color:var(--accent)}
+.player .name.turn::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);
+  margin-right:7px;vertical-align:1px;box-shadow:0 0 8px var(--accent)}
+.caps{display:flex;align-items:center;min-height:22px}
+.caps:not(:empty){background:var(--dark);border-radius:999px;padding:1px 10px 1px 4px}
+.caps img{width:20px;height:20px;margin-right:-6px}
+.caps img.gap{margin-left:8px}
+.adv{color:var(--dim);font-size:13px}
+.player .think{color:var(--accent);font-size:13px}
+.think::after{content:"";animation:dots 1.2s steps(4) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+#board{position:relative;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);aspect-ratio:1;
+  border-radius:8px;overflow:hidden;box-shadow:0 0 0 2px var(--line),0 10px 40px #0008;touch-action:none;user-select:none;
+  transition:filter .3s}
+#board.waiting{filter:saturate(.75) brightness(.92)}
+#board.yours{box-shadow:0 0 0 2px var(--accent),0 0 22px #c49dff55,0 10px 40px #0008}
 .sq{position:relative;min-width:0;min-height:0}
 .sq.l{background:var(--light)}.sq.d{background:var(--dark)}
 .sq.last::before{content:"";position:absolute;inset:0;background:var(--last)}
@@ -21,66 +43,97 @@ main{display:flex;gap:22px;padding:18px;min-height:100%;align-items:flex-start;a
 .sq.sel::before{content:"";position:absolute;inset:0;background:rgba(196,157,255,.55)}
 .sq.to::after{content:"";position:absolute;left:35%;top:35%;width:30%;height:30%;border-radius:50%;background:var(--dot);pointer-events:none;z-index:2}
 .sq.to.cap::after{left:5%;top:5%;width:90%;height:90%;background:transparent;border:5px solid var(--dot);box-sizing:border-box}
-.sq img{position:absolute;left:4%;top:4%;width:92%;height:92%;pointer-events:none;transition:none}
+.sq img{position:absolute;left:4%;top:4%;width:92%;height:92%;pointer-events:none}
 .sq.mine{cursor:grab}
+.sq.mine:hover img{transform:scale(1.06);filter:drop-shadow(0 3px 4px #0006)}
+.sq img{transition:transform .12s}
 .coord{position:absolute;font-size:11px;font-weight:600;pointer-events:none;opacity:.75}
 .coord.f{right:3px;bottom:1px}.coord.r{left:3px;top:1px}
 .sq.l .coord{color:var(--dark)}.sq.d .coord{color:var(--light)}
 #float{position:fixed;pointer-events:none;z-index:50;display:none}
-#side{width:min(92vw,340px);display:flex;flex-direction:column;gap:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-h1{font-size:18px;margin:0 0 2px}
-#status{font-weight:600;color:var(--accent)}
-#status.wait::after{content:"";display:inline-block;width:1.2em;animation:dots 1.2s steps(4) infinite;overflow:hidden;vertical-align:bottom}
-@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
-#said .now{font-size:16px;margin:0 0 6px}
-#said .old{color:var(--dim);font-size:13px;margin:4px 0;border-top:1px solid var(--line);padding-top:4px}
-#said .who{color:var(--accent);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
-#moves{font:13px/1.6 ui-monospace,monospace;color:var(--dim);max-height:160px;overflow:auto;word-spacing:2px}
-.row{display:flex;gap:6px;flex-wrap:wrap}
-button,select{background:#2a2040;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 11px;font:inherit;cursor:pointer}
-button:hover{background:#3a2d55}button.warn{border-color:#ff6b8b}
-#toast{min-height:1.4em;color:#ffb3c4;font-size:13px}
+
+/* one compact bar: what's happening, and the buttons */
+#bar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 8px 6px 12px}
+#status{flex:1;min-width:0;font-weight:600;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#toast{color:#ffb3c4;font-size:13px}
+#toast:empty{display:none}
+.btns{display:flex;gap:4px;position:relative}
+button{background:#2a2040;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:5px 10px;font:inherit;cursor:pointer;white-space:nowrap}
+button:hover{background:#3a2d55}
+button:disabled{opacity:.4;cursor:default;background:#2a2040}
+button.icon{width:34px;padding:5px 0;font-size:16px;line-height:1.2}
+button.warn{border-color:#ff6b8b}
+#newmenu{position:absolute;right:0;bottom:calc(100% + 6px);background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:6px;display:none;flex-direction:column;gap:4px;z-index:30;box-shadow:0 8px 24px #000a}
+#newmenu.open{display:flex}
+#newmenu button{text-align:left}
+
+/* moves: one scrolling line under the bar, or a table beside the board on a wide screen */
+#strip{font:13px/1.6 ui-monospace,monospace;color:var(--dim);white-space:nowrap;overflow-x:auto;scrollbar-width:thin;padding:0 2px}
+#side{display:none;width:300px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  margin-top:36px;max-height:var(--size);overflow:auto}
+#side h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:0 0 6px}
+#moves{width:100%;border-collapse:collapse;font:13px/1.7 ui-monospace,monospace}
+#moves td{padding:0 6px}
+#moves td:first-child{color:var(--dim);width:2.5em;text-align:right}
+#moves tr:nth-child(even){background:#ffffff08}
+#moves td.new{color:var(--accent);font-weight:600}
+@media (min-width:1150px){#side{display:block}#strip{display:none}}
+
 #promo{position:absolute;inset:0;background:#120d1ccc;display:none;align-items:center;justify-content:center;gap:10px;z-index:20}
 #promo img{width:16%;background:var(--light);border-radius:8px;cursor:pointer;padding:4px}
 #promo img:hover{background:var(--accent)}
+#over{position:absolute;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:#120d1c99}
+#over.show{display:flex}
+#over .card{background:var(--panel);border:1px solid var(--accent);border-radius:14px;padding:18px 22px;text-align:center;
+  box-shadow:0 12px 40px #000c;max-width:80%}
+#over h2{margin:0 0 4px;font-size:22px}
+#over p{margin:0 0 14px;color:var(--dim)}
+#over .row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+#over .x{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--dim);font-size:18px}
+#strip b{color:var(--accent);font-weight:600}
 #off{display:none;text-align:center;padding:40px;color:var(--dim)}
 </style>
 </head>
 <body>
 <main>
-  <div id="wrap">
-    <div id="board"><div id="promo"></div></div>
-  </div>
-  <div id="side">
-    <div class="card">
-      <h1>Chess with <span id="name">Luna</span></h1>
+  <section id="play">
+    <div class="player" id="top"><span class="name"></span><span class="caps"></span><span class="adv"></span><span class="think" hidden>thinking</span></div>
+    <div id="board"><div id="promo"></div>
+      <div id="over"><div class="card" style="position:relative"><button class="x" title="Look at the board">&#10005;</button>
+        <h2 id="overhead"></h2><p id="overwhy"></p>
+        <div class="row"><button data-side="white">Play white</button><button data-side="black">Play black</button><button data-side="random">Random</button></div>
+      </div></div>
+    </div>
+    <div class="player" id="bottom"><span class="name"></span><span class="caps"></span><span class="adv"></span><span class="think" hidden>thinking</span></div>
+    <div id="bar">
       <div id="status">Loading</div>
-      <div id="toast"></div>
-    </div>
-    <div class="card" id="said"><div class="who" id="who">Luna</div><p class="now">Your move first, if you're white.</p></div>
-    <div class="card"><div id="moves">No moves yet.</div></div>
-    <div class="card">
-      <div class="row">
-        <button id="undo">Take back</button>
-        <button id="flip">Flip board</button>
-        <button id="resign" class="warn">Resign</button>
-        <button id="nudge" hidden>Nudge her</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <select id="side-pick"><option value="white">I play white</option><option value="black">I play black</option><option value="random">Random</option></select>
-        <button id="new">New game</button>
+      <div class="btns">
+        <button id="undo" class="icon" title="Take back">&#8630;</button>
+        <button id="flip" class="icon" title="Flip board">&#8645;</button>
+        <button id="nudge" hidden title="She didn't move: nudge her">Nudge</button>
+        <button id="newbtn" title="New game">New</button>
+        <button id="resign" class="icon warn" title="Resign">&#9873;</button>
+        <div id="newmenu">
+          <button data-side="white">I play white</button>
+          <button data-side="black">I play black</button>
+          <button data-side="random">Random</button>
+        </div>
       </div>
     </div>
-  </div>
+    <div id="toast"></div>
+    <div id="strip">No moves yet.</div>
+  </section>
+  <aside id="side"><h2>Moves</h2><table id="moves"></table></aside>
 </main>
 <div id="off">The chess plugin is off. Type <code>/chess on</code> in Luna.</div>
 <img id="float" alt="">
 <script>
 const B = document.getElementById("board"), FLOAT = document.getElementById("float");
 const $ = id => document.getElementById(id);
-let S = null, flipped = false, sel = null, drag = null, lastSeen = null, squares = {};
+let S = null, flipped = false, sel = null, drag = null, lastSeen = null, squares = {}, overSeen = null;
 const FILES = "abcdefgh";
+const START = {P: 8, N: 2, B: 2, R: 2, Q: 1}, VALUE = {P: 1, N: 3, B: 3, R: 5, Q: 9}, ORDER = "QRBNP";
 
 function pieceAt(fen) {                       // board_fen -> {e4: "wP"}
   const out = {};
@@ -95,12 +148,14 @@ function pieceAt(fen) {                       // board_fen -> {e4: "wP"}
   return out;
 }
 
+function whiteDown() { return (S && S.you === "black") === flipped; }
+
 function build() {
   B.querySelectorAll(".sq").forEach(e => e.remove());
   squares = {};
-  const whiteDown = (S && S.you === "black") === flipped;
+  const wd = whiteDown();
   for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
-    const file = whiteDown ? f : 7 - f, rank = whiteDown ? 7 - r : r;
+    const file = wd ? f : 7 - f, rank = wd ? 7 - r : r;
     const name = FILES[file] + (rank + 1), el = document.createElement("div");
     el.className = "sq " + ((file + rank) % 2 ? "l" : "d");
     el.dataset.sq = name;
@@ -113,8 +168,47 @@ function build() {
 
 function targets(from) { return (S.legal[from] || []).map(t => t.slice(0, 2)); }
 
+// what each side has taken, and who's ahead on material (a promoted pawn can push a count past
+// the start; that only ever shows as fewer captures, never a wrong one)
+function taken(pieces) {
+  const left = {w: {}, b: {}};
+  for (const p of Object.values(pieces)) left[p[0]][p[1]] = (left[p[0]][p[1]] || 0) + 1;
+  const took = {w: [], b: []}, score = {w: 0, b: 0};
+  for (const c of "wb") {
+    const them = c === "w" ? "b" : "w";
+    for (const t of ORDER) {
+      const n = Math.max(0, START[t] - (left[them][t] || 0));
+      for (let i = 0; i < n; i++) took[c].push(them + t);
+    }
+    for (const t of ORDER) score[c] += (left[c][t] || 0) * VALUE[t];
+  }
+  return {took, diff: score.w - score.b};
+}
+
+function player(el, color, name, turn, thinking, cap) {
+  el.querySelector(".name").textContent = name;
+  el.querySelector(".name").classList.toggle("turn", turn);
+  el.querySelector(".think").hidden = !thinking;
+  let last = "";
+  el.querySelector(".caps").innerHTML = cap.took[color].map(p => {
+    const gap = last && last !== p ? "gap" : ""; last = p;
+    return `<img class="${gap}" src="piece/${p}.svg" alt="${p}">`;
+  }).join("");
+  const ahead = color === "w" ? cap.diff : -cap.diff;
+  el.querySelector(".adv").textContent = ahead > 0 ? `+${ahead}` : "";
+}
+
+function moveRows(history) {                  // "1. e4 e5 2. Nf3" -> [["1", "e4", "e5"], ["2", "Nf3", ""]]
+  const rows = [], parts = (history || "").split(/(?:^|\s+)(\d+)\.\s+/);
+  for (let i = 1; i < parts.length; i += 2) {
+    const [w = "", b = ""] = (parts[i + 1] || "").trim().split(/\s+/);
+    rows.push([parts[i], w, b]);
+  }
+  return rows;
+}
+
 function render() {
-  const pieces = pieceAt(S.fen), mine = S.you[0];
+  const pieces = pieceAt(S.fen), mine = S.you[0], hers = mine === "w" ? "b" : "w";
   for (const [name, el] of Object.entries(squares)) {
     el.querySelector("img")?.remove();
     el.classList.remove("last", "check", "sel", "to", "cap", "mine");
@@ -132,17 +226,41 @@ function render() {
     squares[sel]?.classList.add("sel");
     for (const t of targets(sel)) squares[t].classList.add("to", ...(pieces[t] ? ["cap"] : []));
   }
-  $("name").textContent = S.luna;
+  const thinking = /thinking/.test(S.status), cap = taken(pieces);
+  const downColor = whiteDown() ? "w" : "b", upColor = downColor === "w" ? "b" : "w";
+  const who = c => c === mine ? "You" : S.luna;
+  const turn = c => !S.over && (c === mine ? S.yourTurn : !S.yourTurn);
+  player($("top"), upColor, who(upColor), turn(upColor), upColor === hers && thinking, cap);
+  player($("bottom"), downColor, who(downColor), turn(downColor), downColor === hers && thinking, cap);
+  B.classList.toggle("waiting", !S.yourTurn && !S.over);
+  B.classList.toggle("yours", S.yourTurn && !S.over);
+  const ended = S.over && S.status !== overSeen;
+  if (ended) {
+    overSeen = S.status;
+    const [head, how] = S.status.split(/ by | \(/);
+    $("overhead").textContent = /draw/i.test(head) ? "A draw" : head;
+    $("overwhy").textContent = how ? how.replace(/\)$/, "") : "";
+    $("over").classList.add("show");
+  }
+  if (!S.over) { overSeen = null; $("over").classList.remove("show"); }
+
   document.title = `Chess with ${S.luna}`;
-  $("status").textContent = S.status;
-  $("status").classList.toggle("wait", /thinking/.test(S.status));
+  $("status").textContent = thinking ? `${S.luna}'s move` : S.status;
+  $("status").title = S.status;
   $("nudge").hidden = !/didn't move/.test(S.status);
-  $("moves").textContent = S.history || "No moves yet.";
-  $("moves").scrollTop = 1e9;
-  const said = S.said.slice().reverse();
-  $("said").innerHTML = `<div class="who">${esc(S.luna)}</div>` +
-    (said.length ? `<p class="now">${esc(said[0].text)}</p>` + said.slice(1, 4).map(s => `<p class="old">${esc(s.text)}</p>`).join("")
-                 : `<p class="now">${S.you === "white" ? "Your move first." : "She opens..."}</p>`);
+  $("resign").disabled = !!S.over;
+
+  const rows = moveRows(S.history);
+  const words = (S.history || "").split(" ").filter(Boolean);
+  $("strip").innerHTML = words.length ? words.map((w, i) => i === words.length - 1 ? `<b>${esc(w)}</b>` : esc(w)).join(" ")
+                                      : "No moves yet.";
+  $("strip").scrollLeft = 1e9;
+  $("moves").innerHTML = rows.map((r, i) => {
+    const newCol = i === rows.length - 1 ? (r[2] ? 2 : 1) : 0;
+    return `<tr><td>${esc(r[0])}.</td><td class="${newCol === 1 ? "new" : ""}">${esc(r[1])}</td>` +
+           `<td class="${newCol === 2 ? "new" : ""}">${esc(r[2])}</td></tr>`;
+  }).join("") || `<tr><td></td><td colspan="2">No moves yet.</td></tr>`;
+  $("side").scrollTop = 1e9;
 }
 
 function esc(t) { return String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
@@ -153,6 +271,7 @@ function slideIn() {                          // her move glides from where it c
     const [from, to] = S.last, img = squares[to]?.querySelector("img");
     if (img) {
       const a = squares[from].getBoundingClientRect(), b = squares[to].getBoundingClientRect();
+      img.style.transition = "none";
       img.style.transform = `translate(${a.left - b.left}px,${a.top - b.top}px)`;
       requestAnimationFrame(() => requestAnimationFrame(() => {
         img.style.transition = "transform .35s ease"; img.style.transform = "";
@@ -236,11 +355,28 @@ B.addEventListener("pointerup", e => {
 $("flip").onclick = () => { flipped = !flipped; build(); render(); };
 $("undo").onclick = () => post("action", {action: "undo"});
 $("nudge").onclick = () => post("action", {action: "nudge"});
-$("new").onclick = () => { flipped = false; S = null; post("action", {action: "new", side: $("side-pick").value}).then(() => { build(); render(); }); };
+$("newbtn").onclick = e => { e.stopPropagation(); $("newmenu").classList.toggle("open"); };
+function newGame(e) {
+  const side = e.target.dataset.side;
+  if (!side) return;
+  $("newmenu").classList.remove("open"); $("over").classList.remove("show");
+  flipped = false; S = null;
+  post("action", {action: "new", side}).then(() => { build(); render(); });
+}
+$("newmenu").onclick = newGame;
+$("over").querySelector(".row").onclick = newGame;
+$("over").querySelector(".x").onclick = () => $("over").classList.remove("show");
+document.addEventListener("click", e => { if (!e.target.closest(".btns")) $("newmenu").classList.remove("open"); });
 let sure = 0;
+function resignIcon() { $("resign").innerHTML = "&#9873;"; $("resign").classList.add("icon"); }
 $("resign").onclick = () => {
-  if (Date.now() - sure > 3000) { sure = Date.now(); $("resign").textContent = "Sure? Click again"; setTimeout(() => $("resign").textContent = "Resign", 3000); return; }
-  $("resign").textContent = "Resign"; post("action", {action: "resign"});
+  if (Date.now() - sure > 3000) {
+    sure = Date.now(); $("resign").textContent = "Sure?"; $("resign").classList.remove("icon");
+    setTimeout(resignIcon, 3000);
+    return;
+  }
+  resignIcon();
+  post("action", {action: "resign"});
 };
 
 try {
