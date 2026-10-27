@@ -119,6 +119,8 @@ Luna.command
 # Local helper scripts
 pr.sh
 wiki.sh
+push.sh
+mem_url.txt
 
 # The published experiments evals/setup.sh fetches (their own licences) and what they produce.
 evals/vendor/
