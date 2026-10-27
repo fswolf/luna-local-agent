@@ -1,0 +1,305 @@
+"""Ask a bigger model: Luna asks Claude, Grok or ChatGPT when you tell her to.
+
+    "Luna, ask Claude how a heat pump works"
+    "ask Grok what's new in Fedora 45"
+    "ask your big brother ..."              (the default provider)
+
+She sends one short question, gets a short answer, and tells you in her
+own words. She's still herself; the bigger model is a reference book.
+
+Only when you ask, on purpose. A small model either never calls a tool
+or calls it every turn, so the tool runs only on a turn where your own
+message said "ask Claude" (or Grok, ChatGPT, your big brother). Not a
+guest's or a stranger's turn, not stream chat, Discord, a job or a game,
+not while she's in the lewd row, and only so many a day.
+
+Only the question leaves the machine: no prompt, memories, people files
+or conversation. Turns that call tools never become patch examples, so
+a bigger model's words never train her.
+
+    /ask on | off               start or stop it (saved)
+    /ask                        provider, model, keys found, used today
+    /ask <question>             ask directly, answer shown here (she isn't involved)
+    /ask with grok <question>   the same, another provider
+    /ask use grok               the default provider (claude, grok, openai)
+
+Keys, never in config.json (it's in the repo):
+    ~/.config/ai-voice/ask.json   {"claude": "...", "grok": "...", "openai": "..."}
+or ANTHROPIC_API_KEY, XAI_API_KEY, OPENAI_API_KEY in the environment.
+
+Settings, config.json plugins.ask:
+    provider    "claude"
+    models      {"claude": "claude-haiku-5-5", "grok": "grok-4.7", "openai": "gpt-5.4-mini"}
+    daily_cap   30 questions a day, all providers together
+    max_tokens  600 (Claude only; the others are kept short by the instructions)
+"""
+import json
+import os
+import re
+import threading
+import time
+import urllib.error
+import urllib.request
+
+import config
+from core import logbook
+from core import turnctx
+
+NAME = "ask"
+SUMMARY = "lets her ask Claude, Grok or ChatGPT a question when you tell her to"
+CREDENTIALS_FILE = os.path.expanduser("~/.config/ai-voice/ask.json")
+
+PROVIDERS = {
+    "claude": {"label": "Claude", "env": "ANTHROPIC_API_KEY", "model": "claude-haiku-5-5"},
+    "grok": {"label": "Grok", "env": "XAI_API_KEY", "model": "grok-4.7",
+             "url": "https://api.x.ai/v1/chat/completions"},
+    "openai": {"label": "ChatGPT", "env": "OPENAI_API_KEY", "model": "gpt-5.4-mini",
+               "url": "https://api.openai.com/v1/chat/completions"},
+}
+_NAMES = {"claude": "claude", "grok": "grok", "chatgpt": "openai", "chat gpt": "openai", "gpt": "openai",
+          "openai": "openai"}
+# "ask Claude", "ask your big brother", "check with Grok"
+_ASKED = re.compile(r"\b(?:ask|check with)\s+(?:your\s+|my\s+)?(big\s+brother|claude|grok|chat\s?gpt|gpt|openai)\b", re.I)
+SYSTEM = ("You're answering a question from Luna, a small AI assistant running on someone's own computer, "
+          "who asks you when she doesn't know. Answer the question directly in under 150 words of plain "
+          "text: no markdown, no lists unless they're needed, no follow-up questions. She'll pass it on "
+          "in her own words.")
+ASK_WINDOW = 180            # seconds your "ask Claude" stays good for
+PER_MESSAGE = 2             # questions per message of yours (a follow-up, at most)
+MAX_QUESTION = 1000
+
+_lock = threading.Lock()
+_running = False
+_asked = {}                 # {"provider", "at", "left"} from your last message
+_used = {"day": "", "count": 0}
+
+
+def settings():
+    s = config.plugin_settings(NAME)
+    return {"provider": str(s.get("provider") or "claude").lower(),
+            "models": dict(s.get("models") or {}),
+            "daily_cap": int(s.get("daily_cap", 30)),
+            "max_tokens": int(s.get("max_tokens", 600))}
+
+
+def _key(provider):
+    try:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as f:
+            key = str(json.load(f).get(provider) or "")
+    except FileNotFoundError:
+        key = ""
+    key = (key or os.environ.get(PROVIDERS[provider]["env"], "")).strip()
+    return "" if key.lower().startswith(("your", "paste", "put")) else key
+
+
+def _keys():
+    return [p for p in PROVIDERS if _key(p)]
+
+
+def _model(provider):
+    return str(settings()["models"].get(provider) or PROVIDERS[provider]["model"])
+
+
+# ---------------------------------------------------------------------------
+# The call
+# ---------------------------------------------------------------------------
+def _post(url, headers, body, timeout=60):
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", **headers})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        try:
+            why = json.load(e).get("error")
+            why = why.get("message") if isinstance(why, dict) else why
+        except Exception:
+            why = ""
+        raise RuntimeError(f"HTTP {e.code}{': ' + str(why)[:200] if why else ''}") from None
+
+
+def _call(provider, question):
+    """The bigger model's answer, as text. Raises with a reason."""
+    key, model, limit = _key(provider), _model(provider), settings()["max_tokens"]
+    if provider == "claude":
+        data = _post("https://api.anthropic.com/v1/messages",
+                     {"x-api-key": key, "anthropic-version": "2023-06-01"},
+                     {"model": model, "max_tokens": limit, "system": SYSTEM,
+                      "messages": [{"role": "user", "content": question}]})
+        text = "".join(b.get("text", "") for b in data.get("content") or [] if b.get("type") == "text")
+    else:
+        # No token limit: the two name it differently, and a reasoning model spends it thinking.
+        data = _post(PROVIDERS[provider]["url"], {"Authorization": f"Bearer {key}"},
+                     {"model": model,
+                      "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": question}]})
+        text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+    text = str(text).strip()
+    if not text:
+        raise RuntimeError("an empty answer")
+    return text
+
+
+def _spend():
+    """Count one question against today's cap. False when it's used up."""
+    day = time.strftime("%Y-%m-%d")
+    with _lock:
+        if _used["day"] != day:
+            _used.update(day=day, count=0)
+        if _used["count"] >= settings()["daily_cap"]:
+            return False
+        _used["count"] += 1
+        return True
+
+
+def ask(provider, question):
+    """(ok, text): the answer, or why not."""
+    question = str(question or "").strip()[:MAX_QUESTION]
+    if not question:
+        return False, "no question"
+    if provider not in PROVIDERS:
+        return False, f"no such provider {provider!r} (claude, grok, openai)"
+    if not _key(provider):
+        return False, f"no {PROVIDERS[provider]['label']} key (docs/ask.md)"
+    if not _spend():
+        return False, f"that's all {settings()['daily_cap']} questions for today"
+    started = time.time()
+    try:
+        answer = _call(provider, question)
+    except Exception as e:
+        logbook.warn("ask", "%s: %s", provider, e)
+        return False, f"{PROVIDERS[provider]['label']} didn't answer ({e})"
+    logbook.info("ask", "%s (%s) answered in %.1fs: %s", provider, _model(provider), time.time() - started,
+                 question[:120])
+    return True, answer
+
+
+# ---------------------------------------------------------------------------
+# Her side: the tool, only on a turn where you asked for it
+# ---------------------------------------------------------------------------
+def _lewd():
+    try:
+        from mind.mood import core
+        return core.S.label in core._extra("lewd")["row"]
+    except Exception:
+        return False
+
+
+def _why_not():
+    """'' when this turn may ask, else why not (said to her, so she can tell you)."""
+    turn = turnctx.current()
+    if not turn.private or turn.speaker or turn.remote or turn.job:
+        return "Only the user's own conversation can ask a bigger model."
+    if _lewd():
+        return "Not now: questions to a bigger model never go out from this mood."
+    with _lock:
+        if not _asked or time.time() - _asked["at"] > ASK_WINDOW or _asked["left"] <= 0:
+            return ("The user didn't ask you to ask anyone. Only use this when they say "
+                    "'ask Claude', 'ask Grok', 'ask ChatGPT' or 'ask your big brother'.")
+    return ""
+
+
+def _run(question=""):
+    why = _why_not()
+    if why:
+        return why
+    with _lock:
+        provider = _asked["provider"]
+        _asked["left"] -= 1
+    ok, text = ask(provider, question)
+    label = PROVIDERS[provider]["label"]
+    if not ok:
+        return f"Couldn't ask {label}: {text}"
+    return (f"{label} answered:\n{text}\n\n(Tell the user what {label} said, in your own words and "
+            f"your own voice, and that you asked {label}.)")
+
+
+def on_user_text(text):
+    """Your message: did it ask her to ask someone?"""
+    m = _ASKED.search(str(text or ""))
+    with _lock:
+        _asked.clear()
+        if m:
+            said = re.sub(r"\s+", " ", m.group(1).lower())
+            provider = settings()["provider"] if said.startswith("big") else _NAMES.get(said, "")
+            if provider in PROVIDERS:
+                _asked.update(provider=provider, at=time.time(), left=PER_MESSAGE)
+
+
+def _register_tool():
+    import tools
+
+    tools.register_external(
+        "ask_bigger_model",
+        "Ask a bigger AI (Claude, Grok or ChatGPT) one question, ONLY when the user tells you to "
+        "('ask Claude...', 'ask your big brother...'). Write a short, self-contained question with no "
+        "personal details about the user. Then tell the user the answer in your own words.",
+        {"question": {"type": "string", "description": "The question, complete on its own."}},
+        required=("question",), run=_run, group="Ask a bigger model",
+        available=running, why=lambda: "the ask plugin is off - /ask on", outside=True,
+    )
+
+
+
+# ---------------------------------------------------------------------------
+# Plugin interface
+# ---------------------------------------------------------------------------
+def available():
+    return bool(_keys())
+
+
+def why_unavailable():
+    return "" if _keys() else "no API key - put one in ~/.config/ai-voice/ask.json (docs/ask.md)"
+
+
+def running():
+    return _running
+
+
+def start(model=None):
+    global _running
+    if not _keys():
+        return False, why_unavailable()
+    _running = True
+    return True, f"ask is on: she can ask {', '.join(PROVIDERS[p]['label'] for p in _keys())} when you tell her to"
+
+
+def stop():
+    global _running
+    _running = False
+    with _lock:
+        _asked.clear()
+    return True, "ask is off"
+
+
+def status():
+    s = settings()
+    keys = _keys()
+    with _lock:
+        used = _used["count"] if _used["day"] == time.strftime("%Y-%m-%d") else 0
+    lines = [f"ask: {'on' if _running else 'off'}",
+             f"  default   {s['provider']} ({_model(s['provider']) if s['provider'] in PROVIDERS else '?'})",
+             f"  keys      {', '.join(keys) or 'none (docs/ask.md)'}",
+             f"  today     {used} of {s['daily_cap']} questions"]
+    return "\n".join(lines)
+
+
+def command(text):
+    text = str(text or "").strip()
+    m = re.match(r"use\s+(\w+)$", text, re.I)
+    if m:
+        provider = _NAMES.get(m.group(1).lower(), m.group(1).lower())
+        if provider not in PROVIDERS:
+            return "ask: claude, grok or openai"
+        config.save_any(f"plugins.{NAME}.provider", provider)
+        return f"ask: {PROVIDERS[provider]['label']} is the default now"
+    provider = settings()["provider"]
+    m = re.match(r"with\s+(\w+)\s+(.+)$", text, re.I | re.S)
+    if m:
+        provider, text = _NAMES.get(m.group(1).lower(), m.group(1).lower()), m.group(2)
+    if not text:
+        return status()
+    ok, answer = ask(provider, text)
+    return f"{PROVIDERS.get(provider, {}).get('label', provider)}: {answer}" if ok else f"ask: {answer}"
+
+
+_register_tool()

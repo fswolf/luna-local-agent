@@ -7,6 +7,7 @@
 - [Tool calling](tools.md)
 - [Files and commands](files.md)
 - [Web](web.md)
+- [Asking a bigger model](ask.md)
 - [Email](email.md)
 - [Vision](vision.md)
 - [People in the house](people.md)
