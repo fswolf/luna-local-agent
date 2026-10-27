@@ -1,4 +1,4 @@
-"""Her morning coffee (coffee.py) and the pose studio's prop placement
+"""Her morning coffee (life/coffee.py) and the pose studio's prop placement
 (livefeed.prop_entry, the gesture file's prop fields). Nothing real is
 touched: the day's cup is kept in a temporary file and the portrait events
 are caught instead of sent.
@@ -16,9 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
-import coffee  # noqa: E402
+from life import coffee  # noqa: E402
 import config  # noqa: E402
-import livefeed  # noqa: E402
+from web import livefeed  # noqa: E402
 
 
 class Coffee(unittest.TestCase):
@@ -34,7 +34,7 @@ class Coffee(unittest.TestCase):
             mock.patch.object(coffee, "_someone_here", lambda: True),
             mock.patch.object(coffee, "_busy", lambda: False),
             mock.patch.object(coffee, "morning", lambda hour=None: True),
-            mock.patch("mood._nudge", lambda **kw: self.nudges.append(kw)),
+            mock.patch("mind.mood._nudge", lambda **kw: self.nudges.append(kw)),
             mock.patch.object(coffee, "_lewd", lambda: False),
             mock.patch.object(coffee, "_walked_away", lambda: False),
         ]

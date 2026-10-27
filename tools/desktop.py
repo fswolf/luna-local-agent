@@ -5,11 +5,11 @@ Every one of these is gated on the thing it needs actually being
 installed. A tool that cannot work is never offered, because a
 model told it can see will describe a screen it never looked at.
 """
-import camera
+from senses import camera
 import config
-import desktop
-import machine
-import vision
+from senses import desktop
+from core import machine
+from senses import vision
 
 from . import tool
 

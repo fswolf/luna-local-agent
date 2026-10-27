@@ -33,8 +33,8 @@ import stat
 import subprocess
 
 import config
-import logbook
-import turnctx
+from core import logbook
+from core import turnctx
 
 from . import tool
 
@@ -166,7 +166,7 @@ def _is_text(data):
 # ---------------------------------------------------------------------------
 def _note_denied():
     try:
-        import mood
+        from mind import mood
 
         mood.note_denied()
     except Exception:
@@ -309,7 +309,7 @@ def _ask(action, full, body_lines, note=""):
         # Voice: a one-liner so you know to look at the screen. The
         # details stay in the popup; reading a diff aloud helps nobody.
         try:
-            from speech import speak
+            from voice.speech import speak
 
             speak(f"Can I {action} {os.path.basename(full)}? "
                   "It's on screen.")

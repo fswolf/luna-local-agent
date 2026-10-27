@@ -7,7 +7,7 @@ import json
 import re
 from datetime import datetime
 
-import timeutil
+from core import timeutil
 import tools
 
 def _format_ts(when):

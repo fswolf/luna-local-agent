@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import mcpclient  # noqa: E402
+from core import mcpclient  # noqa: E402
 from ui import tools_pane  # noqa: E402
 
 

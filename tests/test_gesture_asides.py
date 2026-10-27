@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
-import gestures  # noqa: E402
+from life import gestures  # noqa: E402
 
 ABOUTS = {
     "beckon_kiss": "flirty, teasing: beckons you over, then blows you a kiss",
@@ -83,7 +83,7 @@ class Asides(unittest.TestCase):
                 mock.patch.object(gestures, "builtin", return_value=self._builtin(names)), \
                 mock.patch.object(gestures, "clips", return_value=[]), \
                 mock.patch.object(gestures, "_band", return_value=(band, label)), \
-                mock.patch("mood.tame", return_value=False):
+                mock.patch("mind.mood.tame", return_value=False):
             return gestures.prompt_line()
 
     def test_a_short_list_of_names_only(self):
@@ -92,7 +92,8 @@ class Asides(unittest.TestCase):
         self.assertIn("[hug]", line)
         self.assertNotIn("(x", line)                  # no descriptions to copy
         self.assertLessEqual(line.count("["), 8)
-        self.assertLess(len(line) / 4, 120)           # tokens, roughly
+        self.assertLess(len(line) / 4, 70)            # tokens, roughly
+        self.assertNotIn("asterisks", line)           # no advice on how to write
 
     def test_it_fits_her_mood(self):
         self.assertIn("[huff]", self._line("grudge"))

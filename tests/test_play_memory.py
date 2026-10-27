@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402  (first: no real servers)
 
 import config  # noqa: E402
-import notebook  # noqa: E402
+from mind import notebook  # noqa: E402
 from plugins import _playlog  # noqa: E402
 
 
@@ -126,7 +126,7 @@ class TurnLines(_TempNotebook):
 
 class WrittenUp(_TempNotebook):
     def test_a_finished_session_becomes_an_episode(self):
-        import reflect
+        from mind import reflect
         notebook.play_turn("realiti", "REALITI Relax", "-> put on the felt hat")
         notebook.play_end("realiti")
         asked = []
@@ -148,7 +148,7 @@ class WrittenUp(_TempNotebook):
         self.assertEqual(notebook.play_to_write(20), [])
 
     def test_a_failed_summary_is_tried_again_later(self):
-        import reflect
+        from mind import reflect
         notebook.play_turn("zork", "Zork I", "something")
         notebook.play_end("zork")
         with mock.patch.object(reflect, "_ask", side_effect=OSError("server down")), \
@@ -166,7 +166,7 @@ class TheTurnsCalls(unittest.TestCase):
 
         import llm
         import tools
-        import turnctx
+        from core import turnctx
         from llm import streaming
 
         tools.register_external("t_move", "test move", {}, run=lambda **kw: "you moved",

@@ -29,8 +29,8 @@ tools.routing false sends everything, as before.
 from types import SimpleNamespace
 
 import config
-import logbook
-import turnctx
+from core import logbook
+from core import turnctx
 
 from . import tool
 
@@ -60,7 +60,7 @@ def server_up():
     """Whether the embedding server answered last time anyone asked
     (True/False), None before it's been tried. Never waits on it."""
     try:
-        import embedmem
+        from mind import embedmem
 
         return embedmem._state.get("up")
     except Exception:
@@ -110,7 +110,7 @@ def _meaning(query, docs):
     """{group: similarity to what was said}, or None when the embedding
     server can't answer - and then the turn isn't routed at all."""
     try:
-        import embedmem
+        from mind import embedmem
 
         ranked = embedmem.rank(query, list(docs.values()))
     except Exception:

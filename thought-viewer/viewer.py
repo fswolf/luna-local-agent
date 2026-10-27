@@ -38,7 +38,7 @@ PAGE_SIZE = 40
 
 
 def _log():
-    import thoughtlog
+    from mind import thoughtlog
 
     return thoughtlog
 

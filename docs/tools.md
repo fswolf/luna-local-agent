@@ -185,7 +185,7 @@ sys  │ set_reminder() -> Scheduled: 14:40 - stretch (in 10m)
 
 ## The desktop tools
 
-`vision.py` taught her to *see* the desktop. These are the other half:
+`senses/vision.py` taught her to *see* the desktop. These are the other half:
 acting on it.
 
 ```

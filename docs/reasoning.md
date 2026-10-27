@@ -517,7 +517,7 @@ switcher in the corner of each page to hop between them. The thought
 viewer and the memory manager are still their own programs in their own
 folders, and they're only mounted here. `thought-viewer/start.sh` and
 `memory-manager/start.sh` open the page on Luna's server if she's
-running, and start the shared server (`python livefeed.py`) if she
+running, and start the shared server (`python -m web.livefeed`) if she
 isn't. Each one also still runs entirely on its own, on its old port:
 `python thought-viewer/viewer.py` (:8791) and
 `python memory-manager/manager.py` (:8790). It refuses any

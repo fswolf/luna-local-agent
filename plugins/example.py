@@ -12,7 +12,7 @@ path run:
 
 Everything about *who gets answered* - her name, rate limits, the
 untrusted framing, the tool ceiling, waiting for her turn - is in
-chatroom.py and comes for free. What a real plugin adds is the two
+core/chatroom.py and comes for free. What a real plugin adds is the two
 marked spots: connecting, and turning whatever arrives into
 (name, message).
 
@@ -29,7 +29,7 @@ config.json the way plugins/pomf.py does - config.json is in the repo.
 import threading
 import time
 
-import chatroom
+from core import chatroom
 import config
 
 # Required. This is what /<name> on|off calls it, and the key its

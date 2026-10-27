@@ -40,8 +40,8 @@ from email.parser import BytesParser
 from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 
 import config
-import logbook
-import turnctx
+from core import logbook
+from core import turnctx
 
 from . import OUTSIDE, tool
 
@@ -133,7 +133,7 @@ def _clean(text):
 
 def _html_text(html):
     try:
-        import webpage
+        from mind import webpage
 
         parser = webpage._Extractor()
         parser.feed(html)
@@ -444,7 +444,7 @@ def _approve_send(lines, title):
 
     if turnctx.current().source == "voice":
         try:
-            from speech import speak
+            from voice.speech import speak
 
             speak("Can I send an email? It's on screen.")
         except Exception:
@@ -520,7 +520,7 @@ def _send_email(to, body, subject="", reply_to=""):
         logbook.info("email", "send to %s denied", to)
 
         try:
-            import mood
+            from mind import mood
 
             mood.note_denied()
         except Exception:

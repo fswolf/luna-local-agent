@@ -5,8 +5,8 @@ for the same reason set_reminder takes words: the model is good
 at repeating what was said and bad at bookkeeping.
 """
 import config
-import longterm
-import transcript
+from mind import longterm
+from core import transcript
 
 from . import tool
 
@@ -165,7 +165,7 @@ def _search_history(about):
 
 
 # ---------------------------------------------------------------------------
-# Meeting people (people.py's ladder)
+# Meeting people (senses/people.py's ladder)
 # ---------------------------------------------------------------------------
 @tool(
     "meet_guest",
@@ -179,7 +179,7 @@ def _search_history(about):
     required=("name",),
 )
 def _meet_guest(name):
-    import people
+    from senses import people
 
     _ok, said = people.meet(name)
     return said

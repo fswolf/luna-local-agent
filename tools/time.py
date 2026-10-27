@@ -4,7 +4,7 @@ Both exist because a 9B model will not admit it cannot do
 arithmetic - it will give you a confident wrong date instead. The
 rule the descriptions enforce is: never calculate, always ask.
 """
-import timeutil
+from core import timeutil
 
 from . import tool
 

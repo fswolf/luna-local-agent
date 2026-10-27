@@ -1,7 +1,7 @@
 import os
 import ui
 
-from ptt import toggle
+from voice.ptt import toggle
 
 HOME_KEYCODE = "KEY_HOME"
 ESC_KEYCODE = "KEY_ESC"
@@ -88,7 +88,7 @@ def _run_evdev(model):
 
 # ---------------------------------------------------------------------------
 # Path 2: pynput fallback (X11 only - under Wayland this sees nothing,
-# which is why the control socket exists; see control.py)
+# which is why the control socket exists; see core/control.py)
 # ---------------------------------------------------------------------------
 def _run_pynput(model):
     from pynput import keyboard

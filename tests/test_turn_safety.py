@@ -18,7 +18,7 @@ from tests.offline import FAKE as _FAKE  # noqa: E402  (first: no real servers)
 
 import config  # noqa: E402
 import tools  # noqa: E402
-import turnctx  # noqa: E402
+from core import turnctx  # noqa: E402
 from tools import files, web  # noqa: E402
 
 HOME = os.path.expanduser("~")
@@ -257,7 +257,7 @@ class EveryGuardReadsTheTurn(unittest.TestCase):
             self.assertIn("outside content", _toys.blocked())
 
     def test_mcp_tools_ask_the_turns_approver(self):
-        import mcpclient
+        from core import mcpclient
         asked = []
         approver = lambda kind, title, body, guarded: asked.append(kind) or True  # noqa: E731
         with turnctx.begin(remote="discord", approver=approver):
@@ -275,8 +275,8 @@ class EveryGuardReadsTheTurn(unittest.TestCase):
             dirs[:] = [d for d in dirs if d not in (".git", "llama", "tests", "__pycache__") and not d.startswith(".")]
             for name in names:
                 path = os.path.join(folder, name)
-                # llm.py: the pre-split file. turnctx.py names the old globals it replaced.
-                if not name.endswith(".py") or name in ("llm.py", "turnctx.py") and folder == root:
+                # llm.py: the pre-split file. core/turnctx.py names the old globals it replaced.
+                if not name.endswith(".py") or name == "llm.py" and folder == root or name == "turnctx.py":
                     continue
                 with open(path, encoding="utf-8", errors="replace") as f:
                     for n, line in enumerate(f, 1):

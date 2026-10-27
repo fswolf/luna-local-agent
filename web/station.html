@@ -1,0 +1,139 @@
+<!doctype html><html lang=en><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name=theme-color content="#120d1c"><title>Luna</title><style>__STYLE__
+main{display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh;justify-content:center;gap:18px}
+#talk{width:min(62vw,260px);height:min(62vw,260px);border-radius:50%;border:3px solid var(--accent);
+background:radial-gradient(circle at 50% 40%,#3a2357,#1a1328 70%);color:var(--text);font-size:22px;font-weight:700;
+box-shadow:0 0 0 0 #ff87d755;transition:box-shadow .15s, transform .1s;touch-action:manipulation}
+#talk.rec{box-shadow:0 0 0 18px #ff87d733;border-color:#ff5fb0}
+#talk.busy{border-color:var(--dim);opacity:.85}
+#talk:active{transform:scale(.97)}
+#status{color:var(--dim);min-height:1.5em}
+#you{color:var(--dim);font-style:italic;min-height:1.5em}
+#her{font-size:19px;min-height:3em;max-width:520px}
+#ask{display:none;text-align:left;width:100%}
+#ask pre{white-space:pre-wrap;max-height:30vh;overflow:auto;background:#0e0a16;border:1px solid var(--line);
+border-radius:8px;padding:8px;font-size:13px;color:var(--dim)}
+.row{display:flex;gap:10px;justify-content:center}
+.no{background:#2a2040;color:var(--text)}
+#room{color:var(--dim);font-size:14px}
+</style></head><body><main>
+<div id=room>Luna · __ROOM__</div>
+<button id=talk>Tap to talk</button>
+<div id=status>tap, talk, she answers here</div>
+<div id=you></div>
+<div id=her></div>
+<div id=ask class=card><b id=asktitle></b><pre id=askbody></pre>
+<div class=row><button class=btn id=allow>Allow</button><button class="btn no" id=deny>Deny</button></div></div>
+</main><script>
+// a copy of this device's token, for a browser that drops the cookie on close
+try { const k = __KEEP__; if (k) localStorage.setItem('__KEEP_KEY__', k); } catch (e) {}
+const $ = s => document.querySelector(s);
+const talk = $('#talk'), status = $('#status');
+let ctx = null, stream = null, node = null, chunks = [], rec = false, busy = false, rate = 48000;
+let heardAt = 0, quietSince = 0, startedAt = 0, playing = Promise.resolve(), turnId = null, lock = null;
+const say = t => status.textContent = t;
+
+async function unlock() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') await ctx.resume();
+  rate = ctx.sampleRate;
+  try { if ('wakeLock' in navigator && !lock) { lock = await navigator.wakeLock.request('screen'); lock.onrelease = () => lock = null; } } catch (e) {}
+}
+
+async function start() {
+  await unlock();
+  // the microphone only while recording: the phone's mic light goes off between turns
+  try { stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}}); }
+  catch (e) { say('no microphone: ' + e.message); return; }
+  const src = ctx.createMediaStreamSource(stream);
+  node = ctx.createScriptProcessor(4096, 1, 1);
+  chunks = []; heardAt = 0; quietSince = 0; startedAt = performance.now();
+  node.onaudioprocess = e => {
+    if (!rec) return;
+    const d = e.inputBuffer.getChannelData(0);
+    chunks.push(new Float32Array(d));
+    let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] * d[i];
+    const loud = Math.sqrt(s / (d.length / 4)) > 0.02, now = performance.now();
+    if (loud) { heardAt = heardAt || now; quietSince = 0; } else if (heardAt && !quietSince) quietSince = now;
+    if ((heardAt && quietSince && now - quietSince > 1300) || now - startedAt > 30000) finish();
+    if (!heardAt && now - startedAt > 8000) { finish(true); }
+  };
+  src.connect(node); node.connect(ctx.destination);
+  rec = true; talk.classList.add('rec'); talk.textContent = 'Listening'; say('talk now, tap to send');
+}
+
+function wav(buffers, from) {
+  const to = 16000, n = buffers.reduce((a, b) => a + b.length, 0), all = new Float32Array(n);
+  let o = 0; for (const b of buffers) { all.set(b, o); o += b.length; }
+  const len = Math.floor(n * to / from), pcm = new Int16Array(len);
+  for (let i = 0; i < len; i++) { const v = all[Math.floor(i * from / to)] || 0; pcm[i] = Math.max(-1, Math.min(1, v)) * 32767; }
+  const buf = new ArrayBuffer(44 + pcm.length * 2), v = new DataView(buf);
+  const w = (p, s) => { for (let i = 0; i < s.length; i++) v.setUint8(p + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, to, true);
+  v.setUint32(28, to * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data');
+  v.setUint32(40, pcm.length * 2, true); new Int16Array(buf, 44).set(pcm);
+  return buf;
+}
+
+async function finish(silent) {
+  if (!rec) return;
+  rec = false; talk.classList.remove('rec');
+  try { node.disconnect(); } catch (e) {}
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (silent || !heardAt) { talk.textContent = 'Tap to talk'; say('didn\'t hear anything'); return; }
+  busy = true; talk.classList.add('busy'); talk.textContent = '…'; say('sending');
+  $('#you').textContent = ''; $('#her').textContent = '';
+  try {
+    const r = await fetch('/talk', {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: wav(chunks, rate)});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    turnId = j.turn; follow(j.turn);
+  } catch (e) { done('couldn\'t reach Luna: ' + e.message); }
+}
+
+function done(msg) {
+  busy = false; talk.classList.remove('busy'); talk.textContent = 'Tap to talk'; if (msg) say(msg);
+}
+
+async function follow(id) {
+  let played = 0, lost = 0;
+  for (;;) {
+    await new Promise(r => setTimeout(r, 350));
+    let t;
+    try { t = await (await fetch('/turn/' + id)).json(); lost = 0; }
+    catch (e) { if (++lost > 40) { done('lost touch with Luna - is the PC awake?'); return; } continue; }
+    if (t.error && !t.error.startsWith('no voice')) { done(t.error); return; }
+    if (t.heard !== null && t.heard !== undefined) $('#you').textContent = t.heard ? '“' + t.heard + '”' : 'didn\'t catch that';
+    $('#her').textContent = t.reply || '';
+    say({hearing: 'listening to you', thinking: 'thinking', speaking: 'speaking', done: ''}[t.state] || '');
+    showAsk(t.ask, id);
+    while (played < t.clips) queue(id, played++);
+    if (t.state === 'done' && played >= t.clips) { await playing; done(t.error || (t.heard === '' ? 'didn\'t catch that' : '')); return; }
+  }
+}
+
+function queue(id, n) {
+  const clip = fetch(`/clip/${id}/${n}`).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b));
+  playing = playing.then(() => clip).then(buf => new Promise(res => {
+    const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination); s.onended = res; s.start();
+  })).catch(() => {});
+}
+
+function showAsk(ask, id) {
+  const box = $('#ask');
+  if (!ask) { box.style.display = 'none'; return; }
+  if (box.style.display === 'block') return;
+  $('#asktitle').textContent = 'Luna asks: ' + ask.title; $('#askbody').textContent = ask.body;
+  box.style.display = 'block';
+  const send = allow => { box.style.display = 'none';
+    fetch('/answer/' + id, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({allow})}); };
+  $('#allow').onclick = () => send(true); $('#deny').onclick = () => send(false);
+}
+
+talk.onclick = () => { if (busy) return; rec ? finish() : start(); };
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && !lock && ctx) { try { lock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+});
+</script></body></html>

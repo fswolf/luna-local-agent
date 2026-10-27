@@ -1,4 +1,4 @@
-"""The face check (facecheck.py) and the camera hooks (camera.hooks),
+"""The face check (senses/facecheck.py) and the camera hooks (camera.hooks),
 without a camera: every way a look can fail, and that none of them
 raises or holds a turn up past its budget.
 
@@ -15,12 +15,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
-import camera  # noqa: E402
+from senses import camera  # noqa: E402
 import config  # noqa: E402
-import facecheck  # noqa: E402
-import people  # noqa: E402
+from senses import facecheck  # noqa: E402
+from senses import people  # noqa: E402
 import plugins  # noqa: E402
-import presence  # noqa: E402
+from senses import presence  # noqa: E402
 
 
 class FakeImage:
@@ -63,7 +63,7 @@ class Base(unittest.TestCase):
             mock.patch.object(people, "everyone", return_value={"Shannon": {"name": "Shannon", "face": [[0.1] * 128]}}),
             mock.patch.object(people, "verdict", return_value=("Shannon", 0.6)),
             mock.patch.object(facecheck, "_remote_or_job", return_value=False),
-            mock.patch("facecheck.logbook"),
+            mock.patch("senses.facecheck.logbook"),
         ]
         for p in self.patches:
             p.start()
@@ -243,8 +243,8 @@ class SecondPass(Base):
         self.assertEqual(self.grab.call_args.kwargs.get("width"), presence.WIDTH)
 
     def test_unsure_voice_starts_the_look_during_transcription(self):
-        import assistant
-        import voices
+        from core import assistant
+        from senses import voices
 
         with mock.patch.object(voices, "identify", return_value=(None, 0.25)), \
                 mock.patch.object(voices, "enrolling", return_value=None):
@@ -306,7 +306,7 @@ class Deciding(Base):
 
 class Hooks(unittest.TestCase):
     def setUp(self):
-        self.log = mock.patch("camera.logbook").start()
+        self.log = mock.patch("senses.camera.logbook").start()
         self.addCleanup(mock.patch.stopall)
 
     def test_command_not_installed(self):
@@ -326,7 +326,7 @@ class Hooks(unittest.TestCase):
 
     def test_device_goes_into_the_command(self):
         with mock.patch.object(config, "CAMERA_BEFORE", "tool -d {device}", create=True), \
-                mock.patch("camera.subprocess.run") as run:
+                mock.patch("senses.camera.subprocess.run") as run:
             run.return_value = mock.Mock(returncode=0)
             camera._run_command("before", "/dev/video2")
         self.assertEqual(run.call_args[0][0], ["tool", "-d", "/dev/video2"])

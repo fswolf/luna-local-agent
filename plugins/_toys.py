@@ -6,7 +6,7 @@ Not a plugin itself: the leading underscore keeps the loader away.
 import re
 
 import config
-import turnctx
+from core import turnctx
 
 # Said by you, any of these stops every device before she even reads the
 # message - a stop that depends on a model noticing isn't a stop. Whole

@@ -31,10 +31,7 @@ from .conversation_pane import (
     _ConversationControl, _conversation_cursor, _conversation_fragments, _conversation_lines,
     _page_size, _scroll_by, _scroll_position, _status_lines, _window_height,
 )
-from .help import (
-    _HelpControl, _help_cursor, _help_fragments, _help_height, _help_line_count,
-    _help_scroll_by, _help_scroll_position,
-)
+from . import launcher
 from .messages import add_message, toggle_mouse
 from .text import _HORIZONTAL, _framed, _keyed, _rule
 from . import settings_pane
@@ -56,10 +53,9 @@ def scroll_report():
         f"| mouse capture: {'ON' if view.mouse else 'OFF (F2)'}\n"
         f"conversation: {conv_lines} lines, pane {_window_height()} tall, "
         f"scrollback {view.scrollback} (max {max(0, conv_lines - _window_height())})\n"
-        f"help: {_help_line_count()} lines, pane {_help_height()} tall, "
-        f"scroll {view.help_scroll}, pane={view.pane}\n"
+        f"pane={view.pane}\n"
         f"events since start: conversation wheel {_events['conv_wheel']}, "
-        f"help wheel {_events['help_wheel']}, other mouse {_events['other_mouse']}, "
+        f"other mouse {_events['other_mouse']}, "
         f"PgUp/PgDn {_events['page_keys']}, arrows {_events['arrow_keys']}"
     )
 
@@ -83,14 +79,14 @@ def _next_pane():
 
 
 # What the next Tab will do, on the input frame. Tab used to open one
-# thing, so a fixed "tab for help" was honest; now it cycles, and a
+# thing, so a fixed "tab for ..." was honest; now it cycles, and a
 # label that names the next stop beats making you remember the ring.
-_TAB_HINT = {None: "tab for help", "help": "tab for tools",
+_TAB_HINT = {None: "tab for pages", "launch": "tab for tools",
              "tools": "tab for settings", "settings": "tab to close"}
 
 
 def _tab_hint():
-    return _TAB_HINT.get(view.pane, "tab for help")
+    return _TAB_HINT.get(view.pane, "tab for pages")
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +217,16 @@ def _build_keys():
     def _(event):
         settings_pane.toggle_all()
 
+    # The launcher: enter or space opens the picked page (only with an empty
+    # input box, so a message you were typing still sends on Enter)
+    in_launcher = Condition(lambda: view.pane == "launch" and not approving()
+                            and not (view.input_area and view.input_area.text.strip()))
+
+    @keys.add(" ", filter=in_launcher)
+    @keys.add("enter", filter=in_launcher)
+    def _(event):
+        launcher.launch()
+
     @keys.add(" ", filter=Condition(lambda: view.pane == "tools" and not approving()))
     def _(event):
         _tool_toggle()
@@ -240,15 +246,11 @@ def _build_keys():
             return
 
         view.pane = _next_pane()
-
-        if view.pane == "help":
-            view.help_scroll = 0  # always open at the top
-
         _refresh()
 
     @keys.add("escape", eager=True)
     def _(event):
-        # Esc answers a permission popup with no, closes the help window
+        # Esc answers a permission popup with no, closes an open pane
         # if it's open, quits otherwise - same as sfav's notes popup.
 
         if approving():
@@ -290,8 +292,8 @@ def _build_keys():
             settings_pane.move(-max(1, settings_pane._height() - 2))
         elif view.pane == "tools":
             _tool_move(-max(1, _tool_height() - 3))
-        elif view.pane == "help":
-            _help_scroll_by(-max(1, _help_height() - 2))
+        elif view.pane == "launch":
+            launcher.move(-99)
         else:
             _scroll_by(_page_size())
 
@@ -307,8 +309,8 @@ def _build_keys():
             settings_pane.move(max(1, settings_pane._height() - 2))
         elif view.pane == "tools":
             _tool_move(max(1, _tool_height() - 3))
-        elif view.pane == "help":
-            _help_scroll_by(max(1, _help_height() - 2))
+        elif view.pane == "launch":
+            launcher.move(99)
         else:
             _scroll_by(-_page_size())
 
@@ -332,8 +334,8 @@ def _build_keys():
             settings_pane.move(-1)
         elif view.pane == "tools":
             _tool_move(-1)
-        elif view.pane == "help":
-            _help_scroll_by(-1)
+        elif view.pane == "launch":
+            launcher.move(-1)
         else:
             _scroll_by(1)
 
@@ -349,20 +351,15 @@ def _build_keys():
             settings_pane.move(1)
         elif view.pane == "tools":
             _tool_move(1)
-        elif view.pane == "help":
-            _help_scroll_by(1)
+        elif view.pane == "launch":
+            launcher.move(1)
         else:
             _scroll_by(-1)
 
     @keys.add("end")
     def _(event):
-        # Back to the resting position of whichever pane is showing:
-        # the top of the help, the newest line of the conversation.
-
-        if view.pane == "help":
-            view.help_scroll = 0
-        else:
-            view.scrollback = 0
+        # Back to the newest line of the conversation.
+        view.scrollback = 0
 
         _refresh()
 
@@ -413,22 +410,13 @@ def run(on_submit, on_hotkey=None):
 
     view.conv_window = conversation_window
 
-    # Same shape as the conversation window, plus a scrollbar - the help
-    # outgrew one screen the day alarms landed, and a pane that cuts off
-    # silently reads as "that's all there is".
-    help_window = Window(
-        content=_HelpControl(
-            _help_fragments,
-            get_cursor_position=_help_cursor,
-        ),
+    # The launcher: her pages, one key away (ui/launcher.py)
+    launcher_window = Window(
+        content=launcher.LauncherControl(launcher.fragments, get_cursor_position=launcher.cursor),
         height=Dimension(min=3, weight=1),
         wrap_lines=False,
-        get_vertical_scroll=_help_scroll_position,
         always_hide_cursor=True,
-        right_margins=[ScrollbarMargin()],
     )
-
-    view.help_window = help_window
 
     tools_list = Window(
         content=_ToolControl(
@@ -507,13 +495,13 @@ def run(on_submit, on_hotkey=None):
         tools_list,
     ])
 
-    # Help replaces the conversation panel rather than floating over it.
+    # A pane replaces the conversation panel rather than floating over it.
     # A float has to be full width anyway - a 2-cell emoji whose first
     # half falls outside the float still gets drawn in full and shunts
     # the border a column right, and Luna uses emoji constantly - and a
     # full-width float left the conversation's leftover rows and bottom
     # border poking out underneath. Swapping is exact and artifact-free.
-    showing_help = Condition(lambda: view.pane == "help")
+    showing_launcher = Condition(lambda: view.pane == "launch")
 
     body = HSplit([
         _framed(
@@ -528,8 +516,8 @@ def run(on_submit, on_hotkey=None):
             filter=Condition(lambda: view.pane is None),
         ),
         ConditionalContainer(
-            _framed(help_window, title="Help"),
-            filter=showing_help,
+            _framed(launcher_window, title="Pages"),
+            filter=showing_launcher,
         ),
         ConditionalContainer(
             _framed(tools_window, title="Tools"),
@@ -649,7 +637,7 @@ STDERR_MAX = 1024 * 1024          # bytes; a bigger file starts over
 
 
 def stderr_path():
-    import logbook
+    from core import logbook
 
     return os.path.join(logbook.LOG_DIR, STDERR_FILE)
 

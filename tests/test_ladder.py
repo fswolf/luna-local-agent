@@ -1,4 +1,4 @@
-"""The identity ladder (people.py): owner, registered, guest met this
+"""The identity ladder (senses/people.py): owner, registered, guest met this
 session, stranger. Prints are faked and files go to a temp folder.
 
     python -m unittest discover tests        (from the repo folder)
@@ -15,11 +15,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import facecheck  # noqa: E402
-import longterm  # noqa: E402
-import people  # noqa: E402
-import presence  # noqa: E402
-import turnctx  # noqa: E402
+from senses import facecheck  # noqa: E402
+from mind import longterm  # noqa: E402
+from senses import people  # noqa: E402
+from senses import presence  # noqa: E402
+from core import turnctx  # noqa: E402
 
 SHANNON, RYAN, MIKE = [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]
 EDGE = [0.0, 0.3, 0.954]        # Ryan's score about 0.3: under the line, not clearly someone else
@@ -226,14 +226,14 @@ class SecondPass(_Folder):
             self.assertIsNone(facecheck.check(fresh=True))           # looks (here: can't)
 
     def test_no_welcome_back_for_a_stranger(self):
-        import assistant
+        from core import assistant
         import llm
 
         with mock.patch.dict(presence._state, {"stranger": True, "who": None, "model": "m"}), \
                 mock.patch.object(presence.time, "sleep"), \
                 mock.patch.object(assistant, "busy", return_value=False), \
-                mock.patch("interrupts.recording", return_value=False), \
-                mock.patch("mood.away", return_value=False), \
+                mock.patch("core.interrupts.recording", return_value=False), \
+                mock.patch("mind.mood.away", return_value=False), \
                 mock.patch.object(llm, "ask") as ask:
             presence._greet(3600)
         ask.assert_not_called()

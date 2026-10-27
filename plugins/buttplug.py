@@ -65,7 +65,7 @@ import threading
 import time
 
 import config
-import logbook
+from core import logbook
 
 from plugins import _toys
 

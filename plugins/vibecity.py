@@ -56,7 +56,7 @@ import re
 import urllib.parse
 
 import config
-import logbook
+from core import logbook
 
 from plugins import _game
 
@@ -88,7 +88,7 @@ def _goal():
 # Plugin interface
 # ---------------------------------------------------------------------------
 def why_unavailable():
-    import mcpclient
+    from core import mcpclient
 
     if not mcpclient.available():
         return "pip install mcp"
@@ -111,7 +111,7 @@ def running():
 
 def start(model):
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     if _connected:
         return True, "vibecity: already connected"
@@ -139,7 +139,7 @@ def start(model):
 
 def stop():
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     _loop.stop()
 
@@ -310,7 +310,7 @@ def _last_sentence(answer, limit=200):
     return (parts[-1] if parts else "(no report)")[:limit]
 
 def _step():
-    import assistant
+    from core import assistant
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-12:]) or "- nothing yet"
@@ -318,7 +318,7 @@ def _step():
                                 project="{project}", guide="{guide}")
     allowed = list(_state["tools"]) + ["play_vibe_city", "game_note"] + (_game.WEB_TOOLS if s["web"] else [])
 
-    import projects
+    from mind import projects
 
     pid = projects.game_project(NAME, _goal())
 

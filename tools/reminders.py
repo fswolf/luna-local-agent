@@ -4,8 +4,8 @@ One free-text field for the time rather than a number, because
 the model is good at repeating "next friday at 4" and bad at
 turning it into minutes. timeutil.parse_when does the maths.
 """
-import reminders
-import timeutil
+from life import reminders
+from core import timeutil
 
 from . import tool
 

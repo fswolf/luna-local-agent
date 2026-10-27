@@ -4,13 +4,13 @@ Part of the llm package (it was one llm.py); see llm/__init__.py.
 """
 
 from config import MAX_TOOL_ROUNDS
-import gestures
-import interrupts
-import livefeed
-import logbook
+from life import gestures
+from core import interrupts
+from web import livefeed
+from core import logbook
 import tools
-import turnctx
-import vision
+from core import turnctx
+from senses import vision
 
 from .streaming import _Narrator, _THINK_BLOCK, _calls_from_text, _chat_completion, _content, _last_raw, _visible
 

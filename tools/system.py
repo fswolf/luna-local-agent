@@ -28,7 +28,7 @@ import sys
 import time
 from collections import Counter
 
-import machine
+from core import machine
 
 from . import tool
 

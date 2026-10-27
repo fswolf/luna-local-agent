@@ -34,7 +34,7 @@ def _race(fn, n=16):
 
 class WalkAway(unittest.TestCase):
     def setUp(self):
-        import mood
+        from mind import mood
         self.mood = mood
         self.patches = [mock.patch.object(config, "MOOD_ENABLED", True),
                         mock.patch.object(config, "MOOD_WALK_AWAY", True, create=True),
@@ -127,7 +127,7 @@ class Conversation(unittest.TestCase):
 
 class Microphone(unittest.TestCase):
     def test_every_stream_is_counted_and_restart_waits_for_them(self):
-        import speech
+        from voice import speech
 
         class FakeStream:
             def __init__(self, **kw):

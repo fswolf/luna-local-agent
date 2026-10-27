@@ -29,7 +29,7 @@ import subprocess
 import sys
 
 import config
-import logbook
+from core import logbook
 
 NAME = "camera_led"
 SUMMARY = "switch the webcam's light while she looks (Linux, cameras with a V4L2 LED control)"

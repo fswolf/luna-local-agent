@@ -70,7 +70,7 @@ class FullBodyGestures(unittest.TestCase):
     the portrait shows all of her."""
 
     def setUp(self):
-        import gestures
+        from life import gestures
 
         self.g = gestures
         self.saved = (config.PORTRAIT_FRAME, dict(gestures._files))

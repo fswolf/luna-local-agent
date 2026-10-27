@@ -76,7 +76,7 @@ import threading
 import time
 
 import config
-import logbook
+from core import logbook
 
 from plugins import _game
 
@@ -152,7 +152,7 @@ def _node():
 # Plugin interface
 # ---------------------------------------------------------------------------
 def why_unavailable():
-    import mcpclient
+    from core import mcpclient
 
     if not mcpclient.available():
         return "pip install mcp"
@@ -260,7 +260,7 @@ def _storage():
 
 def _connect():
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     who = ["--html", _html(), "--resident", str(settings()["resident"]), "--storage", _storage()]
     city = _city()
@@ -287,7 +287,7 @@ def _connect():
 
 def stop():
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     _loop.stop()
     _state["visiting"] = False
@@ -366,7 +366,7 @@ def _update():
 
     def go():
         global _connected
-        import mcpclient
+        from core import mcpclient
 
         try:
             was_in = _connected
@@ -463,8 +463,8 @@ STEP_PROMPT = (
 
 
 def _step():
-    import assistant
-    import projects
+    from core import assistant
+    from mind import projects
 
     s = settings()
     # The turn before last and earlier: the last one is shown in full above it.

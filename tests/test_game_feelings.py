@@ -11,8 +11,8 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import tests.offline  # noqa: F401,E402
 
-import notebook  # noqa: E402
-import reflect  # noqa: E402
+from mind import notebook  # noqa: E402
+from mind import reflect  # noqa: E402
 
 
 class Notebook(unittest.TestCase):
@@ -88,7 +88,7 @@ class WriteUp(Notebook):
         reply = "I found the lamp and the trophy case.\nFeeling: Proud of that run.\nVerdict: enjoyed"
         with mock.patch.object(reflect, "_ask", return_value=reply), \
              mock.patch.object(reflect, "_model", return_value="m"), mock.patch.object(reflect, "_yield"), \
-             mock.patch("mood.note_play") as nudge:
+             mock.patch("mind.mood.note_play") as nudge:
             reflect.summarize_play("m")
         ep = notebook.episodes(1)[0]
         self.assertEqual(ep["summary"], "I found the lamp and the trophy case. Proud of that run.")
@@ -97,7 +97,7 @@ class WriteUp(Notebook):
 
     def test_an_old_session_leaves_the_mood_alone(self):
         old = (datetime.now() - timedelta(days=2)).isoformat(timespec="seconds")
-        with mock.patch("mood.note_play") as nudge:
+        with mock.patch("mind.mood.note_play") as nudge:
             reflect._play_mood({"ended": old, "title": "Zork I"}, "frustrated")
             reflect._play_mood({"ended": datetime.now().isoformat(), "title": "Zork I"}, "mixed")
         nudge.assert_not_called()
@@ -105,7 +105,7 @@ class WriteUp(Notebook):
 
 class Mood(unittest.TestCase):
     def test_how_a_session_moves_her(self):
-        import mood
+        from mind import mood
 
         with mock.patch.object(mood, "_nudge") as nudge:
             mood.note_play("enjoyed", "Zork I")

@@ -1,4 +1,4 @@
-"""The settings page (settings_web.py) and the presets (config/presets.py):
+"""The settings page (web/settings_web.py) and the presets (config/presets.py):
 what the page is sent, what it may change, and who may change it.
 Changes go to a temporary config.json (yours is never touched).
 
@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-import settings_web  # noqa: E402
+from web import settings_web  # noqa: E402
 from config.presets import PRESETS  # noqa: E402
 from config.schema import BASIC, SCHEMA  # noqa: E402
 
@@ -182,7 +182,7 @@ class Page(unittest.TestCase):
         self.assertFalse(active["assistant"])
 
     def test_pages_cant_be_framed_by_other_sites(self):
-        import livefeed
+        from web import livefeed
 
         with open(livefeed.__file__) as f:
             src = f.read()

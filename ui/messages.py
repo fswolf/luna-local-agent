@@ -14,7 +14,7 @@ def set_status(status: str):
 
     # The live monitor's stage pill follows the same status line.
     try:
-        import livefeed
+        from web import livefeed
 
         livefeed.emit("stage", status=status)
     except Exception:
@@ -40,7 +40,7 @@ def set_mode(mode: str):
 
 
 def set_controls(text: str):
-    """A note shown at the bottom of the help window (Tab).
+    """A note shown at the bottom of the launcher pane (Tab).
 
     Was the footer line; the footer is gone, but the keyboard listener
     still uses this to report when no global hotkey is available.

@@ -1,7 +1,7 @@
 """pomf.tv stream chat.
 
 Transport only. Everything about who gets answered, how often, and what
-she is allowed to do about it lives in chatroom.py, so this file is the
+she is allowed to do about it lives in core/chatroom.py, so this file is the
 part that is actually specific to pomf: a websocket, a connect frame,
 and a reconnect loop.
 
@@ -38,10 +38,10 @@ import time
 
 from datetime import datetime
 
-import chatroom
+from core import chatroom
 import config
-import logbook
-import timeutil
+from core import logbook
+from core import timeutil
 
 NAME = "pomf"
 SUMMARY = "answers pomf.tv stream chat out loud"

@@ -44,10 +44,10 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
-import chatroom
+from core import chatroom
 import config
-import logbook
-import timeutil
+from core import logbook
+from core import timeutil
 
 NAME = "youtube"
 SUMMARY = "answers YouTube live chat out loud (read-only, needs an API key)"
@@ -366,7 +366,7 @@ def start(model):
         _thread.start()
         _running = True
 
-    import mood
+    from mind import mood
     mood.set_tame(NAME, not settings().get("lewd", False))
 
     return True, (f"Reading YouTube chat for {stream}. She'll answer anything "
@@ -387,7 +387,7 @@ def stop():
 
         _running = False
 
-    import mood
+    from mind import mood
     mood.set_tame(NAME, False)
 
     return True, "Stopped reading YouTube chat."

@@ -61,7 +61,7 @@ import shutil
 import sys
 
 import config
-import logbook
+from core import logbook
 
 from plugins import _game
 
@@ -99,7 +99,7 @@ def _dfrotz():
 # Plugin interface
 # ---------------------------------------------------------------------------
 def why_unavailable():
-    import mcpclient
+    from core import mcpclient
 
     if not mcpclient.available():
         return "pip install mcp"
@@ -124,7 +124,7 @@ def running():
 
 def start(model):
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     if _connected:
         return True, "zork: already loaded"
@@ -153,7 +153,7 @@ def start(model):
 
 def stop():
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     _loop.stop()
     _state["playing"] = False
@@ -224,7 +224,7 @@ def _new_game():
 
     _state.update(notes=[], steps=0)
     try:
-        import projects
+        from mind import projects
 
         projects.new_game(NAME, GOAL)     # fresh notes; the old ones are retired, not lost
     except Exception:
@@ -460,13 +460,13 @@ def _one_move_per_turn():
 
 
 def _step():
-    import assistant
+    from core import assistant
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-20:]) or "- nothing yet: a new game"
     allowed = list(_state["tools"]) + ["play_zork", "game_note"] + (_game.WEB_TOOLS if s["web"] else [])
 
-    import projects
+    from mind import projects
 
     pid = projects.game_project(NAME, GOAL)
 

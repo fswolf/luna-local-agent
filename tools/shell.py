@@ -37,8 +37,8 @@ import subprocess
 import time
 
 import config
-import logbook
-import turnctx
+from core import logbook
+from core import turnctx
 
 from . import tool
 from .files import HOME, Refused, _display, resolve
@@ -281,7 +281,7 @@ def _run_command(command, folder="~", why="", background=False):
     else:
         if turnctx.current().source == "voice":
             try:
-                from speech import speak
+                from voice.speech import speak
 
                 speak("Can I run a command? It's on screen.")
             except Exception as e:

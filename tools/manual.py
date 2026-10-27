@@ -39,7 +39,7 @@ def _files():
 
 def _items():
     """Every passage of the manual, re-read when a doc changes."""
-    import knowledge
+    from mind import knowledge
 
     files = _files()
     stamp = tuple((f, os.path.getmtime(f)) for f in files)
@@ -72,7 +72,7 @@ def _where(item):
 
 def search(query, limit=3):
     """[(score, item)] best first."""
-    import knowledge
+    from mind import knowledge
 
     items = _items()
     query = " ".join(str(query or "").split())[:300]

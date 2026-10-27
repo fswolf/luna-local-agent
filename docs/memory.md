@@ -134,7 +134,7 @@ plain messages, so nothing needs converting.
 
 # Remembering past conversations
 
-`history.py` keeps the last fifteen turns and folds the rest into a
+`core/history.py` keeps the last fifteen turns and folds the rest into a
 summary, then deletes them. That's right for the prompt, where context
 is scarce, and wrong for the conversation: ask what you decided last
 Tuesday and it's gone, replaced by two sentences written without that

@@ -1,4 +1,4 @@
-"""She reads while you're quiet (reading.py). Nothing real is touched: the
+"""She reads while you're quiet (life/reading.py). Nothing real is touched: the
 clock, the idle time and presence are faked and the portrait events caught.
 
     python -m unittest discover tests        (from the repo folder)
@@ -12,9 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
-import coffee  # noqa: E402
+from life import coffee  # noqa: E402
 import config  # noqa: E402
-import reading  # noqa: E402
+from life import reading  # noqa: E402
 
 
 class Reading(unittest.TestCase):
@@ -150,7 +150,7 @@ class Reading(unittest.TestCase):
         self.assertFalse(coffee.holding())
 
     def test_she_knows(self):
-        import situation
+        from mind import situation
 
         self.assertEqual(reading.describe(now=0), "")
         reading.begin(now=0)
@@ -168,7 +168,7 @@ class Reading(unittest.TestCase):
 
 class Snapshot(unittest.TestCase):
     def test_one_per_prop(self):
-        import livefeed
+        from web import livefeed
 
         with mock.patch.dict(livefeed._snapshot, clear=True):
             livefeed.emit("prop", name="mug", on=False)

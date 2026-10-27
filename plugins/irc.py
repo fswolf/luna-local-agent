@@ -1,7 +1,7 @@
 """IRC. Libera.Chat and #gameranger by default.
 
 Transport only, the same as pomf.py: who gets answered, how often, and
-what she is allowed to do about it all live in chatroom.py. What is
+what she is allowed to do about it all live in core/chatroom.py. What is
 specific to IRC is a socket, a handshake, and the two things that will
 get you disconnected if you get them wrong - PING and flooding.
 
@@ -60,10 +60,10 @@ import time
 
 from datetime import datetime
 
-import chatroom
+from core import chatroom
 import config
-import logbook
-import timeutil
+from core import logbook
+from core import timeutil
 
 NAME = "irc"
 SUMMARY = "answers a channel on IRC, out loud and in the room"

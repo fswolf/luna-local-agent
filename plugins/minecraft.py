@@ -53,7 +53,7 @@ import shutil
 import time
 
 import config
-import logbook
+from core import logbook
 
 from plugins import _game
 
@@ -113,7 +113,7 @@ def available():
 
 
 def why_unavailable():
-    import mcpclient
+    from core import mcpclient
 
     if not mcpclient.available():
         return "pip install mcp"
@@ -130,7 +130,7 @@ def running():
 
 def start(model):
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     if _connected:
         return True, "minecraft: already in the world"
@@ -162,7 +162,7 @@ def start(model):
 
 def stop():
     global _connected
-    import mcpclient
+    from core import mcpclient
 
     _loop.stop()
     mcpclient.disconnect_server(SERVER)
@@ -255,7 +255,7 @@ STEP_PROMPT = (
 
 
 def _step():
-    import assistant
+    from core import assistant
 
     s = settings()
     notes = "\n".join(f"- {n}" for n in _state["notes"][-6:]) or "- nothing yet, you just arrived"
@@ -264,7 +264,7 @@ def _step():
     allowed = (list(_state["tools"]) + ["set_minecraft_goal", "remember_minecraft_spot", "game_note"]
                + (_game.WEB_TOOLS if s["web"] else []))
 
-    import projects
+    from mind import projects
 
     pid = projects.game_project(NAME, _state["goal"])
     prompt = STEP_PROMPT.format(username=s["username"], goal=_state["goal"], notes=notes, spots=spots,

@@ -19,7 +19,7 @@ from treating it as a plugin).
 import threading
 
 import config
-import logbook
+from core import logbook
 
 # When a game's "web" is on: stuck on a puzzle or a recipe, she can look
 # it up. If that means she reads a walkthrough and wins, she wins.
@@ -71,7 +71,7 @@ def guide_by_room(folder, here, on=True):
     if not here or not on:
         return ""
     try:
-        import knowledge
+        from mind import knowledge
 
         text = knowledge.about(folder, here)
     except Exception:
@@ -85,7 +85,7 @@ def guide_by_topic(folder, query, intro="From your guide, on what you're working
     if not folder or not str(query or "").strip():
         return ""
     try:
-        import knowledge
+        from mind import knowledge
 
         text = knowledge.guide(str(folder), query)
     except Exception:
@@ -148,7 +148,7 @@ class Loop:
             return False
         if self.quiet is None:
             return True
-        import reflect
+        from mind import reflect
 
         return reflect.idle_seconds() >= float(self.quiet() or 0)
 

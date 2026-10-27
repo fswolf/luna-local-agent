@@ -15,7 +15,7 @@ import config  # noqa: E402
 config.MONITOR_ENABLED = True
 config.MONITOR_PORT = int(os.environ.get("LUNA_VIEW_PORT", 8793))
 
-import livefeed  # noqa: E402
+from web import livefeed  # noqa: E402
 
 if not livefeed.start():
     # Already running (a viewer left open, or Luna's own monitor on this port)?

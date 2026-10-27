@@ -9,18 +9,18 @@ from datetime import datetime
 
 import config
 from config import AGENT_NAME
-import history
-import gestures
-import livefeed
-import lmstudio
-import logbook
-import mood
-import longterm
-import reminders
+from core import history
+from life import gestures
+from web import livefeed
+from core import lmstudio
+from core import logbook
+from mind import mood
+from mind import longterm
+from life import reminders
 import tools
-import transcript
-import turnctx
-import websearch
+from core import transcript
+from core import turnctx
+from mind import websearch
 
 from . import session
 from .prompts import _calibration_note, _previous_user_text, build_generation_params, build_memory_prompt, build_self_prompt, build_system_prompt, build_tools_prompt
@@ -50,7 +50,7 @@ def _record_thoughts(user_text, answer, started, source=None, model="",
     and a failed write must not cost the reply in front of him now.
     """
     try:
-        import thoughtlog
+        from mind import thoughtlog
 
         rounds = _last_raw.get("thinking") or []
 
@@ -108,7 +108,7 @@ def prompt_budget(text="hello"):
     self_block = build_self_prompt(text)
 
     try:
-        import situation
+        from mind import situation
 
         situation_block = situation.block()
     except Exception:
@@ -430,7 +430,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
         conf = second["conf2"] if second["corrected"] else second["conf"]
     elif _last_raw.get("tokens"):
         try:
-            import thoughtlog
+            from mind import thoughtlog
 
             conf = thoughtlog.confidence(_last_raw["tokens"])["conf"]
         except Exception:
@@ -440,17 +440,17 @@ def _ask(text, model, on_text=None, on_sentence=None,
     gestures.after_reply(text, answer, private=bool(turn.private))
 
     try:
-        import reflect
+        from mind import reflect
 
         reflect.touch()  # any turn, chat included - she's not idle
 
         if remember and turn.lessons:
-            import notebook
+            from mind import notebook
 
             notebook.credit(turn.lessons)
 
         if remember and turn.skills:
-            import skills
+            from mind import skills
 
             skills.credit(turn.skills)
     except Exception:
@@ -469,16 +469,16 @@ def _ask(text, model, on_text=None, on_sentence=None,
     # get_messages_full()'s own "timestamp" field stays the single
     # source of truth and formatting can change later without rewriting
     # anything already saved to disk.
-    # Someone other than the owner said it (people.py): the history says
+    # Someone other than the owner said it (senses/people.py): the history says
     # who, so later turns don't put their words in his mouth.
-    import people
+    from senses import people
 
     guest = people.guest()
     said = f"[{guest}] {text}" if guest else text
     history.add_message("user", said)
     history.add_message("assistant", answer, tools=_last_raw.get("exchanges"))
 
-    # The same turns, to a file summarization never touches. history.py
+    # The same turns, to a file summarization never touches. core/history.py
     # deletes these once they're folded into the summary; this is what
     # makes "what did we decide last week" answerable.
     transcript.add("user", said)

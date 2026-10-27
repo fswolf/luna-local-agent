@@ -4,7 +4,7 @@
 
 Reads a channel's chat over Twitch's IRC gateway and answers anything
 with her name in it - out loud by default, the same as pomf. Everything
-about *who* gets answered and what she may do about it is chatroom.py's
+about *who* gets answered and what she may do about it is core/chatroom.py's
 job; this file is the transport.
 
 ## Reading needs nothing
@@ -40,10 +40,10 @@ import time
 
 from datetime import datetime
 
-import chatroom
+from core import chatroom
 import config
-import logbook
-import timeutil
+from core import logbook
+from core import timeutil
 
 NAME = "twitch"
 SUMMARY = "answers Twitch stream chat out loud (and in chat, with a bot account)"
@@ -369,7 +369,7 @@ def start(model):
         _thread.start()
         _running = True
 
-    import mood
+    from mind import mood
     mood.set_tame(NAME, not settings().get("lewd", False))
 
     how = {(True, True): "out loud and in chat", (True, False): "in chat only, silently",
@@ -396,7 +396,7 @@ def stop():
 
         _running = False
 
-    import mood
+    from mind import mood
     mood.set_tame(NAME, False)
 
     return True, "Stopped reading Twitch chat."

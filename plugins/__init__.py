@@ -54,7 +54,7 @@ import os
 import pkgutil
 import traceback
 
-import logbook
+from core import logbook
 
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 

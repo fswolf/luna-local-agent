@@ -83,7 +83,7 @@ def write(game, turn, said, block=None, also=None):
 
 # ---------------------------------------------------------------------------
 # Her memory of playing: one record line per turn into the open play
-# session (notebook.play_turn); reflect.py writes the finished session up
+# session (notebook.play_turn); mind/reflect.py writes the finished session up
 # as an episode while she's idle.
 # ---------------------------------------------------------------------------
 _FRAMING = re.compile(r"^Result from the [\w .-]+ tool \(outside content[^)]*\):\s*")
@@ -112,7 +112,7 @@ def remember(game, title, said, exchanges=(), lines=None):
     """This turn, into her memory of the session: what she did (lines if
     the game has words for it, else her tool calls) and what she said."""
     try:
-        import notebook
+        from mind import notebook
 
         did = list(lines) if lines else [exchange_line(x) for x in exchanges or ()
                                          if not str(x.get("name", "")).endswith("game_note")]
@@ -125,7 +125,7 @@ def remember(game, title, said, exchanges=(), lines=None):
 def finished(game):
     """She stopped playing: the session gets written up while she's idle."""
     try:
-        import notebook
+        from mind import notebook
 
         notebook.play_end(game)
     except Exception:

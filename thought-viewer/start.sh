@@ -15,4 +15,4 @@ if [ -z "$VIRTUAL_ENV" ]; then
     done
 fi
 
-exec python3 livefeed.py --open thoughts "$@"
+exec python3 -m web.livefeed --open thoughts "$@"
