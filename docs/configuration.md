@@ -112,19 +112,15 @@ and keys are never sent to the page, only whether one is set.
 
 ### The settings pane
 
-Press **Tab three times** (conversation, help, tools, then settings)
+Press **Tab three times** (conversation, pages, tools, then settings)
 for the everyday settings without leaving the terminal. `a` switches to
 all of them, and a filter (`/`) always searches all of them. Each row
 shows the name, its value and a line saying what it does:
 
-```
- Listening
- > mode                       auto                 How listening starts and stops: auto (HOME starts, ...
-   vad                        auto               ↻ What decides you're talking: silero (a speech model)...
-   silence_seconds            1.2                  Seconds of silence after you speak before she stops...
-```
+<img width="1210" alt="The settings pane: the everyday settings grouped by voice, listening, mood and portrait, each with its value and a line saying what it does" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-settings.png" />
 
-- A green value is set in your `config.json`; a grey one is the default.
+- A dot before the name means it's set in your `config.json`; no dot,
+  it's the default. Switches show green when on, grey when off.
 - `↻` means a change takes effect on the next start; everything else
   applies at once, the same split `/set` uses.
 - Passwords, tokens and keys show as `••••`, never in clear.

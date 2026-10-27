@@ -17,6 +17,8 @@ help (every command and key, searchable) and any page a plugin adds, like
 the chess board. Up/down or the wheel picks one; Enter, space or a click
 opens it. `/help` opens the help page straight away.
 
+<img width="1210" alt="The pages pane: her portrait, the OBS address, settings, the live monitor, thoughts, memory and help, each opening in your browser" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-pages.png" />
+
 ## Selecting text
 
 Mouse capture is **off** by default, so you can select and copy from the
