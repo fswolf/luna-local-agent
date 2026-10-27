@@ -45,7 +45,7 @@ ai-voice/
 │   ├── livefeed.py   #   the server and event stream for the monitor and the portrait (python -m web.livefeed)
 │   ├── portrait_config.py, gesture_files.py, gaze.py  # what the portrait loads, gesture files, where she looks
 │   ├── settings_web.py, help_web.py  # /settings/ and /help/
-│   ├── dataset_web.py  #   /dataset/: examples for her patches
+│   ├── dataset_web.py  #   /examples/: examples for her patches (training/dataset.py)
 │   ├── portrait_window.py  # /portrait's window of its own (no address bar)
 │   ├── holofan.py    #   hologram fans (python -m web.holofan sim)
 │   ├── station.py, satellites.py  # relay stations in other rooms, ESPHome satellites

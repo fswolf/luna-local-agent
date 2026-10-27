@@ -567,7 +567,7 @@ def start():
     try:
         from web import dataset_web
 
-        dataset_web.register()           # /dataset/: examples for her patches
+        dataset_web.register()           # /examples/: examples for her patches
     except Exception as e:
         logbook.warn("monitor", "examples page unavailable: %s", e)
 

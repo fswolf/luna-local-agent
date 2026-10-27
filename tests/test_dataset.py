@@ -67,6 +67,57 @@ class Store(unittest.TestCase):
         with self.assertRaises(ValueError):
             dataset.keep("good")
 
+    def test_one_example_per_reply(self):
+        a_turn()
+        first = dataset.keep("good")
+        with self.assertRaises(ValueError):
+            dataset.keep("good")                                   # twice: kept once
+        dataset.keep("fix", reply="I'm good, you?")                # then fixed: the same example
+        rows = dataset.examples()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]["id"], rows[0]["source"], rows[0]["reply"], rows[0]["original"]),
+                         (first["id"], "fix", "I'm good, you?", "Mrrp~ hello there"))
+        a_turn("a new reply")                                     # a new turn can be kept again
+        dataset.keep("good")
+        self.assertEqual(len(dataset.examples()), 2)
+
+    def test_a_keep_during_a_page_change_isnt_lost(self):
+        # /good lands right between the page's read of the file and its rewrite:
+        # the rewrite must not save over it.
+        import threading
+
+        a_turn()
+        first = dataset.keep("good")
+        a_turn("kept meanwhile")
+        keeper, fired = [], []
+
+        def keep_meanwhile(read):
+            def wrapped(*a, **k):
+                rows = read(*a, **k)
+                if not fired:
+                    fired.append(1)
+                    t = threading.Thread(target=dataset.keep, args=("good",))
+                    t.start()
+                    t.join(0.3)             # done by now unless it has to wait its turn
+                    keeper.append(t)
+                return rows
+            return wrapped
+
+        hooks = [mock.patch.object(dataset, name, keep_meanwhile(getattr(dataset, name)))
+                 for name in ("_read", "examples") if hasattr(dataset, name)]
+        for h in hooks:
+            h.start()
+        try:
+            dataset.update(first["id"], approved=False)
+        finally:
+            for h in hooks:
+                h.stop()
+        for t in keeper:
+            t.join(5)
+        replies = [r["reply"] for r in dataset.examples()]
+        self.assertIn("kept meanwhile", replies)
+        self.assertIn("Mrrp~ hello there", replies)
+
     def test_review_changes(self):
         a_turn()
         ex = dataset.keep("good")
@@ -95,7 +146,7 @@ class Store(unittest.TestCase):
             self.assertTrue(patches.handle("/examples"))
             self.assertFalse(patches.handle("/goodbye"))
         self.assertIn("Not kept", said[0])
-        self.assertEqual([r["source"] for r in dataset.examples()], ["good", "fix"])
+        self.assertEqual([r["source"] for r in dataset.examples()], ["fix"])   # /good then /fix: one example
 
     def test_the_page(self):
         a_turn()
