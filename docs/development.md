@@ -13,7 +13,8 @@ ai-voice/
 │   ├── interrupts.py #   stopping her: each turn's own Stop; HOME, barge-in, !stop
 │   ├── history.py, transcript.py  # the conversation, and the full record summaries never touch
 │   ├── logbook.py    #   the debug log (/log)
-│   ├── lmstudio.py, mcpclient.py, chatroom.py, control.py, machine.py, firstrun.py, timeutil.py
+│   ├── timeutil.py   #   time shown to her; timeparse.py reads "next tuesday at 9", timewords.py the words
+│   ├── lmstudio.py, mcpclient.py, chatroom.py, control.py, machine.py, firstrun.py
 ├── mind/             # what she knows and how she thinks about it:
 │   ├── longterm.py, factstore.py, embedmem.py  # facts, the sqlite store, recall by meaning
 │   ├── knowledge.py  #   your notes, manuals and PDFs
@@ -24,6 +25,7 @@ ai-voice/
 │   ├── grounding.py  #   specifics in a reply that nothing she was given backs up
 │   ├── situation.py  #   the live lines at the top of each turn: window, music, load, her hands
 │   ├── mood.py       #   how she feels, and what moves it
+│   ├── appraise.py, mood_files.py  # how a turn landed; agent/moods.json
 │   └── webpage.py, websearch.py  # reading pages and searching, for research
 ├── senses/           # what she perceives:
 │   ├── camera.py, vision.py, desktop.py  # the webcam, the screen, the desktop
@@ -31,10 +33,17 @@ ai-voice/
 │   ├── facecheck.py  #   one quick look to see who's at the desk
 │   ├── voices.py     #   whose voice it is, by SpeechBrain's speaker model
 │   └── people.py     #   who's who: owner, registered, guests, strangers; their own facts
-├── voice/            # hearing and speaking: speech.py, ptt.py (push to talk), wakeword.py
+├── voice/            # hearing and speaking:
+│   ├── speech.py     #   the front door: load_models, transcribe, speak, Player
+│   ├── listen.py     #   recording you, room calibration, VAD
+│   ├── tts.py        #   her words into sound (Kokoro), lip sync
+│   ├── playback.py   #   mic and speakers (PortAudio, afplay on a Mac)
+│   ├── bargein.py    #   interrupting her, the wake word
+│   └── ptt.py, wakeword.py  # push to talk, the wake-word model
 ├── life/             # her own days: coffee.py, reading.py, touches.py, gestures.py, reminders.py, alarm.py
 ├── web/              # her pages, served on 127.0.0.1:8792:
-│   ├── livefeed.py   #   the live monitor and the portrait (python -m web.livefeed opens one alone)
+│   ├── livefeed.py   #   the server and event stream for the monitor and the portrait (python -m web.livefeed)
+│   ├── portrait_config.py, gesture_files.py, gaze.py  # what the portrait loads, gesture files, where she looks
 │   ├── settings_web.py, help_web.py  # /settings/ and /help/
 │   ├── portrait_window.py  # /portrait's window of its own (no address bar)
 │   ├── holofan.py    #   hologram fans (python -m web.holofan sim)
@@ -64,6 +73,7 @@ ai-voice/
 ├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── portrait/         # her animated portrait
 │   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
+│   │                 #   face_layers.js (blush, tears, brows), debug_panel.js (?debug=1), studio.js,
 │   │                 #   look.js (where she looks), emotes.js (hearts, sweat drop...),
 │   │                 #   hologram.js / hologram3d.js, view.py (./viewer.sh),
 │   │                 #   vendor/ (bundled three.js and pixi.js; build.sh rebuilds them)

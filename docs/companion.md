@@ -73,7 +73,9 @@ and stop words still work.
 | `agent/agent.json` | Her name, personality, tone, traits, rules, who you are, and how to pronounce her cat sounds |
 | `agent/moods.json` | Every mood: its name, what she's told, face, voice, idle moves, emote; the lewd and grudge rows; quick feelings; walk-away lines |
 | `agent/mood.json` | Where the dials are right now (saved after every turn, so a restart picks up where she was) |
-| `mind/mood.py` | The engine: signals, drift, the exchange reading, desire, grudge, walk-away |
+| `mind/mood.py` | The engine: signals, drift, desire, grudge, walk-away |
+| `mind/appraise.py` | The exchange reading: the one side question that asks how a turn landed |
+| `mind/mood_files.py` | Loads and checks `agent/moods.json`, with built-in moods if it's broken |
 | `config.json` → `"mood"` | On/off, intensity, where she rests, what shows where (see [Settings](#settings-reference)) |
 | `portrait/touch.json` | What she does when each part of her is clicked, per mood |
 | `portrait/gestures/*.js` | Every gesture: one file each, data only |
