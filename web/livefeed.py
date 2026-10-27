@@ -17,6 +17,13 @@ Localhost only, and stricter than that: a request whose Host or Origin
 isn't this server is refused. The stream carries what you say and what
 she thinks, and a page on any other site must not be able to read it -
 including through a DNS name pointed at 127.0.0.1.
+
+This file is the server and the event stream (emit, the request handler,
+the page registry). It re-exports the rest, so `livefeed.X` still works:
+
+    web/portrait_config.py   what the portrait page is told when it loads
+    web/gesture_files.py     reading gesture and prop files for the pages
+    web/gaze.py              where her eyes follow on screen
 """
 import importlib.util
 import json
@@ -25,12 +32,38 @@ import queue
 import re
 import threading
 import time
-
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
 import config
 from web import holofan
 from core import logbook
+from web.gaze import _gaze_loop
+from web.gesture_files import gesture_file, prop_entry, props_list
+from web.portrait_config import portrait_config, portrait_models
+from web.gesture_files import (  # noqa: F401  re-exported: livefeed.X keeps working
+    _BONE,
+    _GNAME,
+    _IDLE_BANDS,
+    _WORD,
+    _ZONES,
+    _num,
+    _text,
+    _words,
+)
+from web.portrait_config import (  # noqa: F401  re-exported: livefeed.X keeps working
+    _gesture_mode,
+    _model_sidecar,
+    _mood_list,
+    gesture_mode_changed,
+    lights_changed,
+    lights_config,
+    portrait_clips,
+    portrait_url,
+)
+from web.gaze import (  # noqa: F401  re-exported: livefeed.X keeps working
+    _GAZE_REACH,
+    _own_pids,
+    gaze_target,
+)
 
 _subs = set()
 _lock = threading.Lock()
@@ -76,176 +109,6 @@ def emit(kind, **data):
                 q.put_nowait(event)
             except queue.Full:
                 pass  # a page that stopped reading loses events, not the turn
-
-
-# -- the pose studio's gesture files ------------------------------------------
-_GNAME = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
-_BONE = re.compile(r"^\+?[A-Za-z][A-Za-z0-9]{0,40}$")
-_WORD = re.compile(r"^[A-Za-z0-9_\- ]{1,40}$")
-_IDLE_BANDS = {"grudge", "cool", "neutral", "warm", "loving", "lewd"}
-_ZONES = {"head", "nose", "mouth", "chest", "tummy", "groin", "legs", "neck", "arms", "back", "butt", "tail"}
-
-
-def _num(v, lo=-1e4, hi=1e4):
-    if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:
-        raise ValueError(f"not a number: {v!r}")
-    return round(max(lo, min(hi, float(v))), 4)
-
-
-def _words(v, limit=40, pattern=_WORD):
-    if not isinstance(v, list):
-        raise ValueError("expected a list")
-    out = [str(w).strip() for w in v if str(w).strip()][:limit]
-    for w in out:
-        if not pattern.match(w):
-            raise ValueError(f"not allowed: {w!r}")
-    return out
-
-
-def _text(v, limit=200):
-    return " ".join(str(v).split())[:limit]
-
-
-def gesture_file(data):
-    """(name, file text) for a gesture from the pose studio. Everything is
-    checked and rebuilt here - names, numbers, words - so what's written is
-    always plain data in the gesture-file shape, whatever was sent."""
-    if not isinstance(data, dict):
-        raise ValueError("expected a JSON object")
-    name = str(data.get("name", "")).strip().lower()
-    if not _GNAME.match(name):
-        raise ValueError("name: lower-case letters, numbers and _ only, starting with a letter")
-    g = {}
-    if data.get("chain") is not None:
-        g["chain"] = _words(data["chain"], 12, _GNAME)
-        if not g["chain"]:
-            raise ValueError("a chain needs at least one gesture")
-    else:
-        keys = []
-        for item in data.get("keys") or []:
-            t, pose = item
-            bones = {}
-            for b, v in pose.items():
-                if not _BONE.match(b) or not isinstance(v, list) or not 3 <= len(v) <= 4:
-                    raise ValueError(f"bad bone: {b!r}")
-                bones[b] = [_num(x, -7, 7) for x in v]
-            keys.append([_num(t, 0, 600), bones])
-        if not keys:
-            raise ValueError("no keyframes")
-        keys.sort(key=lambda k: k[0])
-        g["dur"] = _num(data.get("dur", keys[-1][0] or 1), 0.1, 600)
-        fade = data.get("fade") or [0.4, 0.5]
-        g["fade"] = [_num(fade[0], 0, 10), _num(fade[1], 0, 10)]
-        g["keys"] = keys
-        expr = {}
-        for ch, v in (data.get("expr") or {}).items():
-            if not _WORD.match(ch):
-                raise ValueError(f"bad face channel: {ch!r}")
-            expr[ch] = _num(v, 0, 1) if not isinstance(v, list) else [[_num(t, 0, 600), _num(x, 0, 1)] for t, x in v]
-        if expr:
-            g["expr"] = expr
-    if data.get("about"):
-        g["about"] = _text(data["about"])
-    if data.get("keywords"):
-        g["keywords"] = [_text(k, 60) for k in data["keywords"] if _text(k, 60)][:20]
-    for flag in ("private", "lewd", "full"):
-        if data.get(flag):
-            g[flag] = True
-    idle = data.get("idle")
-    if isinstance(idle, list):       # only in these mood bands
-        bands = [b for b in _words(idle, 6) if b in _IDLE_BANDS]
-        if bands:
-            g["idle"] = bands
-    elif idle:
-        g["idle"] = True
-    if data.get("touch"):
-        g["touch"] = [z for z in _words(data["touch"], 12) if z in _ZONES]
-    if data.get("moods"):
-        g["moods"] = _words(data["moods"], 20)
-    snd = data.get("sound")
-    if isinstance(snd, str) and snd.strip():
-        g["sound"] = _words([snd.strip()], 1)[0]
-    elif isinstance(snd, dict) and snd.get("name"):
-        s = {"name": _words([str(snd["name"])], 1)[0]}
-        if snd.get("from") == "random":
-            s["from"] = "random"
-        elif snd.get("from") not in (None, ""):
-            s["from"] = _num(snd["from"], 0, 3600)
-        if snd.get("len"):
-            s["len"] = _num(snd["len"], 0.1, 600)
-        g["sound"] = s
-    emotes = []
-    for e in (data.get("emote") or [])[:6]:
-        emotes.append({"name": _words([str(e["name"])], 1)[0], "at": _num(e.get("at", 0), 0, 600)})
-    if emotes:
-        g["emote"] = emotes if len(emotes) > 1 else emotes[0]
-    for k in ("wag", "tail_up"):
-        if data.get(k):
-            g[k] = _num(data[k], 0, 1)
-    # carried through from a gesture loaded into the studio, checked the same way
-    if data.get("then"):
-        g["then"] = _words([str(data["then"])], 1, _GNAME)[0]
-    if data.get("left"):
-        g["left"] = True
-    if data.get("osc"):
-        g["osc"] = [[b, int(_num(ax, 0, 3)), _num(a, -7, 7), _num(hz, 0, 60)]
-                    for b, ax, a, hz in data["osc"][:12] if _BONE.match(str(b))]
-    # a prop it picks up or puts down (props.js): which, when in it the prop
-    # appears or goes, and whether her last pose is held while she carries it
-    if data.get("prop"):
-        g["prop"] = _words([str(data["prop"])], 1, _GNAME)[0]
-    if data.get("prop_at") not in (None, ""):
-        g["prop_at"] = _num(data["prop_at"], 0, 600)
-    if data.get("hold") is True:
-        g["hold"] = True
-    if isinstance(data.get("lights"), list):        # her light strips' throb: [[seconds, level], ...]
-        g["lights"] = [[_num(t, 0, 600), _num(v, 0, 2)] for t, v in data["lights"][:40]]
-    if data.get("add"):
-        g["add"] = {b: [_num(x, -7, 7) for x in v[:4]] for b, v in data["add"].items() if _BONE.match(str(b)) and isinstance(v, list)}
-
-    lines = [f"// {name}: made in the pose studio (portrait/viewer/studio.js).",
-             f"// {g['about']}" if g.get("about") else "// (no description yet)",
-             "export default {"]
-    for k, v in g.items():
-        if k == "keys":
-            lines.append("  keys: [")
-            lines += [f"    [{t}, {json.dumps(p)}]," for t, p in v]
-            lines.append("  ],")
-        else:
-            lines.append(f"  {k}: {json.dumps(v, ensure_ascii=False)},")
-    lines.append("};")
-    return name, "\n".join(lines) + "\n"
-
-
-def prop_entry(data):
-    """(name, entry) for portrait/props/props.json from the pose studio's prop
-    tab: where a prop sits in her hand. Numbers only, clamped; the prop must
-    be a .glb in portrait/props/."""
-    if not isinstance(data, dict):
-        raise ValueError("expected a JSON object")
-    name = str(data.get("name", "")).strip().lower()
-    if not _GNAME.match(name):
-        raise ValueError("name: lower-case letters, numbers and _ only")
-    if not os.path.isfile(os.path.join(config.BASE_DIR, "portrait", "props", name + ".glb")):
-        raise ValueError(f"there's no portrait/props/{name}.glb")
-    hand = str(data.get("hand", "right"))
-    if hand not in ("right", "left"):
-        raise ValueError("hand: right or left")
-    at, turn = list(data.get("at") or []), list(data.get("turn") or [])
-    if len(at) != 3 or len(turn) != 3:
-        raise ValueError("at and turn are three numbers each")
-    return name, {"hand": hand, "at": [_num(v, -0.5, 0.5) for v in at],
-                  "turn": [_num(v, -7, 7) for v in turn],
-                  "scale": _num(data.get("scale", 1), 0.05, 5)}
-
-
-def props_list():
-    """Every prop model in portrait/props/ (a .glb by its name)."""
-    try:
-        return sorted(f[:-4] for f in os.listdir(os.path.join(config.BASE_DIR, "portrait", "props"))
-                      if f.endswith(".glb") and _GNAME.match(f[:-4]))
-    except OSError:
-        return []
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -673,176 +536,6 @@ def with_switcher(html, here):
     return html[:j + 1] + nav + html[j + 1:]
 
 
-def portrait_models():
-    """Every model in portrait/models, as paths portrait.model takes:
-    a folder's .model3.json (Live2D), and any .vrm / .glb (3D)."""
-    root = os.path.join(config.BASE_DIR, "portrait", "models")
-    found = []
-
-    for dirpath, _dirs, files in sorted(os.walk(root)):
-        if dirpath[len(root):].count(os.sep) > 2:      # not deep inside a model's own folders
-            continue
-
-        for f in sorted(files):
-            if f.endswith((".model3.json", ".vrm", ".glb")):
-                found.append(os.path.relpath(os.path.join(dirpath, f), os.path.dirname(root)).replace(os.sep, "/"))
-
-    return found
-
-
-def portrait_clips():
-    """The animation clips in portrait/animations: every .vrma, with its
-    settings from clips.json (keyed by file name, without .vrma).
-
-    A clip plays as the gesture it's named after - wave.vrma replaces the
-    built-in wave, wave-2.vrma is a second one to pick from at random -
-    or as whatever "as" says. Anything in animations/private/ is private:
-    never played from chat, and only offered to her in your own turns.
-    """
-    base = os.path.join(config.BASE_DIR, "portrait")
-    root = os.path.join(base, "animations")
-    settings = {}
-
-    for sub in ("", "private"):
-        try:
-            with open(os.path.join(root, sub, "clips.json"), encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                settings.update({k: v for k, v in data.items() if isinstance(v, dict)})
-        except FileNotFoundError:
-            pass
-        except (OSError, ValueError) as e:
-            logbook.warn("monitor", "ignoring %s/clips.json: %s", sub or "animations", e)
-
-    found = []
-
-    for dirpath, _dirs, files in sorted(os.walk(root)):
-        if dirpath[len(root):].count(os.sep) > 1:
-            continue
-
-        for f in sorted(files):
-            if not f.lower().endswith(".vrma"):
-                continue
-
-            stem = f[:-5]
-            opts = dict(settings.get(stem, {}))
-            name = str(opts.pop("as", "") or re.sub(r"[-_ ]?\d+$", "", stem) or stem).strip().lower().replace(" ", "_")
-            rel = os.path.relpath(os.path.join(dirpath, f), base).replace(os.sep, "/")
-            private = bool(opts.get("private", "/private/" in "/" + rel + "/"))
-            found.append(dict(opts, name=name, file=rel, private=private))
-
-    return found
-
-
-def _model_sidecar(path):
-    """The luna.json beside a model, or {} - a broken one is a log line,
-    not a portrait that won't load."""
-    side = os.path.join(os.path.dirname(path), "luna.json")
-
-    try:
-        with open(side, encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError) as e:
-        logbook.warn("monitor", "ignoring %s: %s", side, e)
-        return {}
-
-
-def _gesture_mode():
-    try:
-        from life import gestures
-
-        return gestures.mode()
-    except Exception:
-        return "keywords"
-
-
-def gesture_mode_changed():
-    """Tell an open portrait the gesture settings changed."""
-    emit("gesture_mode", mode=_gesture_mode(),
-         chat=bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)))
-
-
-def _mood_list():
-    """Every mood, for the debug viewer's mood menu ([] if moods.json won't load)."""
-    try:
-        from mind import mood
-
-        return mood.preview_list()
-    except Exception as e:
-        logbook.warn("monitor", "mood list for the portrait: %s", e)
-        return []
-
-
-def lights_config():
-    """portrait.lights, as the page's lights.js takes it."""
-    return {"enabled": bool(getattr(config, "PORTRAIT_LIGHTS_ENABLED", False)),
-            "color": str(getattr(config, "PORTRAIT_LIGHTS_COLOR", "") or ""),
-            "brightness": float(getattr(config, "PORTRAIT_LIGHTS_BRIGHTNESS", 1.0)),
-            "voice": bool(getattr(config, "PORTRAIT_LIGHTS_VOICE", True)),
-            "private": bool(getattr(config, "PORTRAIT_LIGHTS_PRIVATE", True)),
-            "style": str(getattr(config, "PORTRAIT_LIGHTS_STYLE", "neon"))}
-
-
-def lights_changed():
-    """Tell an open portrait the light strip settings changed."""
-    emit("lights", lights=lights_config())
-
-
-def portrait_config(preview=None):
-    """What the portrait page needs from config.json: which model, and
-    which nodes are her ears if their names don't say so. A model that
-    isn't there falls back to Luna's robot model, then Sigewinne; with
-    neither, the page says so."""
-    root = os.path.join(config.BASE_DIR, "portrait")
-    model = str(preview or getattr(config, "PORTRAIT_MODEL", "") or "")
-    missing = ""
-
-    if not model or not os.path.isfile(os.path.join(root, model)):
-        missing = model
-        model = ""
-        for fallback in (getattr(config, "_LUNA_ROBOT", "models/luna/robot_default.vrm"),
-                         getattr(config, "_SIGEWINNE", "models/sigewinne/sigewinne.model3.json")):
-            if os.path.isfile(os.path.join(root, fallback)):
-                model = fallback
-                break
-
-    # The live2d block belongs to one model, so it travels with it: a
-    # luna.json in the model's folder (framing, expressions, credit).
-    # Without one, what config.json says, else Sigewinne's expressions
-    # for Sigewinne and nothing for anything else.
-    sidecar = _model_sidecar(os.path.join(root, model)) if model else {}
-    live2d = sidecar.get("live2d") or (config._stored("portrait.live2d")
-                                       if model == getattr(config, "PORTRAIT_MODEL", "") else None) or {}
-    if not live2d and model == getattr(config, "_SIGEWINNE", ""):
-        live2d = {"expressions": {"sad": "tears", "flustered": "x_eyes", "confused": "spiral_eyes"}}
-
-    return {"model": model, "missing": missing,
-            "ear_bones": list(getattr(config, "PORTRAIT_EAR_BONES", []) or []),
-            "live2d": live2d, "credit": str(sidecar.get("credit") or ""),
-            "vrm": dict(sidecar.get("vrm") or {}),
-            "gestures": _gesture_mode(),
-            "chat_gestures": bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)),
-            "sounds": bool(getattr(config, "PORTRAIT_SOUNDS", True)),
-            "sound_volume": float(getattr(config, "PORTRAIT_SOUND_VOLUME", 0.8)),
-            "frame": str(getattr(config, "PORTRAIT_FRAME", "bust")),
-            "lights": lights_config(),
-            "moods": _mood_list(),
-            "background": str(getattr(config, "PORTRAIT_BACKGROUND", "") or ""),
-            "seasonal": config.seasonal_backgrounds(),
-            "fan": dict(getattr(config, "PORTRAIT_FAN", {}) or {},
-                        cast=bool(getattr(config, "PORTRAIT_FAN_CAST", False))),
-            "clips": portrait_clips(),
-            "hologram": dict(getattr(config, "PORTRAIT_HOLOGRAM", {}) or {},
-                             enabled=bool(getattr(config, "PORTRAIT_HOLOGRAM_ENABLED", False)))}
-
-
-def portrait_url(transparent=False):
-    return url() + "/portrait/" + ("?bg=transparent" if transparent else "")
-
-
 def start():
     """Serve the page, if monitor.enabled. A port already in use is a
     line in the log, not a failed startup."""
@@ -877,116 +570,6 @@ def start():
     logbook.info("monitor", "live monitor on %s", url())
 
     return True
-
-
-# ---------------------------------------------------------------------------
-# Where the portrait should look
-#
-# On Hyprland the portrait window and Luna's terminal both have a place
-# on screen, so the portrait can turn towards the conversation instead
-# of staring at the middle of its own window. The direction goes out as
-# a "gaze" event: x and y from -1 to 1, x towards the right of the
-# screen, y up. Anywhere else (another compositor, OBS, the terminal on
-# another workspace) it sends {"none": true} and the portrait looks
-# ahead, as it always did.
-# ---------------------------------------------------------------------------
-# How far away, in screen pixels, counts as "as far to the side as she
-# can look". Roughly a monitor's width from the portrait.
-_GAZE_REACH = 1100.0
-
-
-def _own_pids():
-    pids, pid = set(), os.getpid()
-
-    for _ in range(12):
-        if pid <= 1 or pid in pids:
-            break
-
-        pids.add(pid)
-
-        try:
-            with open(f"/proc/{pid}/stat") as f:
-                pid = int(f.read().rsplit(")", 1)[1].split()[1])
-        except (OSError, ValueError, IndexError):
-            break
-
-    return pids
-
-
-def gaze_target():
-    """{"x", "y"} from the portrait window towards Luna's terminal, or
-    None when either can't be found."""
-    import shutil
-    import subprocess
-
-    if not shutil.which("hyprctl"):
-        return None
-
-    try:
-        out = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True,
-                             text=True, timeout=2)
-        clients = json.loads(out.stdout) if out.returncode == 0 else []
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None
-
-    ours = _own_pids()
-    terminal = next((c for c in clients if c.get("pid") in ours), None)
-    # The portrait page's <title> is "Luna"; Chromium's --app window
-    # takes the page title as its own.
-    # Firefox and friends append their own name: "Luna — Mozilla Firefox".
-    portrait = next((c for c in clients if c is not terminal
-                     and re.match(r"^Luna(\s+[-—–]\s+.*)?$", str(c.get("title", "")).strip())),
-                    None)
-
-    if not terminal or not portrait:
-        return None
-
-    if (terminal.get("workspace") or {}).get("id") != (portrait.get("workspace") or {}).get("id"):
-        return None  # she can't see it from here
-
-    try:
-        (tx, ty), (tw, th) = terminal["at"], terminal["size"]
-        (px, py), (pw, ph) = portrait["at"], portrait["size"]
-    except (KeyError, TypeError, ValueError):
-        return None
-
-    # Her face sits in the upper third of the window; the conversation
-    # is wherever the terminal's middle is.
-    dx = (tx + tw / 2) - (px + pw / 2)
-    dy = (ty + th / 2) - (py + ph * 0.3)
-    clamp = lambda v: max(-1.0, min(1.0, v))
-
-    return {"x": round(clamp(dx / _GAZE_REACH), 3), "y": round(clamp(-dy / _GAZE_REACH), 3)}
-
-
-def _gaze_loop():
-    """Twice a second while a page is open: tell the portrait where the
-    terminal is, when that changes. Costs nothing with no page open."""
-    last = object()
-
-    while True:
-        time.sleep(0.5)
-
-        if not _subs:
-            last = object()  # a page that opens later gets a fresh answer
-            continue
-
-        from senses import presence
-
-        # Someone in front of the webcam: look at them. Otherwise at the
-        # terminal, where the conversation is.
-        target = presence.gaze() or gaze_target()
-
-        if target is None:
-            if last is not None:
-                emit("gaze", none=True)
-                last = None
-            continue
-
-        if (not isinstance(last, dict) or abs(target["x"] - last["x"]) > 0.02
-                or abs(target["y"] - last["y"]) > 0.02):
-            emit("gaze", **target)
-            last = target
 
 
 def _web_page(name):

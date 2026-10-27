@@ -191,7 +191,8 @@ back where she was. Pomf, IRC and Discord don't hold anything back.
 
 The weights (how much a flirty message, an insult or a turn is worth)
 are the `DESIRE_*` and `HOSTILE_HIT` numbers at the top of the
-exchange section in `mind/mood.py`.
+exchange section in `mind/mood.py` (the question itself is in
+`mind/appraise.py`).
 
 ## The moods file
 

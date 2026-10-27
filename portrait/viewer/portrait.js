@@ -26,6 +26,56 @@ import { createFan } from './fan.js';
 import { createProps } from './props.js';
 import { createLights } from './lights.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
+import { bindFaceLayers, blush, drool, tears, updateBlush, updateBrows, updateTears } from './face_layers.js';
+import { bindDebugPanel, debugPanel } from './debug_panel.js';
+
+bindDebugPanel({
+  get blink() { return blink; },
+  get camera() { return camera; },
+  get cfg() { return cfg; },
+  get clock() { return clock; },
+  get ears() { return ears; },
+  get emote() { return emote; },
+  get emoteLast() { return emoteLast; }, set emoteLast(v) { emoteLast = v; },
+  get fakeVoice() { return fakeVoice; },
+  get fan() { return fan; },
+  get fx() { return fx; },
+  get gesture() { return gesture; },
+  get handle() { return handle; },
+  get has() { return has; },
+  get holo() { return holo; },
+  get idlePool() { return idlePool; },
+  get lights() { return lights; },
+  get lightsCfg() { return lightsCfg; },
+  get mind() { return mind; },
+  get moodBand() { return moodBand; },
+  get mouthShut() { return mouthShut; },
+  get moves() { return moves; },
+  get orbit() { return orbit; },
+  get params() { return params; },
+  get props() { return props; },
+  get renderer() { return renderer; },
+  get setHolo() { return setHolo; },
+  get setLights() { return setLights; },
+  get spankSlider() { return spankSlider; },
+  get studio() { return studio; }, set studio(v) { studio = v; },
+  get throbAt() { return throbAt; }, set throbAt(v) { throbAt = v; },
+  get twitch() { return twitch; },
+  get vrm() { return vrm; },
+});
+
+
+bindFaceLayers({
+  get camera() { return camera; },
+  get cfg() { return cfg; },
+  get damp() { return damp; },
+  get fx() { return fx; },
+  get has() { return has; },
+  get mind() { return mind; },
+  get moodNow() { return moodNow; },
+  get vrm() { return vrm; },
+});
+
 
 const params = new URLSearchParams(location.search);
 const note = document.getElementById('note');
@@ -1081,488 +1131,11 @@ function moodParts() {
   return mouthShut.parts.length > 0 && cfg.vrm?.mood_parts !== false;
 }
 
-// Blush. VRoid paints the cheeks into the face texture, so there's no
-// expression to turn up; instead a second copy of the face skin, sharing
-// its skeleton and shape keys, carries a pink glow painted in the face's
-// own texture layout and fades in over the cheeks. It moves with every
-// expression because it is the same face. A model with its own "blush"
-// expression uses that instead.
-//
-// What raises it: a gesture that asks (hug, kiss, shy), a big jump in
-// warmth (flustered, then fading), and a little while warmth stays high.
-// luna.json, "vrm": {"blush": {"left": [u, v], "right": [u, v], "size": 0.075,
-//                               "color": "#ff5f86", "strength": 0.65}}
-// (u, v from the top-left of the face texture; the default is VRoid's.)
-const blush = { now: 0, gesture: 0, fluster: 0, mood: 0, layer: null, tried: false, test: null };
-function blushLayer() {
-  if (blush.tried) return blush.layer;
-  blush.tried = true;
-  const o = cfg.vrm?.blush || {};
-  let skin = null;
-  vrm.scene.traverse(m => {
-    if (!skin && m.isSkinnedMesh && !m.userData.overlay && [].concat(m.material).some(x => /face.*skin|skin.*face/i.test(x.name || ''))) skin = m;
-  });
-  if (!skin || o.enabled === false) return null;
-  const S = 512, cv = document.createElement('canvas');
-  cv.width = cv.height = S;
-  const g = cv.getContext('2d');
-  const col = new THREE.Color(o.color || '#ff5f86'), [r, gg, b] = [col.r, col.g, col.b].map(x => Math.round(x * 255));
-  for (const [u, v] of [o.left || [0.33, 0.61], o.right || [0.67, 0.61]]) {
-    const rad = (o.size || 0.075) * S;
-    const grad = g.createRadialGradient(u * S, v * S, 0, u * S, v * S, rad);
-    grad.addColorStop(0, `rgba(${r},${gg},${b},0.75)`);
-    grad.addColorStop(0.45, `rgba(${r},${gg},${b},0.38)`);
-    grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
-    g.fillStyle = grad;
-    g.beginPath(); g.ellipse(u * S, v * S, rad * 1.25, rad, 0, 0, Math.PI * 2); g.fill();
-  }
-  const tex = new THREE.CanvasTexture(cv);
-  tex.flipY = false;                       // glTF texture layout
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false,
-                                            polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-  const layer = new THREE.SkinnedMesh(skin.geometry, mat);
-  layer.userData.overlay = true;
-  layer.bind(skin.skeleton, skin.bindMatrix);
-  layer.morphTargetInfluences = skin.morphTargetInfluences;      // same array: same expression, always
-  layer.morphTargetDictionary = skin.morphTargetDictionary;
-  layer.frustumCulled = false;
-  layer.renderOrder = (skin.renderOrder || 0) + 1;
-  skin.parent.add(layer);
-  layer.position.copy(skin.position); layer.quaternion.copy(skin.quaternion); layer.scale.copy(skin.scale);
-  blush.layer = { mesh: layer, mat, strength: o.strength ?? 0.65 };
-  return blush.layer;
-}
-function updateBlush(dt) {
-  blush.fluster = Math.max(0, blush.fluster - dt / 7);                 // flustered fades over ~7 s
-  const warm = Math.max(0, (mind.warmth - 0.6) * 0.9);
-  const target = blush.test ?? Math.min(1, Math.max(blush.gesture, blush.fluster, blush.mood, warm));
-  blush.now = damp(blush.now, target, target > blush.now ? 2.5 : 0.8, dt);   // rises quicker than it fades
-  if (has.has('blush')) { vrm.expressionManager.setValue('blush', blush.now); return; }
-  const l = blushLayer();
-  if (l) { l.mat.opacity = blush.now * l.strength; l.mesh.visible = blush.now > 0.01; }
-}
-
-// Tears. The same trick as the blush: a copy of the face skin that moves
-// with every expression, carrying a texture painted in the face's own
-// layout - here redrawn as she cries: a wet shine on the lower lids, then
-// streaks that grow down her cheeks with drops running along them.
-// What brings them: the cry gesture, or staying deeply sad for a while.
-// luna.json, "vrm": {"tears": {"left": [u, v], "right": [u, v], "length": 0.3}}
-// (where each tear starts, below the eye; the default is VRoid's layout).
-// The same layer carries drool: a gesture's "drool" channel (0..1) draws a
-// glossy strand from the corner of her mouth, "vrm": {"drool": {"start":
-// [u, v], "length": 0.07}} (default: VRoid's left mouth corner).
-const tears = { now: 0, gesture: 0, sadFor: 0, layer: null, tried: false, test: null, drops: [] };
-const drool = { now: 0, gesture: 0, test: null };
-function tearLayer() {
-  if (tears.tried) return tears.layer;
-  tears.tried = true;
-  let skin = null;
-  vrm.scene.traverse(m => {
-    if (!skin && m.isSkinnedMesh && m.renderOrder !== 1000 && !m.userData.overlay
-        && [].concat(m.material).some(x => /face.*skin|skin.*face/i.test(x.name || ''))) skin = m;
-  });
-  if (!skin) return null;
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = 512;
-  const tex = new THREE.CanvasTexture(cv);
-  tex.flipY = false;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 1, depthWrite: false,
-                                            polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
-  const layer = new THREE.SkinnedMesh(skin.geometry, mat);
-  layer.userData.overlay = true;
-  layer.bind(skin.skeleton, skin.bindMatrix);
-  layer.morphTargetInfluences = skin.morphTargetInfluences;
-  layer.morphTargetDictionary = skin.morphTargetDictionary;
-  layer.frustumCulled = false;
-  layer.renderOrder = (skin.renderOrder || 0) + 2;
-  skin.parent.add(layer);
-  layer.position.copy(skin.position); layer.quaternion.copy(skin.quaternion); layer.scale.copy(skin.scale);
-  const o = cfg.vrm?.tears || {};
-  tears.layer = { mesh: layer, tex, g: cv.getContext('2d'),
-                  starts: [o.left || [0.335, 0.565], o.right || [0.665, 0.565]], length: o.length || 0.3 };
-  return tears.layer;
-}
-function updateTears(dt, now) {
-  // deeply sad for ~6 s brings tears on its own
-  tears.sadFor = moodNow.sad > 0.55 ? tears.sadFor + dt : Math.max(0, tears.sadFor - dt * 2);
-  const target = tears.test ?? Math.min(1, Math.max(tears.gesture, tears.sadFor > 6 ? Math.min(1, (tears.sadFor - 6) / 4) : 0));
-  tears.now = damp(tears.now, target, target > tears.now ? 0.9 : 0.35, dt);    // well up slowly, dry slower
-  const dTarget = drool.test ?? drool.gesture;
-  drool.now = damp(drool.now, dTarget, dTarget > drool.now ? 4 : 1.5, dt);
-  const exprTears = has.has('tears');
-  if (exprTears) vrm.expressionManager.setValue('tears', tears.now);
-  const showTears = !exprTears && cfg.vrm?.tears?.enabled !== false && tears.now > 0.01;
-  const showDrool = cfg.vrm?.drool?.enabled !== false && drool.now > 0.01;
-  if (!showTears) tears.drops.length = 0;
-  const l = showTears || showDrool ? tearLayer() : tears.layer;
-  if (!l) return;
-  l.mesh.visible = showTears || showDrool;
-  if (!l.mesh.visible) return;
-  const g = l.g, S = 512, k = tears.now;
-  g.clearRect(0, 0, S, S);
-  if (showDrool) drawDrool(g, S, drool.now);
-  if (!showTears) { l.tex.needsUpdate = true; return; }
-  // drops: born at the lid every so often, sliding down and slowing
-  if (k > 0.35 && Math.random() < dt * 1.4 * k) {
-    const side = Math.random() < 0.5 ? 0 : 1;
-    tears.drops.push({ side, y: 0, v: 0.05 + Math.random() * 0.04, wob: Math.random() * 6 });
-  }
-  for (const [i, [u, v]] of l.starts.entries()) {
-    const x = u * S, y0 = v * S, len = l.length * S * Math.min(1, k * 1.3), dir = i === 0 ? 1 : -1;
-    // wet lower lid: a soft, bright line
-    const lid = g.createRadialGradient(x, y0, 0, x, y0, 30);
-    lid.addColorStop(0, `rgba(150,200,255,${0.6 * k})`);
-    lid.addColorStop(1, 'rgba(225,240,255,0)');
-    g.fillStyle = lid;
-    g.beginPath(); g.ellipse(x, y0, 30, 7, 0, 0, Math.PI * 2); g.fill();
-    // the streak: thin, glossy, curving slightly outward as it runs down
-    if (k > 0.25) {
-      const path = t => [x + dir * -Math.sin(t * 1.4) * 6, y0 + t * len];
-      const grad = g.createLinearGradient(x, y0, x, y0 + len);
-      grad.addColorStop(0, `rgba(120,175,250,${0.85 * k})`);
-      grad.addColorStop(0.85, `rgba(120,175,250,${0.6 * k})`);
-      grad.addColorStop(1, 'rgba(120,175,250,0)');
-      g.strokeStyle = grad; g.lineWidth = 7; g.lineCap = 'round';
-      g.beginPath();
-      for (let t = 0; t <= 1.001; t += 0.05) { const [px, py] = path(t); t ? g.lineTo(px, py) : g.moveTo(px, py); }
-      g.stroke();
-      g.strokeStyle = `rgba(255,255,255,${0.6 * k})`; g.lineWidth = 2;    // highlight down its middle
-      g.beginPath();
-      for (let t = 0; t <= 0.9; t += 0.05) { const [px, py] = path(t); t ? g.lineTo(px - dir, py) : g.moveTo(px - dir, py); }
-      g.stroke();
-      for (const d of tears.drops) {
-        if (d.side !== i) continue;
-        const [px, py] = path(Math.min(1.15, d.y));
-        g.fillStyle = `rgba(110,170,250,${0.9 * k * Math.max(0, 1 - Math.max(0, d.y - 0.9) * 4)})`;
-        g.beginPath(); g.ellipse(px, py, 5.5, 8, 0, 0, Math.PI * 2); g.fill();
-        g.fillStyle = `rgba(255,255,255,${0.9 * k})`;
-        g.beginPath(); g.arc(px - 1.3, py - 2, 1.4, 0, Math.PI * 2); g.fill();
-      }
-    }
-  }
-  for (const d of tears.drops) { d.y += d.v * dt * 6 * (1 - Math.min(0.6, d.y * 0.5)); }
-  tears.drops = tears.drops.filter(d => d.y < 1.3);
-  l.tex.needsUpdate = true;
-}
-
-// A strand from the corner of her mouth: grows down as the channel rises,
-// thin and glossy, with a bead gathering at its end.
-function drawDrool(g, S, k) {
-  const o = cfg.vrm?.drool || {}, [u, v] = o.start || [0.552, 0.762];
-  const x = u * S, y0 = v * S, len = (o.length || 0.07) * S * Math.min(1, k * 1.2);
-  const path = t => [x + Math.sin(t * 2.2) * 2.5 + t * 3, y0 + t * len];
-  const line = (w, style, to = 1.001, dx = 0) => {
-    g.strokeStyle = style; g.lineWidth = w; g.lineCap = 'round'; g.beginPath();
-    for (let t = 0; t <= to; t += 0.05) { const [px, py] = path(t); t ? g.lineTo(px + dx, py) : g.moveTo(px + dx, py); }
-    g.stroke();
-  };
-  line(6, `rgba(150,165,215,${0.35 * k})`);                               // a faint edge, so it reads on pale skin
-  const strand = g.createLinearGradient(x, y0, x, y0 + len);
-  strand.addColorStop(0, `rgba(235,242,255,${0.9 * k})`);
-  strand.addColorStop(1, `rgba(220,232,255,${0.75 * k})`);
-  line(4, strand);
-  line(1.4, `rgba(255,255,255,${0.95 * k})`, 0.85, -0.9);                  // the shine down it
-  const [bx, by] = path(1), r = 3 + 3 * k;                                 // the bead
-  g.fillStyle = `rgba(150,165,215,${0.35 * k})`;
-  g.beginPath(); g.ellipse(bx, by + r * 0.4, r * 0.85 + 1.2, r + 1.2, 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = `rgba(225,236,255,${0.9 * k})`;
-  g.beginPath(); g.ellipse(bx, by + r * 0.4, r * 0.85, r, 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = `rgba(255,255,255,${0.95 * k})`;
-  g.beginPath(); g.arc(bx - r * 0.3, by, r * 0.3, 0, Math.PI * 2); g.fill();
-}
-
-// Brows through the bangs, the anime way: a copy of the brows drawn over
-// the hair, sharing the face's skeleton and shape keys. Faint normally,
-// stronger when she's cross or sad, so her brows can actually say it.
-// "vrm": {"brows_over_hair": 0..1} in luna.json sets the resting strength (0 = off).
-const brows = { layer: null, tried: false };
-function browLayer() {
-  if (brows.tried) return brows.layer;
-  brows.tried = true;
-  let src = null;
-  vrm.scene.traverse(m => { if (!src && m.isSkinnedMesh && /facebrow/i.test([].concat(m.material)[0]?.name || '')) src = m; });
-  if (!src || (cfg.vrm?.brows_over_hair ?? 0.35) <= 0 && cfg.vrm?.brows_over_hair !== undefined) return null;
-  const from = [].concat(src.material)[0];
-  const mat = new THREE.MeshBasicMaterial({ map: from.map, color: 0x6e3550, transparent: true, opacity: 0,
-                                            depthTest: false, depthWrite: false, alphaTest: 0.05 });
-  const layer = new THREE.SkinnedMesh(src.geometry, mat);
-  layer.bind(src.skeleton, src.bindMatrix);
-  layer.morphTargetInfluences = src.morphTargetInfluences;
-  layer.morphTargetDictionary = src.morphTargetDictionary;
-  layer.frustumCulled = false;
-  layer.renderOrder = 1000;          // after the hair (VRM sets its own orders in the teens)
-  src.parent.add(layer);
-  layer.position.copy(src.position); layer.quaternion.copy(src.quaternion); layer.scale.copy(src.scale);
-  brows.layer = { mesh: layer, mat };
-  return brows.layer;
-}
-const _hf = new THREE.Vector3(), _hc = new THREE.Vector3(), _hp = new THREE.Vector3();
-function updateBrows() {
-  const l = browLayer();
-  if (!l) return;
-  const rest = cfg.vrm?.brows_over_hair ?? 0.35;
-  // only from the front: from behind they'd show through her head
-  const head = vrm.humanoid.getNormalizedBoneNode('head');
-  head.getWorldPosition(_hp);
-  _hf.set(0, 0, fx).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion()));
-  _hc.copy(camera.position).sub(_hp).normalize();
-  const facing = Math.max(0, Math.min(1, (_hf.dot(_hc) - 0.2) * 2.5));
-  l.mat.opacity = Math.min(1, rest + moodNow.angry * 0.9 + moodNow.sad * 0.6) * facing;
-  l.mesh.visible = l.mat.opacity > 0.01;
-}
-
 // the debug panel's "throb": a 10 s build and release, as a lewd gesture would drive them
 let throbAt = -99;
 function throbTest(now) {
   const t = now - throbAt;
   return t < 0 || t > 10 ? 0 : t < 7 ? 0.2 + t / 7 * 1.2 : 1.4 * (1 - (t - 7) / 3);
-}
-
-// The debug panel's "light tour": every way her light strips react, one
-// after another, with a caption saying what you're looking at. Press again to stop.
-let tourRun = 0, tourWas = null;
-async function lightTour(toggle) {
-  const run = ++tourRun;
-  const cap = document.getElementById('lighttour') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'lighttour' });
-  Object.assign(cap.style, { position: 'fixed', left: '50%', bottom: '18px', transform: 'translateX(-50%)', zIndex: 50,
-    background: 'rgba(20,10,30,0.85)', color: '#ffd6ef', padding: '8px 14px', borderRadius: '8px', font: '14px sans-serif', pointerEvents: 'none' });
-  const running = !!cap.dataset.on;
-  if (!running) tourWas = { on: !!lights?.enabled, e: mind.energy, w: mind.warmth, label: mind.label, row: mind.row };
-  const was = tourWas;
-  const done = () => { cap.remove(); handle({ t: 'stage', status: 'Idle' }); throbAt = -99;
-    handle({ t: 'mood', energy: was.e, warmth: was.w, label: was.label, row: was.row });
-    if (!was.on && lights?.enabled) toggle(); };
-  if (running) { tourRun++; done(); return; }                        // pressed while running: stop
-  cap.dataset.on = '1';
-  if (!lights?.enabled) toggle();
-  const wait = s => new Promise(ok => setTimeout(ok, s * 1000));
-  const step = async (text, s, fn) => { if (run !== tourRun) throw 0; cap.textContent = text; fn?.(); await wait(s); };
-  const mood = (energy, warmth, row = '') => handle({ t: 'mood', energy, warmth, row, label: row ? 'heated' : '' });
-  try {
-    await step('light tour · at rest: dark', 2.5, () => { mood(0, 0.2); handle({ t: 'stage', status: 'Idle' }); });
-    await step('listening: her ears glow', 3, () => handle({ t: 'stage', status: 'Listening...' }));
-    await step('thinking: a sweep runs down her', 4.5, () => handle({ t: 'stage', status: 'Thinking...' }));
-    await step('talking: they pulse with her voice', 3.5, () => { handle({ t: 'stage', status: 'Speaking...' }); fakeVoice(3.2); });
-    await step('back to idle: dark again', 2, () => handle({ t: 'stage', status: 'Idle' }));
-    for (const z of ['head', 'chest', 'arms', 'tummy', 'legs', 'tail'])
-      await step(`a touch lights that part: ${z}`, 1.3, () => lights?.touched(z));
-    await step('a tool failed: flicker', 2, () => lights?.failed());
-    for (const [name, e, w, row] of [['sad: blue', -0.8, -0.1], ['mad: red', 0.2, -0.9], ['tired: violet', -0.8, 0.5], ['lewd: hot pink', 0.3, 0.9, 'lewd']])
-      await step(`her mood picks the colour · ${name}`, 3, () => { mood(e, w, row); handle({ t: 'stage', status: 'Speaking...' }); fakeVoice(2.6); });
-    await step('a lewd gesture: the throb builds, peaks, fades', 10.5, () => { handle({ t: 'stage', status: 'Idle' }); mood(0.3, 0.9, 'lewd'); throbAt = clock.elapsedTime; });
-    await step('end of the tour', 1.5);
-  } catch (_) { return; }
-  if (run === tourRun) done();
-}
-
-function debugPanel() {
-  const buttons = {
-    'light tour': () => lightTour(buttons['lights on/off']),
-    'lights on/off': () => { const on = !(lights?.enabled ?? lightsCfg(cfg.lights || {}).enabled);
-                             params.delete('lights'); setLights({ ...(cfg.lights || {}), enabled: on }); },
-    throb: () => { if (!lights?.enabled) buttons['lights on/off'](); throbAt = clock.elapsedTime; },
-    flicker: () => lights?.failed(),
-    blink: () => { blink.next = 0; },
-    twitch: () => twitch(0, 1),
-    'left ear': () => twitch(1, 1),
-    talk: () => { handle({ t: 'stage', status: 'Speaking...' }); fakeVoice(); },
-    listen: () => handle({ t: 'stage', status: 'Listening...' }),
-    think: () => handle({ t: 'stage', status: 'Thinking...' }),
-    idle: () => handle({ t: 'stage', status: 'Idle' }),
-    happy: () => handle({ t: 'mood', energy: 0.6, warmth: 1 }),
-    sad: () => handle({ t: 'mood', energy: -0.8, warmth: -0.1 }),
-    cross: () => handle({ t: 'mood', energy: 0.2, warmth: -0.9 }),
-    neutral: () => handle({ t: 'mood', energy: 0, warmth: 0 }),
-    // as agent/moods.json has them: the flirty mood, and the playful feeling
-    flirty: () => { handle({ t: 'mood', energy: 0.5, warmth: 1, face: { happy: 0.3, blush: 0.4, lids: 0.45 }, emote: 'hearts' });
-                    emoteLast = -99; emote('hearts'); },
-    playful: () => handle({ t: 'feeling', face: { happy: 0.4, blush: 0.4, lids: 0.5 }, gesture: 'wink', seconds: 6 }),
-    // the two rows past the grid, so touches answer from their lewd / grudge entries
-    lewd: () => { handle({ t: 'mood', energy: 0.3, warmth: 0.9, label: 'frisky', row: 'lewd',
-                           face: { happy: 0.4, blush: 0.55, lids: 0.5 }, emote: 'hearts' });
-                  emoteLast = -99; emote('hearts'); },
-    grudge: () => handle({ t: 'mood', energy: 0.8, warmth: -0.5, label: 'furious', row: 'grudge',
-                           face: { angry: 0.9 }, emote: 'anger' }),
-    'you: left': () => handle({ t: 'gaze', x: -0.8, y: -0.1 }),
-    'you: right': () => handle({ t: 'gaze', x: 0.8, y: -0.1 }),
-    'you: ahead': () => handle({ t: 'gaze', none: true }),
-    glitch: () => holo?.glitch(1),
-    fluster: () => { blush.fluster = 1; },
-    'tears on/off': () => { tears.test = tears.test ? null : 1; },
-    'wag tail': () => { moves.wag(1); setTimeout(() => moves.wag(0), 3000); },
-    'holo on/off': () => setHolo(!(holo && holo.isOn())),
-    hearts: () => { emoteLast = -99; emote('hearts'); },
-    'sweat drop': () => { emoteLast = -99; emote('sweat'); },
-    anger: () => { emoteLast = -99; emote('anger'); },
-    question: () => { emoteLast = -99; emote('question'); },
-  };
-  const tune = document.getElementById('dtune');
-  if (tune) {
-    const row = document.createElement('label');
-    row.style.display = 'block';
-    row.textContent = 'mouth closed ';
-    const r = document.createElement('input');
-    Object.assign(r, { type: 'range', min: 0, max: 1, step: 0.05, value: mouthShut.amount });
-    const out = document.createElement('span');
-    out.textContent = ` ${mouthShut.amount}`;
-    r.oninput = () => { mouthShut.amount = +r.value; out.textContent = ` ${r.value}  ("vrm": {"mouth_close": ${r.value}} in luna.json)`; };
-    row.append(r, out);
-    tune.appendChild(row);
-    const row2 = document.createElement('label');
-    row2.style.display = 'block';
-    row2.textContent = 'blush ';
-    const r2 = document.createElement('input');
-    Object.assign(r2, { type: 'range', min: -0.05, max: 1, step: 0.05, value: -0.05, title: 'left end: automatic' });
-    const out2 = document.createElement('span');
-    out2.textContent = ' auto';
-    r2.oninput = () => { blush.test = +r2.value < 0 ? null : +r2.value; out2.textContent = blush.test == null ? ' auto' : ` ${r2.value}`; };
-    row2.append(r2, out2);
-    row.after(row2);
-  }
-  // a button for every gesture file, labelled by its file name (blow_kiss.js -> "blow kiss"),
-  // with a hover line saying what it is: about, touch zones, moods, and
-  // 🔥 lewd, 🔒 private (never from stream chat), 🧍 full body only, ⛓ a chain of others
-  const tips = {};
-  for (const n of GESTURE_NAMES) {
-    if (n.endsWith('_left')) continue;
-    const label = n.replace(/_/g, ' '), g = GESTURES[n] || {};
-    buttons[label] = () => gesture(n);
-    tips[label] = [`${n}.js` + (g.lewd ? ' 🔥' : '') + (g.private ? ' 🔒' : '') + (g.full ? ' 🧍' : '') + (g.chain ? ` ⛓ ${g.chain.join(' → ')}` : ''),
-                   g.about, g.touch && `touch: ${g.touch.join(', ')}`, g.moods && `moods: ${g.moods.join(', ')}`].filter(Boolean).join('\n');
-  }
-  // grouped, each group alphabetical; anything not listed is a gesture
-  const GROUPS = [
-    ['her state', ['idle', 'listen', 'talk', 'think']],
-    ['face and mood', ['blink', 'cross', 'flirty', 'fluster', 'grudge', 'happy', 'lewd', 'neutral', 'playful', 'sad', 'tears on/off']],
-    ['looking', ['you: ahead', 'you: left', 'you: right']],
-    ['body', ['left ear', 'twitch', 'wag tail']],
-    ['effects', ['glitch', 'holo on/off']],
-    ['light strips (also: her state, mood, clicking her)', ['flicker', 'light tour', 'lights on/off', 'throb']],
-    ['emotes', ['anger', 'hearts', 'question', 'sweat drop']],
-  ];
-  const grouped = new Set(GROUPS.flatMap(([, l]) => l));
-  GROUPS.splice(1, 0, ['gestures', Object.keys(buttons).filter(l => !grouped.has(l))]);
-  const box = document.getElementById('dbuttons');
-  for (const [title, labels] of GROUPS) {
-    const list = labels.filter(l => buttons[l]).sort((a, b) => a.localeCompare(b));
-    if (!list.length) continue;
-    const h = document.createElement('div');
-    h.className = 'dim';
-    h.style.margin = '6px 0 1px';
-    h.textContent = title;
-    box.appendChild(h);
-    if (title === 'face and mood' && Array.isArray(cfg.moods) && cfg.moods.length) {
-      // every mood in moods.json, top (lewd) to bottom (grudge): her face, idle
-      // moves and emote as Luna would send them, so touches answer as in that mood
-      const sel = document.createElement('select');
-      sel.style.maxWidth = '100%';
-      sel.add(new Option(`set her mood (${cfg.moods.length})`, ''));
-      let og = null;
-      cfg.moods.forEach((m, i) => {
-        if (!og || og.label !== m.group) { og = document.createElement('optgroup'); og.label = m.group; sel.append(og); }
-        og.append(new Option(m.name, String(i)));
-      });
-      sel.onchange = () => {
-        const m = cfg.moods[+sel.value];
-        if (!m) return;
-        handle({ t: 'mood', label: m.name, row: m.row, energy: m.energy, warmth: m.warmth,
-                 face: m.face, idle: m.idle, emote: m.emote, hold: '', tame: false });
-        if (m.emote) { emoteLast = -99; emote(m.emote); }
-        drawPool();
-      };
-      // what she'd drift into in this mood, and a button to play one of them
-      const pool = document.createElement('div'), one = document.createElement('button');
-      pool.className = 'dim'; pool.style.margin = '3px 0';
-      one.textContent = '▶ play an idle';
-      one.onclick = () => {
-        const { mood, everyday } = idlePool(), all = [...new Set([...mood, ...everyday])];
-        if (all.length) moves.play(all[Math.floor(Math.random() * all.length)]);
-      };
-      const drawPool = () => {
-        const { mood, everyday } = idlePool();
-        pool.textContent = `idles in ${mind.label || moodBand()} (${moodBand()}): ` +
-          `mood ${mood.join(', ') || 'none'} · everyday ${everyday.join(', ') || 'none'}`;
-      };
-      drawPool();
-      setInterval(drawPool, 3000);       // her mood moves on its own too
-      box.append(sel, pool, one);
-    }
-    if (title === 'gestures') {
-      // one menu, by file name: pick to play, ▶ to play it again
-      const sel = document.createElement('select'), again = document.createElement('button');
-      sel.style.maxWidth = '100%';
-      sel.add(new Option(`pick a gesture (${list.length})`, ''));
-      for (const label of list) {
-        const n = label.replace(/ /g, '_'), g = GESTURES[n] || {};
-        const o = new Option(n + (g.lewd ? ' 🔥' : '') + (g.private ? ' 🔒' : '') + (g.full ? ' 🧍' : '') + (g.chain ? ' ⛓' : ''), label);
-        o.title = tips[label] || '';
-        sel.add(o);
-      }
-      const play = () => { if (sel.value) buttons[sel.value](); sel.title = tips[sel.value] || ''; };
-      sel.onchange = play;
-      again.textContent = '▶'; again.title = 'play it again'; again.onclick = play;
-      // this menu plays; ✎ opens the picked one in the pose studio to change it
-      const edit = document.createElement('button');
-      edit.textContent = '✎ edit'; edit.title = 'open it in the pose studio';
-      edit.onclick = () => { const n = sel.value.replace(/ /g, '_'); if (n) studio?.open(n); else studio?.show(); };
-      const key = document.createElement('div');
-      key.className = 'dim';
-      key.textContent = 'pick to play · ✎ edit opens it in the pose studio · 🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
-      box.append(sel, again, edit, key);
-      continue;
-    }
-    for (const label of list) {
-      const b = document.createElement('button');
-      b.textContent = label;
-      if (tips[label]) b.title = tips[label];
-      b.onclick = buttons[label];
-      box.appendChild(b);
-    }
-    if (title === 'effects') box.appendChild(spankSlider());
-  }
-  if (fan) {            // the WiFi hologram fan, while casting is on
-    const h = Object.assign(document.createElement('div'), { className: 'dim', textContent: 'hologram fan' });
-    const line = Object.assign(document.createElement('div'), { className: 'dim' });
-    h.style.margin = '6px 0 1px';
-    const show = () => {
-      const f = fan.status();
-      line.textContent = !f.enabled ? 'cast is off (portrait.fan.cast)'
-        : !f.connected ? `waiting for a fan (on its WiFi, or your router)${f.error ? ' · ' + f.error : ''}`
-        : !f.type ? `a fan at ${f.ip}: asking which model it is...`
-        : !f.geometry ? `a fan at ${f.ip} (type ${f.type}): a model we can't draw for`
-        : `${f.model} (type ${f.type}) at ${f.ip} · ${f.casting ? `live ${f.fps}/s` : 'idle'} · jpeg q${f.quality}`
-          + (f.geometry.support === 'legacy' ? ' · older format: may not show live' : '')
-          + (f.error ? ' · ' + f.error : '');
-    };
-    show(); setInterval(show, 2000);
-    box.append(h, line);
-  }
-  // the pose studio: its own window (studio.js); this button brings it back
-  const open = document.createElement('button');
-  open.textContent = '🎬 pose studio';
-  open.onclick = () => studio?.show();
-  box.appendChild(open);
-  import('./studio.js').then(m => { studio = m.createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas: renderer.domElement, fx, props: () => props }); })
-    .catch(e => console.warn('pose studio:', e));
-  // a gesture file with a mistake in it: say which and why, instead of a missing button
-  if (Object.keys(GESTURE_FAILED).length) {
-    const p = document.createElement('pre');
-    p.style.color = '#ff8aa8';
-    p.textContent = Object.entries(GESTURE_FAILED).map(([n, why]) => n.startsWith('(') ? why : `gestures/${n}.js didn't load: ${why}`).join('\n');
-    box.appendChild(p);
-  }
-  document.getElementById('dears').textContent = ears.length
-    ? ears.map(e => `${e.node.name} (${e.side > 0 ? 'left' : 'right'})`).join('\n')
-    : 'none found - name them in config.json: "portrait": {"ear_bones": [...]}';
-  document.getElementById('dexpr').textContent = [...has].join(', ') || 'none';
-  const names = [];
-  vrm.scene.traverse(o => { if (o.isBone || /ear|hair|j_sec/i.test(o.name)) names.push(o.name); });
-  document.getElementById('dbones').textContent = names.filter(n => /ear|hair|sec/i.test(n)).join('\n') || '(none)';
-  setInterval(() => { document.getElementById('dstate').textContent =
-    `${mind.stage} · energy ${mind.energy.toFixed(2)} warmth ${mind.warmth.toFixed(2)}`; }, 300);
 }
 
 async function demo() {

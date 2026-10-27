@@ -1,38 +1,88 @@
-import io
-import os
-import queue
-import re
-import shutil
-import subprocess
-import sys
-import tempfile
-import threading
-import time
-import unicodedata
+"""Her voice, in and out: the front door to the voice package.
 
+This file keeps the parts everything else calls (load_models, transcribe,
+speak, speak_queue, Player) and re-exports the rest, so `speech.X` works
+for anything that used to live here. The pieces:
+
+    voice/listen.py     recording you, the room calibration, VAD
+    voice/tts.py        turning her words into sound (Kokoro), lip sync
+    voice/playback.py   the mic and speakers (PortAudio, afplay on a Mac)
+    voice/bargein.py    cutting her off while she talks, the wake word
+"""
+import queue
+import threading
 import requests
-import sounddevice as sd
-import numpy as np
+import sounddevice as sd  # noqa: F401  (speech.sd: tests and /mic reach the device layer through here)
 from core import interrupts
 from core import logbook
 import ui
-
 from concurrent.futures import ThreadPoolExecutor
-from scipy.io.wavfile import read as read_wav, write
 from faster_whisper import WhisperModel
 from collections import deque
-
-import config
-
-from config import (
-    SAMPLE_RATE,
-    TTS_URL,
-    TTS_ADDRESS,
-    STT_MODEL,
-    STT_LANGUAGE,
-    STT_MODE,
-    STT_VAD,
+from config import TTS_URL, STT_MODEL, STT_LANGUAGE
+from voice.bargein import _watch_for_barge_in, barge_in_available
+from voice.listen import _load_vad
+from voice.playback import _play
+from voice.tts import _set_reachable, _speakable, _split_chunks, _synthesize
+from voice import tts
+from voice.tts import (  # noqa: F401  re-exported: speech.X keeps working
+    MAX_TTS_CHARS,
+    _decode,
+    _lip_stop,
+    _lip_sync,
+    _mood_pitch,
+    _mood_speed,
+    _pronounce,
+    _shift_pitch,
+    server_label,
 )
+from voice.playback import (  # noqa: F401  re-exported: speech.X keeps working
+    AFPLAY,
+    _afplay,
+    _afplay_once,
+    _afplay_rate,
+    _audio_devices,
+    _audio_warned,
+    _close_mic,
+    _device_rate,
+    _mic_lock,
+    _mic_streams,
+    _native_rate,
+    _open_mic,
+    _play_afplay,
+    _resample,
+    _reset_portaudio,
+    _start_playback,
+    _use_afplay,
+)
+from voice.listen import (  # noqa: F401  re-exported: speech.X keeps working
+    ABSOLUTE_FLOOR,
+    BLOCK_SIZE,
+    CALIBRATION_SECONDS,
+    CONTINUE_MULTIPLIER,
+    MIN_SPEECH_SECONDS,
+    NOISE_CEILING,
+    PRE_ROLL_SECONDS,
+    SMOOTHING,
+    START_MULTIPLIER,
+    VAD_BLOCK_SIZE,
+    _INPUT_WAV,
+    _calibrate,
+    _record_energy,
+    _record_silero,
+    _rms,
+    levels,
+    record_audio,
+)
+from voice.bargein import (  # noqa: F401  re-exported: speech.X keeps working
+    BARGE_IN_ARM_TIMEOUT,
+    BARGE_IN_CALIBRATION_SECONDS,
+    BARGE_IN_FLOOR,
+    _playing,
+    _speech_probability,
+    wait_for_wake_word,
+)
+from voice import playback, listen, bargein  # noqa: F401
 
 # The rest are deliberately NOT imported by value. /set can change them
 # mid-session, and `from config import X` takes a copy that never hears
@@ -45,36 +95,6 @@ whisper = None
 # existed, so every launch began with a blank terminal; now it loads on
 # a worker and this says whether it has finished.
 models_ready = False
-
-# Set by load_models(); main.py surfaces it in the UI so a dead TTS
-# server is obvious at startup instead of on the first reply.
-tts_ok = False
-tts_error = ""
-
-
-def server_label():
-    """The VServer line: address, plus whether it answered."""
-    return TTS_ADDRESS if tts_ok else f"{TTS_ADDRESS} [offline]"
-
-
-def _set_reachable(ok, error=""):
-    """Track reachability so the header reflects reality mid-session -
-    if the server dies (or comes back) you see it on the next reply."""
-    global tts_ok, tts_error
-
-    changed = ok != tts_ok
-    tts_ok = ok
-    tts_error = error
-
-    if changed:
-        try:
-            ui.set_voice_server(server_label())
-        except Exception:
-            pass
-
-# The server truncates at 1200 chars, so split below that and stitch
-# the pieces back together on playback.
-MAX_TTS_CHARS = 1000
 
 # One worker: synthesize the next chunk while the current one plays.
 _pool = ThreadPoolExecutor(max_workers=1)
@@ -100,357 +120,7 @@ def load_models():
     except Exception as e:
         _set_reachable(False, str(e))
 
-    return tts_ok
-
-
-# ---------------------------------------------------------------------------
-# Recording / voice activity detection
-#
-# The old version compared RMS against a hardcoded 0.035 and nothing else.
-# That's roughly ten times the level a normal desktop mic produces, so on
-# most inputs `started` never flipped true, the silence timer never began,
-# and every recording ran to the 60-second cap instead of stopping when
-# you did. Thresholds are now derived from the actual noise floor, with
-# separate levels to start and to keep going.
-# ---------------------------------------------------------------------------
-BLOCK_SIZE = 1024                 # 64ms at 16kHz, energy path
-VAD_BLOCK_SIZE = 512              # 32ms - what the Silero model expects
-CALIBRATION_SECONDS = 0.4         # listen to the room before arming
-SMOOTHING = 3                     # blocks averaged, so one quiet frame
-                                  # doesn't look like you stopped talking
-PRE_ROLL_SECONDS = 0.8            # audio kept from before speech was detected
-MIN_SPEECH_SECONDS = 0.25         # shorter than this is a cough, not a sentence
-ABSOLUTE_FLOOR = 0.0022           # don't trust a silent-room calibration
-NOISE_CEILING = 0.02              # don't trust a loud one either
-
-# Energy-path multipliers. Lowered from 3.0/1.5: with only loudness to go
-# on, a high bar is late to trigger and a high floor treats quiet
-# syllables as silence. Silero replaces the guesswork entirely.
-START_MULTIPLIER = 2.2
-CONTINUE_MULTIPLIER = 1.15
-
-# Set by load_models() when silero-vad imports.
-_vad_model = None
-vad_backend = "energy"
-
-
-def _load_vad():
-    """Load Silero if we're allowed to and it's installed.
-
-    It is a genuine speech classifier rather than a loudness meter, which
-    is the whole difference: it can trigger on the first syllable without
-    also triggering on a fan, and it won't end a turn because you went
-    quiet for a moment.
-    """
-    global _vad_model, vad_backend
-
-    if STT_VAD == "energy":
-        vad_backend = "energy"
-        return
-
-    try:
-        from silero_vad import load_silero_vad
-
-        _vad_model = load_silero_vad()
-        vad_backend = "silero"
-    except Exception as e:
-        _vad_model = None
-        vad_backend = "energy"
-
-        if STT_VAD == "silero":
-            # Explicitly asked for it, so say why it isn't happening.
-            try:
-                ui.add_message(
-                    "system",
-                    f"silero-vad unavailable ({e}) - using the energy detector. "
-                    "pip install silero-vad",
-                )
-            except Exception:
-                pass
-
-# Last measurement, surfaced by /mic so a bad mic is diagnosable.
-levels = {
-    "noise_floor": 0.0,
-    "start": 0.0,
-    "continue": 0.0,
-    "peak": 0.0,
-    "speech_seconds": 0.0,
-    "triggered": False,
-    "mode": STT_MODE,
-    "backend": "energy",
-    # Barge-in, reported by /barge
-    "barge_baseline": 0.0,
-    "barge_peak": 0.0,
-    "barge_probability": 0.0,
-}
-
-
-def _rms(block):
-    return float(np.sqrt(np.mean(block ** 2)))
-
-
-def _calibrate(stream):
-    """Measure the room for a moment to place the thresholds.
-
-    Uses the lower quartile rather than the mean, so starting to talk
-    immediately after pressing HOME doesn't drag the noise floor up and
-    deafen the detector.
-    """
-    readings = []
-
-    for _ in range(max(1, int(CALIBRATION_SECONDS * SAMPLE_RATE / BLOCK_SIZE))):
-        audio, _overflow = stream.read(BLOCK_SIZE)
-        readings.append(_rms(audio[:, 0]))
-
-    readings.sort()
-
-    return readings[len(readings) // 4] if readings else 0.0
-
-
-# The turn's recording, for Whisper. The system's temp folder: "/tmp" is
-# C:\tmp on Windows, which doesn't exist.
-_INPUT_WAV = os.path.join(tempfile.gettempdir(), "luna-input.wav")
-
-
-def _record_energy(mode):
-    """RMS fallback. Only loudness to work with, so it is late to start
-    and prone to cutting off - see _record_silero for the good path."""
-    record_immediately = mode == "manual"
-    stop_on_silence = mode != "manual"
-    give_up_after = config.STT_NO_SPEECH_TIMEOUT if mode == "auto" else None
-    max_seconds = config.STT_MANUAL_MAX_SECONDS if mode == "manual" else config.STT_MAX_SECONDS
-
-    stream = _open_mic(BLOCK_SIZE)
-
-    try:
-        noise = min(_calibrate(stream), NOISE_CEILING)
-
-        sensitivity = max(0.1, config.STT_SENSITIVITY)
-        start_threshold = max(ABSOLUTE_FLOOR, noise * START_MULTIPLIER) / sensitivity
-        continue_threshold = max(
-            ABSOLUTE_FLOOR / 2, noise * CONTINUE_MULTIPLIER
-        ) / sensitivity
-
-        levels.update({
-            "noise_floor": noise,
-            "start": start_threshold,
-            "continue": continue_threshold,
-            "peak": 0.0,
-            "speech_seconds": 0.0,
-            "triggered": record_immediately,
-            "mode": mode,
-            "backend": "energy",
-        })
-
-        block_seconds = BLOCK_SIZE / SAMPLE_RATE
-        pre_roll = deque(maxlen=max(1, int(PRE_ROLL_SECONDS / block_seconds)))
-        recent = deque(maxlen=SMOOTHING)
-
-        chunks = []
-        started = record_immediately
-        silence = 0.0
-        elapsed = 0.0
-
-        if record_immediately:
-            ui.set_status("Recording...")
-
-        while True:
-            audio, _overflow = stream.read(BLOCK_SIZE)
-            block = audio[:, 0].copy()
-
-            level = _rms(block)
-            recent.append(level)
-            smoothed = sum(recent) / len(recent)
-
-            elapsed += block_seconds
-            levels["peak"] = max(levels["peak"], level)
-
-            if not started:
-                pre_roll.append(block)
-
-                # Raw level to trigger: waiting for the smoothed average
-                # costs you the first syllable.
-                if level > start_threshold:
-                    started = True
-                    levels["triggered"] = True
-                    chunks.extend(pre_roll)
-                    chunks.append(block)
-                    ui.set_status("Recording...")
-                elif give_up_after is not None and elapsed >= give_up_after:
-                    return None  # you never said anything
-            else:
-                chunks.append(block)
-
-                if stop_on_silence:
-                    # Smoothed level to *stop*: a pause between words
-                    # shouldn't end the recording.
-                    if smoothed > continue_threshold:
-                        silence = 0.0
-                    else:
-                        silence += block_seconds
-
-                    if silence >= config.STT_SILENCE_SECONDS:
-                        break
-
-            if interrupts.current().listening.is_set():     # HOME, or manual's second press
-                break
-
-            if elapsed >= max_seconds:
-                break
-    finally:
-        _close_mic(stream)
-
-    if not started or not chunks:
-        return None
-
-    recorded = np.concatenate(chunks)
-
-    # Drop the trailing silence that ended the recording - Whisper
-    # hallucinates filler over long silent tails.
-    keep = len(recorded) - int(max(0.0, silence - 0.3) * SAMPLE_RATE)
-    recorded = recorded[:max(0, keep)]
-
-    speech_seconds = len(recorded) / SAMPLE_RATE
-    levels["speech_seconds"] = speech_seconds
-
-    if speech_seconds < MIN_SPEECH_SECONDS:
-        return None
-
-    filename = _INPUT_WAV
-    write(filename, SAMPLE_RATE, recorded)
-
-    return filename
-
-
-def _record_silero(mode):
-    """Silero VAD path.
-
-    VADIterator hands back {'start': ...} the first frame that crosses
-    the threshold and {'end': ...} only after min_silence of genuine
-    non-speech - and it ends at (threshold - 0.15), not the threshold, so
-    trailing off quietly doesn't terminate the turn. That built-in
-    hysteresis is what the energy detector could never do.
-    """
-    from silero_vad import VADIterator
-
-    iterator = VADIterator(
-        _vad_model,
-        threshold=min(0.9, max(0.1, config.STT_VAD_THRESHOLD)),
-        sampling_rate=SAMPLE_RATE,
-        min_silence_duration_ms=int(config.STT_SILENCE_SECONDS * 1000),
-        speech_pad_ms=200,
-    )
-    iterator.reset_states()
-
-    give_up_after = config.STT_NO_SPEECH_TIMEOUT if mode == "auto" else None
-    block_seconds = VAD_BLOCK_SIZE / SAMPLE_RATE
-
-    levels.update({
-        "noise_floor": 0.0,
-        "start": config.STT_VAD_THRESHOLD,
-        "continue": max(0.0, config.STT_VAD_THRESHOLD - 0.15),
-        "peak": 0.0,
-        "speech_seconds": 0.0,
-        "triggered": False,
-        "mode": mode,
-        "backend": "silero",
-    })
-
-    stream = _open_mic(VAD_BLOCK_SIZE)
-
-    pre_roll = deque(maxlen=max(1, int(PRE_ROLL_SECONDS / block_seconds)))
-    chunks = []
-    started = False
-    elapsed = 0.0
-
-    try:
-        while True:
-            audio, _overflow = stream.read(VAD_BLOCK_SIZE)
-            block = audio[:, 0].copy()
-
-            elapsed += block_seconds
-            levels["peak"] = max(levels["peak"], _rms(block))
-
-            try:
-                event = iterator(block)
-            except Exception:
-                # Model unhappy with a frame - don't let it kill the turn.
-                event = None
-
-            if not started:
-                pre_roll.append(block)
-
-                if event and "start" in event:
-                    started = True
-                    levels["triggered"] = True
-                    chunks.extend(pre_roll)
-                    ui.set_status("Recording...")
-                elif give_up_after is not None and elapsed >= give_up_after:
-                    return None
-            else:
-                chunks.append(block)
-
-                if event and "end" in event:
-                    break
-
-            if interrupts.current().listening.is_set():     # HOME, or manual's second press
-                break
-
-            if elapsed >= config.STT_MAX_SECONDS:
-                break
-    finally:
-        _close_mic(stream)
-
-    if not started or not chunks:
-        return None
-
-    recorded = np.concatenate(chunks)
-    speech_seconds = len(recorded) / SAMPLE_RATE
-    levels["speech_seconds"] = speech_seconds
-
-    logbook.debug("stt", "silero captured %.1fs | mode=%s peak=%.4f",
-                  speech_seconds, mode, levels["peak"])
-
-    if speech_seconds < MIN_SPEECH_SECONDS:
-        logbook.debug("stt", "dropped: %.2fs is shorter than %.2fs",
-                      speech_seconds, MIN_SPEECH_SECONDS)
-
-        return None
-
-    filename = _INPUT_WAV
-    write(filename, SAMPLE_RATE, recorded)
-
-    return filename
-
-
-def record_audio(mode=None):
-    """Record a turn. Returns a wav path, or None if there was nothing
-    worth transcribing.
-
-    Three shapes, because one size genuinely doesn't fit:
-
-      auto   - wait for speech, stop on silence. Good for a quick
-               question.
-      manual - record from the moment you press, stop when you press
-               again. Silence ignored entirely, so you can gather your
-               thoughts mid-sentence.
-      open   - wait for speech however long it takes, stop on silence.
-               Same as auto minus the give-up timeout, because hands
-               free there's nothing to give up on.
-    """
-    mode = mode or STT_MODE
-
-    # Manual has nothing to detect - you decide both ends.
-    if mode != "manual" and _vad_model is not None:
-        try:
-            return _record_silero(mode)
-        except Exception as e:
-            logbook.exception("stt", "silero failed, falling back to levels")
-            ui.add_message(
-                "system", f"Silero VAD failed ({e}) - falling back to levels."
-            )
-
-    return _record_energy(mode)
+    return tts.tts_ok
 
 
 # Whisper emits these over near-silence. Harmless when you press a key
@@ -484,534 +154,6 @@ def transcribe(filename):
         return ""
 
     return text
-
-
-# ---------------------------------------------------------------------------
-# Text-to-speech over HTTP
-#
-# The client speaks a three-endpoint contract and nothing more:
-#
-#   POST /tts   {"text", "voice", "speed"}  -> WAV bytes
-#   GET  /health                            -> {"ok": true}
-#   GET  /voices                            -> the available voices
-#
-# kokoro-reader is what it talks to by default, but any server
-# answering that works - point tts.url somewhere else and nothing here
-# needs to know.
-# ---------------------------------------------------------------------------
-def _split_chunks(text):
-    """Break text into <= MAX_TTS_CHARS pieces on sentence boundaries."""
-    pieces = []
-
-    for sentence in re.split(r"(?<=[.!?…])\s+|\n+", text.strip()):
-        sentence = sentence.strip()
-
-        if not sentence:
-            continue
-
-        # A single monster sentence still has to be cut somewhere.
-        while len(sentence) > MAX_TTS_CHARS:
-            cut = sentence.rfind(" ", 0, MAX_TTS_CHARS)
-
-            if cut <= 0:  # rfind returns -1 when there's no space to break on
-                cut = MAX_TTS_CHARS
-
-            pieces.append(sentence[:cut].strip())
-            sentence = sentence[cut:].strip()
-
-        if not pieces or len(pieces[-1]) + len(sentence) + 1 > MAX_TTS_CHARS:
-            pieces.append(sentence)
-        else:
-            pieces[-1] = f"{pieces[-1]} {sentence}"
-
-    return [p for p in pieces if p]
-
-
-def _decode(payload):
-    """WAV bytes -> (float32 samples in [-1, 1], sample rate).
-
-    Deliberately not assuming 16-bit PCM. Python's `wave` module can't
-    even open a float32 WAV - it raises "unknown format: 3" - and most
-    PyTorch speech models emit float32 natively, so hardcoding <i2 meant
-    the client only worked with servers that converted on the way out.
-    Reading the dtype and scaling by it costs three lines and means any
-    server answering the contract works, whatever it hands back.
-    """
-    rate, data = read_wav(io.BytesIO(payload))
-
-    # Read the type *before* downmixing: averaging channels promotes
-    # ints to float, and then the scaling below would treat a 16-bit
-    # sample of 16383 as a float amplitude of 16383 and clip it to a
-    # square wave.
-    dtype = data.dtype
-    kind = dtype.kind
-
-    # Mono. Two speakers talking at once is not what anybody wanted.
-    if data.ndim > 1:
-        data = data.mean(axis=1)
-
-    if kind == "f":
-        samples = data.astype(np.float32)
-    elif kind == "u":
-        # 8-bit WAV is unsigned, centred on 128.
-        samples = (data.astype(np.float32) - 128.0) / 128.0
-    elif kind == "i":
-        # Scale by the width of whatever integer type it came in as.
-        samples = data.astype(np.float32) / float(
-            1 << (8 * dtype.itemsize - 1)
-        )
-    else:
-        raise RuntimeError(f"unsupported audio format from the TTS server: {dtype}")
-
-    return np.clip(samples, -1.0, 1.0), rate
-
-
-# How she's feeling nudges how she sounds - a few percent, on top of
-# whatever tts.speed and tts.pitch are set to. Imported lazily and
-# wrapped: mood is decoration, and nothing here may be the reason she
-# stops speaking.
-def _mood_speed():
-    try:
-        from mind import mood
-
-        return mood.voice_tint()[0]
-    except Exception:
-        return 1.0
-
-
-def _mood_pitch():
-    try:
-        from mind import mood
-
-        return mood.voice_tint()[1]
-    except Exception:
-        return 0.0
-
-
-def _shift_pitch(samples, semitones):
-    """Move the pitch, and the formants with it.
-
-    Deliberately the naive version: resample the audio, then declare the
-    result to be at the original rate. That moves pitch and formants
-    together, which is what makes a voice read as a *different person* -
-    younger or older - rather than the same person singing higher.
-
-    A formant-preserving shift is the more sophisticated tool and the
-    wrong one here. It keeps the speaker's identity and only moves the
-    note, which is what you want for music and not at all what you want
-    for "give me a younger-sounding character".
-
-    Linear interpolation rather than a windowed resampler: this runs on
-    every chunk in the streaming path, the shifts in use are small, and
-    at 24 kHz the aliasing it introduces sits above anything the voice
-    is doing.
-    """
-    if abs(semitones) < 0.01 or len(samples) < 2:
-        return samples
-
-    # Twelve semitones to an octave; an octave is a doubling.
-    ratio = 2.0 ** (semitones / 12.0)
-    wanted = int(len(samples) / ratio)
-
-    if wanted < 2:
-        return samples
-
-    position = np.linspace(0, len(samples) - 1, wanted)
-
-    return np.interp(position, np.arange(len(samples)), samples).astype(np.float32)
-
-
-def _speakable(text):
-    """What's left of a sentence once the things meant for the eye are
-    gone: emoji, markdown asterisks and backticks, and the ~ of "Mrrp~"
-    (tts.strip_tilde - Kokoro says "tilde", some voices stretch the word
-    instead). Kokoro reads emoji out loud otherwise ("crescent moon",
-    "sparkles", "paw prints"). The screen keeps them; only the voice
-    loses them. Returns "" when nothing speakable is left."""
-    out = []
-
-    for ch in str(text or ""):
-        code = ord(ch)
-        if (unicodedata.category(ch) in ("So", "Sk", "Cs", "Co")
-                or 0x1F000 <= code <= 0x1FAFF          # emoji and pictographs
-                or 0x2600 <= code <= 0x27BF             # symbols, dingbats (sparkles)
-                or code in (0x200D, 0xFE0E, 0xFE0F, 0x20E3)):   # joiners, variation selectors
-            out.append(" ")
-        elif ch in "*_`#|<>^" or (ch == "~" and getattr(config, "TTS_STRIP_TILDE", True)):
-            out.append(" ")
-        else:
-            out.append(ch)
-
-    text = re.sub(r"\s+", " ", "".join(out))
-    text = re.sub(r"\s+([,.!?;:])", r"\1", text).strip()
-
-    return text if re.search(r"[0-9A-Za-z\u00C0-\uFFFF]", text) else ""
-
-
-def _pronounce(text):
-    """agent.json "pronounce" applied for the voice: each word (any case, its
-    last letter stretched - "nyaaa" counts as "nya") becomes Kokoro's
-    [word](/phonemes/) override, so she says her cat sounds instead of
-    spelling them out. Only the voice gets this; the screen keeps the word."""
-    for word, phonemes in (getattr(config, "PRONOUNCE", None) or {}).items():
-        word, phonemes = str(word).strip(), str(phonemes).strip().strip("/")
-        if not word or not phonemes:
-            continue
-        pattern = rf"(?<![\w\[])({re.escape(word)}{re.escape(word[-1])}*)(?![\w\]])"
-        text = re.sub(pattern, lambda m: f"[{m.group(1)}](/{phonemes}/)", text, flags=re.IGNORECASE)
-
-    return text
-
-
-def _synthesize(text):
-    """POST one chunk to /tts and decode the WAV it returns."""
-    text = _pronounce(text)
-    try:
-        response = requests.post(
-            f"{TTS_URL}/tts",
-            json={"text": text, "voice": config.VOICE,
-                  "speed": config.TTS_SPEED * _mood_speed()},
-            timeout=180,
-        )
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        _set_reachable(False, str(e))
-        logbook.error("tts", "POST %s/tts failed: %s", TTS_URL, e)
-
-        raise RuntimeError(
-            f"TTS server unreachable at {TTS_URL}: {e}"
-        ) from e
-
-    _set_reachable(True)
-
-    samples, rate = _decode(response.content)
-    samples = _shift_pitch(samples, config.TTS_PITCH + _mood_pitch())
-
-    return np.clip(samples * config.TTS_VOLUME, -1.0, 1.0), rate
-
-
-def _lip_sync(samples, rate, fps=30):
-    """What the portrait's mouth needs for one chunk: loudness and
-    hissiness (zero-crossing rate) per frame. Sent only while a page is
-    watching - with none open it's skipped entirely."""
-    try:
-        from web import livefeed
-
-        if not livefeed.watching():
-            return
-
-        hop = max(1, int(rate / fps))
-        n = len(samples) // hop
-        frames = np.asarray(samples[:n * hop], dtype=np.float32).reshape(n, hop)
-        rms = np.sqrt((frames ** 2).mean(axis=1))
-        env = np.clip(rms / 0.12, 0, 1) ** 0.7
-        zcr = (np.abs(np.diff(np.signbit(frames).astype(np.int8), axis=1)).sum(axis=1) / hop)
-        livefeed.emit("voice", fps=fps, env=[round(float(x), 2) for x in env],
-                      zcr=[round(float(x), 3) for x in zcr])
-    except Exception:
-        pass  # decoration - never the reason she goes quiet
-
-
-def _lip_stop():
-    try:
-        from web import livefeed
-
-        livefeed.emit("voice", stop=True)
-    except Exception:
-        pass
-
-
-_audio_warned = [0.0]
-
-
-def _reset_portaudio():
-    """Make PortAudio forget and re-read the audio devices. Only when no
-    microphone stream is open: restarting it under one breaks that stream.
-    Holding _mic_lock, so none can open while it restarts."""
-    with _mic_lock:
-        if _mic_streams[0] > 0:
-            return
-
-        try:
-            sd._terminate()
-            sd._initialize()
-            logbook.info("speech", "restarted PortAudio to re-read the audio devices")
-        except Exception as e:
-            logbook.warn("speech", "couldn't restart PortAudio: %s", e)
-
-
-# Every microphone stream (recording, barge-in, the wake word) opens and
-# closes through these, so _reset_portaudio knows when one is open.
-_mic_lock = threading.Lock()
-_mic_streams = [0]
-
-
-def _open_mic(blocksize):
-    """A started mono float32 input stream at SAMPLE_RATE, counted."""
-    with _mic_lock:
-        stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1,
-                                blocksize=blocksize, dtype="float32")
-        try:
-            stream.start()
-        except Exception:
-            stream.close()
-            raise
-        _mic_streams[0] += 1
-
-    return stream
-
-
-def _close_mic(stream):
-    try:
-        stream.stop()
-        stream.close()
-    except Exception:
-        pass    # already gone with the device; the count still has to drop
-    finally:
-        with _mic_lock:
-            _mic_streams[0] -= 1
-
-
-_native_rate = [False]   # set once CoreAudio has refused the voice's own rate
-
-
-def _resample(samples, rate, target):
-    if not target or target == rate or len(samples) < 2:
-        return samples, rate
-    n = max(1, int(len(samples) * target / rate))
-    out = np.interp(np.linspace(0, len(samples) - 1, n), np.arange(len(samples)), samples)
-    return out.astype(np.float32), target
-
-
-def _device_rate():
-    try:
-        return int(sd.query_devices(kind="output")["default_samplerate"])
-    except Exception:
-        return 0
-
-
-def _start_playback(samples, rate):
-    """sd.play, made to survive macOS and Bluetooth.
-
-    macOS's CoreAudio sometimes refuses to open a stream (PortAudio's
-    -9986 "Internal PortAudio error", CoreAudio's 'what'). The usual cause
-    is Bluetooth headphones: opening their microphone switches them to
-    headset mode, the output device changes rate under PortAudio's feet,
-    and PortAudio's cached idea of the device is stale. So: wait, restart
-    PortAudio so it re-reads the devices, try again, then try at the
-    device's own rate. A voice that can't play is
-    reported once and skipped - the reply is on screen either way - rather
-    than taking the whole speaker thread down with it."""
-    # On a Mac, play at the output device's own rate. Bluetooth headphones
-    # run at 44.1 kHz (music) or 16/24 kHz (call mode) and CoreAudio can
-    # refuse anything else outright - her Mac took 44100 straight away
-    # after refusing Kokoro's 24000 five times. Elsewhere, only after a
-    # refusal has been seen once.
-    if sys.platform == "darwin" or _native_rate[0]:
-        samples, rate = _resample(samples, rate, _device_rate())
-
-    try:
-        sd.play(samples, rate)
-        return True
-    except sd.PortAudioError as e:
-        first = e
-
-    # Bluetooth takes a second or two to switch back from headset mode to
-    # music mode after the mic closes - longer than a fast model takes to
-    # answer, which is why LM Studio (slower) got away with it and
-    # llama-server didn't. So keep trying for up to ~3 seconds, re-reading
-    # the devices each time, before falling back to the device's own rate.
-    for wait in (0.25, 0.5, 0.75, 1.0):
-        try:
-            sd.stop()
-            time.sleep(wait)
-            _reset_portaudio()
-            sd.play(samples, rate)
-            logbook.info("speech", "speakers opened after a retry (%s)", first)
-            return True
-        except sd.PortAudioError:
-            continue
-
-    try:
-        device_rate = int(sd.query_devices(kind="output")["default_samplerate"])
-        if device_rate and device_rate != rate and len(samples) > 1:
-            n = max(1, int(len(samples) * device_rate / rate))
-            resampled = np.interp(np.linspace(0, len(samples) - 1, n),
-                                  np.arange(len(samples)), samples).astype(np.float32)
-            sd.play(resampled, device_rate)
-            logbook.info("speech", "played at the device's %d Hz after: %s", device_rate, first)
-            _native_rate[0] = True      # from now on, go straight to the device's rate
-            return True
-    except Exception:
-        pass
-
-    logbook.warn("speech", "couldn't open the speakers: %s | %s", first, _audio_devices())
-
-    if time.monotonic() - _audio_warned[0] > 60:
-        _audio_warned[0] = time.monotonic()
-        ui.add_message("system", f"Couldn't play her voice ({first}). The reply is on screen; "
-                                 "check the sound output device.")
-
-    return False
-
-
-def _audio_devices():
-    """One line about the devices PortAudio sees, for the log."""
-    try:
-        out = sd.query_devices(kind="output")
-        inp = sd.query_devices(kind="input")
-        return (f"out={out['name']!r} {int(out['default_samplerate'])}Hz "
-                f"in={inp['name']!r} {int(inp['default_samplerate'])}Hz "
-                f"default={sd.default.device}")
-    except Exception as e:
-        return f"devices unknown ({e})"
-
-
-# macOS fallback: afplay, the system's own player. It talks to CoreAudio
-# directly, takes any rate, and doesn't care what mode Bluetooth headphones
-# are in - which is exactly where PortAudio gives up. Once it's needed it's
-# used for the rest of the session, so no sentence waits out the retries.
-_afplay = [None, False]      # [running process, switched over]
-_afplay_rate = [0]           # a rate afplay has accepted this session (0 = not yet known)
-AFPLAY = shutil.which("afplay") if sys.platform == "darwin" else None
-
-
-def _use_afplay():
-    """afplay from the start on a Mac (tts.player "auto"), or once PortAudio
-    has refused; never when tts.player is "portaudio"."""
-    player = str(getattr(config, "TTS_PLAYER", "auto")).lower()
-    if not AFPLAY or player == "portaudio":
-        return False
-    return player == "afplay" or sys.platform == "darwin" or _afplay[1]
-
-
-def _play_afplay(samples, rate, stop):
-    """Play one chunk with afplay; False if interrupted (`stop`, interrupts.Stop).
-
-    Bluetooth headphones on macOS can refuse the voice's own rate
-    outright ("AudioQueueStart failed ('what')" for Kokoro's 24 kHz), so
-    a refused file is rewritten at 44.1 kHz, then 48 kHz, and the rate
-    that works is used first from then on."""
-    rates = [rate, 44100, 48000]
-
-    if _afplay_rate[0]:
-        rates = [_afplay_rate[0]] + [r for r in rates if r != _afplay_rate[0]]
-
-    # 'what' is usually transient: Bluetooth still in headset mode right
-    # after the mic closed. llama-server answers before it switches back,
-    # so back off and retry for ~3s instead of giving up in 0.3s.
-    for n, wait in enumerate((0, 0.5)):
-        if wait and stop.speaking.wait(wait):
-            return False
-        for attempt, target in enumerate(dict.fromkeys(rates)):
-            played, outcome = _afplay_once(*_resample(samples, rate, target), stop)
-
-            if played is None:           # interrupted
-                return False
-
-            if played:
-                if attempt or n:
-                    logbook.info("speech", "afplay took the audio at %d Hz (not %d) on pass %d",
-                                 target, rate, n + 1)
-                _afplay_rate[0] = target
-                return True
-
-            logbook.warn("speech", "afplay refused %d Hz (pass %d): %s", target, n + 1, outcome)
-
-    # Keep the refused audio so it can be inspected (empty? NaN? odd rate?).
-    try:
-        dump = os.path.join(os.path.expanduser("~/.cache/ai-voice"), "last-refused.wav")
-        write(dump, rate, (np.nan_to_num(np.clip(samples, -1, 1)) * 32767).astype(np.int16))
-        logbook.warn("speech", "afplay refused every try: %d samples @ %d Hz, finite=%s, peak=%.3f -> %s",
-                     len(samples), rate, bool(np.isfinite(samples).all()),
-                     float(np.nanmax(np.abs(samples))) if len(samples) else 0.0, dump)
-    except Exception as e:
-        logbook.warn("speech", "couldn't save refused audio: %s", e)
-    return "refused"
-
-
-def _afplay_once(samples, rate, stop):
-    """(played, message): played is True, False (refused), or None (interrupted)."""
-    fd, path = tempfile.mkstemp(prefix="luna-", suffix=".wav")
-    os.close(fd)
-
-    try:
-        write(path, rate, (np.clip(samples, -1, 1) * 32767).astype(np.int16))
-        proc = subprocess.Popen([AFPLAY, path], stdin=subprocess.DEVNULL,
-                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    except Exception as e:
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
-        return False, f"couldn't start afplay: {e}"
-
-    _afplay[0] = proc
-    started = time.monotonic()
-
-    try:
-        while proc.poll() is None:
-            if stop.speaking.wait(0.05):    # wakes the moment it's set
-                proc.kill()
-                _lip_stop()
-                return None, "interrupted"
-
-        err = (proc.stderr.read() or b"").decode("utf-8", "replace").strip()
-        took = time.monotonic() - started
-
-        if proc.returncode != 0 or "failed" in err.lower():
-            return False, f"exit {proc.returncode} after {took:.1f}s: {err or 'no message'}"
-
-        logbook.debug("speech", "afplay played %.1fs of audio at %d Hz in %.1fs", len(samples) / rate, rate, took)
-        return True, ""
-    finally:
-        _afplay[0] = None
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
-
-
-def _play(samples, rate, stop):
-    """Play one chunk; return False if it was stopped (`stop`, interrupts.Stop)."""
-    _lip_sync(samples, rate)
-
-    if _use_afplay():
-        result = _play_afplay(samples, rate, stop)
-        if result != "refused":
-            return result
-        # afplay can't get the speakers; try PortAudio in-process instead,
-        # and stick with it from now on if it works.
-        logbook.info("speech", "afplay refused - trying PortAudio")
-        if not _start_playback(samples, rate):
-            if time.monotonic() - _audio_warned[0] > 60:
-                _audio_warned[0] = time.monotonic()
-                ui.add_message("system", "Couldn't play her voice (afplay and PortAudio both refused). "
-                                         "The reply is on screen; the log has the details.")
-            return True
-        config.TTS_PLAYER = "portaudio"
-        logbook.info("speech", "PortAudio played it - using PortAudio from now on")
-
-    if not _start_playback(samples, rate):
-        if AFPLAY:
-            if not _afplay[1]:
-                _afplay[1] = True
-                logbook.info("speech", "PortAudio won't open the speakers - playing with afplay from now on")
-                ui.add_message("system", "Playing her voice through macOS's own player (afplay) - "
-                                         "PortAudio wouldn't open the speakers.")
-            return _play_afplay(samples, rate, stop) is not False
-        return True     # skipped, not interrupted: carry on with the rest
-
-    while True:
-        stream = sd.get_stream()
-
-        if stream is None or not stream.active:
-            return True
-
-        if stop.speaking.wait(0.05):        # wakes the moment it's set
-            sd.stop()
-            _lip_stop()
-            return False
 
 
 def speak(text):
@@ -1101,218 +243,6 @@ def speak_queue(inbox, stop=None):
             future.cancel()
 
 
-# ---------------------------------------------------------------------------
-# Barge-in
-#
-# The problem with listening while she talks is that the microphone
-# hears her too, and Silero is quite right to call that speech. With no
-# echo cancellation available the only honest discriminator left is
-# loudness: her voice arrives at the mic attenuated by the room, yours
-# doesn't.
-#
-# So the first fraction of a second of playback is used to measure how
-# loud she is *at the microphone*, and after that it takes both a
-# confident speech classification and a level well above that baseline,
-# sustained, to count as you interrupting. On headphones the baseline is
-# near silence and this is trivially reliable; on speakers it depends on
-# your volume, which is why the margin is configurable.
-# ---------------------------------------------------------------------------
-BARGE_IN_CALIBRATION_SECONDS = 0.5
-BARGE_IN_FLOOR = 0.004      # below this it's room tone, not a person
-BARGE_IN_ARM_TIMEOUT = 20.0 # give up waiting for playback to start
-
-
-def _playing():
-    """Is audio actually coming out of the speakers right now?
-
-    The distinction matters more than it sounds. The watcher starts
-    when the first sentence is handed to the TTS server, which is a
-    second or so before any sound exists - and calibrating against that
-    silence sets the baseline to the noise floor, after which her own
-    first word clears the bar and she interrupts herself. Every time.
-    """
-    if _afplay[0] is not None and _afplay[0].poll() is None:
-        return True
-
-    try:
-        stream = sd.get_stream()
-    except Exception:
-        return False
-
-    return stream is not None and stream.active
-
-
-def _speech_probability(block):
-    """Raw Silero probability for one 512-sample frame."""
-    import torch
-
-    with torch.no_grad():
-        return float(_vad_model(torch.from_numpy(block), SAMPLE_RATE).item())
-
-
-def _watch_for_barge_in(done, stop):
-    """Stop the reply's speaking (`stop`, its interrupts.Stop) if the user
-    starts talking over Luna. `done`: playback finished, stop watching.
-
-    Runs for as long as playback does. Bails out quietly on any audio
-    error - failing to offer barge-in is a missing nicety, but crashing
-    the speaker thread would lose the reply.
-    """
-    threshold = min(0.95, config.STT_VAD_THRESHOLD + config.STT_BARGE_IN_BOOST)
-    block_seconds = VAD_BLOCK_SIZE / SAMPLE_RATE
-    needed = max(1, int(config.STT_BARGE_IN_SECONDS / block_seconds))
-
-    bleed = []
-    calibrating = max(1, int(BARGE_IN_CALIBRATION_SECONDS / block_seconds))
-    baseline = None
-    streak = 0
-
-    levels["barge_peak"] = 0.0
-    levels["barge_probability"] = 0.0
-
-    # The model carries LSTM state between frames, and it was last used
-    # on your voice, not hers.
-    try:
-        _vad_model.reset_states()
-    except Exception:
-        pass
-
-    try:
-        stream = _open_mic(VAD_BLOCK_SIZE)
-    except Exception:
-        return
-
-    waited = 0.0
-
-    try:
-        while not done.is_set() and not stop.speaking.is_set():
-            audio, _overflow = stream.read(VAD_BLOCK_SIZE)
-            block = audio[:, 0].copy()
-            level = _rms(block)
-
-            # Nothing to talk over yet. Keep draining the mic so the
-            # buffer doesn't go stale, but don't measure anything.
-            if not _playing():
-                if baseline is None:
-                    waited += block_seconds
-
-                    if waited > BARGE_IN_ARM_TIMEOUT:
-                        return
-
-                continue
-
-            if baseline is None:
-                bleed.append(level)
-
-                if len(bleed) >= calibrating:
-                    # Upper quartile: her loudest moments are the ones
-                    # that would otherwise trigger a false interrupt.
-                    bleed.sort()
-                    baseline = max(
-                        BARGE_IN_FLOOR, bleed[int(len(bleed) * 0.75)]
-                    )
-                    levels["barge_baseline"] = baseline
-                    logbook.debug(
-                        "barge-in", "calibrated | her level at the mic=%.4f "
-                        "(floor %.4f) | you need %.4f to cut in",
-                        baseline, BARGE_IN_FLOOR,
-                        baseline * config.STT_BARGE_IN_MARGIN,
-                    )
-
-                continue
-
-            levels["barge_peak"] = max(levels["barge_peak"], level)
-
-            if level < baseline * config.STT_BARGE_IN_MARGIN:
-                streak = 0
-                continue
-
-            try:
-                probability = _speech_probability(block)
-            except Exception:
-                return
-
-            levels["barge_probability"] = max(
-                levels["barge_probability"], probability
-            )
-
-            if probability < threshold:
-                streak = 0
-                continue
-
-            streak += 1
-
-            if streak >= needed:
-                # The line that would have found this bug in a minute:
-                # a baseline at the floor means calibration ran during
-                # silence, so she is interrupting herself.
-                logbook.info(
-                    "barge-in",
-                    "fired | level=%.4f baseline=%.4f needed>%.4f "
-                    "speech=%.2f threshold=%.2f held=%.2fs",
-                    level, baseline, baseline * config.STT_BARGE_IN_MARGIN,
-                    probability, threshold, streak * block_seconds,
-                )
-                stop.barged_in = True
-                stop.stop(speaking=True)
-
-                try:
-                    from mind import mood
-
-                    mood.note_bargein()
-                except Exception:
-                    pass  # moods are decoration; never break the audio path
-                ui.set_status("Stopped - go ahead")
-                return
-    except Exception:
-        return
-    finally:
-        _close_mic(stream)
-
-
-def barge_in_available():
-    return config.STT_BARGE_IN and _vad_model is not None
-
-
-# ---------------------------------------------------------------------------
-# Wake word
-# ---------------------------------------------------------------------------
-def wait_for_wake_word(should_stop):
-    """Block until the wake word is heard.
-
-    Returns True if it fired, False if `should_stop()` asked us to give
-    up. Nothing else runs while this does - no Whisper, no model, just
-    a 1.5MB classifier over 80ms frames - so it can sit here all day.
-    """
-    from voice import wakeword
-
-    if not wakeword.available():
-        return True  # nothing to wait for; behave as before
-
-    ui.set_status(f"Waiting for \"{wakeword.label()}\"")
-    wakeword.reset()
-
-    try:
-        stream = _open_mic(wakeword.FRAME_SIZE)
-    except Exception as e:
-        ui.add_message("system", f"Wake word listener couldn't open the mic: {e}")
-        return True
-
-    try:
-        while not should_stop():
-            audio, _overflow = stream.read(wakeword.FRAME_SIZE)
-
-            if wakeword.heard(audio[:, 0].copy()):
-                return True
-    except Exception as e:
-        ui.add_message("system", f"Wake word listener stopped: {e}")
-        return True
-    finally:
-        _close_mic(stream)
-
-    return False
-
-
 class Player:
     """A speaker you can hand sentences to while they're still being
     written, and stop mid-word.
@@ -1369,3 +299,14 @@ class Player:
     @property
     def started(self):
         return self._thread is not None
+
+
+# Values the pieces reassign while running, read live from where they're kept
+# (a copy taken at import would never change).
+_LIVE = {'_vad_model': listen, 'tts_error': tts, 'tts_ok': tts, 'vad_backend': listen}
+
+
+def __getattr__(name):
+    if name in _LIVE:
+        return getattr(_LIVE[name], name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

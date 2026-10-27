@@ -84,22 +84,33 @@ grudge there is no state in which she is less useful. In a grudge she
 grumbles and may turn down what isn't urgent until you make up -
 never alarms, reminders, safety or anything urgent - and the walk-away
 (three strikes) is still the only thing that stops her talking.
+
+Two pieces live beside this file and are re-exported, so `mood.X` still
+works: mind/mood_files.py (agent/moods.json and the built-in moods) and
+mind/appraise.py (the side question that reads how a turn landed).
 """
 import json
 import os
 import random
-import re
 import threading
 import time
 from datetime import datetime
-
 import config
 from core import logbook
-
 from config import BASE_DIR
+from mind.appraise import _RATING, _appraise
+from mind.mood_files import _FALLBACK, moods
+from mind.mood_files import (  # noqa: F401  re-exported: mood.X keeps working
+    MOODS_FILE,
+    _check,
+    _moods,
+)
+from mind.appraise import (  # noqa: F401  re-exported: mood.X keeps working
+    _APPRAISE_PROMPT,
+    _parse_appraisal,
+)
 
 STATE_FILE = os.path.join(BASE_DIR, "agent", "mood.json")
-MOODS_FILE = os.path.join(BASE_DIR, "agent", "moods.json")
 
 _lock = threading.Lock()
 _energy = 0.0
@@ -126,83 +137,6 @@ def _intensity():
         return max(0.0, min(2.0, float(getattr(config, "MOOD_INTENSITY", 1.0))))
     except (TypeError, ValueError):
         return 1.0
-
-
-# ---------------------------------------------------------------------------
-# The moods file
-# ---------------------------------------------------------------------------
-# Used when agent/moods.json is missing or broken, so a typo in the file
-# costs you your edits, never a working assistant. The shipped file is
-# the real list; this is the smallest thing that still makes sense.
-_FALLBACK = {
-    "energy": {"edges": [-0.20, 0.35], "words": ["tired", "even", "wired"]},
-    "warmth": {"edges": [-0.20, 0.35, 0.66], "words": ["cool", "neutral", "warm", "very warm"]},
-    "grid": [["sad", "annoyed", "mad"], ["tired", "calm", "focused"],
-             ["sleepy", "happy", "excited"], ["cuddly", "loving", "flirty"]],
-    "lewd": {"row": ["teasing", "frisky", "heated"], "enter": 0.6},
-    "grudge": {"row": ["sulky", "hurt", "furious"], "minutes": 20},
-    "states": {},
-    "feelings": {},
-}
-_moods = {"data": None, "mtime": None, "error": ""}
-
-
-def _check(data):
-    """The file's shape, or a ValueError saying what's wrong with it."""
-    energy, warmth = data.get("energy") or {}, data.get("warmth") or {}
-    e_edges, w_edges = list(energy.get("edges") or []), list(warmth.get("edges") or [])
-    grid = data.get("grid") or []
-
-    if len(grid) != len(w_edges) + 1:
-        raise ValueError(f"grid has {len(grid)} rows but warmth has {len(w_edges)} edges - "
-                         "it needs one more row than edges")
-
-    for row in grid:
-        if len(row) != len(e_edges) + 1:
-            raise ValueError(f"grid row {row} needs {len(e_edges) + 1} moods, one more "
-                             "than energy has edges")
-
-    if e_edges != sorted(e_edges) or w_edges != sorted(w_edges):
-        raise ValueError("edges must go from low to high")
-
-    for extra in ("lewd", "grudge"):
-        row = (data.get(extra) or {}).get("row")
-        if row is not None and len(row) != len(e_edges) + 1:
-            raise ValueError(f"{extra}.row needs {len(e_edges) + 1} moods, one per energy band")
-
-    data["energy"] = dict(energy, edges=e_edges)
-    data["warmth"] = dict(warmth, edges=w_edges)
-    data["states"] = data.get("states") or {}
-    data["feelings"] = data.get("feelings") or {}
-
-    return data
-
-
-def moods():
-    """agent/moods.json, re-read whenever it changes on disk."""
-    try:
-        mtime = os.path.getmtime(MOODS_FILE)
-    except OSError:
-        mtime = None
-
-    if _moods["data"] is not None and mtime == _moods["mtime"]:
-        return _moods["data"]
-
-    _moods["mtime"] = mtime
-
-    try:
-        with open(MOODS_FILE, encoding="utf-8") as handle:
-            _moods["data"] = _check(json.load(handle))
-        _moods["error"] = ""
-    except (OSError, ValueError) as e:
-        if _moods["data"] is None:     # keep the last good copy if there is one
-            _moods["data"] = _FALLBACK
-        _moods["error"] = f"agent/moods.json: {e}"
-        logbook.warn("mood", "%s - %s", _moods["error"],
-                     "keeping the last good version" if _moods["data"] is not _FALLBACK
-                     else "using the built-in names")
-
-    return _moods["data"]
 
 
 def _state(name):
@@ -612,62 +546,10 @@ def note_bargein():
     """Talked over mid-sentence. Once is nothing; a run of it isn't."""
     _nudge(energy=0.04, warmth=-0.07, why="you talked over her")
 
-
 # ---------------------------------------------------------------------------
-# Being nice to her
-#
-# The one signal that asks the model rather than reading the session,
-# and the only one that costs anything. It started as a word list and
-# that was the wrong shape for a project other people clone: the
-# vocabulary of affection is personal. "good kitty" is one household's
-# phrase, "awsome" is one person's spelling, and neither belongs baked
-# into someone else's assistant. A model knows warmth in any wording
-# and any language, which is the whole job.
-#
-# It reports a 0-3 rating of how warm the *user's message* was. Not the
-# exchange - whether she was nice back is not the question.
-#
-# Nothing here darkens her. Bluntness rates 0 and 0 does nothing. An
-# assistant that cools when you're terse is one you have to manage, and
-# she drifts back to warm on her own regardless - you never have to be
-# nice to her to get a pleasant assistant, it just registers when you
-# are.
+# Being nice to her: the one model call that reads each exchange, and why,
+# is in mind/appraise.py. What it does to her dials is below.
 # ---------------------------------------------------------------------------
-# These were an order of magnitude too small. At a resting warmth of
-# +0.63 the drift pull takes -0.045 off every turn, and a rating of 2
-# used to put +0.045 back: a clear compliment moved the dial by
-# +0.0002 and the header never budged. A kind word should be worth
-# more than one turn of drift, or the signal is decorative.
-_RATING = {1: 0.08, 2: 0.18, 3: 0.30}
-
-# The one model call moods make. It used to rate only how warm your
-# message was; it now reads the whole exchange - your message and her
-# answer - and returns four small things on one line, which a 9B model
-# manages reliably where a free-form "how does she feel?" would not:
-#
-#   warmth of YOUR message, 0-3      the old rating, same rules
-#   energy  - = +                    did the exchange liven her up or wear her down
-#   warmth  - = +                    "-" only for real hostility: bluntness is not it
-#   a feeling from moods.json        shown on her face for a few seconds
-#
-# Still one call, still off the turn's path, still off with
-# mood.affection false.
-_APPRAISE_PROMPT = (
-    "Read this moment from a conversation between {user} and {their} assistant, {name}.\n\n"
-    "User: {said}\n{name}: {answer}\n\n"
-    "Answer with one line of four fields separated by spaces, nothing else:\n"
-    "1. how warm or affectionate the USER's message is toward her: 0 neutral, businesslike "
-    "or blunt (swearing is not unfriendly by itself), 1 polite warmth (thanks, a friendly "
-    "greeting), 2 clear affection or praise of her, 3 strong affection\n"
-    "2. how the exchange leaves her energy: - (draining), = (no change), + (lively, fun)\n"
-    "3. how it leaves her warmth toward {them}: - (only if the user was clearly hostile or hurtful "
-    "to her), =, +\n"
-    "4. the one feeling she shows right now, from: none {feelings}\n"
-    "5. how flirtatious or intimate the USER's message is: 0 not at all, 1 flirting or "
-    "suggestive, 2 openly intimate or sexual\n"
-    "When unsure: 0 = = none 0\n"
-    "Example: 2 + + laughing 1"
-)
 
 # The lewd row's dial. Desire builds from flirting while she's warm,
 # fades a little every turn, and one hostile exchange wipes it: quick to
@@ -680,60 +562,6 @@ HOSTILE_HIT = 0.27                 # warmth, on top of the exchange's own -0.08
 _affection_recent = 0.0
 _last_rating = None    # what the last message scored, for /mood
 _last_feeling = None   # the last quick feeling, for /mood
-
-
-def _appraise(said, answer, model):
-    """(rating 0-3, energy -1/0/1, warmth -1/0/1, feeling or None, flirt 0-2).
-    (0, 0, 0, None, 0) on anything unexpected - a mood is never worth an error."""
-    import requests
-
-    from config import LM_URL, LLM_HEADERS
-
-    feelings = list((moods().get("feelings") or {}).keys())
-
-    try:
-        from core import lmstudio
-
-        name = getattr(config, "AGENT_NAME", "the assistant")
-        prompt = _APPRAISE_PROMPT.format(name=name, said=str(said)[:600],
-                                         user=getattr(config, "USER", "the user"),
-                                         them=getattr(config, "USER_THEM", "them"),
-                                         their=getattr(config, "USER_THEIR", "their"),
-                                         answer=str(answer or "(no answer)")[:600],
-                                         feelings=" ".join(feelings))
-        response = requests.post(LM_URL, headers=LLM_HEADERS, json=lmstudio.chore({
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0,
-        }, max_tokens=200), timeout=30)
-        reply = response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        logbook.info("mood", "couldn't read the exchange: %s", e)
-
-        return 0, 0, 0, None, 0
-
-    return _parse_appraisal(reply, feelings)
-
-
-def _parse_appraisal(reply, feelings):
-    # A reasoning model thinks out loud first; the answer is the last
-    # line that has the right shape, not the first thing it mentions.
-    reply = re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL)
-    signs = {"-": -1, "=": 0, "+": 1}
-    shape = re.compile(r"\b([0-3])\s+([-=+])\s+([-=+])\s+([A-Za-z_]+)(?:\s+([0-2])\b)?")
-    found = shape.findall(reply)
-
-    if found:
-        rating, energy, warmth, feeling, flirt = found[-1]
-        feeling = feeling.lower()
-
-        return (int(rating), signs[energy], signs[warmth],
-                feeling if feeling in feelings else None, int(flirt or 0))
-
-    # A model that only managed the digit still gets its warmth counted.
-    digits = re.findall(r"\b([0-3])\b", reply)
-
-    return (int(digits[-1]) if digits else 0), 0, 0, None, 0
 
 
 def _apply_exchange(said, answer, model):
