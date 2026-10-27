@@ -3,7 +3,7 @@
 Part of the llm package (it was one llm.py); see llm/__init__.py.
 """
 
-from config import MAX_TOOL_ROUNDS
+import config
 from life import gestures
 from core import interrupts
 from web import livefeed
@@ -67,7 +67,7 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
 
     # A game turn can ask for more rounds than chat gets (Vibe City's
     # checklist is a dozen calls); assistant.respond_to_job sets it.
-    rounds = int(turnctx.current().max_rounds or MAX_TOOL_ROUNDS)
+    rounds = int(turnctx.current().max_rounds or config.MAX_TOOL_ROUNDS)
 
     for _round in range(rounds):
         # Stopped (HOME, !stop) - while a tool ran, or before the turn
@@ -234,9 +234,9 @@ def _why_empty():
             "generation.reasoning in agent.json, or raise max_tokens"
         )
 
-    if _last_raw.get("tool_rounds", 0) >= MAX_TOOL_ROUNDS:
+    if _last_raw.get("tool_rounds", 0) >= config.MAX_TOOL_ROUNDS:
         return (
-            f"it called tools {MAX_TOOL_ROUNDS} times without answering - "
+            f"it called tools {config.MAX_TOOL_ROUNDS} times without answering - "
             "raise tools.max_rounds, or the model is stuck in a loop"
         )
 

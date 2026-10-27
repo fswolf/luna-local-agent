@@ -230,7 +230,7 @@ def _station_action(action, data):
     from web import station
 
     if action == "station_forget":
-        ok = station.forget(str(data.get("key", "")))
+        ok = station.forget(str(data.get("device", "")))
         return {"ok": ok, "message": "unpaired" if ok else "no such device", "station": station.panel()}
     if not station.running():
         return {"ok": False, "message": "switch relay stations on first" if not getattr(config, "STATION_ENABLED", False)

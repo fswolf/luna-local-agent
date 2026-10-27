@@ -12,7 +12,7 @@ import ui
 from scipy.io.wavfile import write
 from collections import deque
 import config
-from config import SAMPLE_RATE, STT_MODE, STT_VAD
+from config import SAMPLE_RATE, STT_VAD
 from voice.playback import _close_mic, _open_mic
 
 
@@ -89,7 +89,7 @@ levels = {
     "peak": 0.0,
     "speech_seconds": 0.0,
     "triggered": False,
-    "mode": STT_MODE,
+    "mode": config.STT_MODE,
     "backend": "energy",
     # Barge-in, reported by /barge
     "barge_baseline": 0.0,
@@ -351,7 +351,7 @@ def record_audio(mode=None):
                Same as auto minus the give-up timeout, because hands
                free there's nothing to give up on.
     """
-    mode = mode or STT_MODE
+    mode = mode or config.STT_MODE
 
     # Manual has nothing to detect - you decide both ends.
     if mode != "manual" and _vad_model is not None:

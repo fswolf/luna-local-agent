@@ -29,7 +29,8 @@ import threading
 
 from datetime import datetime
 
-from config import BASE_DIR, TRANSCRIPT_ENABLED, TRANSCRIPT_MAX_MB
+import config
+from config import BASE_DIR, TRANSCRIPT_MAX_MB
 
 TRANSCRIPT_DIR = os.path.join(BASE_DIR, "history")
 TRANSCRIPT_FILE = os.path.join(TRANSCRIPT_DIR, "transcript.jsonl")
@@ -89,7 +90,7 @@ _STOP_STEMS = {_stem(word) for word in _STOPWORDS}
 def add(role, content):
     """Append one turn. Never raises - losing a line is survivable,
     losing the reply because the disk filled up is not."""
-    if not TRANSCRIPT_ENABLED or not str(content or "").strip():
+    if not config.TRANSCRIPT_ENABLED or not str(content or "").strip():
         return
 
     entry = {
@@ -249,7 +250,7 @@ def trim():
     to be long, and rewriting a multi-megabyte file mid-conversation to
     save a few kilobytes is a bad trade.
     """
-    if not TRANSCRIPT_ENABLED or size_mb() <= TRANSCRIPT_MAX_MB:
+    if not config.TRANSCRIPT_ENABLED or size_mb() <= TRANSCRIPT_MAX_MB:
         return False
 
     entries = _load()

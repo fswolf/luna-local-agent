@@ -26,14 +26,8 @@ from core import logbook
 
 from datetime import datetime
 
-from config import (
-    LM_URL,
-    LLM_HEADERS,
-    MAX_RAW_MESSAGES,
-    SUMMARIZE_CHUNK,
-    SUMMARY_MAX_CHARS,
-    BASE_DIR,
-)
+import config
+from config import LM_URL, LLM_HEADERS, BASE_DIR
 
 HISTORY_DIR = os.path.join(BASE_DIR, "history")
 HISTORY_FILE = os.path.join(HISTORY_DIR, "conversation.json")
@@ -310,10 +304,10 @@ def _fold(model):
         with _lock:
             messages = _data.get("messages", [])
 
-            if len(messages) <= MAX_RAW_MESSAGES:
+            if len(messages) <= config.MAX_RAW_MESSAGES:
                 return
 
-            chunk = list(messages[:SUMMARIZE_CHUNK])
+            chunk = list(messages[:config.SUMMARIZE_CHUNK])
             existing = _data.get("summary", "")
 
         # The model call happens outside the lock - it's the slow part,
@@ -321,14 +315,14 @@ def _fold(model):
         piece = _summarize_chunk(model, chunk)
         merged = f"{existing}\n{piece}".strip() if existing else piece
 
-        if len(merged) > SUMMARY_MAX_CHARS:
+        if len(merged) > config.SUMMARY_MAX_CHARS:
             try:
                 merged = _compress(model, merged)
             except Exception:
                 # Compression failing is survivable; an over-long
                 # summary is better than a lost one. Trim the oldest
                 # half so it can't grow without bound either way.
-                merged = merged[-SUMMARY_MAX_CHARS:]
+                merged = merged[-config.SUMMARY_MAX_CHARS:]
 
         with _lock:
             messages = _data.get("messages", [])
@@ -337,11 +331,11 @@ def _fold(model):
             # chunk we summarized is still the oldest, so dropping that
             # many from the front is still correct - but only if they
             # haven't already been dropped by a previous fold.
-            if messages[:SUMMARIZE_CHUNK] != chunk:
+            if messages[:config.SUMMARIZE_CHUNK] != chunk:
                 return
 
             _data["summary"] = merged
-            _data["messages"] = messages[SUMMARIZE_CHUNK:]
+            _data["messages"] = messages[config.SUMMARIZE_CHUNK:]
 
         save()
     except Exception:
@@ -360,7 +354,7 @@ def maybe_summarize(model):
     global _summarizing
 
     with _lock:
-        if _summarizing or len(_data.get("messages", [])) <= MAX_RAW_MESSAGES:
+        if _summarizing or len(_data.get("messages", [])) <= config.MAX_RAW_MESSAGES:
             return
 
         _summarizing = True
