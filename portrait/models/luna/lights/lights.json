@@ -1,5 +1,6 @@
 {
  "version": 1,
+ "model": "robot_default.vrm",
  "zones": [
   "none",
   "torso",

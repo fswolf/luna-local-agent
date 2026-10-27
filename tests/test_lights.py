@@ -75,6 +75,7 @@ class Build(unittest.TestCase):
         self.assertFalse(any("Face" in n or "Hair" in n for n in names))       # her face isn't a strip
         with open(os.path.join(self.out, "lights.json")) as f:
             self.assertEqual(json.load(f)["zones"][0], "none")
+        self.assertEqual(self.manifest["model"], "robot.vrm")           # only for the model they came from
 
     def test_body_zones(self):
         body = self.manifest["materials"]["N00_000_00_Body_00_SKIN"]

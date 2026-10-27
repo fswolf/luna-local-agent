@@ -317,7 +317,7 @@ def build(model_path, panels=(), private=(), color="#ff4fb4", tolerance=1.0, for
     out_dir = os.path.join(os.path.dirname(model_path), "lights")
     os.makedirs(out_dir, exist_ok=True)
     want = tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
-    manifest = {"version": 1, "zones": [n for n, _c in ZONES],
+    manifest = {"version": 1, "model": os.path.basename(model_path), "zones": [n for n, _c in ZONES],
                 "zone_colors": {n: "#%02x%02x%02x" % c for n, c in ZONES}, "private": list(PRIVATE),
                 "materials": {}}
     seen = set()

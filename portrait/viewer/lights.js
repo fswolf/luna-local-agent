@@ -147,6 +147,8 @@ export async function createLights(THREE, vrm, modelUrl, settings = {}) {
   const dir = modelUrl.replace(/[^/]*$/, '') + 'lights/';
   const manifest = await fetch(dir + 'lights.json').then(r => r.ok ? r.json() : null).catch(() => null);
   if (!manifest?.materials || !Array.isArray(manifest.zones)) return null;
+  // made for one model: the others in the folder share its material names, not its paint
+  if (manifest.model && manifest.model !== decodeURIComponent(modelUrl.split('/').pop().split('?')[0])) return null;
   const id = Object.fromEntries(manifest.zones.map((n, i) => [n, i]));
   // the paint's colour, as a light: more saturated than the paint, or pink on pink washes out
   const own = new THREE.Color(Object.values(manifest.materials)[0]?.color || '#ff4fb4');
