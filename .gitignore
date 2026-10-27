@@ -42,6 +42,8 @@ agent/backups/
 # Face and voice prints of the people she knows (people.py). Personal: never commit.
 agent/people/
 agent/coffee.json
+# Examples for her patches (training/dataset.py): her whole prompt, your facts included.
+agent/dataset/
 games/zork/saves/
 
 # llama.cpp is built in place by llama/install.sh; only the scripts and
@@ -54,6 +56,8 @@ llama/*.log
 llama/.api_key
 # Per-machine llama-server overrides (a MODEL path) - see llama/start.sh.
 llama/server.local.env
+# Trained patches (LoRA): built from your examples, for one model.
+llama/patches/
 
 # Injection experiments: her answers (personal) and vectors (model-specific).
 introspection/results/

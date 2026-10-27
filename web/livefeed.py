@@ -564,6 +564,13 @@ def start():
     except Exception as e:
         logbook.warn("monitor", "help page unavailable: %s", e)
 
+    try:
+        from web import dataset_web
+
+        dataset_web.register()           # /dataset/: examples for her patches
+    except Exception as e:
+        logbook.warn("monitor", "examples page unavailable: %s", e)
+
     threading.Thread(target=server.serve_forever, daemon=True).start()
     threading.Thread(target=_gaze_loop, daemon=True, name="portrait-gaze").start()
     holofan.start()          # only does anything with portrait.fan.cast on
