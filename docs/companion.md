@@ -470,7 +470,7 @@ itself in; the emote in brackets):
 | Zone | cool | neutral | warm | loving | lewd | grudge |
 |---|---|---|---|---|---|---|
 | **head** | shrug | bashful | bashful | bashful (hearts) | bashful (hearts) | shrug, huff* (anger) |
-| **nose** | surprise | surprise | wink | wink (hearts) | nose_tease | shrug (anger) |
+| **nose** | surprise | surprise, boop* | wink, boop* | wink, boop* (hearts) | nose_tease | shrug (anger) |
 | **mouth** | shh | shy, say_ah* | blow_kiss, say_ah* | blow_kiss, beckon_kiss*, say_ah* (hearts) | blow_kiss, open_wide* (hearts) | shh |
 | **chest** | hands_on_chest (anger) | shy | bashful | cup_breasts, beckon_kiss* | cup_breasts | hands_on_chest (anger) |
 | **tummy** | shrug | surprise | giggle, bounce | giggle, bashful | giggle, bashful | shrug, huff* |
@@ -538,6 +538,7 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 | `beckon_kiss` | flirty, teasing: beckons you over, then blows you a kiss | chain: sultry_beckon → blow_kiss | 🔒 | mouth, chest | loving |
 | `bend_over` | lewd, teasing: bends right over with her back to you, tail up | 9.0 s | 🔥🔒🧍 | butt, back | lewd |
 | `blow_kiss` | blowing a kiss, affection | 3.0 s | - | - | any |
+| `boop` | booped on the nose: squeezes her eyes shut, 'hey!', then a happy flustered smile | 1.8 s | - | nose | neutral, warm, loving |
 | `bounce` | happy, playful | 1.3 s | 💤 | - | any |
 | `climax` | lewd, heated: peaks, then left out of breath | chain: touch_self → pant | 🔥🔒 | groin | heated |
 | `cry` | deeply sad or hurt, moved to tears | 7.0 s | - | - | any |
