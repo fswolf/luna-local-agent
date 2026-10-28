@@ -472,7 +472,7 @@ itself in; the emote in brackets):
 | **legs** | step_back* | standing_split, knee_lift* | knee_lift*, weight_shift* | weight_shift* (hearts) | leg_hold (hearts) | - (anger) |
 | **butt** | step_back (anger) | surprise | shy | bashful (hearts) | sultry_beckon, wink, bend_over* (hearts) | huff (anger) |
 | **tail** | - | - | - | - (hearts) | - (hearts) | huff (anger) |
-| **back** | shrug | - | - | bend_forward* (hearts) | bend_over* | huff |
+| **back** | shrug | - | - | - (hearts) | bend_over* | huff |
 | **neck** | step_back | shy | bashful | bashful (hearts) | - (hearts) | huff (anger) |
 | **arms** | - | - | - | - | - | huff |
 
@@ -530,7 +530,6 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 | `arch_stretch` | relaxed, stretching, arching her back with her hands behind her head | 5.0 s | 💤 | - | any |
 | `bashful` | bashful, shy, flustered and quiet | 5.5 s | - | - | any |
 | `beckon_kiss` | flirty, teasing: beckons you over, then blows you a kiss | chain: sultry_beckon → blow_kiss | 🔒 | mouth, chest | loving |
-| `bend_forward` | playful, flirty: bends forward with her back to you, looking back over her shoulder | 7.0 s | 🔒🧍 | back | loving |
 | `bend_over` | lewd, teasing: bends right over with her back to you, tail up | 9.0 s | 🔥🔒🧍 | butt, back | lewd |
 | `blow_kiss` | blowing a kiss, affection | 3.0 s | - | - | any |
 | `bounce` | happy, playful | 1.3 s | 💤 | - | any |

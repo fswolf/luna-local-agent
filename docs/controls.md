@@ -12,7 +12,8 @@
 | Esc | Quit |
 
 **Pages** (Tab once) opens her pages in your browser: the portrait, the
-OBS address, settings, the live monitor, her thoughts, her memory, the
+OBS address, the pose studio (the debug viewer, for making and trying
+gestures), settings, the live monitor, her thoughts, her memory, the
 help (every command and key, searchable) and any page a plugin adds, like
 the chess board. Up/down or the wheel picks one; Enter, space or a click
 opens it. `/help` opens the help page straight away.
