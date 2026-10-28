@@ -102,6 +102,9 @@ SELF_MAX_SKILLS = int(_self_cfg.get("max_skills", 60))
 # Ongoing projects (mind/projects.py): work that spans sessions.
 SELF_PROJECTS = bool(_self_cfg.get("projects", True))
 SELF_PROJECTS_IN_PROMPT = int(_self_cfg.get("projects_in_prompt", 3))
+# Pages (mind/pages.py): a short joined-up note per subject she knows a lot about.
+SELF_PAGES = bool(_self_cfg.get("pages", True))
+SELF_PAGES_IN_PROMPT = int(_self_cfg.get("pages_in_prompt", 2))
 
 # The situation block (mind/situation.py): focused window, music, machine load,
 # running plugins, next reminder, what's in her hands - a few live lines in

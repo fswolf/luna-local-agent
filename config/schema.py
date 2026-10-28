@@ -24,6 +24,7 @@ SECTIONS = {
     "llm": "Model server",
     "mood": "Mood",
     "situation": "Situation",
+    "offers": "Offers",
     "portrait": "Portrait",
     "ui": "Terminal",
     "theme": "Theme",
@@ -136,6 +137,14 @@ SCHEMA = {
     "situation.plugins": ("bool", "Include which plugins are running in the situation lines"),
     "situation.reminders": ("bool", "Include the next reminder in the situation lines"),
     "situation.hands": ("bool", "Include what she's holding on her portrait (her coffee, the book she's reading) in the situation lines"),
+
+    # --- Offers -------------------------------------------------------------
+    "offers.enabled": ("bool", "Let her notice things on her own (a full disk, a date coming up) and offer to help, once, when you next talk"),
+    "offers.per_day": ("int", "At most this many offers a day"),
+    "offers.gap_minutes": ("int", "Minutes between two offers"),
+    "offers.machine": ("bool", "Watch the machine: a disk nearly full, a failed service"),
+    "offers.dates": ("bool", "Watch dates in what she remembers about you and offer a reminder before them"),
+    "offers.days_ahead": ("int", "How many days ahead a remembered date gets a reminder offer"),
 
     # --- Portrait -----------------------------------------------------------
     "portrait.model": ("text", "Her portrait model: a .vrm or Live2D file in portrait/models (space steps through them)"),
@@ -357,6 +366,8 @@ SCHEMA = {
     "self.episodes_in_prompt": ("int", "Most past-conversation notes in one prompt"),
     "self.idle_minutes": ("int", "Minutes of quiet that end a conversation for her notes"),
     "self.tidy_facts": ("bool", "Let her merge duplicate facts and retire contradicted ones"),
+    "self.pages": ("bool", "Let her write a short joined-up page on each subject she knows a lot about, while idle"),
+    "self.pages_in_prompt": ("int", "Most pages in one prompt (the ones your message is about)"),
     "self.calibration": ("bool", "Let her say when she's unsure, measured from her word probabilities (llama-server)"),
     "self.hedge_below": ("float", "How sure, 0-1, a reply must be before she skips the unsure line"),
     "self.hedge_line": ("text", "What she says when unsure; empty keeps her quiet"),

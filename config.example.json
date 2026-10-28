@@ -43,6 +43,14 @@
         "voice": true,
         "affection": true
     },
+    "offers": {
+        "enabled": true,
+        "per_day": 3,
+        "gap_minutes": 120,
+        "machine": true,
+        "dates": true,
+        "days_ahead": 14
+    },
     "files": {
         "enabled": true,
         "approval_timeout": 120,

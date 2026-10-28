@@ -692,6 +692,20 @@ def tidy_facts(model, report=None, limit=6):
     return changes
 
 
+def write_pages(model, report=None):
+    """A short page per subject she knows a lot about (mind/pages.py), after the
+    facts are tidied. Returns the subjects written."""
+    from mind import pages
+
+    if not pages.enabled():
+        return []
+    written = pages.write(lambda prompt: _ask(_model(model), prompt, think=0, max_tokens=320),
+                          yield_=_yield, report=report)
+    if written:
+        logbook.info("reflect", "pages written: %s", ", ".join(written))
+    return written
+
+
 # ---------------------------------------------------------------------------
 # All of it, and when
 # ---------------------------------------------------------------------------
@@ -705,6 +719,7 @@ def run_all(model, report=None):
             feel_about_games(model, report)
             dream(model, report)
             tidy_facts(model, report)
+            write_pages(model, report)
         except Interrupted:
             if report:
                 report("Paused - you started talking. The rest happens next time she's idle.")
@@ -936,6 +951,7 @@ def _loop(model, show):
                 if idle_seconds() >= 600 and _dream_due():
                     dream(model, report=_shout(show))
                     tidy_facts(model, report=_shout(show))
+                    write_pages(model, report=_shout(show))
         except Interrupted:
             pass
         except Exception:

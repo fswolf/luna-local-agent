@@ -69,6 +69,22 @@ def handle(text):
         ui.add_message("system", "\n".join(lines))
         return True
 
+    if text == "/offers" or text.startswith("/offers "):
+        from life import offers
+
+        word = text[len("/offers"):].strip().lower()
+        if word in ("on", "off"):
+            config.save_any("offers.enabled", word)
+            ui.add_message("system", f"Offers {word}." + (" She'll keep what she notices to herself." if word == "off" else ""))
+        elif word == "unmute":
+            ui.add_message("system", f"Unmuted {offers.unmute_all()} - she may bring them up again.")
+        elif word == "now":
+            offers.scan()
+            ui.add_message("system", offers.status())
+        else:
+            ui.add_message("system", offers.status())
+        return True
+
     if text == "/coffee" or text.startswith("/coffee "):
 
         word = text[len("/coffee"):].strip().lower()

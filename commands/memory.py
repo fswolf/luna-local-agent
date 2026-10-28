@@ -268,6 +268,32 @@ def handle(text):
             ui.add_message("system", knowledge.status())
         return True
 
+    if text == "/pages" or text.startswith("/pages "):
+        from mind import pages
+
+        word = text[len("/pages"):].strip()
+        if word.lower() == "rebuild":
+            n = pages.rebuild_all()
+            ui.add_message("system", f"{n} page(s) will be rewritten on her next idle pass (or /reflect now).")
+        elif word.lower().startswith("forget "):
+            gone = pages.forget(word[7:].strip())
+            ui.add_message("system", f"Page on {gone} dropped." if gone else "No page by that name.")
+        elif word:
+            page = pages.get(word)
+            ui.add_message("system", f"{word}: {page['text']}\n(from {page['facts']} facts, {page['updated'][:16].replace('T', ' ')})"
+                           if page else f"No page on {word}. /pages lists them.")
+        else:
+            have = pages.pages()
+            waiting = sorted(set(pages.subjects()) - set(have))
+            lines = [f"{s} ({p['facts']} facts, {p['updated'][5:10]}): {p['text'][:110]}{'...' if len(p['text']) > 110 else ''}"
+                     for s, p in have.items()] or ["No pages yet."]
+            if waiting:
+                lines.append("Waiting for her next idle pass: " + ", ".join(waiting))
+            lines.append("A subject gets a page once 3 of your facts are about it. /pages <subject> reads one; "
+                         "/pages rebuild, /pages forget <subject>.")
+            ui.add_message("system", "\n".join(lines))
+        return True
+
     if text == "/episodes" or text.startswith("/episodes "):
         from mind import notebook
 
