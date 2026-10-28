@@ -1,7 +1,8 @@
 {
-    "_about": "What she does when you click on her portrait (3D models). Each zone has a reaction per mood band - cool, neutral, warm, loving, from her warmth, plus lewd and grudge (her rows past the grid; without them she falls back to loving / cool) - and can also name one of her moods (flirty, heated, furious...) to override its band. A reaction: gestures (one is picked at random), face (a quick expression: happy, relaxed, sad, angry, surprised, blush, lids, 0..1), seconds (how long the face holds), emote (hearts, sweat, anger, question), ears (twitch them). Leave a zone out, or a band, and that touch does nothing. Zones: head, nose, mouth, chest, tummy, groin, legs, neck, arms, back, butt, and tail (only on models with tail bones). Gesture files can also join in on their own with touch: ['legs'] and moods: ['warm'] - those are added to a zone's gestures. too_much is what she does when you keep at it. docs/portrait.md explains it all.",
+    "_about": "What she does when you click on her portrait (3D models). Each zone has a reaction per mood band - cool, neutral, warm, loving, from her warmth, plus lewd and grudge (her rows past the grid; without them she falls back to loving / cool) - and can also name one of her moods (flirty, heated, furious...) to override its band. A reaction: gestures (one is picked at random), face (a quick expression: happy, relaxed, sad, angry, surprised, blush, lids, 0..1), seconds (how long the face holds), emote (hearts, sweat, anger, question), ears (twitch them). Leave a zone out, or a band, and that touch does nothing. Zones: head, nose, mouth, chest, tummy, groin, legs, neck, arms, back, butt, and tail (only on models with tail bones). Gesture files can also join in on their own with touch: ['legs'] and moods: ['warm'] - those are added to a zone's gestures. A reaction can also build up: build is how many touches on that part of her it takes for the full reaction (a number, or { tired, even, wired } by her energy), and soft is what she does until then (a reaction, or one per energy); soft's gesture plays on the first touch only, then just its face. build_seconds: how long a part of her stays warmed up. too_much is what she does when you keep at it. docs/portrait.md explains it all.",
     "enabled": true,
     "cooldown": 1.5,
+    "build_seconds": 15,
     "too_much": {
         "touches": 5,
         "seconds": 8
@@ -230,6 +231,37 @@
                 "face": {
                     "blush": 0.9,
                     "lids": 0.6
+                },
+                "build": {
+                    "tired": 3,
+                    "even": 2,
+                    "wired": 1
+                },
+                "soft": {
+                    "tired": {
+                        "gestures": [
+                            "sleepy_lean",
+                            "hand_over"
+                        ],
+                        "face": {
+                            "relaxed": 0.6,
+                            "blush": 0.5,
+                            "lids": 0.5
+                        },
+                        "seconds": 4
+                    },
+                    "even": {
+                        "gestures": [
+                            "hand_over",
+                            "squirm"
+                        ],
+                        "face": {
+                            "blush": 0.7,
+                            "happy": 0.2,
+                            "lids": 0.4
+                        },
+                        "seconds": 3
+                    }
                 }
             }
         },
@@ -288,6 +320,35 @@
                     "happy": 0.4,
                     "blush": 0.7,
                     "lids": 0.5
+                },
+                "build": {
+                    "tired": 3,
+                    "even": 2,
+                    "wired": 1
+                },
+                "soft": {
+                    "tired": {
+                        "gestures": [
+                            "sleepy_lean"
+                        ],
+                        "face": {
+                            "relaxed": 0.6,
+                            "blush": 0.5,
+                            "lids": 0.5
+                        },
+                        "seconds": 4
+                    },
+                    "even": {
+                        "gestures": [
+                            "squirm"
+                        ],
+                        "face": {
+                            "blush": 0.7,
+                            "happy": 0.2,
+                            "lids": 0.4
+                        },
+                        "seconds": 3
+                    }
                 }
             }
         },
@@ -344,6 +405,35 @@
                 "face": {
                     "blush": 1.0,
                     "lids": 0.7
+                },
+                "build": {
+                    "tired": 3,
+                    "even": 2,
+                    "wired": 1
+                },
+                "soft": {
+                    "tired": {
+                        "gestures": [
+                            "sleepy_lean"
+                        ],
+                        "face": {
+                            "relaxed": 0.6,
+                            "blush": 0.5,
+                            "lids": 0.5
+                        },
+                        "seconds": 4
+                    },
+                    "even": {
+                        "gestures": [
+                            "squirm"
+                        ],
+                        "face": {
+                            "blush": 0.7,
+                            "happy": 0.2,
+                            "lids": 0.4
+                        },
+                        "seconds": 3
+                    }
                 }
             }
         },
@@ -390,7 +480,36 @@
                 "emote": "hearts",
                 "gestures": [
                     "leg_hold"
-                ]
+                ],
+                "build": {
+                    "tired": 3,
+                    "even": 2,
+                    "wired": 1
+                },
+                "soft": {
+                    "tired": {
+                        "gestures": [
+                            "sleepy_lean"
+                        ],
+                        "face": {
+                            "relaxed": 0.6,
+                            "blush": 0.5,
+                            "lids": 0.5
+                        },
+                        "seconds": 4
+                    },
+                    "even": {
+                        "gestures": [
+                            "squirm"
+                        ],
+                        "face": {
+                            "blush": 0.7,
+                            "happy": 0.2,
+                            "lids": 0.4
+                        },
+                        "seconds": 3
+                    }
+                }
             }
         },
         "butt": {
@@ -538,6 +657,35 @@
                 "face": {
                     "blush": 0.6,
                     "lids": 0.5
+                },
+                "build": {
+                    "tired": 3,
+                    "even": 2,
+                    "wired": 1
+                },
+                "soft": {
+                    "tired": {
+                        "gestures": [
+                            "sleepy_lean"
+                        ],
+                        "face": {
+                            "relaxed": 0.6,
+                            "blush": 0.5,
+                            "lids": 0.5
+                        },
+                        "seconds": 4
+                    },
+                    "even": {
+                        "gestures": [
+                            "squirm"
+                        ],
+                        "face": {
+                            "blush": 0.7,
+                            "happy": 0.2,
+                            "lids": 0.4
+                        },
+                        "seconds": 3
+                    }
                 }
             }
         },

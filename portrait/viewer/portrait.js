@@ -341,6 +341,7 @@ function handle(ev) {
       const w = +ev.warmth || 0;
       if (w > 0.85 && mind.warmth <= 0.85 || w - mind.warmth > 0.3) blush.fluster = 1;   // that landed
       mind.energy = +ev.energy || 0;
+      mind.energyStep = Number.isInteger(ev.energy_step) ? ev.energy_step : null;   // 0 tired .. 2 wired (mood/show.py)
       mind.warmth = w;
       mind.label = typeof ev.label === 'string' ? ev.label : '';
       mind.row = typeof ev.row === 'string' ? ev.row : '';
@@ -1200,7 +1201,29 @@ async function loadClips() {
 // ---------------------------------------------------------------------------
 const touchCfg = await fetch('touch.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
 const toucher = createTouch(THREE, camera, renderer.domElement);
-const touched = { last: -99, recent: [] };
+const touched = { last: -99, recent: [], build: {} };
+
+// Touches that add up (touch.json "build" and "soft" on a reaction): while
+// she's tired it takes a few touches on a part of her before the full
+// reaction plays; until then she gets the soft one - its gesture on the first
+// touch only, then just the face, so not every touch is a big move. A zone
+// she hasn't been touched on for build_seconds starts over, and so does one
+// that's just had its full reaction. build and soft can be one value or
+// { tired, even, wired } (her energy, the same edges as moods.json).
+// her mood's place in its row (teasing / frisky / heated) when the server says,
+// else the dial with moods.json's default edges
+function energyBand() {
+  if (mind.energyStep != null) return ['tired', 'even', 'wired'][Math.max(0, Math.min(2, mind.energyStep))];
+  const e = mind.energy; return e < -0.2 ? 'tired' : e < 0.35 ? 'even' : 'wired';
+}
+function byEnergy(v) {
+  return v && typeof v === 'object' && !Array.isArray(v) && ['tired', 'even', 'wired'].some(k => k in v) ? v[energyBand()] : v;
+}
+function buildNeed(r) { return Math.max(1, Math.round(+byEnergy(r?.build) || 1)); }
+function buildOf(zone, now) {
+  const b = touched.build[zone];
+  return b && now - b.at < (+touchCfg.build_seconds || 15) ? b : { n: 0, at: now };
+}
 
 function warmthBand() {        // the same edges as moods.json's warmth
   const w = mind.warmth;
@@ -1376,7 +1399,21 @@ function touch(zone, side) {
   const r = pickReaction(tooMuch ? touchCfg.too_much_reaction : touchCfg.zones?.[zone])
             || (!tooMuch && taggedFor(zone, touchKey(zone)).length ? {} : null);
   if (tooMuch) touched.recent = [];
-  if (r) react(r, tooMuch ? '' : zone, side);
+  if (!r) return;
+  const need = tooMuch ? 1 : buildNeed(r);
+  if (need > 1) {
+    const b = buildOf(zone, now);
+    b.n += 1; b.at = now; touched.build[zone] = b;
+    if (b.n < need) {
+      const s = byEnergy(r.soft);
+      // its gesture on the first touch only, and never over one still playing
+      // (the full reaction she's just had): then it's the face alone
+      if (s && typeof s === 'object') react({ ...s, gestures: b.n === 1 && !moves?.busy() ? s.gestures : [] }, '', side);
+      return;
+    }
+    delete touched.build[zone];                // the full one: the next touches build up again
+  }
+  react(r, tooMuch ? '' : zone, side);
 }
 
 // ...and Luna hears about it (livefeed -> touches.py): with touch talk on
@@ -1417,7 +1454,9 @@ if (touchCfg.enabled !== false) {
       const key = reactionKey(table), tagged = hit ? taggedFor(hit.zone, touchKey(hit.zone)).length : 0;
       if (!params.get('debug')) el.style.cursor = key || tagged ? 'pointer' : '';
       if (tip) {
-        tip.textContent = !hit ? '' : `${hit.zone} · ${key || (tagged ? `gestures (${moodBand()})` : `nothing set (${mind.label || moodBand()})`)}`;
+        const need = hit ? buildNeed(pickReaction(touchCfg.zones?.[hit.zone])) : 1;
+        const built = need > 1 ? ` · ${buildOf(hit.zone, clock.elapsedTime).n}/${need} (${energyBand()})` : '';
+        tip.textContent = !hit ? '' : `${hit.zone} · ${key || (tagged ? `gestures (${moodBand()})` : `nothing set (${mind.label || moodBand()})`)}${built}`;
         tip.style.left = x + 14 + 'px';
         tip.style.top = y + 10 + 'px';
       }

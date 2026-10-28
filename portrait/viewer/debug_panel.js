@@ -159,7 +159,7 @@ export function debugPanel() {
       sel.onchange = () => {
         const m = ctx.cfg.moods[+sel.value];
         if (!m) return;
-        ctx.handle({ t: 'mood', label: m.name, row: m.row, energy: m.energy, warmth: m.warmth,
+        ctx.handle({ t: 'mood', label: m.name, row: m.row, energy: m.energy, energy_step: m.energy_step, warmth: m.warmth,
                  face: m.face, idle: m.idle, emote: m.emote, hold: '', tame: false });
         if (m.emote) { ctx.emoteLast = -99; ctx.emote(m.emote); }
         drawPool();

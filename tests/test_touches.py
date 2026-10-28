@@ -57,6 +57,23 @@ class Gathering(unittest.TestCase):
         self.assertEqual(touches.clean("<think>never closed"), "")
 
 
+class Tired(unittest.TestCase):
+    def test_the_note_says_when_shes_tired(self):
+        from mind.mood import core
+        saved = core.S.energy
+        try:
+            with mock.patch.object(config, "MOOD_ENABLED", True):
+                core.S.energy = -0.6
+                self.assertIn("You're tired right now.", touches._note("on the chest"))
+                core.S.energy = 0.4
+                self.assertNotIn("tired", touches._note("on the chest"))
+            with mock.patch.object(config, "MOOD_ENABLED", False):
+                core.S.energy = -0.6
+                self.assertNotIn("tired", touches._note("on the chest"))
+        finally:
+            core.S.energy = saved
+
+
 class Answering(unittest.TestCase):
     """_answer with the model, screen and voice stood in."""
 

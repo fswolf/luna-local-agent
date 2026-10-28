@@ -40,7 +40,7 @@ def preview_list():
         for j, name in enumerate(names):
             spec = _state(name)
             out.append({"name": name, "group": group, "row": row, "warmth": warmth,
-                        "energy": energies[min(j, len(energies) - 1)],
+                        "energy": energies[min(j, len(energies) - 1)], "energy_step": j,
                         "face": dict(spec.get("face") or {}), "idle": [str(g) for g in spec.get("idle") or []],
                         "emote": str(spec.get("emote") or "")})
     return out
@@ -347,6 +347,18 @@ def bands():
         return word("energy", S.energy), row or word("warmth", S.warmth)
 
 
+def energy_step(name=None):
+    """Her energy as a step, 0 (tired) .. 2 (wired): where her mood sits in its row
+    (teasing, frisky, heated), so it agrees with the name she's showing even while
+    the dial hovers near an edge; the dial's own band for anything not in a row."""
+    data = moods()
+    name = S.label if name is None else name
+    for row in [(data.get("lewd") or {}).get("row"), (data.get("grudge") or {}).get("row"), *data.get("grid", [])]:
+        if row and name in row:
+            return row.index(name)
+    return _band(S.energy, data["energy"]["edges"])
+
+
 def portrait_state():
     """What the live monitor and the portrait get: the mood, the dials,
     its face and idle moves. With mood.face off she shows nothing - the
@@ -361,11 +373,11 @@ def portrait_state():
                 "warmth": warmth if show else 0.0,
                 "face": dict(spec.get("face") or {}) if show else {}, "idle": [],
                 "hold": str(spec.get("hold") or "") if moves else "",
-                "emote": _emote(spec.get("emote"), sulking=True)}
+                "emote": _emote(spec.get("emote"), sulking=True), "energy_step": energy_step("")}
 
     return {"label": name, "row": _row_of(name), "energy": energy if show else 0.0,
             "warmth": warmth if show else 0.0, "face": face() if show else {}, "idle": idle(),
-            "hold": "", "emote": emote(), "tame": bool(S.tamed_by)}
+            "hold": "", "emote": emote(), "tame": bool(S.tamed_by), "energy_step": energy_step(name)}
 
 
 def _announce():
