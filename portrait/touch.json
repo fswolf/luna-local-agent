@@ -88,7 +88,8 @@
                 ],
                 "face": {
                     "surprised": 0.5
-                }
+                },
+                "ears": true
             },
             "warm": {
                 "gestures": [
@@ -96,7 +97,8 @@
                 ],
                 "face": {
                     "happy": 0.5
-                }
+                },
+                "ears": true
             },
             "loving": {
                 "gestures": [
@@ -106,7 +108,8 @@
                     "happy": 0.6,
                     "blush": 0.4
                 },
-                "emote": "hearts"
+                "emote": "hearts",
+                "ears": true
             },
             "grudge": {
                 "gestures": [
