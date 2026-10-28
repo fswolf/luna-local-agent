@@ -115,10 +115,23 @@ def _quiet_now():
         return False
 
 
+def _tired():
+    """Is she tired (teasing in the lewd row, or the tired column anywhere)? Her portrait
+    builds up slowly then, and her line should know why."""
+    try:
+        if not getattr(config, "MOOD_ENABLED", True):
+            return False
+        from mind.mood import show
+        return show.energy_step(show.state()[0]) == 0
+    except Exception:
+        return False
+
+
 def _note(where):
     who = getattr(config, "USER", "the user")
+    tired = " You're tired right now." if _tired() else ""
     return (f"(Not words from {who}: {who} just touched you {where} on your portrait. React to it in "
-            "character, out loud, in one short line - under 12 words. Don't narrate the touch back.)")
+            f"character, out loud, in one short line - under 12 words. Don't narrate the touch back.{tired})")
 
 
 def _request(messages, model):

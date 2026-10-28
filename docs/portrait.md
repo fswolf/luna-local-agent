@@ -173,6 +173,31 @@ conversation like any other gesture, but only while she's framed full
 body (`full: true` in the file): in the bust view her legs are out of
 shot, so they aren't offered and cost no prompt tokens.
 
+**Touches add up.** A reaction can take a few touches to get going:
+`build` is how many touches on that part of her it takes before the full
+reaction plays, and `soft` is what she does until then. Both can be one
+value or one per energy (`tired`, `even`, `wired`, her energy dial with the
+same edges as moods.json). The soft gesture plays on the first touch only;
+after that it's just the face, so not every touch is a big move. A part of
+her that's had its full reaction, or hasn't been touched for
+`build_seconds` (15), starts over. The lewd row uses it on the chest,
+tummy, groin, back and legs:
+
+```json
+"build": { "tired": 3, "even": 2, "wired": 1 },
+"soft": {
+    "tired": { "gestures": ["sleepy_lean"], "face": { "relaxed": 0.6, "blush": 0.5, "lids": 0.5 } },
+    "even": { "gestures": ["squirm"], "face": { "blush": 0.7, "happy": 0.2, "lids": 0.4 } }
+}
+```
+
+So tired (teasing), she settles into it first (`sleepy_lean`, or
+`hand_over` on her chest: her hand over yours), and only the third touch
+gets the full reaction; even (frisky), the second; wired (heated), every
+touch, like before. A reaction without `build` answers every touch. The
+debug viewer's hover shows how far along a part of her is (`2/3 (tired)`).
+With touch talk on, her line knows she's tired too.
+
 `cooldown` is the seconds between reactions. Keep poking (`too_much`:
 5 touches in 8 seconds) and she does `too_much_reaction` instead. The
 file is read when the portrait opens, so reload it after an edit;

@@ -455,8 +455,14 @@ zone answers from (in heated the chest answers from lewd, so a
 - **Too much:** 5 touches within 8 s gets a "that's enough" reaction
   (`too_much_reaction`): cool → arms crossed and angry, warm → flustered,
   lewd → blush and hearts.
+- **Touches add up** (`build` and `soft`): in the lewd row, while she's
+  tired, the chest, tummy, groin, back and legs take three touches before
+  the full reaction (two when she's even, one when she's wired). Before
+  that she settles into it: `sleepy_lean`, `hand_over` (chest) or a
+  `squirm`, on the first touch, then just her face. See
+  [portrait](portrait.md).
 - **Hover** (debug viewer): the cursor shows the zone and what it would
-  do in her current mood.
+  do in her current mood, and how far a touch has built up.
 
 Every zone, every mood, as it stands (`*` = a gesture that tagged
 itself in; the emote in brackets):
