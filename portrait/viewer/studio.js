@@ -379,7 +379,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     if (st.on) return;
     stopPlay();
     st.on = true; onOff.textContent = 'stop posing'; posingDot.textContent = '● posing';
-    st.live = moves.studio(view, viewExpr);
+    st.live = moves.studio(view, viewExpr, A.extra.face);
     show(); drawNow();
   }
   function stop() {
@@ -1112,7 +1112,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     A.sound = { name: s.name || '', from: s.from ?? '', len: s.len ?? '' };
     A.emote = [].concat(g.emote || []).map(e => (typeof e === 'string' ? { name: e, at: 0 } : { name: e.name, at: +e.at || 0 }));
     if (g.tail_up) { A.tail = 'tail_up'; A.tailLevel = g.tail_up; } else if (g.wag) { A.tail = 'wag'; A.tailLevel = g.wag; }
-    for (const k of ['then', 'left', 'osc', 'add', 'prop', 'prop_at', 'hold', 'lights']) if (g[k] != null) A.extra[k] = g[k];
+    for (const k of ['then', 'left', 'osc', 'add', 'prop', 'prop_at', 'hold', 'lights', 'face']) if (g[k] != null) A.extra[k] = g[k];
     // made with a prop: in her hand straight away (the menu isn't filled yet, so say which first)
     if (g.prop && propSel) { pp.name = propSel.value = g.prop; fillProps().then(() => { propSel.value = g.prop; pickProp(); }); }
     else if (pp.shown && propSel) { propSel.value = ''; pickProp(); }          // not made with one: put away what the studio got out

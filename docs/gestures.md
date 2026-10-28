@@ -151,8 +151,7 @@ left out of the line in chat rooms, so she can't pick them there.
 **A move she describes plays too.** If she still narrates one, an aside in
 parentheses or asterisks that clearly matches a gesture's `about` (and
 name) plays that gesture: "(beckons you over and blows a kiss)" is
-`beckon_kiss`, "(bends forward, looking back over her shoulder)" is
-`bend_forward`, "*waves hello*" is `wave`. The words stay as she wrote
+`beckon_kiss`, "*waves hello*" is `wave`. The words stay as she wrote
 them. An aside has to share at least two words with the gesture and be
 mostly about it, so "(poses, shifting between a few animations)" or
 "*giggles, realizing what he's doing*" play nothing. Each gesture plays
@@ -336,6 +335,7 @@ export default {
 | `private: true` | Never triggered from stream chat, and only offered to her in your own conversations |
 | `left: true` | Also make a mirrored copy, `<name>_left` |
 | `full: true` | It only reads with all of her on screen (her legs): offered to her, and played as an idle move, only while the portrait is framed full body. In the bust view it would be a tag that shows nothing |
+| `face: 'away'` or `face: 'me'` | She turns at the hips so her back (or her front) is square to you, from wherever you're looking: front, side or behind. The turn is worked out once as it starts, so you can still drag round her while it plays. A `+hips` turn in the keys comes on top of it. `bend_over` uses `away`. Kept when you open and save it in the pose studio, and the studio's preview turns her the same way |
 | `touch: [...]` | Touch zones it answers when you click her: `['legs']`. See *Touching her* in [portrait](portrait.md) |
 | `moods: [...]` | With `touch`: the mood bands (`cool`, `neutral`, `warm`, `loving`) or mood names it suits. Leave it out for any mood |
 | `prop: 'mug'` | The prop it's made with (a `.glb` in `portrait/props/`, placed in her hand from the pose studio's *Prop* tab); opening the gesture in the studio puts it in her hand. Her morning coffee plays `coffee_pickup`, `coffee_sip` and `coffee_putdown`; reading plays `book_open_pickup`, `book_read_turn`, `book_read_lookup` and `book_open_putdown` (a prop called `book_open` finds `book_open_pickup` and `book_open_putdown` by name). She holds one prop at a time: picking one up puts the other down first. While she holds one, only its own moves (named like its pick-up: `coffee_*`, `book_*`) and gestures that leave her arms alone play, so a wave or a hug from chat, a touch or her reply doesn't swing it about. Walking away puts it down |

@@ -180,6 +180,11 @@ class PropPlacement(unittest.TestCase):
         with self.assertRaises(ValueError):
             livefeed.gesture_file({"name": "pick", "keys": [[0, {"rightHand": [0, 0, 0]}]], "prop": "a b"})
 
+    def test_face_kept(self):
+        k = [[0, {"rightHand": [0, 0, 0]}]]
+        self.assertIn('face: "away"', livefeed.gesture_file({"name": "s", "keys": k, "face": "away"})[1])
+        self.assertNotIn("face", livefeed.gesture_file({"name": "s", "keys": k, "face": "sideways"})[1])
+
     def test_idle_moods(self):
         k = [[0, {"rightHand": [0, 0, 0]}]]
         _n, text = livefeed.gesture_file({"name": "s", "keys": k, "idle": ["warm", "lewd", "nope"]})

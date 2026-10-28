@@ -131,6 +131,8 @@ def gesture_file(data):
         g["hold"] = True
     if isinstance(data.get("lights"), list):        # her light strips' throb: [[seconds, level], ...]
         g["lights"] = [[_num(t, 0, 600), _num(v, 0, 2)] for t, v in data["lights"][:40]]
+    if data.get("face") in ("away", "me"):           # turned square to/away from the camera (gestures.js)
+        g["face"] = data["face"]
     if data.get("add"):
         g["add"] = {b: [_num(x, -7, 7) for x in v[:4]] for b, v in data["add"].items() if _BONE.match(str(b)) and isinstance(v, list)}
 

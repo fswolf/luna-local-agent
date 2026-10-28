@@ -1428,7 +1428,7 @@ if (touchCfg.enabled !== false) {
 
 try {
   vrm = await load(cfg.model);
-  moves = createGestures(THREE, vrm);
+  moves = createGestures(THREE, vrm, () => view.target ?? orbit.yaw);      // where the camera is, or is heading
   props = createProps({ THREE, GLTFLoader, vrm, fx: vrm.meta?.metaVersion === '0' ? -1 : 1 });
   earRange = cfg.vrm?.ear_range ?? (ears.some(e => /catear/i.test(e.node.name)) ? 0.3 : 1);
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;

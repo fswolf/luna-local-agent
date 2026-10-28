@@ -17,7 +17,6 @@ from life import gestures  # noqa: E402
 ABOUTS = {
     "beckon_kiss": "flirty, teasing: beckons you over, then blows you a kiss",
     "blow_kiss": "blowing a kiss, affection",
-    "bend_forward": "playful, flirty: bends forward with her back to you, looking back over her shoulder",
     "look_back": "teasing, turns around and bends over, looking back at you",
     "sultry_beckon": "sultry come-hither, teasing, inviting",
     "giggle": "giggling, amused, tickled, a little embarrassed",
@@ -30,7 +29,6 @@ ABOUTS = {
 class Asides(unittest.TestCase):
     def test_what_she_actually_wrote(self):
         for aside, name in [("beckons you over and blows a kiss", "beckon_kiss"),
-                            ("bends forward, looking back over her shoulder", "bend_forward"),
                             ("sultry come-hither", "sultry_beckon"),
                             ("blows you a kiss", "blow_kiss"),
                             ("waves hello", "wave"),

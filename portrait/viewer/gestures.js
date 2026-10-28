@@ -26,6 +26,10 @@
 //   tail_up    0-1: her tail lifts and holds up, still, while it plays
 //   lewd       true: never plays while a stream with lewd off is live
 //              (twitch/youtube "lewd": false) - she shows the row below instead
+//   face       'away' or 'me': she turns (at the hips) so her back, or her front,
+//              is square to the camera, from wherever you're looking. Worked out
+//              once as it starts, so you can still walk the camera round her
+//              after. Her '+hips' turn in the keys comes on top (0 = square).
 //   view       instead of keys: degrees to swing the camera round her (turn_around
 //              180, turn_side 90, face_me 0); back to the front after 120 s
 //   chain      instead of keys: other gestures to play in turn, each flowing into
@@ -107,7 +111,17 @@ export function sampleScalar(v, t) {
   return prev[1] + (next[1] - prev[1]) * ease((t - prev[0]) / (next[0] - prev[0]));
 }
 
-export function createGestures(THREE, vrm) {
+// How far to turn her (radians about her hips) so her back ('away') or front ('me')
+// is to a camera at yaw (0 = in front of her). She turns to her right (clockwise
+// from above) unless her left is a lot shorter: the turn is kept in -225°..135°,
+// so a camera nudged a little off the front doesn't flip a half turn to her left.
+export function faceTurn(face, yaw) {
+  const tau = Math.PI * 2, low = -1.25 * Math.PI, want = (yaw || 0) + (face === 'away' ? Math.PI : 0);
+  return ((want - low) % tau + tau) % tau + low;
+}
+
+// view(): the camera's yaw round her now, for gestures with face: (portrait.js orbit)
+export function createGestures(THREE, vrm, view = () => 0) {
   const hips = vrm.humanoid.getNormalizedBoneNode('hips');
   const hipsRest = hips ? hips.position.clone() : null;
   const bone = n => vrm.humanoid.getNormalizedBoneNode(n);
@@ -115,6 +129,7 @@ export function createGestures(THREE, vrm) {
   // bones the portrait sets itself every frame, before the gestures
   const MANAGED = new Set(['head', 'neck', 'spine', 'leftShoulder', 'rightShoulder',
                            bone('upperChest') ? 'upperChest' : 'chest']);
+  const turnFor = g => (g && (g.face === 'away' || g.face === 'me') ? faceTurn(g.face, view()) : 0);
   const touched = new Set();      // every bone a gesture has written to
   const touchedObj = new Set();   // ...and every node a .vrma clip has          // {g, name, t, out}
   const qa = new THREE.Quaternion(), e = new THREE.Euler();
@@ -201,7 +216,7 @@ export function createGestures(THREE, vrm) {
       if (!vs.length && !g) return false;
       for (const a of active) if (!a.out) a.out = a.t;          // let the old one go
       if (vs.length) active.push(startClip(name, vs[Math.floor(Math.random() * vs.length)]));
-      else active.push({ g, name, t: 0, ct: 0, out: 0, ch: channels(g), next });
+      else active.push({ g, name, t: 0, ct: 0, out: 0, ch: channels(g), next, turn: turnFor(g) });
       return true;
     },
     stop() { for (const a of active) if (!a.out) a.out = a.t; },
@@ -225,10 +240,10 @@ export function createGestures(THREE, vrm) {
     },
     // The pose studio (studio.js): a gesture that never ends, edited in place.
     // pose is {bone: [x, y, z, twist?]} like any key; expr {blush: 0.6, ...}.
-    studio(pose, expr) {
+    studio(pose, expr, face) {
       for (const a of active) if (!a.out) a.out = a.t;
-      const g = { dur: 1e9, fade: [0.25, 0.4], keys: [[0, pose]], expr };
-      const a = { g, name: '(studio)', t: 0, out: 0, ch: channels(g) };
+      const g = { dur: 1e9, fade: [0.25, 0.4], keys: [[0, pose]], expr, face };
+      const a = { g, name: '(studio)', t: 0, out: 0, ch: channels(g), turn: turnFor(g) };
       active.push(a);
       return { refresh() { a.ch = channels(g); }, stop() { if (!a.out) a.out = a.t; } };
     },
@@ -298,7 +313,8 @@ export function createGestures(THREE, vrm) {
         if (nx && !a.out && !a.chained && a.t >= g.dur - fo && GESTURES[nx]) {
           a.chained = true;
           const n = GESTURES[nx], inChain = !!a.next?.length;
-          active.push({ g: n, name: inChain ? a.name : nx, t: 0, ct: inChain ? (a.ct || 0) + a.t : 0, out: 0, ch: channels(n), next: inChain ? a.next.slice(1) : [] });
+          active.push({ g: n, name: inChain ? a.name : nx, t: 0, ct: inChain ? (a.ct || 0) + a.t : 0, out: 0, ch: channels(n), next: inChain ? a.next.slice(1) : [],
+                        turn: n.face === a.g.face ? a.turn : turnFor(n) });     // the same way: keep the turn it had
         }
         const wIn = Math.min(1, a.t / fi);
         const wOut = a.out ? 1 - (a.t - a.out) / fo : Math.min(1, (g.dur - a.t) / fo);
@@ -318,6 +334,8 @@ export function createGestures(THREE, vrm) {
           continue;
         }
 
+        // face: turned square to (or away from) the camera first, so her pose is from there
+        if (a.turn && hips) { euler(0, a.turn * w, 0); hips.quaternion.multiply(qa.setFromEuler(e)); touched.add('hips'); }
         for (const name of a.ch) {
           const v = sample(g.keys, name, t);
           if (!v) continue;

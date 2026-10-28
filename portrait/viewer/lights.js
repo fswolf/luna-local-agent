@@ -23,6 +23,7 @@ const SWEEP = ['ears', 'neck', 'chest', 'arm_l', 'arm_r', 'torso', 'hand_l', 'ha
 const TOUCH = { head: ['ears'], nose: ['ears'], mouth: ['ears'], neck: ['ears', 'neck'], chest: ['chest'],
                 tummy: ['navel', 'torso'], groin: ['groin'], legs: ['leg_l', 'leg_r', 'foot_l', 'foot_r'],
                 arms: ['arm_l', 'arm_r', 'hand_l', 'hand_r'], back: ['torso'], butt: ['torso'], tail: ['tail'] };
+const UNLIT = ['hand_l', 'hand_r'];                 // never lit: on the fingers it looks rough (Ryan, 2026-10-27)
 const MOOD = { sad: '#3d6dff', angry: '#ff2414', tired: '#7a5cff', lewd: '#ff1e8c', excited: '#ff9de2' };
 
 const SHADER = `
@@ -247,6 +248,7 @@ export async function createLights(THREE, vrm, modelUrl, settings = {}) {
       st.pulse[z] = Math.max(0, st.pulse[z] - dt * 0.9);
       v += st.pulse[z];
       if (dark && manifest.private.includes(name)) v = 0;
+      if (UNLIT.includes(name)) v = 0;
       level.value[z] = v * bright * st.on * flick;
       color.value[z].copy(st.tint);
     }

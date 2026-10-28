@@ -4,8 +4,9 @@
 import { fingers } from './_pose.js';
 
 // the shh arm, forearm twisted so the back of her hand faces you and the
-// curled fingers sit over her lips (hand rolled ~180: palm to her lips)
-const COVER = { rightUpperArm: [0, 1.15, 0.3], rightLowerArm: [0, 2.35, -0.3, 1.0], rightHand: [-2.74, 0.35, -0.6],
+// curled fingers sit over her lips. The roll is mostly in the forearm twist, a little in the
+// wrist: all of it in the wrist (as before 2026-10-27) folded the wrist like a broken one
+const COVER = { rightUpperArm: [0, 1.15, 0.3], rightLowerArm: [0, 2.35, -0.3, -1.3], rightHand: [-0.44, 0.35, -0.6],
                 ...fingers('right', 0.35) };
 const HITCH = (t, d) => [t, { '+rightShoulder': [0, 0, -0.05 * d], '+leftShoulder': [0, 0, 0.05 * d],
                                '+upperChest': [-0.03 * d, 0, 0] }];

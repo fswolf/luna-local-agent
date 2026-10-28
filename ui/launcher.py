@@ -15,10 +15,11 @@ from prompt_toolkit.mouse_events import MouseEventType
 from .shared import _refresh, state, view
 from .text import vwidth
 
-# (label, what it is, command). The address is filled in from livefeed.
+# (label, what it is, command, address). The address is filled in from livefeed.
 _FIXED = (
     ("Portrait", "her animated portrait in a window of its own (again closes it)", "/portrait", "portrait/"),
     ("Portrait for OBS", "the see-through address for a browser source", "/portrait obs", "portrait/?bg=transparent"),
+    ("Pose studio", "the debug viewer: make and try gestures, touches and moods", "open:", "portrait/?debug=1"),
     ("Settings", "every setting, with switches, sliders, search and presets", "/settings", "settings/"),
     ("Live monitor", "watch her think: stages, tokens, tools, mood", "/monitor", ""),
     ("Thoughts", "her reasoning, turn by turn", "/thoughts", "thoughts/"),
@@ -39,6 +40,9 @@ def entries():
     except Exception:
         base, pages = "", []
     out = [(label, what, cmd, f"{base}/{path}" if base else "") for label, what, cmd, path in _FIXED]
+    # "open:" alone: open its own address in the browser (no slash command for it)
+    out = [(label, what, f"open:{address}" if cmd == "open:" else cmd, address) for label, what, cmd, address in out
+           if cmd != "open:" or address]
     known = {path.split("/")[0] for *_x, path in _FIXED if path}
     for name, (label, _handler, visible) in pages:
         try:
