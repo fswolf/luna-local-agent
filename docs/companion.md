@@ -469,7 +469,7 @@ itself in; the emote in brackets):
 
 | Zone | cool | neutral | warm | loving | lewd | grudge |
 |---|---|---|---|---|---|---|
-| **head** | shrug | bashful | bashful | bashful (hearts) | bashful (hearts) | shrug, huff* (anger) |
+| **head** | shrug, pat_hmph* | bashful, pat_lean* | bashful, pat_lean* | bashful, pat_lean*, pat_nuzzle* (hearts) | bashful, pat_nuzzle* (hearts) | shrug, huff*, pat_hmph* (anger) |
 | **nose** | surprise | surprise, boop* | wink, boop* | wink, boop* (hearts) | nose_tease | shrug (anger) |
 | **mouth** | shh | shy, say_ah* | blow_kiss, say_ah* | blow_kiss, beckon_kiss*, say_ah* (hearts) | blow_kiss, open_wide* (hearts) | shh |
 | **chest** | hands_on_chest (anger) | shy | bashful | cup_breasts, beckon_kiss* | cup_breasts | hands_on_chest (anger) |
@@ -560,6 +560,9 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 | `nose_tease` | lewd, teasing look up at you, lips parted, blushing | 4.2 s | 🔥🔒 | nose | lewd |
 | `open_wide` | lewd, teasing: blushing, eyes half closed, mouth opened wide and held | 4.0 s | 🔥🔒 | mouth | lewd |
 | `pant` | out of breath, exhausted, worn out after effort | 7.5 s | - | - | any |
+| `pat_hmph` | hmph: chin up, turns her head away from a pat she didn't want, a small pout | 2.6 s | - | head | cool, grudge |
+| `pat_lean` | enjoying a head pat: tips her head up into your hand, eyes closed, content | 3.2 s | - | head | neutral, warm, loving |
+| `pat_nuzzle` | nuzzling into a head pat like a cat, eyes closed, blushing and happy | 3.4 s | - | head | loving, lewd |
 | `peace_dance` | cute, playful, showing off, a little dance | 16 s | - | - | any |
 | `say_ah` | opens her mouth wide, 'aah', like at the dentist; playful, a bit silly | 2.8 s | - | mouth | neutral, warm, loving |
 | `shh` | a secret, mischief, being sly | 2.8 s | - | - | any |
