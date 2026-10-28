@@ -471,7 +471,7 @@ itself in; the emote in brackets):
 |---|---|---|---|---|---|---|
 | **head** | shrug | bashful | bashful | bashful (hearts) | bashful (hearts) | shrug, huff* (anger) |
 | **nose** | surprise | surprise | wink | wink (hearts) | nose_tease | shrug (anger) |
-| **mouth** | shh | shy | blow_kiss | blow_kiss, beckon_kiss* (hearts) | blow_kiss (hearts) | shh |
+| **mouth** | shh | shy, say_ah* | blow_kiss, say_ah* | blow_kiss, beckon_kiss*, say_ah* (hearts) | blow_kiss, open_wide* (hearts) | shh |
 | **chest** | hands_on_chest (anger) | shy | bashful | cup_breasts, beckon_kiss* | cup_breasts | hands_on_chest (anger) |
 | **tummy** | shrug | surprise | giggle, bounce | giggle, bashful | giggle, bashful | shrug, huff* |
 | **groin** | shy (anger) | shy | bashful | touch_self | touch_self, climax*, masturbate* | hands_on_chest (anger) |
@@ -557,8 +557,10 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 | `look_hand` | - | 3.6 s | 💤 | - | any |
 | `masturbate` | lewd, heated: touches herself until she's spent, then out of breath | chain: touch_self → touch_self → pant | 🔥🔒 | groin | heated |
 | `nose_tease` | lewd, teasing look up at you, lips parted, blushing | 4.2 s | 🔥🔒 | nose | lewd |
+| `open_wide` | lewd, teasing: blushing, eyes half closed, mouth opened wide and held | 4.0 s | 🔥🔒 | mouth | lewd |
 | `pant` | out of breath, exhausted, worn out after effort | 7.5 s | - | - | any |
 | `peace_dance` | cute, playful, showing off, a little dance | 16 s | - | - | any |
+| `say_ah` | opens her mouth wide, 'aah', like at the dentist; playful, a bit silly | 2.8 s | - | mouth | neutral, warm, loving |
 | `shh` | a secret, mischief, being sly | 2.8 s | - | - | any |
 | `shrug` | don't know, oh well | 2.2 s | - | - | any |
 | `shy` | bashful, flustered by a compliment | 4.2 s | 🔒 | - | any |
