@@ -63,6 +63,8 @@ Slash commands:
 | `/people` | People she knows ([people.md](people.md)): `/people enroll face\|voice <name>`, `/people forget <name> [face\|voice]`, `/people cancel` |
 | `/log` | Tail the debug log without leaving the app |
 | `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |
+| `/pages` | Her joined-up notes per subject ([memory.md](memory.md#pages)): `/pages <subject>`, `rebuild`, `forget <subject>` |
+| `/offers` | What she's noticed on her own to offer you ([offers.md](offers.md)): `/offers now`, `on`, `off`, `unmute` |
 | `/good`, `/fix <reply>` | Keep her last reply, or your better version, as an example for her patches ([patches.md](patches.md)); `/examples` shows the count and the page |
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |
 | `/skills` | Recipes she's saved: `/skills show`, `forget`, `restore <n>` |

@@ -13,6 +13,7 @@ from life import gestures
 from core import logbook
 from mind import mood
 from mind.mood import heavy
+from life import offers
 from mind import longterm
 from senses import people
 from core import timeutil
@@ -43,6 +44,14 @@ def build_memory_prompt(query=""):
 
         for fact in facts:
             prompt += f"- {fact}\n"
+
+    # Her pages: the facts on a subject joined up while she was idle (mind/pages.py).
+    try:
+        from mind import pages
+
+        prompt += pages.prompt_block(query)
+    except Exception:
+        logbook.exception("llm", "pages block failed")
 
     # Passages from his knowledge folder that match closely enough to
     # come along unasked (mind/knowledge.py). Private turns only: this is
@@ -280,7 +289,7 @@ time_until instead.
 
 Personality:
 {PERSONALITY}
-{mood.line(private)}{heavy.line(private)}
+{mood.line(private)}{heavy.line(private)}{offers.line(private)}
 Tone:
 {TONE}
 

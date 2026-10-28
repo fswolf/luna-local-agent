@@ -10,6 +10,7 @@ or switch it off.
 | Lessons (the dream pass) | reads back her own turns that went wrong and writes one-line lessons she follows from then on; she can also note one herself, with your OK | `/lessons` |
 | Episodic memory | a few sentences of her own notes on each conversation, and on each time she played a game | `/episodes` |
 | Fact cleanup | merges facts that say the same thing twice, retires the losing side of a contradiction | `/facts retired` |
+| Pages | a short joined-up note on each subject she knows a lot about (a person, your hardware), brought along when you talk about it ([memory.md](memory.md#pages)) | `/pages` |
 | Calibration | says so out loud when her token probabilities say she didn't know | the thought log's **overconfident** flag |
 | Startup greeting | after a break, opens by picking up where you left off | the first thing she says |
 | Recipes (skill library) | saves the steps of a multi-step job that went right, and brings them back for similar jobs | `/skills` |
@@ -318,7 +319,8 @@ wasn't given is refused before it runs.
     "hedge_line": "I'm not totally sure about that one, though.",
     "greet": true,
     "skills": true, "skills_in_prompt": 2, "max_skills": 60,
-    "projects": true, "projects_in_prompt": 3
+    "projects": true, "projects_in_prompt": 3,
+    "pages": true, "pages_in_prompt": 2
 }
 ```
 

@@ -9,12 +9,14 @@ Everything the README only touches on, one subject per page.
 - [Tool calling](tools.md): every tool, her own manual, turning them off, MCP servers
 - [Files and commands](files.md): reading, writing with approval, allow-all, run_command
 - [Web](web.md): search, research, reading pages
+- [Asking a bigger model](ask.md): she asks Claude, Grok or ChatGPT when you tell her to
 - [Email](email.md): checking, reading and searching your inbox, sending with your OK
 - [Vision](vision.md): looking at your screen, the webcam, noticing you're there
 - [People in the house](people.md): who's talking, by voice or face, and their own memories
 - [Who she's talking to](who.md): how every turn is matched to a person, and what changes for a guest
 - [Relay stations](stations.md): talk to her from another room on an old phone or tablet
 - [Reminders and alarms](reminders.md)
+- [Offers](offers.md): things she notices on her own (a full disk, a date coming up) and offers to help with
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
@@ -73,11 +75,13 @@ Everything the README only touches on, one subject per page.
 - Permanent SQLite fact store that retires what stops being true, with a browser editor
 - Reminders in plain language, with repeats, retry and DST-safe schedules
 - Alarms that ring, nag and snooze until you're actually up
+- [Notices things on her own](offers.md), like a disk filling up or a birthday coming, and offers to help: only acts if you say yes
 - Writes and edits your files, with every change approved on screen first
 - Runs shell commands and opens apps, each one approved first
 - Read, write and execute permissions you set from the tools pane: allow, ask or off
 - A tools pane showing what each schema costs, and switches to turn them off
 - Web search the model reaches for on its own
+- [Asks a bigger model](ask.md), Claude, Grok or ChatGPT, when you tell her to ("ask your big brother..."), and tells you the answer in her own words
 - Scheduled jobs she runs on her own, approved once, with writes fenced to folders you pick
 - Remote access from Discord for the owner only, off until you switch it on, with approvals answered right in the chat
 - Plays Minecraft: joins your world, works towards a goal, asks when something's unclear

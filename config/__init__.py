@@ -284,6 +284,8 @@ SETTINGS = {
     "self.max_skills":            ("SELF_MAX_SKILLS",              True),
     "self.projects":              ("SELF_PROJECTS",                True),
     "self.projects_in_prompt":    ("SELF_PROJECTS_IN_PROMPT",      True),
+    "self.pages":                 ("SELF_PAGES",                   True),
+    "self.pages_in_prompt":       ("SELF_PAGES_IN_PROMPT",         True),
     "situation.enabled":          ("SITUATION_ENABLED",            True),
 
     "portrait.model":             ("PORTRAIT_MODEL",               True),

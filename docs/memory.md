@@ -89,6 +89,45 @@ view, which is what makes the setting safe to flip the day it misbehaves.
 If this python's sqlite lacks FTS5 the setting quietly stays on json and
 the log says why.
 
+## Pages
+
+Facts are single sentences, saved one at a time over months. That's the
+right way to collect them and a hard way to think with them: asked about
+the server build, a small model gets six scattered lines and has to join
+them up mid-reply. A page is that joining-up, done ahead of time while
+she's idle:
+
+```
+> /pages hardware
+hardware: Ryan's desktop runs an RX 6950 XT, and a second one is ordered
+for the Unraid server. He worries the AI work will starve his media
+server, so it gets a memory cap and trains at night.
+```
+
+- **What gets a page:** a subject tag on 3 or more of your facts
+  (`hardware`), or a name that turns up in 3 or more (`Shannon`). A tag
+  and a name that are the same word are one page. Your own name and hers
+  never get one, and neither do catch-all tags like `general`.
+- **What goes in:** those facts, plus her notes on conversations about it.
+  Only what's there: she's told not to guess or add anything.
+- **When:** in the idle dream pass, a few pages at a time, and a page is
+  only rewritten when something under it changed. `/reflect` runs it now.
+- **When she uses it:** when your message names the subject, or is close to
+  it in meaning, its page comes along in her prompt (2 at most). Only on
+  your own turns, never a guest's or stream chat's, the same as your facts.
+- **Facts stay the truth.** A page is a summary she can always rewrite;
+  her prompt says the facts win if they ever differ.
+
+```
+/pages               the pages she has, and subjects waiting for one
+/pages <subject>     read one
+/pages rebuild       rewrite them all on her next idle pass
+/pages forget <s>    drop one (it comes back if the facts still call for it)
+```
+
+`/set self.pages false` switches them off; `self.pages_in_prompt` sets
+how many can come along. Kept in `agent/notebook.db`.
+
 ## Conversation history
 
 Older turns are folded into a running summary once there are more than
