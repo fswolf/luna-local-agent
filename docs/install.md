@@ -348,6 +348,7 @@ everything else, these lines in `llama/server.env` free the most:
 
 | Setting | Saves | What you give up |
 |---------|-------|------------------|
+| `EMBED_NGL=0`, `RERANK_NGL=0` | about 1.5 GB of VRAM | nothing but a moment: both run on the CPU instead |
 | `RERANK=off` | under 1 GB | the reranker's sharper pick |
 | `EMBED=off` | about 0.7 GB | recall by meaning (back to matching words) |
 | `MMPROJ=off` | about 0.6 to 1 GB | screenshots, the webcam and Vibe City pictures |

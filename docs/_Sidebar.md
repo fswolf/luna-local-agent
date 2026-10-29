@@ -2,6 +2,7 @@
 
 - [Install](install.md)
 - [Models](models.md)
+- [What she runs on](parts.md)
 - [Configuration](configuration.md)
 - [Controls and voice](controls.md)
 - [Tool calling](tools.md)
