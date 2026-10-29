@@ -8,7 +8,7 @@ find becomes an offer, never an action:
               birthday is March 3") and no reminder for it
 
 The next time you talk to her (typed, spoken or from a relay station),
-one offer rides along in her prompt: she can bring it up once, briefly,
+or she says hello when you come back, one offer rides along in her prompt: she can bring it up once, briefly,
 if it fits, and leave it if you're in the middle of something. She only
 acts if you say yes, through the same tools and approvals as anything
 else you ask for. "Don't bring that up again" mutes it for good
@@ -35,7 +35,7 @@ from core import logbook
 
 DEFAULTS = {"enabled": True, "per_day": 3, "gap_minutes": 120, "machine": True, "dates": True, "days_ahead": 14}
 SCAN_EVERY = 600
-SOURCES = ("typed", "voice", "station")      # your own turns
+SOURCES = ("typed", "voice", "station", "greeting")      # your own turns, and her hello to you
 STATE_KEY = "offers"
 DATE_ASKS = 2                                # a date is offered at most twice
 

@@ -507,6 +507,36 @@ def _arrived(gap):
     threading.Thread(target=_greet, args=(gap,), daemon=True, name="presence-greet").start()
 
 
+def _greet_trigger(person, gap, report=""):
+    """The note that starts her hello. report: what happened while they were away
+    (life/away.py), only ever for the owner."""
+    return (f"(Not words from anyone: {person} just came back and is in front of you again, "
+            f"after being away {_when(gap)}. Greet them in {'a line or two' if report else 'one short line'}, in your own voice "
+            "and your current mood. Don't ask where they were unless you want to."
+            + (f"\n{report}" if report else "") + ")")
+
+
+def _while_away(start):
+    """(prompt block, plain lines) of what happened since start, for your hello;
+    ("", "") when there's nothing, or when it should wait (the lewd row, a heavy
+    moment: the same holds as offers'), and then it keeps for a better turn."""
+    try:
+        from life import away, offers
+        if offers._quiet_now():
+            return "", ""
+        return away.block(start), away.facts(away.since(start)[-8:])
+    except Exception:
+        return "", ""
+
+
+def _said_away(upto):
+    try:
+        from life import away
+        away.clear(upto)
+    except Exception:
+        pass
+
+
 def _greet(gap):
     time.sleep(1.5)                       # a moment to settle, and to see who it is
     try:
@@ -531,16 +561,35 @@ def _greet(gap):
     name = _state["who"] if _tracker.present else None
     person = name or getattr(config, "USER", "the user")
     try:
+        from core import turnctx
+        from senses import people
+
+        guest = people._not_owner(name)          # None: you
+    except Exception:
+        turnctx, guest = None, name
+    now = time.time()
+    try:
         with interrupts.using(kind="greeting") as stopper:
             assistant._hold(stopper)
-            trigger = (f"(Not words from anyone: {person} just came back and is in front of you again, "
-                       f"after being away {_when(gap)}. Greet them in one short line, in your own voice "
-                       "and your current mood. Don't ask where they were unless you want to.)")
             ui.set_status("Saying hi...")
-            answer = llm.ask(trigger, _state["model"], remember=False, source="greeting")
+            report = news = ""
+            if turnctx is not None:
+                # a known guest coming back is greeted as them: none of your
+                # offers, hard days, pages or news in their hello (turnctx speaker)
+                with turnctx.begin(source="greeting", speaker=guest):
+                    if not guest:
+                        report, news = _while_away(now - gap)
+                    answer = llm.ask(_greet_trigger(person, gap, report), _state["model"],
+                                     remember=False, source="greeting")
+            else:
+                answer = llm.ask(_greet_trigger(person, gap), _state["model"], remember=False, source="greeting")
+            if answer.strip() and report:
+                _said_away(now)
             if answer.strip():
                 ui.add_message(config.AGENT_NAME.lower(), answer)
-                history.add_message("user", f"({person} came back after {_when(gap)})")
+                # what she told you goes in too, so "what went wrong?" has an answer
+                history.add_message("user", f"({person} came back after {_when(gap)})"
+                                    + (f"\n(While they were away:\n{news})" if news else ""))
                 history.add_message("assistant", answer)
                 history.save()
                 if not stopper.speaking.is_set():

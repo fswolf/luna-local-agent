@@ -207,6 +207,17 @@ core and no GPU. With it on she:
   minutes by default), in one short line, only when nothing else is
   going on. At startup, the usual "welcome back" waits until someone is
   actually in front of the camera.
+- **Tells you what happened while you were out**, in that same hello: a
+  reminder that went off, an alarm that rang, a scheduled job that ran
+  or failed ("Welcome back. The backup job ran fine, and your 3 o'clock
+  reminder went off."), and maybe one thing she's [noticed and is
+  offering](offers.md). Only to you, never to a guest she knows; each
+  thing once. Without the camera, the same news rides along on your next
+  own turn instead, for things that happened while you weren't there
+  (nobody in view, or nobody had talked to her for 10 minutes without the
+  camera). Either way the details stay to hand for a while, so "what went
+  wrong?" gets a real answer. In the lewd row or a heavy moment the news
+  waits for a better turn (life/away.py).
 - **Looks at you.** Her portrait's eyes follow your face instead of
   aiming at the terminal.
 - **Keeps quiet in an empty room.** After 5 minutes with nobody in
