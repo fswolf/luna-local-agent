@@ -8,7 +8,7 @@ const SHH = { rightUpperArm: [0, 1.1, 0.4], rightLowerArm: [0, 2.2, -0.3, 0.18],
 
 export default {
   keywords: ["shh", "finger to her lips", "finger to my lips", "🤫"],   // in what she writes, *like this*
-  about: "a secret, mischief, being sly",
+  about: "a secret, mischief, being sly: finger to her lips with a sly smile",
   dur: 2.8, fade: [0.45, 0.6],
   keys: [
     [0.0, { ...SHH, '+head': [0.06, -0.06, 0.1] }],

@@ -8,7 +8,7 @@ const UP = { rightUpperLeg: [-1.05, 0, 0.18], rightLowerLeg: [1.45, 0, 0], right
              ...both({ rightUpperArm: [0.15, 0.25, 1.05], rightLowerArm: [0, 0.6, 0] }) };
 
 export default {
-  about: "ticklish, giggly, startled by a touch",
+  about: "ticklish, startled by a touch: knee jerks up with a squeak and a laugh",
   full: true,                     // her legs: only offered in full-body framing
   touch: ['legs'],                 // answers a touch on her legs...
   moods: ['neutral', 'warm'],      // ...in these moods

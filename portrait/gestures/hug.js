@@ -10,7 +10,7 @@ const HUG_LET_GO = both({ rightUpperArm: [0, 0.6, 0.6], rightLowerArm: [0, 0.6, 
 
 export default {
   keywords: ["hug", "cuddle", "squeez", "embrace", "🤗"],   // in what she writes, *like this*
-  about: "affection, comfort",   // offered to her as [hug] in tags mode
+  about: "affectionate, comforting, glad you're here, missing you: arms open, then wraps you in a hug, head on your shoulder",   // offered to her as [hug] in tags mode
   dur: 4.6, fade: [0.4, 0.6],
   keys: [
     [0.0, { ...HUG_OPEN, '+spine': [-0.03, 0, 0], '+head': [-0.06, 0, 0] }],

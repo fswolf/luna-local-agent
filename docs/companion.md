@@ -533,55 +533,55 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 
 | Gesture | What it is (her description) | Kind | Flags | Touch zones | Moods |
 |---|---|---|---|---|---|
-| `arch_stretch` | relaxed, stretching, arching her back with her hands behind her head | 5.0 s | 💤 | - | any |
-| `bashful` | bashful, shy, flustered and quiet | 5.5 s | - | - | any |
-| `beckon_kiss` | flirty, teasing: beckons you over, then blows you a kiss | chain: sultry_beckon → blow_kiss | 🔒 | mouth, chest | loving |
-| `bend_over` | lewd, teasing: bends right over with her back to you, tail up | 9.0 s | 🔥🔒🧍 | butt, back | lewd |
-| `blow_kiss` | blowing a kiss, affection | 3.0 s | - | - | any |
+| `arch_stretch` | relaxed, unwinding, at ease: hands behind her head, arches her back with a long sigh | 5.0 s | 💤 | - | any |
+| `bashful` | bashful, embarrassed, small and quiet: head tipped down, a hand at her collarbone, blushing | 5.5 s | - | - | any |
+| `beckon_kiss` | flirty, teasing, wants you closer: beckons you over with a finger, winks, then blows you a kiss | chain: sultry_beckon → blow_kiss | 🔒 | mouth, chest | loving |
+| `bend_over` | lewd, teasing: bends right over with her back to you, hands on her backside | 9.0 s | 🔥🔒🧍 | butt, back | lewd |
+| `blow_kiss` | fond, affectionate, sending love, goodnight: fingers to her lips, then blows you a kiss | 3.0 s | - | - | any |
 | `boop` | booped on the nose: squeezes her eyes shut, 'hey!', then a happy flustered smile | 1.8 s | - | nose | neutral, warm, loving |
-| `bounce` | happy, playful | 1.3 s | 💤 | - | any |
+| `bounce` | happy, cheerful, can't keep it in: bounces happily on the spot | 1.3 s | 💤 | - | any |
 | `climax` | lewd, heated: peaks, then left out of breath | chain: touch_self → pant | 🔥🔒 | groin | heated |
-| `cry` | deeply sad or hurt, moved to tears | 7.0 s | - | - | any |
-| `cup_breasts` | lewd, teasing, hands flat on her chest, blush, panting | 8.5 s | 🔥 | - | any |
-| `dance` | celebrating, music, feeling great, being playful | 16 s | - | - | any |
+| `cry` | deeply sad, hurt, grieving, moved to tears: head down, shoulders shaking with sobs | 7.0 s | - | - | any |
+| `cup_breasts` | lewd, teasing: hands flat on her chest, blushing and panting | 8.5 s | 🔥 | - | any |
+| `dance` | celebrating, feeling great, music, playful: a cute dance to the beat | 16 s | - | - | any |
 | `explain` | - | 2.4 s | - | - | any |
-| `face_me` | turning back to face you | turn (0°) | - | - | any |
-| `giggle` | giggling, amused, tickled, a little embarrassed | 2.4 s | - | tummy | warm, loving, lewd |
+| `face_me` | turning back to face you, giving you her attention: the view swings back to her front | turn (0°) | - | - | any |
+| `giggle` | amused, tickled, a little embarrassed: covers her mouth and giggles, shoulders bobbing | 2.4 s | - | tummy | warm, loving, lewd |
 | `hands_on_chest` | - | 4.0 s | - | - | any |
-| `huff` | annoyed huff, arms crossed, looking away | 3.0 s | - | head, tummy, arms | grudge |
-| `hug` | affection, comfort | 4.6 s | - | - | any |
-| `jog` | energetic, going for a run, exercise, can't sit still | 5.0 s | - | - | any |
-| `jump` | big excitement | 1.35 s | - | - | any |
-| `knee_lift` | ticklish, giggly, startled by a touch | 1.9 s | 🧍 | legs | neutral, warm |
-| `leg_hold` | smug, teasing: leg held straight up against her shoulder, arm hooked round it | 7.2 s | 🔥🔒🧍 | legs | lewd |
-| `look_back` | teasing, turns around and bends over, looking back at you | 7.0 s | 🔥🔒🧍 | - | any |
+| `huff` | annoyed, grumpy, offended: arms crossed tight, chin up, looks away with a huff | 3.0 s | - | head, tummy, arms | grudge |
+| `hug` | affectionate, comforting, glad you're here, missing you: arms open, then wraps you in a hug, head on your shoulder | 4.6 s | - | - | any |
+| `jog` | energetic, restless, exercise, can't sit still: runs on the spot, then catches her breath | 5.0 s | - | - | any |
+| `jump` | big excitement, great news, thrilled: jumps for joy | 1.35 s | - | - | any |
+| `knee_lift` | ticklish, startled by a touch: knee jerks up with a squeak and a laugh | 1.9 s | 🧍 | legs | neutral, warm |
+| `leg_hold` | lewd, smug, teasing: holds one leg straight up against her shoulder, arm hooked round it | 7.2 s | 🔥🔒🧍 | legs | lewd |
+| `look_back` | lewd, teasing: turns around, bends over and looks back at you over her shoulder | 7.0 s | 🔥🔒🧍 | - | any |
 | `look_hand` | - | 3.6 s | 💤 | - | any |
 | `masturbate` | lewd, heated: touches herself until she's spent, then out of breath | chain: touch_self → touch_self → pant | 🔥🔒 | groin | heated |
-| `nose_tease` | lewd, teasing look up at you, lips parted, blushing | 4.2 s | 🔥🔒 | nose | lewd |
+| `nose_tease` | lewd, teasing: looks up at you, lips parted, blushing | 4.2 s | 🔥🔒 | nose | lewd |
 | `open_wide` | lewd, teasing: blushing, eyes half closed, mouth opened wide and held | 4.0 s | 🔥🔒 | mouth | lewd |
-| `pant` | out of breath, exhausted, worn out after effort | 7.5 s | - | - | any |
+| `pant` | out of breath, exhausted, worn out after effort: bent over, hands on her knees, then a long sigh | 7.5 s | - | - | any |
 | `pat_hmph` | hmph: chin up, turns her head away from a pat she didn't want, a small pout | 2.6 s | - | head | cool, grudge |
 | `pat_lean` | enjoying a head pat: tips her head up into your hand, eyes closed, content | 3.2 s | - | head | neutral, warm, loving |
 | `pat_nuzzle` | nuzzling into a head pat like a cat, eyes closed, blushing and happy | 3.4 s | - | head | loving, lewd |
-| `peace_dance` | cute, playful, showing off, a little dance | 16 s | - | - | any |
+| `peace_dance` | cute, playful, showing off: a little dance with peace signs by her face and a wink | 16 s | - | - | any |
 | `say_ah` | opens her mouth wide, 'aah', like at the dentist; playful, a bit silly | 2.8 s | - | mouth | neutral, warm, loving |
-| `shh` | a secret, mischief, being sly | 2.8 s | - | - | any |
-| `shrug` | don't know, oh well | 2.2 s | - | - | any |
-| `shy` | bashful, flustered by a compliment | 4.2 s | 🔒 | - | any |
+| `shh` | a secret, mischief, being sly: finger to her lips with a sly smile | 2.8 s | - | - | any |
+| `shrug` | unsure, don't know, oh well, whatever: a shrug with open hands | 2.2 s | - | - | any |
+| `shy` | shy, flustered by a compliment, sweet on you: hands together at her chest, looks away shyly, then peeks back at you | 4.2 s | 🔒 | - | any |
 | `spank_flinch` | flinching from a spank, surprised and flustered | 0.9 s | 🔥🔒 | (bum, warm and up - see Spanks) | warm, very warm, lewd |
 | `standing_split` | bored, idly showing off: a standing split, leg held up by the ankle | 6.6 s | 🧍 | legs | neutral, calm, tired |
-| `step_back` | annoyed, backing off, not having it | 2.8 s | 🧍 | legs | cool |
-| `stretch` | tired, waking up | 4.2 s | 💤 | - | any |
+| `step_back` | annoyed, not having it, wants space: steps back away from you, chin up, looking off | 2.8 s | 🧍 | legs | cool |
+| `stretch` | tired, sleepy, just woke up: arms up over her head in a big stretch and a yawn | 4.2 s | 💤 | - | any |
 | `sulk` | - | 600 s | - | - | any |
-| `sultry_beckon` | sultry come-hither, teasing, inviting | 3.4 s | 🔒 | - | any |
-| `surprise` | happy surprise, delighted by something unexpected | 3.2 s | - | - | any |
-| `touch_self` | lewd, one hand cupping her breast, one hand between her legs, blushing, panting | 10 s | 🔥🔒 | - | any |
+| `sultry_beckon` | sultry, inviting, come here: curls her fingers to beckon you, other hand on her hip, a sly smile | 3.4 s | 🔒 | - | any |
+| `surprise` | happily surprised, delighted by something unexpected: a little gasp, hands flying to her chest | 3.2 s | - | - | any |
+| `touch_self` | lewd, heated: one hand on her breast, one between her legs, blushing and panting | 10 s | 🔥🔒 | - | any |
 | `tuck_hair` | - | 2.6 s | 💤 | - | any |
-| `turn_around` | turning around, showing her back | turn (180°) | - | - | any |
-| `turn_side` | turning to the side, showing her profile | turn (90°) | - | - | any |
-| `wave` | hello, goodbye | 2.6 s | - | - | any |
-| `weight_shift` | pleased, coy, showing off a little | 3.8 s | 🧍 | legs | warm, loving |
-| `wink` | playful, teasing, a little flirty | 1.6 s | - | - | any |
+| `turn_around` | turning around, showing you her back: the view swings round behind her | turn (180°) | - | - | any |
+| `turn_side` | turning to the side, showing her profile: the view swings round to her side | turn (90°) | - | - | any |
+| `wave` | hello, goodbye, see you, welcome back: a friendly wave | 2.6 s | - | - | any |
+| `weight_shift` | pleased, coy, showing off a little: shifts her weight onto one hip, head tilted | 3.8 s | 🧍 | legs | warm, loving |
+| `wink` | playful, teasing, a little flirty, in on the joke: winks at you with a smile | 1.6 s | - | - | any |
 
 How her replies set gestures off is `portrait.gestures`:
 
@@ -601,10 +601,28 @@ their own flags, touches, moods, sound and emotes apply. **Clips**
 ## Turning her round
 
 `turn_around`, `turn_side` and `face_me` swing the camera round her
-instead of moving her: she can show you her back or her profile when
-asked ("turn around"), and chat can do it too. The view eases round in
-about a second and drifts back to the front after **120 s**. "Turn
-around" while she's already turned brings her back. Your mouse can't
+instead of moving her. The view eases round in about a second and
+drifts back to the front after **120 s**.
+
+**Ask her, the way you'd say it.** What you type or say turns her
+straight away, before she answers (portrait/viewer/turns.js), even with
+`portrait.gestures` off:
+
+| You say | She |
+|---|---|
+| turn around, spin around | turns round; again brings her back |
+| show me your ass / bum / butt / back, let me see your behind | shows you her back |
+| turn to the side, turn sideways, show me your profile | shows you her side |
+| turn left, turn right | turns a quarter that way, from wherever she is |
+| turn 90, turn 180 deg, turn -45 | turns that far (+ is her right) |
+| face me, turn back, turn to me | faces you again |
+
+"Turn left", "turn around", "turn back" and the numbers count only in a
+short message (8 words or fewer), so "I had to turn left at the lights"
+doesn't spin her. **She can do it herself too:** `*turns around*`,
+`*spins around*`, `*turns sideways*`, `*turns back to you*` in her reply.
+When you've just asked, her own `*turns around*` in the answer doesn't
+turn her back again. Chat has `!turn`, `!side` and `!front`. Your mouse can't
 rotate the live portrait - only she and chat can.
 
 ## Sounds and pronunciation

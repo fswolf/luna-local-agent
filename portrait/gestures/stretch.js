@@ -3,7 +3,7 @@ import { both } from './_pose.js';
 
 export default {
   keywords: ["stretch", "yawn"],   // in what she writes, *like this*
-  about: "tired, waking up",   // offered to her as [stretch] in tags mode
+  about: "tired, sleepy, just woke up: arms up over her head in a big stretch and a yawn",   // offered to her as [stretch] in tags mode
   idle: ['cool', 'neutral', 'warm', 'loving'],   // on her own, in these moods (studio: Details)
   dur: 4.2, fade: [0.8, 0.9],
   keys: [

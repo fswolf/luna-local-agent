@@ -15,7 +15,7 @@ const DOWN = { '+spine': [0.04, -0.05, 0], '+head': [0.28, -0.16, -0.08] };
 
 export default {
   keywords: ["bashfully", "blushes", "looks down shyly"],   // in what she writes, *like this*
-  about: "bashful, shy, flustered and quiet",
+  about: "bashful, embarrassed, small and quiet: head tipped down, a hand at her collarbone, blushing",
   dur: 5.5, fade: [0.7, 0.9],
   keys: [
     [0.0, { ...POSE, ...DOWN }],

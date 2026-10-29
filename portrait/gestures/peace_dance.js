@@ -41,7 +41,7 @@ keys.push([16 * BEAT, { ...V_R, ...V_L, hips: [0, 0, 0], '+spine': [0, 0, 0], '+
   rightUpperLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], rightFoot: [0, 0, 0] }]);
 
 export default {
-  about: "cute, playful, showing off, a little dance",
+  about: "cute, playful, showing off: a little dance with peace signs by her face and a wink",
   keywords: ["peace sign", "tiktok dance", "✌"],
   dur: 16 * BEAT + 0.6, fade: [0.45, 0.7],
   keys,

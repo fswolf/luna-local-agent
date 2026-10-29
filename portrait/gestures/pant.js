@@ -44,7 +44,7 @@ mouth.push([5.9, 0.45], [6.8, 0.05], [DUR, 0]);
 mouth.sort((a, b) => a[0] - b[0]);
 
 export default {
-  about: "out of breath, exhausted, worn out after effort",
+  about: "out of breath, exhausted, worn out after effort: bent over, hands on her knees, then a long sigh",
   keywords: ["pant", "out of breath", "catches her breath", "catching her breath", "huff", "wheez", "😮‍💨"],
   dur: DUR, fade: [0.6, 0.9],
   keys,

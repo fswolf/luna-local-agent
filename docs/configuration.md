@@ -100,9 +100,28 @@ new run by itself, and the page refreshes what it shows.
 | Companion | Luna as designed: moods that move, a voice that follows them, emotes |
 | Streamer | Livelier on camera, chat can set off gestures, nothing lewd while live |
 
+Under them, **model size** presets set how much goes into each prompt,
+so a small model isn't crowded and a big one isn't held back:
+
+| Preset | For |
+|---|---|
+| Small model | 4-9B with a window around 16k. These are the defaults |
+| Medium model | Around 24B, or a small model with a 32k window |
+| Large model | 70B and up with a 64k+ window |
+
+They set the history kept word for word, how many facts, lessons and
+past-conversation notes go in a prompt, how many tool groups go along
+each turn (Large sends every tool), how many gestures she's offered, and
+how much of a web page or command output she reads. The sizes are rough
+guides: what counts is the context window, so a small model on a server
+card with room to spare can take Medium. The [tools pane](tools.md)
+shows what each tool costs, for fine-tuning after. Size presets don't
+touch the settings the others change, so you can use one of each.
+
 A preset is a starting point, not a mode: it saves its values like any
 other change, and you can change any of them after. `/preset` lists
-them, `/preset assistant` applies one from the terminal.
+them, `/preset assistant` or `/preset medium` applies one from the
+terminal.
 
 The page is served by Luna on your computer only (the live monitor's
 server, `monitor.enabled`). Other sites open in your browser can't

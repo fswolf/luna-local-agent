@@ -83,7 +83,7 @@ export default {
     "hands under her breasts", "cups them", "holds them up",
     "presents her chest", "pushes them together",
   ],
-  about: "lewd, teasing, hands flat on her chest, blush, panting",
+  about: "lewd, teasing: hands flat on her chest, blushing and panting",
   private: false,
   lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
   sound: 'moan-breasts',   // portrait/sounds/moan-breasts.mp3, 8.5 s, as long as the gesture

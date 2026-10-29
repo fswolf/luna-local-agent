@@ -4,6 +4,6 @@
 // back of her head. Chat: !turn, !side, !front.
 export default {
   view: 180,
-  keywords: ["turns around", "turns her back", "shows you her back"],
-  about: "turning around, showing her back",
+  keywords: ["turns around", "turning around", "turns her back", "shows you her back", "spins around", "spinning around", "shows off her back"],
+  about: "turning around, showing you her back: the view swings round behind her",
 };

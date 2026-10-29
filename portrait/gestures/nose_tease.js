@@ -3,7 +3,7 @@
 // down, so they look up), lips part, blush rises, and she holds it - with a
 // little drool from the corner of her mouth. Then she lets it go.
 export default {
-  about: "lewd, teasing look up at you, lips parted, blushing",
+  about: "lewd, teasing: looks up at you, lips parted, blushing",
   private: true,      // never from stream chat
   lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
   touch: ['nose'], moods: ['lewd'],

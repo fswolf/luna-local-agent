@@ -8,7 +8,7 @@ const ARCH = d => ({ '+spine': [-0.12, 0, d], '+chest': [-0.08, 0, 0], '+head': 
 
 export default {
   keywords: ["arches her back", "hands behind her head", "stretches out"],
-  about: "relaxed, stretching, arching her back with her hands behind her head",
+  about: "relaxed, unwinding, at ease: hands behind her head, arches her back with a long sigh",
   idle: ['neutral', 'warm', 'loving'],   // on her own, in these moods (studio: Details)
   dur: 5.0, fade: [0.9, 1.0],
   keys: [

@@ -73,6 +73,10 @@ groups it seems to need:
    groups that weren't sent, and she can attach one mid-turn. Calling a
    hidden tool by name attaches its group too.
 
+The Large model preset ([presets](configuration.md#the-settings-page))
+turns routing off, since a big context window has room for every tool;
+Small and Medium keep it on and send 3 or 5 groups by meaning.
+
 What it can't do is reach a tool you switched off, or one a turn isn't
 allowed (stream chat's narrow list holds). The tools pane is still the
 "never" switch; routing only chooses among what's on.

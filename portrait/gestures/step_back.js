@@ -8,7 +8,7 @@ const BACK = {
 };
 
 export default {
-  about: "annoyed, backing off, not having it",
+  about: "annoyed, not having it, wants space: steps back away from you, chin up, looking off",
   full: true,                     // her legs: only offered in full-body framing
   touch: ['legs'],
   moods: ['cool'],

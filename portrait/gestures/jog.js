@@ -40,7 +40,7 @@ keys.push([STEPS * STEP, { ...leg('right', 0), ...leg('left', 0), ...arm('right'
                            hips: [0, 0, 0], '+spine': [0.08, 0, 0], '+head': [0, 0, 0] }]);
 
 export default {
-  about: "energetic, going for a run, exercise, can't sit still",
+  about: "energetic, restless, exercise, can't sit still: runs on the spot, then catches her breath",
   keywords: ["jog", "runs in place", "running in place", "runs on the spot", "sprint", "🏃"],
   dur: STEPS * STEP, fade: [0.4, 0.5],
   then: 'pant',

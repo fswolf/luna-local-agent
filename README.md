@@ -57,7 +57,7 @@ What she does:
 - **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
 - **Adult toys (18+):** Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
 - **From your phone:** Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
-- **Easy to set up:** the installer picks a model that fits your graphics card, she asks your name the first time she starts, and every setting is on one page in your browser, with presets: Assistant, Companion, Streamer ([details](docs/configuration.md#the-settings-page))
+- **Easy to set up:** the installer picks a model that fits your graphics card, she asks your name the first time she starts, and every setting is on one page in your browser, with presets: Assistant, Companion, Streamer, and Small, Medium or Large to fit your model ([details](docs/configuration.md#the-settings-page))
 - **Knows her own manual:** ask her how to do something and she looks it up and tells you the exact command
 - Linux first, also on macOS and Windows
 - Full-screen terminal interface
