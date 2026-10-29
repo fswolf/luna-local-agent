@@ -30,8 +30,21 @@ uniform float uIntensity;
 uniform float uMix;
 uniform vec3 uTint;
 uniform float uBase;
+uniform float uRim;          // rim width and strength: 1 for the bust, smaller when she's smaller on screen
 
 float rand(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+
+// how much of an edge there is towards one side: she's here, it's empty a step away,
+// and still empty further out (otherwise it's a slit, dimmed)
+float edge(vec2 uv, float here, vec2 dir, vec2 one, float d, float far) {
+  vec2 q = uv + dir * d;
+  float near = texture2D(uScene, q).a;
+  // is that empty spot a gap with her on both sides (left and right, or above and below)?
+  vec2 sx = vec2(one.x * far, 0.0), sy = vec2(0.0, one.y * far);
+  float across = max(min(texture2D(uScene, q + sx).a, texture2D(uScene, q - sx).a),
+                     min(texture2D(uScene, q + sy).a, texture2D(uScene, q - sy).a));
+  return (here - near) * (1.0 - 0.9 * across);
+}
 
 void main() {
   vec2 uv = vUv;
@@ -50,20 +63,23 @@ void main() {
   vec4 cr = texture2D(uScene, uv + vec2(one.x * sh, 0.0));
   vec4 cb = texture2D(uScene, uv - vec2(one.x * sh, 0.0));
 
-  // rim: where the opacity falls away around her
-  float d = 3.0 * k;
-  float aMin = min(min(texture2D(uScene, uv + vec2(one.x * d, 0.0)).a,
-                       texture2D(uScene, uv - vec2(one.x * d, 0.0)).a),
-                   min(texture2D(uScene, uv + vec2(0.0, one.y * d)).a,
-                       texture2D(uScene, uv - vec2(0.0, one.y * d)).a));
-  float rim = clamp((c.a - aMin) * 1.6, 0.0, 1.0);
+  // rim: where the opacity falls away around her. Each side counts only if it stays
+  // empty a little further out: a narrow gap with her body just across it (between her
+  // thighs, an arm close to her side) is a slit, not her outline, and gets little rim.
+  float d = max(3.0 * k * uRim, 1.0);
+  float far = max(9.0 * k * uRim, 4.0);
+  float rim = max(max(edge(uv, c.a, vec2(one.x, 0.0), one, d, far), edge(uv, c.a, vec2(-one.x, 0.0), one, d, far)),
+                  max(edge(uv, c.a, vec2(0.0, one.y), one, d, far), edge(uv, c.a, vec2(0.0, -one.y), one, d, far)));
+  rim = clamp(rim * 1.6, 0.0, 1.0) * (0.5 + 0.5 * min(uRim, 1.0));
 
   // the scene texture is premultiplied over transparent black
   vec3 col = vec3(cr.r / max(cr.a, 0.0001), c.g / max(c.a, 0.0001), cb.b / max(cb.a, 0.0001));
   col = pow(clamp(col, 0.0, 1.0), vec3(1.0 / 2.2));  // to screen colour, like the Live2D one works in
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   vec3 holo = mix(col, uTint * (0.35 + 1.25 * lum), uMix);
-  holo += uTint * rim * 1.4;
+  // the rim is one light colour everywhere, not added on top of what's under it, so
+  // the edge of her dark hair matches the edge of her body instead of going red
+  holo = mix(holo, mix(uTint, vec3(1.0), 0.45) * 1.25, clamp(rim * 0.85, 0.0, 1.0));
 
   float scan = 0.92 + 0.08 * sin(px.y / k * 1.7 + uTime * 3.0);
   float sweep = exp(-pow((fract(-uv.y * 0.6 + uTime * 0.12) - 0.5) * 9.0, 2.0)) * 0.18;
@@ -112,6 +128,7 @@ export function createHologram3D(THREE, renderer, opts = {}) {
       uScene: { value: target.texture }, uSize: { value: size.clone() },
       uTime: { value: 0 }, uGlitch: { value: 0 }, uIntensity: { value: o.intensity },
       uMix: { value: +o.mix }, uTint: { value: hex(THREE, o.tint) }, uBase: { value: o.base ? 1 : 0 },
+      uRim: { value: 1 },
     },
     transparent: true, depthTest: false, depthWrite: false,
     blending: THREE.CustomBlending,                  // the shader writes premultiplied colour
@@ -145,6 +162,7 @@ export function createHologram3D(THREE, renderer, opts = {}) {
       if (k === 'tint') material.uniforms.uTint.value = hex(THREE, v);
       if (k === 'mix') material.uniforms.uMix.value = +v;
       if (k === 'intensity') o.intensity = +v;
+      if (k === 'rim') material.uniforms.uRim.value = +v;   // portrait.js, from the framing
     },
     render(scene, camera) {
       const now = performance.now() / 1000;

@@ -140,7 +140,7 @@ function setLights(s) {
 }
 
 function setHolo(on) {
-  if (on) { if (holo) holo.on(); else holo = createHologram3D(THREE, renderer, holoCfg); }
+  if (on) { if (holo) holo.on(); else { holo = createHologram3D(THREE, renderer, holoCfg); holo.set('rim', base.rim); } }
   else holo?.off();
 }
 
@@ -224,9 +224,14 @@ function frame() {
   base.lookY = lookY;
   base.headZ = p.z;
   base.headY ||= p.y;   // her standing height, measured once (the fan's framing keeps to it)
+  // the hologram's rim is drawn in pixels: thinner when she's smaller on screen, so full
+  // body doesn't swallow her fingers and toes (1 at the bust, softened by the square root)
+  const bust = Math.max(0.23 / tan, 0.20 / (tan * camera.aspect));
+  base.rim = Math.min(1.3, Math.max(0.4, Math.sqrt(bust / dist)));
+  holo?.set('rim', base.rim);
 }
 
-const base = { lookY: 1.45, headZ: 0, follow: 0.7, dist: 2, headY: 0 };
+const base = { lookY: 1.45, headZ: 0, follow: 0.7, dist: 2, headY: 0, rim: 1 };
 
 // The viewer (?debug=1): left-drag to turn around her, wheel to zoom, double-click
 // to put the camera back. Off on the live portrait, so a stray click in OBS
@@ -1035,7 +1040,10 @@ function animate() {
                          tame: mind.tame, talking, glow: Math.max(moves?.glow?.() || 0, throbTest(now)) });
   }
 
-  if (holo && holo.isOn()) holo.render(scene, camera);
+  if (holo && holo.isOn()) {
+    holo.set('rim', Math.min(1.3, Math.max(0.4, base.rim / Math.sqrt(orbit.zoom))));   // the viewer's zoom too
+    holo.render(scene, camera);
+  }
   else renderer.render(scene, camera);
   if (fan && vrm) fan.update(performance.now());
 }
