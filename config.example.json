@@ -193,6 +193,14 @@
             "host": "127.0.0.1",
             "port": 20010,
             "use_https": false
+        },
+        "ask": {
+            "enabled": false,
+            "provider": "claude",
+            "daily_cap": 30,
+            "auto": false,
+            "auto_daily": 5,
+            "max_tokens": 600
         }
     },
     "wake_word": {

@@ -166,11 +166,60 @@ def _tool_groups():
         groups = []
 
     groups = _with_plugin_switches(groups)
+    groups = _with_ask_switches(groups)
     # the portrait's settings live in the settings pane (Tab three times), not here
     extra = [g for g in (_feature_group(), _thoughts_group(), _self_group()) if g]
     perms = _perm_group()
 
     return ([perms] if perms else []) + groups + extra
+
+
+def _with_ask_switches(groups):
+    """The ask plugin isn't an MCP plugin, so it gets its switches here, at
+    the top of its tool group: the plugin itself, and asking on her own
+    (with what its prompt line costs while it's on)."""
+    try:
+        import config
+        import plugins
+
+        plugin = plugins.get("ask")
+        if plugin is None:
+            return groups
+        from plugins import ask
+    except Exception:
+        return groups
+
+    s = config.plugin_settings("ask")
+    running = plugin.running()
+    saved = bool(s.get("enabled"))
+    ready = running or saved or plugin.available()
+    if running:
+        why = "on - asks only when you tell her to, unless on her own is on"
+    elif saved:
+        why = "on, but not running - space switches it off"
+    else:
+        why = plugin.why_unavailable() if not ready else "off - space starts it"
+    alone = s.get("auto") is True
+    line = ask.ALONE_LINE + (ask.SEARCH_FIRST if ask._can_search() else "")
+    cost = int(len(line.format(label="Claude")) / 3.5)
+    try:
+        daily = int(s.get("auto_daily", 5))
+    except (TypeError, ValueError):
+        daily = 5
+    note = (f"stuck on a script or server problem, {daily} a day"
+            + ("" if running else " - only while the plugin is on"))
+    rows = [("ask plugin", running or saved, ready, why, 0, "plugin:ask"),
+            ("on her own", alone, True, note, cost, "pluginset:plugins.ask.auto")]
+    live = cost if alone and running else 0
+
+    out = list(groups)
+    for i, (glabel, members, glive, total) in enumerate(out):
+        if glabel == "Ask a bigger model":
+            out[i] = (glabel, rows + list(members), glive + live, total + cost)
+            break
+    else:
+        out.append(("Ask a bigger model", rows, live, cost))
+    return out
 
 
 def _with_plugin_switches(groups):
@@ -504,6 +553,12 @@ def _tool_toggle():
             _toggle_plugin(setting[len("plugin:"):], on)
         elif setting and setting.startswith("mcpserver:"):
             _toggle_server(setting[len("mcpserver:"):], on)
+        elif setting and setting.startswith("pluginset:"):
+            import config
+
+            path = setting[len("pluginset:"):]
+            config.save_any(path, not on)
+            add_message("system", f"{name}: {'off' if on else 'on'} (saved)")
         elif setting and setting.startswith("perm:"):
             import config
 
@@ -611,7 +666,7 @@ def _tool_group_toggle():
     else:
         return
 
-    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "plugin:", "mcpserver:"))]
+    rows = [m for m in members if m[2] and not (m[5] or "").startswith(("perm:", "plugin:", "mcpserver:", "pluginset:"))]
 
     if not rows:
         add_message("system", f"{label}: nothing here switches as a group")
