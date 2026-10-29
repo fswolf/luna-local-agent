@@ -17,11 +17,20 @@ Only the question leaves the machine: no prompt, memories, people files
 or conversation. Turns that call tools never become patch examples, so
 a bigger model's words never train her.
 
+On her own (off by default, /ask auto on): when she's stuck on a
+script or sysadmin problem she has already tried to solve with her tools
+(an error she can't fix, a service that won't start), she may ask the default
+provider herself. Only on your own turns, only after she's used a tool
+that turn, once per turn, at most auto_daily a day (inside daily_cap),
+never in the lewd row. Every time, it shows on your screen what she
+asked, and she tells you she did.
+
     /ask on | off               start or stop it (saved)
     /ask                        provider, model, keys found, used today
     /ask <question>             ask directly, answer shown here (she isn't involved)
     /ask with grok <question>   the same, another provider
     /ask use grok               the default provider (claude, grok, openai)
+    /ask auto on | off          let her ask on her own when she's stuck (saved)
 
 Keys, never in config.json (it's in the repo):
     ~/.config/ai-voice/ask.json   {"claude": "...", "grok": "...", "openai": "..."}
@@ -31,6 +40,8 @@ Settings, config.json plugins.ask:
     provider    "claude"
     models      {"claude": "claude-haiku-5-5", "grok": "grok-4.7", "openai": "gpt-5.4-mini"}
     daily_cap   30 questions a day, all providers together
+    auto        false: true lets her ask on her own when stuck (/ask auto on)
+    auto_daily  5 of those a day, at most
     max_tokens  600 (Claude only; the others are kept short by the instructions)
 """
 import json
@@ -72,6 +83,8 @@ _lock = threading.Lock()
 _running = False
 _asked = {}                 # {"provider", "at", "left"} from your last message
 _used = {"day": "", "count": 0}
+_alone = {"day": "", "count": 0}   # questions she asked on her own today
+AUTO = "auto"                      # _why_not(): she may ask on her own
 
 
 def settings():
@@ -79,15 +92,18 @@ def settings():
     return {"provider": str(s.get("provider") or "claude").lower(),
             "models": dict(s.get("models") or {}),
             "daily_cap": int(s.get("daily_cap", 30)),
-            "max_tokens": int(s.get("max_tokens", 600))}
+            "max_tokens": int(s.get("max_tokens", 600)),
+            "auto": s.get("auto") is True,
+            "auto_daily": int(s.get("auto_daily", 5))}
 
 
 def _key(provider):
     try:
         with open(CREDENTIALS_FILE, encoding="utf-8") as f:
-            key = str(json.load(f).get(provider) or "")
-    except FileNotFoundError:
-        key = ""
+            saved = json.load(f)
+        key = str(saved.get(provider) or "") if isinstance(saved, dict) else ""
+    except (OSError, ValueError):
+        key = ""                                # missing or mangled: fall back to the environment
     key = (key or os.environ.get(PROVIDERS[provider]["env"], "")).strip()
     return "" if key.lower().startswith(("your", "paste", "put")) else key
 
@@ -139,13 +155,23 @@ def _call(provider, question):
     return text
 
 
+def _today(counter):
+    """Today's count for _used or _alone (reset at midnight). Call with _lock held."""
+    day = time.strftime("%Y-%m-%d")
+    if counter["day"] != day:
+        counter.update(day=day, count=0)
+    return counter["count"]
+
+
+def _out_of_questions():
+    with _lock:
+        return _today(_used) >= settings()["daily_cap"]
+
+
 def _spend():
     """Count one question against today's cap. False when it's used up."""
-    day = time.strftime("%Y-%m-%d")
     with _lock:
-        if _used["day"] != day:
-            _used.update(day=day, count=0)
-        if _used["count"] >= settings()["daily_cap"]:
+        if _today(_used) >= settings()["daily_cap"]:
             return False
         _used["count"] += 1
         return True
@@ -184,33 +210,80 @@ def _lewd():
         return False
 
 
+def _alone_today():
+    with _lock:
+        return _today(_alone)
+
+
 def _why_not():
-    """'' when this turn may ask, else why not (said to her, so she can tell you)."""
+    """'' when you asked her to ask, AUTO when she may ask on her own, else why not
+    (said to her, so she can tell you)."""
     turn = turnctx.current()
     if not turn.private or turn.speaker or turn.remote or turn.job:
         return "Only the user's own conversation can ask a bigger model."
     if _lewd():
         return "Not now: questions to a bigger model never go out from this mood."
     with _lock:
-        if not _asked or time.time() - _asked["at"] > ASK_WINDOW or _asked["left"] <= 0:
-            return ("The user didn't ask you to ask anyone. Only use this when they say "
-                    "'ask Claude', 'ask Grok', 'ask ChatGPT' or 'ask your big brother'.")
-    return ""
+        if _asked and time.time() - _asked["at"] <= ASK_WINDOW and _asked["left"] > 0:
+            return ""
+    s = settings()
+    if not s.get("auto"):
+        return ("The user didn't ask you to ask anyone. Only use this when they say "
+                "'ask Claude', 'ask Grok', 'ask ChatGPT' or 'ask your big brother'.")
+    # on her own: stuck on something she's already been working on, once a turn
+    if getattr(turn, "asked_alone", 0):
+        return "You've already asked a bigger model on your own this turn. Work with what you have."
+    if not [x for x in turn.exchanges if x.get("name") != "ask_bigger_model"]:
+        return ("Only ask on your own when you're stuck on a script or sysadmin problem you've "
+                "already tried to solve with your tools this turn (an error you can't fix, a service "
+                "that won't start). Try it yourself first.")
+    if _alone_today() >= s.get("auto_daily", 5) or _out_of_questions():
+        return "That's all the questions you can ask on your own today. Tell the user you're stuck."
+    return AUTO
 
 
 def _run(question=""):
     why = _why_not()
+    if why == AUTO:
+        return _run_alone(question)
     if why:
         return why
     with _lock:
-        provider = _asked["provider"]
+        provider = _asked.get("provider")
+        if not provider:
+            return "The user didn't ask you to ask anyone."   # a new message came in meanwhile
         _asked["left"] -= 1
     ok, text = ask(provider, question)
     label = PROVIDERS[provider]["label"]
     if not ok:
-        return f"Couldn't ask {label}: {text}"
+        return f"Couldn't ask {label}: {text}. Tell the user you're stuck."
     return (f"{label} answered:\n{text}\n\n(Tell the user what {label} said, in your own words and "
             f"your own voice, and that you asked {label}.)")
+
+
+def _run_alone(question):
+    """She's stuck and asks on her own (/ask auto on). It shows on your screen first."""
+    provider = settings()["provider"]
+    if provider not in PROVIDERS or not _key(provider):
+        return "No bigger model to ask (no key for the default provider). Tell the user you're stuck."
+    label = PROVIDERS[provider]["label"]
+    turn = turnctx.current()
+    if turnctx.active():
+        turn.asked_alone = 1
+    with _lock:
+        _alone["count"] += 1
+    shown = " ".join(str(question or "").split())[:300]
+    logbook.info("ask", "asked %s on her own: %s", provider, shown)
+    try:
+        import ui
+        ui.add_message("system", f"{config.AGENT_NAME} asked {label} on her own: {shown}")
+    except Exception:
+        pass
+    ok, text = ask(provider, question)
+    if not ok:
+        return f"Couldn't ask {label}: {text}. Tell the user you're stuck."
+    return (f"{label} answered:\n{text}\n\n(You asked {label} on your own because you were stuck. "
+            f"Tell the user you did and what you learned, in your own words.)")
 
 
 def on_user_text(text):
@@ -230,10 +303,10 @@ def _register_tool():
 
     tools.register_external(
         "ask_bigger_model",
-        "Ask a bigger AI (Claude, Grok or ChatGPT) one question, ONLY when the user tells you to "
-        "('ask Claude...', 'ask your big brother...'). Write a short, self-contained question with no "
-        "personal details about the user. Then tell the user the answer in your own words.",
-        {"question": {"type": "string", "description": "The question, complete on its own."}},
+        "Ask a bigger AI one short question: when the user says to ('ask Claude', 'ask your big "
+        "brother'), or, if switched on, when stuck on a script or sysadmin problem you already tried "
+        "with your tools. No personal details. Tell the user the answer in your own words.",
+        {"question": {"type": "string", "description": "Complete on its own."}},
         required=("question",), run=_run, group="Ask a bigger model",
         available=running, why=lambda: "the ask plugin is off - /ask on", outside=True,
     )
@@ -279,12 +352,54 @@ def status():
     lines = [f"ask: {'on' if _running else 'off'}",
              f"  default   {s['provider']} ({_model(s['provider']) if s['provider'] in PROVIDERS else '?'})",
              f"  keys      {', '.join(keys) or 'none (docs/ask.md)'}",
-             f"  today     {used} of {s['daily_cap']} questions"]
+             f"  today     {used} of {s['daily_cap']} questions",
+             f"  alone     {'on' if s.get('auto') else 'off'} ({_alone_today()} of {s.get('auto_daily', 5)} today"
+             f"{'' if s.get('auto') else ', /ask auto on'})"]
     return "\n".join(lines)
+
+
+ALONE_LINE = ("If you're stuck on a script or sysadmin problem you've already tried to solve with your "
+              "tools (an error you can't fix, a service that won't start), you can ask {label} with "
+              "ask_bigger_model, once per turn. Say that you did.")
+SEARCH_FIRST = (" Search the web for facts, news and docs; ask {label} when you need it explained or "
+                "reasoned through, or searching didn't help.")
+
+
+def _can_search():
+    try:
+        import tools
+        return tools.enabled("web_search")
+    except Exception:
+        return False
+
+
+def prompt_line(private=True):
+    """With asking on her own switched on, one line so she knows she can, on your own
+    turns only; "" otherwise."""
+    try:
+        s = settings()
+        turn = turnctx.current()
+        if (not private or not _running or not s.get("auto") or turn.speaker or turn.remote or turn.job
+                or _lewd() or _alone_today() >= s.get("auto_daily", 5) or _out_of_questions()
+                or s["provider"] not in PROVIDERS
+                or not _key(s["provider"])):
+            return ""
+        line = ALONE_LINE + (SEARCH_FIRST if _can_search() else "")
+        return line.format(label=PROVIDERS[s["provider"]]["label"])
+    except Exception:
+        return ""
 
 
 def command(text):
     text = str(text or "").strip()
+    m = re.match(r"auto(?:\s+(on|off))?$", text, re.I)
+    if m:
+        if not m.group(1):
+            return status()
+        on = m.group(1).lower() == "on"
+        config.save_any(f"plugins.{NAME}.auto", on)
+        return ("ask: she may ask on her own when she's stuck (it shows here every time; "
+                f"{settings().get('auto_daily', 5)} a day at most)" if on else "ask: only when you tell her to")
     m = re.match(r"use\s+(\w+)$", text, re.I)
     if m:
         provider = _NAMES.get(m.group(1).lower(), m.group(1).lower())

@@ -445,6 +445,15 @@ SCHEMA = {
     "plugins.cron.enabled": ("bool", "Run scheduled jobs from agent/cron.json"),
     "plugins.cron.job_tools": ("list", "The only tools a scheduled job may use"),
 
+    # --- Plugins: asking a bigger model -------------------------------------
+    "plugins.ask.enabled": ("bool", "Let her ask a bigger model (Claude, Grok, ChatGPT) when you tell her to"),
+    "plugins.ask.provider": ("choice", "Who \"your big brother\" is", ("claude", "grok", "openai")),
+    "plugins.ask.models": ("dict", "Model per provider, like {\"claude\": \"claude-sonnet-5-5\"}"),
+    "plugins.ask.daily_cap": ("int", "Questions a day, all providers together"),
+    "plugins.ask.auto": ("bool", "Let her ask on her own when stuck on a script or sysadmin problem"),
+    "plugins.ask.auto_daily": ("int", "Questions a day she may ask on her own"),
+    "plugins.ask.max_tokens": ("int", "Longest answer from Claude, in tokens"),
+
     # --- Plugins: Home Assistant --------------------------------------------
     "plugins.home.enabled": ("bool", "Connect to Home Assistant at startup"),
     "plugins.home.url": ("text", "Home Assistant's address; must be on your own network"),

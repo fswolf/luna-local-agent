@@ -86,6 +86,7 @@ Slash commands:
 | `/minecraft ...` | `on`, `off`, `goal <what>`, `pause`, `resume`: see [Games](games.md#minecraft) |
 | `/zork ...` | `on`, `off`, `play`, `pause`: she plays Zork I, see [Games](games.md#zork) |
 | `/vibecity ...` | `on`, `off`, `play`, `pause`, `goal <what>`: she plays mayor in your open Vibe City window, see [Games](games.md#vibe-city) |
+| `/ask ...` | `on`, `off`, `use claude`, `auto on`/`off`, or a question: asking a bigger model, see [Asking a bigger model](ask.md) |
 | `/home ...` | `on`, `off`, `refresh`: your smart home through Home Assistant, see [Home automation](home.md) |
 | `/discord approval ...` | `auto`, `discord` or `desk`: who approves Discord's commands and file changes |
 | `/cron` | Scheduled jobs, and when each last ran |
