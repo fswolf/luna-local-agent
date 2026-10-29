@@ -1,5 +1,11 @@
 # Luna's documentation
 
+Luna is a persistent-state agent manager: one mind built from several
+local models working together ([what she runs on](parts.md)), with
+memory and moods that carry on between sessions, heavy tooling, research,
+and learning from her own turns. The companion, the assistant and the
+streamer are faces on that same agent, picked with presets.
+
 Everything the README only touches on, one subject per page.
 
 - [Install](install.md): the installer, the model picked for your GPU, LM Studio or llama.cpp, the voice server, first run

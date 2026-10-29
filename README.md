@@ -9,15 +9,30 @@
 [![Tests](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml)
 [![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/fswolf)
 
-**A local voice companion you can see inside: reasoning, confidence and
-memory, all on your own machine.**
+**A persistent-state agent manager, with heavy tooling, research and
+learning, built from several local models working as one. All on your
+own machine.**
 
-Luna listens, thinks, talks back and uses tools, and every turn leaves a
-record you can open. That record holds what she thought before she
+Luna isn't one model. A chat model does the thinking and talking, and
+smaller ones beside it see, hear, speak, recall by meaning and judge
+what's relevant ([what she runs on](docs/parts.md)). Around them sits
+state that carries on between sessions: facts she writes, corrects and
+forgets, notes on past conversations, lessons from her own mistakes,
+moods, routines, and who's in the house. On top of that sit her tools
+(files, commands, email, web research, your network and smart home,
+scheduled jobs, MCP servers), and she looks things up and learns from
+how her turns went.
+
+The persona is a layer, not the point. Her default face is a cat-girl
+with a voice, moods and an animated portrait, and presets set her up as
+a calm assistant, a companion or a streamer. Under every face it's the
+same agent.
+
+Every turn leaves a record you can open: what she thought before she
 answered, how sure she was of each word, which turns look off, and a
 live view of it all while it happens. It started as a voice front end
 for LM Studio (this repo used to be called *LM-Studio-AI-Voice*) and
-grew into a small research rig for watching a local model think.
+grew from there.
 
 ```bash
 git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
