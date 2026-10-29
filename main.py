@@ -5,7 +5,6 @@ import sys
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-import requests
 import threading
 
 import config
@@ -23,10 +22,8 @@ import plugins
 from voice import ptt
 from life import reminders
 from voice import speech
-from core import timeutil
 from core import transcript
 import ui
-from senses import vision
 from voice import wakeword
 
 
