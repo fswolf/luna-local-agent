@@ -39,7 +39,10 @@ def handle(text):
 
         if not name:
             ui.add_message("system", "\n".join(
-                ["Presets (/preset <name>):"] + [f"  {n}: {p['about']}" for n, p in PRESETS.items()]))
+                ["Presets (/preset <name>):"]
+                + [f"  {n}: {p['about']}" for n, p in PRESETS.items() if p.get("kind") != "size"]
+                + ["Model size (one of these as well):"]
+                + [f"  {n}: {p['about']}" for n, p in PRESETS.items() if p.get("kind") == "size"]))
             return True
 
         _ok, said, _entry = settings_web.preset(name)

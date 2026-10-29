@@ -25,6 +25,7 @@ import { createTouch } from './touch.js';
 import { createFan } from './fan.js';
 import { createProps } from './props.js';
 import { createLights } from './lights.js';
+import { turnAsked } from './turns.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 import { bindFaceLayers, blush, drool, tears, updateBlush, updateBrows, updateTears } from './face_layers.js';
 import { bindDebugPanel, debugPanel } from './debug_panel.js';
@@ -318,10 +319,13 @@ function handle(ev) {
       break;
     case 'turn':
       twitch(0, 0.6);
-      said.text = ''; said.done.clear(); said.tagged = false; waveBack = false;
+      said.text = ''; said.done.clear(); said.tagged = false; said.turned = false; waveBack = false;
       // only you (voice, typed, Discord): chat has its own rules, and a
       // game's step prompt is full of "huge trolls" and "hello sailor"
-      if (gmode.mode !== 'off' && /^(voice|typed|discord)?$/.test(ev.source || '')) fromYou(ev.text || '');
+      if (/^(voice|typed|discord)?$/.test(ev.source || '')) {
+        said.turned = turnFromYou(ev.text || '');      // you asked her to turn: even with gestures off
+        if (gmode.mode !== 'off') fromYou(ev.text || '');
+      }
       break;
     case 'tok':         // her reply as it streams: act out *hugs*, *waves*... (the fallback)
       if (ev.p === 'a' && ev.s && gmode.mode !== 'off') { said.text = (said.text + ev.s).slice(-400); actOut(said.text); }
@@ -331,6 +335,7 @@ function handle(ev) {
         if (gmode.mode === 'off') break;
         if (ev.src === 'meaning' && said.done.size) break;   // keywords already caught it
         if (ev.src === 'aside' && said.done.has(ev.name)) break;   // *waves*: the keyword fallback got there first
+        if (said.turned && GESTURES[ev.name]?.view != null) break;   // you turned her already: "*turns around*" in her reply mustn't turn her back
         said.done.add(ev.name);
         if (ev.src === 'tag') said.tagged = true;
       }
@@ -549,6 +554,22 @@ function fromYou(text) {
 }
 let waveBack = false;
 
+// You asked her to turn: "turn around", "show me your ass", "turn left",
+// "turn 90", "face me" (turns.js). True if it was a turn.
+function turnFromYou(text) {
+  const a = turnAsked(text);
+  if (!a) return false;
+  if (a.around) gesture('turn_around');                // round, or back to you if she's turned
+  else if (a.to != null) turnTo(a.to);
+  else {
+    const now = (view.target ?? orbit.yaw) * 180 / Math.PI;
+    let deg = (((now + a.by) % 360) + 540) % 360 - 180; // into -180..180
+    if (Math.abs(deg) < 1) deg = 0;                     // all the way round: facing you, no drift timer
+    turnTo(deg);
+  }
+  return true;
+}
+
 // Chat, answered or not. Viewers can ask with !wave, !hug, !jump,
 // !bounce, !dance, !jog (or !run), !shrug, !stretch, !turn (round and back),
 // !side, !front, !kiss, !bashful; plain chat works too: a hug
@@ -582,7 +603,7 @@ function fromChat(ev) {
 }
 
 // She acts out what she writes: *hugs*, *waves*, *jumps*, 🤗, 👋 ...
-const said = { text: '', done: new Set(), tagged: false };
+const said = { text: '', done: new Set(), tagged: false, turned: false };
 // How her replies set gestures off (gestures.py): tags, meaning, keywords, off.
 const gmode = { mode: cfg.gestures || 'keywords', chat: cfg.chat_gestures !== false };
 // Built from each gesture file's "keywords" (and clips.json's): a word
@@ -613,7 +634,7 @@ function actOut(text) {
   }
   if (best) {
     said.done.add(best[0]);
-    gesture(best[0]);
+    if (!(said.turned && GESTURES[best[0]]?.view != null)) gesture(best[0]);   // see 'gesture' above
     return;
   }
   // said hi back without acting it out: wave anyway

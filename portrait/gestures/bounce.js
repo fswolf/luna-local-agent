@@ -3,7 +3,7 @@ import { both } from './_pose.js';
 
 export default {
   keywords: ["bounc", "hops", "hopping", "wiggle"],   // in what she writes, *like this*
-  about: "happy, playful",   // offered to her as [bounce] in tags mode
+  about: "happy, cheerful, can't keep it in: bounces happily on the spot",   // offered to her as [bounce] in tags mode
   idle: ['warm', 'loving'],   // on her own, in these moods (studio: Details)
   dur: 1.3, fade: [0.15, 0.3],
   keys: [

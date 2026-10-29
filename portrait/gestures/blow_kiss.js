@@ -3,7 +3,7 @@ import { fingers, open } from './_pose.js';
 
 export default {
   keywords: ["blows a kiss", "blowing a kiss", "blows you a kiss", "😘"],   // in what she writes, *like this*
-  about: "blowing a kiss, affection",   // offered to her as [blow_kiss] in tags mode
+  about: "fond, affectionate, sending love, goodnight: fingers to her lips, then blows you a kiss",   // offered to her as [blow_kiss] in tags mode
   dur: 3.0, fade: [0.45, 0.6],
   keys: [
     [0.0, { rightUpperArm: [0, 1.2, 0.4], rightLowerArm: [0, 2.0, -0.55, -0.4], rightHand: [-0.4, 0, 0], ...fingers('right', 0.45),

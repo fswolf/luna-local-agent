@@ -3,7 +3,7 @@ import { both, open, REST } from './_pose.js';
 
 export default {
   keywords: ["jump", "leap"],   // in what she writes, *like this*
-  about: "big excitement",   // offered to her as [jump] in tags mode
+  about: "big excitement, great news, thrilled: jumps for joy",   // offered to her as [jump] in tags mode
   dur: 1.35, fade: [0.12, 0.3],
   keys: [
     [0.00, { ...REST }],

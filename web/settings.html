@@ -24,6 +24,8 @@ main{max-width:980px;margin:0 auto;padding:16px 20px 90px}
 .preset b{color:var(--accent);display:flex;justify-content:space-between;align-items:center}
 .preset b em{font-style:normal;font-weight:400;font-size:11px;color:#14081c;background:var(--ok);border-radius:999px;padding:1px 8px}
 .preset.on{border-color:var(--ok)}
+.ptitle{color:var(--accent);font-weight:600;margin:-10px 0 8px}
+.ptitle span{color:var(--dim);font-weight:400;font-size:13px;margin-left:6px}
 .preset p{margin:0;color:var(--dim);font-size:13px;flex:1}
 .preset button{align-self:flex-start;background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:4px 12px;cursor:pointer;font:inherit}
 .preset button:hover{background:var(--accent);color:#14081c}
@@ -99,7 +101,9 @@ section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;m
 <select class="jump" id="jump" title="Jump to a section" hidden></select>
 </div></header>
 <main>
-<div class="presets" id="presets"></div>
+<div id="presetbox"><div class="presets" id="presets"></div>
+<div class="ptitle">Model size <span>sets how much fits in each prompt; pick the one closest to your model and its context window</span></div>
+<div class="presets" id="sizes"></div></div>
 <div class="count" id="count"></div>
 <div id="list"></div>
 </main>
@@ -150,9 +154,12 @@ async function send(body) {
 }
 
 function presets() {
-  $("#presets").innerHTML = data.presets.map(p =>
+  const card = p =>
     `<div class="preset${p.active ? " on" : ""}"><b>${esc(p.label)}${p.active ? "<em>in use</em>" : ""}</b><p>${esc(p.about)}</p>
-     <button data-preset="${esc(p.name)}" title="${esc(Object.entries(p.values).map(([k, v]) => k + " = " + v).join("\n"))}">Use ${esc(p.label)} · ${p.count} settings</button></div>`).join("");
+     <button data-preset="${esc(p.name)}" title="${esc(Object.entries(p.values).map(([k, v]) => k + " = " + v).join("\n"))}">Use ${esc(p.label)} · ${p.count} settings</button></div>`;
+  // how she behaves, then model size: separate rows, one of each can be in use
+  $("#presets").innerHTML = data.presets.filter(p => p.kind !== "size").map(card).join("");
+  $("#sizes").innerHTML = data.presets.filter(p => p.kind === "size").map(card).join("");
 }
 
 function control(s) {
@@ -249,7 +256,7 @@ function render() {
   }
   $("#list").innerHTML = html || `<div class="empty">${query ? `Nothing matches "${esc(query)}".` : "Nothing set in config.json yet: everything is at its default."}</div>`;
   // presets are for browsing, not for a search or the list of your changes
-  $("#presets").hidden = !!query || view === "changed";
+  $("#presetbox").hidden = !!query || view === "changed";
   $("#count").textContent = query ? `${shown} setting${shown === 1 ? "" : "s"} match` : view === "changed" ? `${shown} set in config.json` : "";
   const jump = $("#jump");
   jump.hidden = view !== "all" || !!query;      // the long list is the one worth jumping around
@@ -330,12 +337,22 @@ $("#list").addEventListener("click", async e => {
     toast(out.ok ? `${r.dataset.reset}: ${out.message}` : out.message, !out.ok);
   }
 });
-$("#presets").addEventListener("click", async e => {
+$("#presetbox").addEventListener("click", async e => {   // both rows
   const b = e.target.closest("[data-preset]");
   if (!b) return;
   const p = data.presets.find(x => x.name === b.dataset.preset);
-  if (p && !confirm(`${p.label} changes ${p.count} settings:\n\n` +
-                    Object.entries(p.values).map(([k, v]) => `  ${k} = ${v}`).join("\n"))) return;
+  if (p) {
+    // what each setting is now, so you see what you'd lose
+    const now = {};
+    for (const g of data.groups) for (const s of g.settings) now[s.path] = s.value;
+    const lines = Object.entries(p.values).map(([k, v]) =>
+      JSON.stringify(now[k]) === JSON.stringify(v) ? `  ${k} = ${v} (already)` : `  ${k}: ${now[k]} → ${v}`);
+    const changes = lines.filter(l => !l.endsWith("(already)")).length;
+    if (!changes) { toast(`${p.label} is already in use`); return; }
+    const order = l => l.endsWith("(already)") ? 1 : 0;      // the changes first
+    if (!confirm(`${p.label} changes ${changes} of your settings:\n\n` +
+                 lines.sort((a, b) => order(a) - order(b)).join("\n"))) return;
+  }
   const out = await send({action: "preset", name: b.dataset.preset});
   toast(out.message, !out.ok);
   load();

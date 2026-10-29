@@ -13,7 +13,7 @@ const UP = { '+rightShoulder': [0, 0, -0.16], '+leftShoulder': [0, 0, 0.16], '+u
 const DOWN = { '+rightShoulder': [0, 0, 0.02], '+leftShoulder': [0, 0, -0.02], '+upperChest': [0.03, 0, 0] };
 
 export default {
-  about: "annoyed huff, arms crossed, looking away",
+  about: "annoyed, grumpy, offended: arms crossed tight, chin up, looks away with a huff",
   private: false,
   touch: ['head', 'tummy', 'arms'], moods: ['grudge'],
   dur: 3.0, fade: [0.25, 0.7],

@@ -56,7 +56,7 @@ export default {
     "touches her breast", "hand on her pussy", "fingers herself",
     "plays with herself", "touches down there", "cups her breast",
   ],
-  about: "lewd, one hand cupping her breast, one hand between her legs, blushing, panting",
+  about: "lewd, heated: one hand on her breast, one between her legs, blushing and panting",
   private: true,
   lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
   sound: 'moan-touch-self',   // portrait/sounds/moan-touch-self.mp3, a 10 s clip made for it

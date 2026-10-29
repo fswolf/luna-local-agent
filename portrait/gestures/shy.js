@@ -3,7 +3,7 @@ import { both, fingers } from './_pose.js';
 
 export default {
   keywords: ["bashful", "shyly", "looks away", "fidget"],   // in what she writes, *like this*
-  about: "bashful, flustered by a compliment",   // offered to her as [shy] in tags mode
+  about: "shy, flustered by a compliment, sweet on you: hands together at her chest, looks away shyly, then peeks back at you",   // offered to her as [shy] in tags mode
   private: true,      // never from stream chat
   dur: 4.2, fade: [0.6, 0.8],
   keys: [

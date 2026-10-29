@@ -77,7 +77,7 @@ Slash commands:
 | `/scroll` | Why the wheel isn't scrolling: pane sizes and what the terminal sent |
 | `/set` | List every setting, or change one: saved to `config.json`. The settings pane (Tab three times) shows the everyday ones |
 | `/settings` | Every setting in your browser: switches, sliders, search and presets |
-| `/preset` | `assistant`, `companion` or `streamer`: several settings at once |
+| `/preset` | `assistant`, `companion` or `streamer`, and `small`, `medium` or `large` for the model: several settings at once |
 | `/tools` | Which tools the model can call, what each costs: Tab twice to change, and to set read/write/execute permissions |
 | `/tooltest` | Whether this model *actually* calls them |
 | `/repair` | Record past reminders as the tool calls they really were |

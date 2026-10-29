@@ -9,7 +9,7 @@ const HANDS = {
 };
 
 export default {
-  about: "happy surprise, delighted by something unexpected",
+  about: "happily surprised, delighted by something unexpected: a little gasp, hands flying to her chest",
   keywords: ["gasp", "😮", "😲"],
   dur: 3.2, fade: [0.15, 0.7],
   keys: [

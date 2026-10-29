@@ -9,7 +9,7 @@ const POSE = {
 };
 
 export default {
-  about: "pleased, coy, showing off a little",
+  about: "pleased, coy, showing off a little: shifts her weight onto one hip, head tilted",
   full: true,                     // her legs: only offered in full-body framing
   touch: ['legs'],
   moods: ['warm', 'loving'],

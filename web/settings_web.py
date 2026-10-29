@@ -110,7 +110,7 @@ def listing():
 
         groups[where[group]]["settings"].append(entry(path))
 
-    presets = [{"name": n, "label": p["label"], "about": p["about"], "count": len(p["values"]),
+    presets = [{"name": n, "kind": p.get("kind", "use"), "label": p["label"], "about": p["about"], "count": len(p["values"]),
                 "values": p["values"],
                 "active": all(pane._value(path)[0] == v for path, v in p["values"].items())}
                for n, p in PRESETS.items()]

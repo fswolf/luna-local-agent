@@ -11,7 +11,7 @@ const POP = { hips: [-0.025, 0, 0], '+spine': [0, 0, 0.06], '+chest': [0, 0, -0.
 
 export default {
   keywords: ["beckon", "come hither", "come-hither", "crooks a finger", "curls a finger"],   // in what she writes, *like this*
-  about: "sultry come-hither, teasing, inviting",
+  about: "sultry, inviting, come here: curls her fingers to beckon you, other hand on her hip, a sly smile",
   private: true,
   dur: 3.4,
   fade: [0.45, 0.6],

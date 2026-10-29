@@ -2,7 +2,7 @@
 // towards the winking eye (her right), the way people do it
 export default {
   keywords: ["wink", "😉"],   // in what she writes, *like this*
-  about: "playful, teasing, a little flirty",
+  about: "playful, teasing, a little flirty, in on the joke: winks at you with a smile",
   dur: 1.6, fade: [0.25, 0.4],
   keys: [
     [0.0, { '+head': [0.02, 0, 0] }],

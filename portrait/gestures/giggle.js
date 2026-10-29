@@ -13,7 +13,7 @@ const HITCH = (t, d) => [t, { '+rightShoulder': [0, 0, -0.05 * d], '+leftShoulde
 
 export default {
   keywords: ["giggle", "giggles", "hehe", "tee hee", "teehee", "titters"],
-  about: "giggling, amused, tickled, a little embarrassed",
+  about: "amused, tickled, a little embarrassed: covers her mouth and giggles, shoulders bobbing",
   touch: ['tummy'], moods: ['warm', 'loving', 'lewd'],
   dur: 2.4, fade: [0.3, 0.55],
   keys: [

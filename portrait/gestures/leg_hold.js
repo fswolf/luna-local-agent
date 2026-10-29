@@ -17,7 +17,7 @@ const DOWN = { rightUpperLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], rightUpperArm
 
 export default {
   keywords: ["holds her leg up", "leg up against her shoulder", "flexible tease", "standing split"],
-  about: "smug, teasing: leg held straight up against her shoulder, arm hooked round it",
+  about: "lewd, smug, teasing: holds one leg straight up against her shoulder, arm hooked round it",
   private: true,      // never from stream chat
   lewd: true,         // held back on a stream where lewd is off (twitch/youtube "lewd": false)
   full: true,         // her legs: full-body framing only

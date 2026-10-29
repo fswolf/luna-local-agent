@@ -57,7 +57,7 @@ ai-voice/
 │   ├── voice.py, desk.py, listening.py, abilities.py, moods.py,
 │   ├── permissions.py, chat.py, mind.py, portrait.py, actions.py
 │   ├── schema.py     #   what every setting is: its kind, choices and the line explaining it; BASIC
-│   └── presets.py    #   Assistant, Companion, Streamer: several settings at once
+│   └── presets.py    #   Assistant, Companion, Streamer; Small, Medium, Large model
 ├── diagnose.py
 ├── kokoro-say.py
 ├── llm/              # the conversation engine, one job per file:

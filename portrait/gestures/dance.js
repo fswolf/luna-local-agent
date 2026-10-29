@@ -31,7 +31,7 @@ for (let i = 0; i < 16; i++) {
 keys.push([16 * BEAT, { ...FISTS, ...KNEES(0), hips: [0, 0, 0], '+spine': [0, 0, 0], '+head': [0, 0, 0] }]);
 
 export default {
-  about: "celebrating, music, feeling great, being playful",
+  about: "celebrating, feeling great, music, playful: a cute dance to the beat",
   keywords: ["danc", "💃", "🕺"],
   dur: 16 * BEAT, fade: [0.5, 0.7],
   keys,
