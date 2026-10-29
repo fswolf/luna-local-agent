@@ -13,6 +13,7 @@ from life import gestures
 from core import logbook
 from mind import mood
 from mind.mood import heavy
+from life import away
 from life import offers
 from mind import longterm
 from senses import people
@@ -289,7 +290,7 @@ time_until instead.
 
 Personality:
 {PERSONALITY}
-{mood.line(private)}{heavy.line(private)}{offers.line(private)}
+{mood.line(private)}{heavy.line(private)}{offers.line(private)}{away.line(private)}
 Tone:
 {TONE}
 

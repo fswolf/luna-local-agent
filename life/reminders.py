@@ -580,6 +580,15 @@ def _seconds_until_next():
     return max(0.5, min(remaining, REMINDER_CHECK_INTERVAL_SECONDS))
 
 
+def _note_away(kind, text):
+    """For the hello when you come back (life/away.py). Never the reason delivery fails."""
+    try:
+        from life import away
+        away.note(kind, text)
+    except Exception:
+        pass
+
+
 def _deliver(model, texts, missed=False):
     """Hand the reminder(s) to Luna so she raises them in her own voice."""
     from core import interrupts
@@ -610,6 +619,7 @@ def _deliver(model, texts, missed=False):
         ui.set_status("Reminder due...")
         answer = llm.ask(trigger, model, source="reminder")
         ui.add_message(AGENT_NAME.lower(), answer)
+        _note_away("reminder", f"a reminder went off: {body}")
 
         if not stop.speaking.is_set():
             ui.set_status("Speaking...")
@@ -658,6 +668,8 @@ def _deliver_alarm(model, item, stale=False):
         return
 
     minutes = alarm.ring(model, item)
+    _note_away("alarm", f'the alarm "{item.get("text", "wake up")}" rang'
+               + (f", snoozed {minutes} minutes" if minutes else ""))
 
     if minutes:
         due = datetime.now() + timedelta(minutes=minutes)

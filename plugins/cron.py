@@ -187,6 +187,15 @@ def _tools():
 # ---------------------------------------------------------------------------
 # Running them
 # ---------------------------------------------------------------------------
+def _away(text):
+    """For the hello when you come back (life/away.py). Never the reason a job fails."""
+    try:
+        from life import away
+        away.note("job", text)
+    except Exception:
+        pass
+
+
 def _fire(job):
     from core import assistant
 
@@ -200,9 +209,14 @@ def _fire(job):
                                           speak=job["speak"])
         outcome = " ".join((answer or "(no reply)").split())[:120]
         logbook.info(NAME, "%s done: %s", job["name"], outcome)
+        lines = [ln.strip() for ln in str(answer or "").splitlines() if ln.strip()]
+        if lines:
+            # her report ends the reply ("End with a short report"): its last line
+            _away(f'the scheduled job "{job["name"]}" ran: {lines[-1][:200]}')
     except Exception as e:
         outcome = f"failed: {e}"
         logbook.exception(NAME, "job %s failed", job["name"])
+        _away(f'the scheduled job "{job["name"]}" failed: {e}')
     finally:
         job["_busy"] = False
 

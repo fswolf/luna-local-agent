@@ -25,9 +25,9 @@ round, like a birthday.
 
 ## When she brings it up
 
-- One thing per turn, on your own turns only: typed, spoken, or from a
-  relay station. Never in her greeting, to a guest, in stream chat,
-  Discord, a job or a game.
+- One thing per turn, on your own turns only: typed, spoken, from a
+  relay station, or her hello when you come back. Never to a guest
+  (not even in a hello), in stream chat, Discord, a job or a game.
 - Never in the lewd row, during a [heavy moment](moods.md#heavy-moments),
   or while she's walked away.
 - Only if it fits. If you're in the middle of something, she leaves it.

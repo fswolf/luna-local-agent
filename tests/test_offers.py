@@ -52,8 +52,12 @@ class Offers(unittest.TestCase):
         self.assertIn("home disk is nearly full", line)
         self.assertIn("Do it only if they say yes", line)
 
+    def test_her_hello_to_you_can_carry_one(self):
+        self.assertIn("home disk is nearly full", self.turn(source="greeting"))
+
     def test_not_for_anyone_else(self):
-        for kw in ({"source": "greeting"}, {"source": "reminder"}, {"speaker": "mike"}, {"private": False},
+        for kw in ({"source": "reminder"}, {"source": "greeting", "speaker": "mike"}, {"speaker": "mike"},
+                   {"private": False},
                    {"source": "job:x", "job": "x"}, {"remote": "discord"}):
             self.assertEqual(self.turn(**kw), "", kw)
         self.assertEqual(self.book, {})                     # nothing was marked asked
