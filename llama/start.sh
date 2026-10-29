@@ -144,6 +144,7 @@ cache_ram=()
 # side_server LABEL SWITCH MODEL MATCH PORT LOG FALLBACK -- server args...
 # MODEL may be empty (found by MATCH). FALLBACK is what Luna does
 # without it, for the "off" line.
+# SIDE_NGL, set just for the call, puts it on the CPU (0) instead of the GPU.
 side_server() {
     local label="$1" switch="${2:-auto}" model="$3" match="$4" port="$5" log="$6" fallback="$7" why=""
     shift 8
@@ -171,7 +172,7 @@ side_server() {
     fi
 
     "$BIN" -m "$model" --alias "$(basename "$model" .gguf)" \
-        --host "$HOST" --port "$port" -ngl "$NGL" -t "$THREADS" \
+        --host "$HOST" --port "$port" -ngl "${SIDE_NGL:-$NGL}" -t "$THREADS" \
         --api-key-file .api_key --cors-origins localhost \
         ${cache_ram[@]:+"${cache_ram[@]}" 0} \
         "$@" > "$log" 2>&1 &
@@ -183,13 +184,13 @@ side_server() {
 # batch is the context.
 eargs=(--embeddings -c "$EMBED_CTX" -b "$EMBED_CTX" -ub "$EMBED_CTX")
 [ -n "$EMBED_POOLING" ] && eargs+=(--pooling "$EMBED_POOLING")
-side_server embeddings "${EMBED:-auto}" "$EMBED_MODEL" "$EMBED_MATCH" "$EMBED_PORT" embed.log \
+SIDE_NGL="${EMBED_NGL:-$NGL}" side_server embeddings "${EMBED:-auto}" "$EMBED_MODEL" "$EMBED_MATCH" "$EMBED_PORT" embed.log \
     "fact recall falls back to matching words; EMBED=off in server.env hides this" -- "${eargs[@]}"
 
 # The reranker scores what you said and one fact together, so each pair
 # has to fit a batch. RERANK=off hides the line when it isn't wanted.
 RERANK_CTX="${RERANK_CTX:-2048}"
-side_server reranker "${RERANK:-auto}" "${RERANK_MODEL:-}" "${RERANK_MATCH:-*qwen3-reranker*}" \
+SIDE_NGL="${RERANK_NGL:-$NGL}" side_server reranker "${RERANK:-auto}" "${RERANK_MODEL:-}" "${RERANK_MATCH:-*qwen3-reranker*}" \
     "${RERANK_PORT:-8082}" rerank.log \
     "recall uses the embedding order as it is; RERANK=off in server.env hides this" -- \
     --reranking --pooling rank -c "$RERANK_CTX" -b "$RERANK_CTX" -ub "$RERANK_CTX"
