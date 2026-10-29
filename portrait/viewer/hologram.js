@@ -35,6 +35,18 @@ uniform float uScreenH;
 
 float rand(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
+// how much of an edge there is towards one side; a slit (her body again just across
+// a narrow gap) is dimmed, the same as hologram3d.js
+float edge(vec2 uv, float here, vec2 dir, vec2 one, float d, float far) {
+  vec2 q = uv + dir * d;
+  float near = texture2D(uSampler, q).a;
+  // is that empty spot a gap with her on both sides (left and right, or above and below)?
+  vec2 sx = vec2(one.x * far, 0.0), sy = vec2(0.0, one.y * far);
+  float across = max(min(texture2D(uSampler, q + sx).a, texture2D(uSampler, q - sx).a),
+                     min(texture2D(uSampler, q + sy).a, texture2D(uSampler, q - sy).a));
+  return (here - near) * (1.0 - 0.9 * across);
+}
+
 void main() {
   vec2 uv = vTextureCoord;
   vec2 px = uv * inputSize.xy + outputFrame.xy;      // screen pixels
@@ -51,16 +63,14 @@ void main() {
   float b = texture2D(uSampler, uv - vec2(one.x * (1.5 + 3.0 * tear), 0.0)).b;
 
   // rim: where the opacity falls away around her
-  float aMin = min(min(texture2D(uSampler, uv + vec2(one.x * 3.0, 0.0)).a,
-                       texture2D(uSampler, uv - vec2(one.x * 3.0, 0.0)).a),
-                   min(texture2D(uSampler, uv + vec2(0.0, one.y * 3.0)).a,
-                       texture2D(uSampler, uv - vec2(0.0, one.y * 3.0)).a));
-  float rim = clamp((c.a - aMin) * 1.6, 0.0, 1.0);
+  float rim = max(max(edge(uv, c.a, vec2(one.x, 0.0), one, 3.0, 9.0), edge(uv, c.a, vec2(-one.x, 0.0), one, 3.0, 9.0)),
+                  max(edge(uv, c.a, vec2(0.0, one.y), one, 3.0, 9.0), edge(uv, c.a, vec2(0.0, -one.y), one, 3.0, 9.0)));
+  rim = clamp(rim * 1.6, 0.0, 1.0);
 
   vec3 col = vec3(r, c.g, b) / max(c.a, 0.0001);      // PIXI hands us premultiplied colour
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   vec3 holo = mix(col, uTint * (0.35 + 1.25 * lum), uMix);
-  holo += uTint * rim * 1.4;
+  holo = mix(holo, mix(uTint, vec3(1.0), 0.45) * 1.25, clamp(rim * 0.85, 0.0, 1.0));   // one rim colour
 
   float scan = 0.92 + 0.08 * sin(px.y * 1.7 - uTime * 3.0);
   float sweep = exp(-pow((fract(px.y / uScreenH * 0.6 + uTime * 0.12) - 0.5) * 9.0, 2.0)) * 0.18;
