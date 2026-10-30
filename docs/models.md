@@ -49,7 +49,8 @@ Apple Silicon counts about two thirds of its shared memory. For another
 model, a rough rule: the GGUF file's size, plus 2 to 4 GB for 16k of
 context, plus the vision file if it has one.
 The embedding model and reranker want about 1.5 GB more beside it;
-[What she runs on](parts.md) says how to move them to the CPU.
+[What she runs on](parts.md) says how to move them to the CPU, and
+[how she scales](parts.md#how-she-scales) with a bigger model or a server.
 
 ## Quantization
 

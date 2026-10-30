@@ -10,7 +10,7 @@ Everything the README only touches on, one subject per page.
 
 - [Install](install.md): the installer, the model picked for your GPU, LM Studio or llama.cpp, the voice server, first run
 - [Models](models.md): which models work, what's been tested, graphics memory, quants, context, using your own
-- [What she runs on](parts.md): the six pieces (chat model, vision, embedding, reranker, hearing, voice), what each costs, and how to leave one out or move it
+- [What she runs on](parts.md): the six pieces (chat model, vision, embedding, reranker, hearing, voice), what each costs, how to leave one out or move it, and how she scales from a 9B on your desktop to a 70B on a server
 - [Configuration](configuration.md): the settings page and presets, config.json, changing settings live, logging
 - [Controls and voice](controls.md): keys, voice modes, speech detection, barge-in, wake word
 - [Tool calling](tools.md): every tool, her own manual, turning them off, MCP servers
