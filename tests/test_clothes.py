@@ -214,7 +214,29 @@ class UndressGestures(unittest.TestCase):
             self.assertIn(name, found)
             self.assertFalse(found[name]["about"], name)          # never offered as a move of its own
             with open(os.path.join(HERE, "portrait", "gestures", name + ".js"), encoding="utf-8") as f:
-                self.assertRegex(f.read(), r"clothes: \[\{ at: [\d.]+, off: \[[^\]]*'%s'" % piece)
+                # hand-written (off: ['top']) or saved by the studio ("off": ["top"])
+                # (the studio saves one entry per piece: {"at": 2.05, "off": ["top"]}, ...)
+                self.assertRegex(f.read(), r"clothes: \[.*\"?off\"?: ?\[[^\]]*['\"]%s['\"]" % piece)
+
+
+@unittest.skipUnless(shutil.which("node"), "node isn't installed")
+class FaceChannels(unittest.TestCase):
+    """A face track that starts later than 0 (blush from 2.4 s, in the undress
+    gestures) gave NaN before its first point, and the face mesh vanished."""
+
+    def test_no_nan_before_the_first_point(self):
+        with open(os.path.join(HERE, "portrait", "viewer", "gestures.js"), encoding="utf-8") as f:
+            src = f.read()
+        ease = src[src.index("const ease ="):].split("\n", 1)[0]
+        fn = src[src.index("export function sampleScalar"):]
+        fn = fn[:fn.index("\n}\n") + 3].replace("export ", "")
+        script = ease + "\n" + fn + """
+const tr = [[2.4, 0], [3.0, 0.5], [4.4, 0.4]];
+console.log(JSON.stringify([0, 1, 2.4, 2.7, 3.0, 9].map(t => sampleScalar(tr, t))));"""
+        out = json.loads(subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True, timeout=30).stdout)
+        self.assertEqual(out[:3], [0, 0, 0])
+        self.assertTrue(0 < out[3] < 0.5)
+        self.assertEqual(out[4:], [0.5, 0.4])
 
 
 CASES_YOU = {

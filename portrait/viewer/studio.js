@@ -320,8 +320,11 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     el('div', { className: 'row' }, el('label', {}, propHold, ' hold her last pose while she carries it')));
   // -- clothes page: her clothes piece by piece (outfits.js), to see them come off ----
   const clothesList = el('div');
+  let clothesHeard = null;
   function fillClothes() {
     const o = O();
+    // kept up to date while it's open: a gesture taking a piece off ticks its box
+    if (o && clothesHeard !== o && o.onChange) { clothesHeard = o; o.onChange(() => { if (tabNow === 'clothes') fillClothes(); }); }
     clothesList.replaceChildren();
     if (!o || !o.has) {
       clothesList.append(el('div', { className: 'dim', textContent: 'this model\'s clothes aren\'t separate pieces, so they can\'t come off one at a time (a VRoid export keeps them separate)' }));
@@ -336,7 +339,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   }
   pages.clothes.append(
     el('h4', { textContent: 'her clothes' }),
-    el('div', { className: 'dim', textContent: 'each piece on or off, to see how it looks (not saved with a gesture yet)' }),
+    el('div', { className: 'dim', textContent: 'each piece on or off, to see how it looks. ▶ play puts back what the gesture takes off first, so it can be played again' }),
     el('div', { className: 'row' },
        btn('dressed', () => { O()?.wear('dressed'); fillClothes(); }, 'everything on'),
        btn('underwear', () => { O()?.wear('underwear'); fillClothes(); }, 'every piece off')),
@@ -993,6 +996,9 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     if (!A.keys.length) return say('make a key first');
     st.live?.stop(); st.live = null; st.on = false; onOff.textContent = 'start posing'; posingDot.textContent = '';
     GESTURES.__studio = build(false);
+    // a gesture that takes clothes off starts with them on, every time it's played
+    const o = O();
+    if (o?.has) for (const c of A.clothes) if (c.way === 'off') o.set(c.piece, true);
     gesture('__studio');
     st.playing = true; playBtn.textContent = '■ stop';
     clearInterval(st.timer);

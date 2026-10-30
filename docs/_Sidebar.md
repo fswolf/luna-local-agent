@@ -23,6 +23,7 @@
 - [The companion](companion.md)
 - [Moods](moods.md)
 - [Portrait](portrait.md)
+- [Cards](cards.md)
 - [Hologram fans](fans.md)
 - [Gestures](gestures.md)
 - [Textures](textures.md)

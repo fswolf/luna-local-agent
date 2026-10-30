@@ -67,12 +67,13 @@
   .now.dirty { box-shadow: inset 3px 0 0 #ffd36b; }
   .tabs { display: flex; gap: 2px; margin: 8px -10px 0; padding: 0 10px; border-bottom: 1px solid #4a3a70;
           position: sticky; top: 30px; background: #120d1cf2; z-index: 1; }
-  .panel .tabs button { flex: 1; margin: 0; padding: 6px 4px; border: 1px solid transparent; border-bottom: none;
+  #debug .tabs button, .panel .tabs button { flex: 1; margin: 0; padding: 6px 4px; border: 1px solid transparent; border-bottom: none;
                         border-radius: 6px 6px 0 0; background: transparent; color: var(--dim); }
-  .panel .tabs button:hover { color: var(--text); border-color: transparent; background: #1a1328; }
-  .panel .tabs button.on { background: #2a2040; color: var(--accent); border-color: #4a3a70; font-weight: 600;
+  #debug .tabs button:hover, .panel .tabs button:hover { color: var(--text); border-color: transparent; background: #1a1328; }
+  #debug .tabs button.on, .panel .tabs button.on { background: #2a2040; color: var(--accent); border-color: #4a3a70; font-weight: 600;
                            position: relative; top: 1px; }
   .page { padding-top: 6px; }
+  #debug .tabs { position: static; }   /* its title bar changes height (her state), so the tabs scroll with the page */
   /* something waiting to be saved: filled orange-red and pulsing, hard to miss */
   .panel button.unsaved { background: #e8553a; border-color: #ff8a5c; color: #fff; font-weight: 600;
                           animation: unsaved 1.6s ease-in-out infinite; }
@@ -91,13 +92,28 @@
   canvas.timeline { display: block; width: 100%; height: 58px; cursor: pointer; border-radius: 6px; margin: 6px 0 2px; }
   .panel optgroup { color: var(--accent); }
   .panel optgroup option { color: var(--text); }
+  .cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px;
+              margin: 6px 0; padding: 6px; min-height: 60px; border: 1px dashed #4a3a70; border-radius: 6px; }
+  .cardgrid.drop { border-color: var(--accent); background: #2a2040; }
+  .cardgrid .card { position: relative; display: flex; flex-direction: column; }
+  #debug .cardgrid button.put { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 0; padding: 3px;
+                                background: #1c1530; border-radius: 6px; }
+  .cardgrid button.put img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 4px; background: #0b0711; }
+  .cardgrid button.put span { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .cardgrid .cact { position: absolute; top: 5px; right: 5px; display: none; gap: 2px; }
+  .cardgrid .card:hover .cact, .cardgrid .card:focus-within .cact { display: flex; }
+  .cardgrid .cact a, #debug .cardgrid .cact button { margin: 0; padding: 0 5px; line-height: 18px; font-size: 11px; border-radius: 4px;
+                    background: #120d1ccc; border: 1px solid #4a3a70; color: var(--text); text-decoration: none; cursor: pointer; }
+  #debug .chips label { white-space: nowrap; }
 </style>
 </head>
 <body>
 <div id="note">loading…</div>
 <div id="debug" class="panel">
-  <div id="dbar" class="pbar"><b>portrait debug</b> - <span id="dstate"></span>
+  <div id="dbar" class="pbar"><b>control panel</b> - <span id="dstate"></span>
     <span class="hint">h hides</span></div>
+  <div class="tabs" id="dtabs"><button class="on" data-tab="dher">Model</button><button data-tab="dcards">Cards</button></div>
+  <div class="page" id="dher">
   <h4>model</h4><select id="dmodel"></select>
   <h4>view</h4><div id="dview"></div>
   <div class="dim">left-drag turns her · wheel zooms · double-click resets</div>
@@ -108,6 +124,8 @@
   <details data-key="ears"><summary>ears</summary><pre id="dears"></pre></details>
   <details data-key="expr"><summary>expressions</summary><pre id="dexpr"></pre></details>
   <details data-key="bones"><summary>bones that might be ears or hair</summary><pre id="dbones"></pre></details>
+  </div>
+  <div class="page" id="dcards" hidden></div>
 </div>
 <script type="module" src="./boot.js"></script>
 </body>

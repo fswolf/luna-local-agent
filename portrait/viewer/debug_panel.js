@@ -1,4 +1,4 @@
-// Luna's portrait: the debug panel (?debug=1) and its light tour.
+// Luna's portrait: the control panel (?debug=1), its light tour and its Cards tab (cards.js).
 // Test buttons for her states, gestures, moods, face layers and lights, the
 // model and view switches, and the bone list.
 //
@@ -7,6 +7,7 @@
 import { FAILED as GESTURE_FAILED, NAMES as GESTURE_NAMES, GESTURES } from './gestures.js';
 import { blush, tears } from './face_layers.js';
 import { THREE } from './vendor/luna-three.js';
+import { cardsPage } from './cards.js';
 
 // What this borrows from portrait.js, read live (see bindDebugPanel there).
 let ctx = null;
@@ -120,7 +121,12 @@ export function debugPanel() {
   for (const n of GESTURE_NAMES) {
     if (n.endsWith('_left')) continue;
     const label = n.replace(/_/g, ' '), g = GESTURES[n] || {};
-    buttons[label] = () => ctx.gesture(n);
+    // one that takes clothes off (tie_off...) puts them back first, so it can be tried again and again
+    buttons[label] = () => {
+      if (g.clothes && ctx.outfits?.has && !ctx.moves?.playing().includes(n))
+        for (const e of [].concat(g.clothes)) for (const p of [].concat(e.off || [])) ctx.outfits.set(p, true);
+      ctx.gesture(n);
+    };
     tips[label] = [`${n}.js` + (g.lewd ? ' 🔥' : '') + (g.private ? ' 🔒' : '') + (g.full ? ' 🧍' : '') + (g.chain ? ` ⛓ ${g.chain.join(' → ')}` : ''),
                    g.about, g.touch && `touch: ${g.touch.join(', ')}`, g.moods && `moods: ${g.moods.join(', ')}`].filter(Boolean).join('\n');
   }
@@ -199,10 +205,14 @@ export function debugPanel() {
       const edit = document.createElement('button');
       edit.textContent = '✎ edit'; edit.title = 'open it in the pose studio';
       edit.onclick = () => { const n = sel.value.replace(/ /g, '_'); if (n) ctx.studio?.open(n); else ctx.studio?.show(); };
+      // her clothes back on (after an undress gesture); only on a model whose clothes come off
+      const dress = document.createElement('button');
+      dress.textContent = '👕 dress her'; dress.title = 'every piece of clothing back on (the Clothes tab in the pose studio does one at a time)';
+      dress.onclick = () => ctx.outfits?.wear('dressed');
       const key = document.createElement('div');
       key.className = 'dim';
-      key.textContent = 'pick to play · ✎ edit opens it in the pose studio · 🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
-      box.append(sel, again, edit, key);
+      key.textContent = 'pick to play · ✎ edit opens it in the pose studio · 👕 puts her clothes back on · 🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
+      box.append(sel, again, edit, dress, key);
       continue;
     }
     for (const label of list) {
@@ -252,6 +262,21 @@ export function debugPanel() {
   const names = [];
   ctx.vrm.scene.traverse(o => { if (o.isBone || /ear|hair|j_sec/i.test(o.name)) names.push(o.name); });
   document.getElementById('dbones').textContent = names.filter(n => /ear|hair|sec/i.test(n)).join('\n') || '(none)';
+  // two tabs: Model (everything above) and Cards, made the first time it's opened
+  let cards = null;
+  const tabs = [...document.querySelectorAll('#dtabs button')];
+  const showTab = id => {
+    for (const b of tabs) { b.classList.toggle('on', b.dataset.tab === id); document.getElementById(b.dataset.tab).hidden = b.dataset.tab !== id; }
+    if (id === 'dcards') {
+      cards ??= cardsPage({ page: document.getElementById('dcards'), canvas: ctx.renderer.domElement, GESTURES });
+      cards.show();
+    }
+    try { localStorage.setItem('luna.controlTab', id); } catch (_) { /* not kept */ }
+  };
+  for (const b of tabs) b.onclick = () => showTab(b.dataset.tab);
+  let was = null;
+  try { was = localStorage.getItem('luna.controlTab'); } catch (_) { /* none */ }
+  if (was && tabs.some(b => b.dataset.tab === was)) showTab(was);
   setInterval(() => { document.getElementById('dstate').textContent =
     `${ctx.mind.stage} · energy ${ctx.mind.energy.toFixed(2)} warmth ${ctx.mind.warmth.toFixed(2)}`; }, 300);
 }

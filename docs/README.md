@@ -32,6 +32,7 @@ Everything the README only touches on, one subject per page.
 - [The companion](companion.md): the whole companion side in one place - persona, every mood and the exact numbers, the lewd and grudge rows, touches, gestures, sounds, settings, recipes
 - [Moods](moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
+- [Cards](cards.md): her look as a picture, to switch looks or share one
 - [Hologram fans](fans.md): Luna live on an HDMI or Holoscope WiFi fan
 - [Textures](textures.md): new clothes, irises and skin for her 3D model from UV templates, through ComfyUI
 - [Gestures](gestures.md): how her body moves, and writing your own
