@@ -112,5 +112,5 @@ SELF_PAGES_IN_PROMPT = int(_self_cfg.get("pages_in_prompt", 2))
 _situation_cfg = setting("situation", {})
 SITUATION_ENABLED = bool(_situation_cfg.get("enabled", True))
 SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
-                   for k in ("window", "music", "machine", "plugins", "reminders", "hands")}
+                   for k in ("window", "music", "machine", "plugins", "reminders", "hands", "clothes")}
 

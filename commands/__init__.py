@@ -5,7 +5,7 @@
     settings   /settings /preset /set /tools /tooltest /context /allow /mcp /plugins
     voice      /look /mic /voice /barge /wake
     life       /mood /coffee /read /situation
-    portrait   /monitor /holo /lights /portrait ...
+    portrait   /monitor /holo /outfit /lights /portrait ...
     memory     /facts /thoughts /memory /reflect /lessons /skills /projects /knowledge /episodes
     people     /camera /presence /people
     patches    /good /fix /examples (examples for her patches)

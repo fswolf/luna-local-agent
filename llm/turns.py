@@ -269,7 +269,8 @@ def _ask(text, model, on_text=None, on_sentence=None,
     # context of their own, which is how they're told apart here.
     gestures.new_turn()
     livefeed.emit("turn", text=text,
-                  source=source or ("chat" if context is not None else turnctx.current().source))
+                  source=source or ("chat" if context is not None else turnctx.current().source),
+                  guest=bool(getattr(turnctx.current(), "speaker", None)))    # not the owner: the portrait won't undress for them
     livefeed.emit("server", model=payload["model"], backend=getattr(config, "LLM_BACKEND", ""))
     livefeed.emit("context", used=lmstudio.estimate_tokens(payload), window=_window())
 

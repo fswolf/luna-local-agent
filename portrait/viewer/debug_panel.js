@@ -236,7 +236,7 @@ export function debugPanel() {
   open.textContent = '🎬 pose studio';
   open.onclick = () => ctx.studio?.show();
   box.appendChild(open);
-  import('./studio.js').then(m => { ctx.studio = m.createStudio({ vrm: ctx.vrm, moves: ctx.moves, GESTURES, gesture: ctx.gesture, THREE, orbit: ctx.orbit, camera: ctx.camera, canvas: ctx.renderer.domElement, fx: ctx.fx, props: () => ctx.props }); })
+  import('./studio.js').then(m => { ctx.studio = m.createStudio({ vrm: ctx.vrm, moves: ctx.moves, GESTURES, gesture: ctx.gesture, THREE, orbit: ctx.orbit, camera: ctx.camera, canvas: ctx.renderer.domElement, fx: ctx.fx, props: () => ctx.props, outfits: () => ctx.outfits }); })
     .catch(e => console.warn('pose studio:', e));
   // a gesture file with a mistake in it: say which and why, instead of a missing button
   if (Object.keys(GESTURE_FAILED).length) {

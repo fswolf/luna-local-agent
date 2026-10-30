@@ -95,7 +95,9 @@ is enough.
 
 `/portrait gestures <mode>`, or the **gestures** row in the settings pane,
 switches between `tags`, `meaning`, `keywords` and `off`. See
-[Portrait](portrait.md#gestures) for the details of each.
+[Portrait](portrait.md#gestures) for the details of each. Her clothes
+follow the same setting unless `portrait.clothes` says otherwise; see
+*Her clothes* in [Companion](companion.md).
 
 ## How she picks one
 
