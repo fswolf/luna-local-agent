@@ -137,6 +137,7 @@ SCHEMA = {
     "situation.plugins": ("bool", "Include which plugins are running in the situation lines"),
     "situation.reminders": ("bool", "Include the next reminder in the situation lines"),
     "situation.hands": ("bool", "Include what she's holding on her portrait (her coffee, the book she's reading) in the situation lines"),
+    "situation.clothes": ("bool", "Include what she's wearing on her portrait when some clothes are off (human models whose clothes come off) in the situation lines"),
 
     # --- Offers -------------------------------------------------------------
     "offers.enabled": ("bool", "Let her notice things on her own (a full disk, a date coming up) and offer to help, once, when you next talk"),
@@ -172,6 +173,8 @@ SCHEMA = {
     "portrait.gestures": ("choice", "How replies trigger gestures: tags (she picks), meaning, keywords, or off",
                           ("tags", "meaning", "keywords", "off")),
     "portrait.gestures_offered": ("int", "Tags mode: how many gestures she's offered at once, picked to fit her mood (fewer keeps a small model from narrating moves)"),
+    "portrait.clothes": ("choice", "How the conversation changes her clothes: same as gestures, tags (she picks), keywords, or off (/outfit only)",
+                         ("gestures", "tags", "keywords", "off")),
     "portrait.chat_gestures": ("bool", "Let stream viewers set off gestures (!hug, hi, lol)"),
     "portrait.meaning_margin": ("float", "In meaning mode, how clearly a gesture must beat an ordinary reply to play"),
     "portrait.sounds": ("bool", "Play little sounds with her gestures (files in portrait/sounds/)"),

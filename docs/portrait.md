@@ -585,6 +585,16 @@ touching a slider starts it). Then the tabs:
   as a new prop; name its gestures `<prop>_pickup` and `<prop>_putdown` and
   they're the ones that pick it up and put it down. What sets that off is
   still code: `life/coffee.py` is the example to copy.
+- **Clothes** - her clothes piece by piece, on a model whose clothes are
+  separate pieces (a VRoid export keeps them separate): a box per piece
+  (*top*, *tie*, *bottoms*...) and *dressed* / *underwear* for all of them.
+  Taking a piece off hides it; the body underneath is whole, so nothing is
+  reloaded. Which piece is which is guessed from where it sits on her; a
+  model can name its own in `<model>.outfits.json` next to it,
+  `{"pieces": {"CLOTH_02": "top"}}` (part of the material name, then the
+  label). Cat ears, a tail, horns and wings are never clothes. It isn't
+  saved with a gesture; what she has on is kept per model and changed the
+  same way as in conversation (see *Her clothes* in [The companion](companion.md)).
 
 **save** writes `portrait/gestures/<name>.js` - plain data, the same shape as the
 hand-written files - and it plays straight away (other menus show it after

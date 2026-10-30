@@ -176,8 +176,18 @@ def _hands():
     return "; ".join(out)
 
 
+def _clothes():
+    """What she's wearing on her portrait, when it isn't simply dressed (life/clothes.py)."""
+    try:
+        from life import clothes
+
+        return clothes.describe()
+    except Exception:
+        return ""
+
+
 SOURCES = (("window", _window), ("music", _music), ("machine", _machine),
-           ("plugins", _plugins), ("reminders", _reminders), ("hands", _hands))
+           ("plugins", _plugins), ("reminders", _reminders), ("hands", _hands), ("clothes", _clothes))
 
 
 # ---------------------------------------------------------------------------

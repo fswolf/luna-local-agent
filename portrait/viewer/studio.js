@@ -34,8 +34,9 @@ const EMOTES = ['hearts', 'sweat', 'anger', 'question'];
 const r2 = v => Math.round(v * 100) / 100;
 const near = (a, b) => Math.abs(a - b) < 0.015;
 
-export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas, fx = 1, props = null }) {
+export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, camera, canvas, fx = 1, props = null, outfits = null }) {
   const P = () => (typeof props === 'function' ? props() : props);
+  const O = () => (typeof outfits === 'function' ? outfits() : outfits);
   const bones = Object.keys(vrm.humanoid.humanBones)
     .filter(n => vrm.humanoid.getNormalizedBoneNode(n) && !/Eye|jaw/.test(n));
   const key = b => (ADDED.has(b) ? '+' + b : b);
@@ -64,7 +65,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   const win = el('div', { id: 'studio', className: 'panel' }, bar);
   document.body.appendChild(win);
   // real tabs: one page at a time
-  const TABS = [['pose', 'Pose'], ['animate', 'Keys'], ['prop', 'Prop'], ['details', 'Details'], ['link', 'Chain']];
+  const TABS = [['pose', 'Pose'], ['animate', 'Keys'], ['prop', 'Prop'], ['clothes', 'Clothes'], ['details', 'Details'], ['link', 'Chain']];
   const tabsRow = el('div', { className: 'tabs' });
   const pages = {}, tabBtn = {};
   let tabNow = 'pose';
@@ -76,6 +77,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     for (const [n, p] of Object.entries(pages)) p.hidden = n !== name;
     for (const [n, b] of Object.entries(tabBtn)) b.classList.toggle('on', n === name);
     if (name === 'prop') fillProps();
+    if (name === 'clothes') fillClothes();
     moveGizmo();                                       // the bone's rings on Pose, the prop's handles on Prop
   }
   for (const [name, label] of TABS) {
@@ -311,6 +313,30 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     el('div', { className: 'row' }, el('label', {}, propUses, ' made with it (in her hand when it\'s opened)')),
     row('at', propAt, el('span', { className: 'dim', textContent: ' s, when it appears or goes ' }), btn('now', () => { propAt.value = st.t; propAt.onchange(); }, 'the time on the timeline')),
     el('div', { className: 'row' }, el('label', {}, propHold, ' hold her last pose while she carries it')));
+  // -- clothes page: her clothes piece by piece (outfits.js), to see them come off ----
+  const clothesList = el('div');
+  function fillClothes() {
+    const o = O();
+    clothesList.replaceChildren();
+    if (!o || !o.has) {
+      clothesList.append(el('div', { className: 'dim', textContent: 'this model\'s clothes aren\'t separate pieces, so they can\'t come off one at a time (a VRoid export keeps them separate)' }));
+      return;
+    }
+    for (const p of o.pieces()) {
+      const box = el('input', { type: 'checkbox', checked: p.on });
+      box.onchange = () => { o.set(p.id, box.checked); fillClothes(); };
+      clothesList.append(el('div', { className: 'row' }, el('label', { title: p.id }, box, ' ' + p.label)));
+    }
+    clothesList.append(el('div', { className: 'dim', textContent: 'wearing: ' + o.state() }));
+  }
+  pages.clothes.append(
+    el('h4', { textContent: 'her clothes' }),
+    el('div', { className: 'dim', textContent: 'each piece on or off, to see how it looks (not saved with a gesture yet)' }),
+    el('div', { className: 'row' },
+       btn('dressed', () => { O()?.wear('dressed'); fillClothes(); }, 'everything on'),
+       btn('underwear', () => { O()?.wear('underwear'); fillClothes(); }, 'every piece off')),
+    clothesList);
+
   // picking "nothing in her hand" is you saying so: away it goes, even one the studio
   // didn't get out itself (a mug left in her hand by the coffee routine or a refresh)
   propSel.onchange = () => (propSel.value ? pickProp() : putAway());

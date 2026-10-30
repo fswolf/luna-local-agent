@@ -122,11 +122,12 @@ What happens around a reply, in order:
    - the **mood line** for where the dials are (in a public chat turn -
      stream or Discord - a mood marked `private` is swapped for the
      nearest one in its row that isn't);
-   - in tags mode on a 3D model, the **gesture line**: the gestures she
-     may use, each with its `about` text. Private ones only in your own
-     turns; lewd ones not while a tame stream is live.
-2. **She answers.** Any `[gesture]` tags she wrote are stripped from the
-   text and played on the portrait. Actions she writes (`*giggles*`) can
+   - in tags mode on a 3D model, the **gesture line**: a few gesture
+     names that fit her mood, and in clothes tags mode the clothes tags
+     that fit what she has on. Private ones only in your own turns; lewd
+     ones not while a tame stream is live.
+2. **She answers.** Any `[gesture]` or clothes tags she wrote are
+   stripped from the text and played on the portrait. Actions she writes (`*giggles*`) can
    set gestures off by their keywords too.
 3. **Her voice** gets the mood's speed and pitch tint, and the
    `pronounce` table is applied just before the text goes to Kokoro.
@@ -585,12 +586,11 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 
 How her replies set gestures off is `portrait.gestures`:
 
-- **tags** (default): she's offered `[name]` tags with each gesture's
-  `about`, and writes one where it fits. Keywords in what she writes are
-  the fallback.
+- **tags**: she's offered a few `[name]` tags that fit her mood, and
+  writes one where it fits. Keywords in what she writes are the fallback.
 - **meaning**: an embedding model compares the exchange with each
   gesture's `about` (turns are never picked this way).
-- **keywords**: only words in her `*actions*` and emoji.
+- **keywords** (default): only words in her `*actions*` and emoji.
 - **off**.
 
 **Chains** (`chain: [...]`) play gestures one after another as one;
@@ -624,6 +624,56 @@ doesn't spin her. **She can do it herself too:** `*turns around*`,
 When you've just asked, her own `*turns around*` in the answer doesn't
 turn her back again. Chat has `!turn`, `!side` and `!front`. Your mouse can't
 rotate the live portrait - only she and chat can.
+
+## Her clothes
+
+On a human model whose clothes are separate pieces (a VRoid export keeps
+them that way), her clothes can come off and go back on, piece by piece:
+*top*, *tie*, *bottoms* and so on, down to her underwear. Taking a piece
+off hides it; nothing reloads. The robot has nothing that comes off, and
+the topless model is a switch you make yourself (`/portrait use`), never
+something she does. See *Clothes* in [Portrait](portrait.md) for the pose
+studio's tab.
+
+| How | Example |
+|---|---|
+| You ask, in plain words | take off your top, lose the tie, take off your shoes and socks, strip, get dressed, put your shirt back on |
+| She does it herself | `*slips her top off*`, `*kicks off her shoes*`, `*pulls her shirt back on*`, `*gets dressed*` in her reply |
+| She picks a tag (tags mode) | `[top_off]`, `[undress]`, `[top_on]`, `[dress]` |
+| `/outfit` | `/outfit underwear`, `/outfit dressed`, `/outfit off tie`, `/outfit on top`; on its own it says what she's wearing |
+
+How the conversation changes them is `portrait.clothes`, set with
+`/portrait clothes <mode>` or the **clothes** row in the settings pane.
+It works the way `portrait.gestures` does, and by default follows it:
+
+- **gestures** (default): the same as your gesture setting. Tags gives
+  tags, meaning and keywords give keywords, off gives off.
+- **tags**: she picks. The clothes tags that fit what she has on now (at
+  most four: `[undress]` and a `_off` for each piece she's wearing,
+  `[dress]` and an `_on` for each piece that's off) go in the same prompt
+  line as the gesture tags, and are cut from what she says. Your plain
+  words and her written actions still work as the fallback. Taking
+  things off is only offered in your own turns, never on a tame stream.
+- **keywords**: your plain words and her written actions only. Nothing
+  goes in her prompt.
+- **off**: nothing from the conversation. `/outfit` and the pose studio
+  still work.
+
+Putting clothes on always works. Taking them off doesn't happen:
+
+- in tame mode (and turning tame mode on dresses her),
+- for stream chat, or a guest at the keyboard,
+- on your word while she's cool with you, holding a grudge or has walked
+  off. Then it's up to her: her own `*slips her top off*` still counts.
+
+"Don't take your top off", "keep your shirt on" and her `*starts to take off
+her top*` or `*teases at the hem*` change nothing. What she has on is kept
+in the browser per model, so a reload doesn't dress her again, and Luna
+is told after every change: with `situation.clothes` on, a line in her
+situation block says what's off, so she doesn't offer to take off a top
+she isn't wearing. Fully dressed says nothing, and neither does a closed
+portrait. A model with two pieces of the same kind ("top 1", "top 2")
+takes both off for "take off your top".
 
 ## Sounds and pronunciation
 
@@ -726,7 +776,8 @@ engine as everything else, so what you see is what she does. Details in
 | `mood.walk_away` | true | Walking away after repeated hostility |
 | `mood.walk_away_after` | 3 | Hostile exchanges in a row |
 | `mood.walk_away_minutes` | 10 | How long she's gone |
-| `portrait.gestures` | tags | tags / meaning / keywords / off |
+| `portrait.gestures` | keywords | tags / meaning / keywords / off |
+| `portrait.clothes` | gestures | gestures (follow the row above) / tags / keywords / off |
 | `portrait.chat_gestures` | true | Viewers' commands and chat reactions |
 | `portrait.touch_talk` | true | Her spoken line when touched |
 | `portrait.touch_talk_cooldown` | 12 | Seconds between spoken touch lines |

@@ -424,7 +424,7 @@ def _after(path, value):
             from web import livefeed
 
             livefeed.emit("reload")
-        elif path in ("portrait.gestures", "portrait.chat_gestures"):
+        elif path in ("portrait.gestures", "portrait.chat_gestures", "portrait.clothes"):
             from web import livefeed
 
             livefeed.gesture_mode_changed()

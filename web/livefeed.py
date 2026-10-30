@@ -162,6 +162,8 @@ class _Handler(BaseHTTPRequestHandler):
             self.end_headers()
         elif self.path == "/portrait/touch":
             self._touch()
+        elif self.path == "/portrait/outfit":
+            self._outfit()
         elif self.path == "/portrait/gestures/save":
             self._save_gesture()
         elif self.path == "/portrait/props/save":
@@ -231,6 +233,26 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception:
             pass
         self.send_response(204)
+        self.end_headers()
+
+    def _outfit(self):
+        """What she's wearing now (outfits.js reports after every change), for
+        /outfit and her situation line (life/clothes.py). JSON only."""
+        kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        try:
+            length = min(int(self.headers.get("Content-Length", 0)), 2048)
+            data = json.loads(self.rfile.read(length) or b"{}") if kind == "application/json" else {}
+        except (ValueError, AttributeError):
+            data = {}
+        ok = False
+        try:
+            from life import clothes
+
+            ok = isinstance(data, dict) and clothes.note(data.get("wearing"), data.get("off") or [],
+                                                         data.get("pieces"))
+        except Exception:
+            ok = False
+        self.send_response(204 if ok else 400)
         self.end_headers()
 
     def _save_gesture(self):

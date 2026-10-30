@@ -70,7 +70,9 @@ Slash commands:
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |
 | `/skills` | Recipes she's saved: `/skills show`, `forget`, `restore <n>` |
 | `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>` |
-| `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder, what's in her hands) |
+| `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder, what's in her hands, clothes that are off) |
+| `/outfit` | Her clothes on a human model: `dressed`, `underwear`, `off <piece>`, `on <piece>`; alone, what she's wearing |
+| `/portrait clothes <mode>` | How the conversation changes her clothes: `gestures` (follow the gesture setting), `tags`, `keywords`, `off` |
 | `/voice` | List voices, or switch: blends too |
 | `/context` | What every turn sends, in tokens, against the model's context length |
 | `/mouse` | Wheel scrolling vs. being able to select text |

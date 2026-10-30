@@ -97,9 +97,18 @@ def _gesture_mode():
         return "keywords"
 
 
+def _clothes_mode():
+    try:
+        from life import clothes
+
+        return clothes.mode()
+    except Exception:
+        return "keywords"
+
+
 def gesture_mode_changed():
-    """Tell an open portrait the gesture settings changed."""
-    livefeed.emit("gesture_mode", mode=_gesture_mode(),
+    """Tell an open portrait the gesture (and clothes) settings changed."""
+    livefeed.emit("gesture_mode", mode=_gesture_mode(), clothes=_clothes_mode(),
          chat=bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)))
 
 
@@ -162,6 +171,7 @@ def portrait_config(preview=None):
             "live2d": live2d, "credit": str(sidecar.get("credit") or ""),
             "vrm": dict(sidecar.get("vrm") or {}),
             "gestures": _gesture_mode(),
+            "clothes": _clothes_mode(),
             "chat_gestures": bool(getattr(config, "PORTRAIT_CHAT_GESTURES", True)),
             "sounds": bool(getattr(config, "PORTRAIT_SOUNDS", True)),
             "sound_volume": float(getattr(config, "PORTRAIT_SOUND_VOLUME", 0.8)),

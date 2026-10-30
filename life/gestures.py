@@ -96,9 +96,13 @@ def clips():
 
 
 def names():
-    """Every tag that means something: the built-ins and every clip."""
+    """Every tag that means something: the built-ins, every clip, and her
+    clothes tags (life/clothes.py), so any of them is cut from what she says."""
+    from life import clothes
+
     return tuple(dict.fromkeys(tuple(n for n, g in builtin().items() if g["about"])
-                               + tuple(c["name"] for c in clips())))
+                               + tuple(c["name"] for c in clips())
+                               + tuple(clothes.tag_names())))
 
 
 _tag_cache = {}
@@ -112,7 +116,7 @@ def _tag():
                                      re.IGNORECASE)
     return _tag_cache[key]
 
-_turn = {"sent": set(), "asides": set()}   # gestures sent; asides already read
+_turn = {"sent": set(), "asides": set(), "clothes": set()}   # gestures sent; asides already read
 
 
 def mode():
@@ -181,12 +185,16 @@ def offered(private=True, limit=None):
 
 
 def prompt_line(private=True):
-    """The system prompt's line about her body, in tags mode, for a 3D
-    model: a few gesture names that fit her mood (offered()). Empty
-    otherwise, so it costs nothing when it can't be used."""
-    if mode() != "tags" or not _three_d():
+    """The system prompt's line about her body, for a 3D model: in tags
+    mode a few gesture names that fit her mood (offered()), and in clothes
+    tags mode (life/clothes.py) the clothes tags that fit what she has on,
+    in the same line. Empty otherwise, so it costs nothing when it can't
+    be used."""
+    from life import clothes
+
+    if not _three_d():
         return ""
-    names = offered(private)
+    names = (offered(private) if mode() == "tags" else []) + clothes.offered(private)
     if not names:
         return ""
     # names only: with "(what it's for)" beside each, small models copied
@@ -214,6 +222,7 @@ def strip(text):
 def new_turn():
     _turn["sent"] = set()
     _turn["asides"] = set()
+    _turn["clothes"] = set()
 
 
 def from_tags(answer_text):
@@ -221,9 +230,10 @@ def from_tags(answer_text):
     every mode, so a tag never does nothing - but only tags mode asks for
     them. A move she described instead, "(beckons you over and blows a
     kiss)", plays too (from_asides)."""
-    if mode() == "off":
-        return
-    if "(" in answer_text or "*" in answer_text:
+    from life import clothes
+
+    moves = mode() != "off"
+    if moves and ("(" in answer_text or "*" in answer_text):
         from_asides(answer_text)
     if "[" not in answer_text:
         return
@@ -232,7 +242,13 @@ def from_tags(answer_text):
         # the name as the file spells it (sultryBeckon), whatever case she wrote
         name = next((n for n in names() if n.lower() == m.group(1).lower()), m.group(1))
 
-        if name.lower() not in _turn["sent"]:
+        # a clothes tag goes to the page as an outfit change; kept apart from
+        # "sent" so meaning mode still reads the reply for a move
+        if name.lower() in clothes.tag_names():
+            if name.lower() not in _turn["clothes"]:
+                _turn["clothes"].add(name.lower())
+                clothes.from_tag(name)
+        elif moves and name.lower() not in _turn["sent"]:
             _turn["sent"].add(name.lower())
             _emit(name, "tag")
 

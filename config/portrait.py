@@ -73,6 +73,11 @@ PORTRAIT_LIGHTS_STYLE = "plain" if str(PORTRAIT_LIGHTS.get("style", "neon")).low
 PORTRAIT_GESTURES = str(_portrait_cfg.get("gestures", "keywords"))
 PORTRAIT_CHAT_GESTURES = bool(_portrait_cfg.get("chat_gestures", True))
 PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
+# How the conversation changes her clothes on a model whose clothes come
+# off (life/clothes.py): "gestures" (the default: follows the setting
+# above, tags -> tags, meaning/keywords -> keywords, off -> off), "tags",
+# "keywords", "off".
+PORTRAIT_CLOTHES = str(_portrait_cfg.get("clothes", "gestures"))
 # tags mode: how many gesture names she's offered at once (fitting her mood)
 PORTRAIT_GESTURES_OFFERED = int(_portrait_cfg.get("gestures_offered", 8))
 # Little sounds with her gestures (portrait/sounds/, yours - not in git): a

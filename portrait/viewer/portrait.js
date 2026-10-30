@@ -24,8 +24,10 @@ import { createEmotes } from './emotes.js';
 import { createTouch } from './touch.js';
 import { createFan } from './fan.js';
 import { createProps } from './props.js';
+import { createOutfits } from './outfits.js';
 import { createLights } from './lights.js';
 import { turnAsked } from './turns.js';
+import { clothesAsked, clothesActed } from './clothes_talk.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 import { bindFaceLayers, blush, drool, tears, updateBlush, updateBrows, updateTears } from './face_layers.js';
 import { bindDebugPanel, debugPanel } from './debug_panel.js';
@@ -55,6 +57,7 @@ bindDebugPanel({
   get orbit() { return orbit; },
   get params() { return params; },
   get props() { return props; },
+  get outfits() { return outfits; },
   get renderer() { return renderer; },
   get setHolo() { return setHolo; },
   get setLights() { return setLights; },
@@ -320,15 +323,29 @@ function handle(ev) {
     case 'turn':
       twitch(0, 0.6);
       said.text = ''; said.done.clear(); said.tagged = false; said.turned = false; waveBack = false;
+      said.raw = ''; said.clothes.clear();
+      // undressing is for you alone: not stream chat, not a guest at the keyboard
+      said.private = /^(voice|typed|discord)?$/.test(ev.source || '') && !ev.guest;
       // only you (voice, typed, Discord): chat has its own rules, and a
-      // game's step prompt is full of "huge trolls" and "hello sailor"
-      if (/^(voice|typed|discord)?$/.test(ev.source || '')) {
+      // game's step prompt is full of "huge trolls" and "hello sailor".
+      // Not the last turn replayed to a page that just opened (or reloaded):
+      // "take off your top" from ten minutes ago isn't a request now.
+      if (/^(voice|typed|discord)?$/.test(ev.source || '') && !(ev.at && ev.at < OPENED - 1)) {
         said.turned = turnFromYou(ev.text || '');      // you asked her to turn: even with gestures off
+        if (said.private && gmode.clothes !== 'off') clothes(clothesAsked(ev.text || ''), 'you');
         if (gmode.mode !== 'off') fromYou(ev.text || '');
       }
       break;
     case 'tok':         // her reply as it streams: act out *hugs*, *waves*... (the fallback)
+      if (ev.p === 'a' && ev.s) {
+        said.raw = (said.raw + ev.s).slice(-600);
+        if (gmode.clothes !== 'off') clothesFromHer(said.raw);   // her *slips her top off* (portrait.clothes)
+      }
       if (ev.p === 'a' && ev.s && gmode.mode !== 'off') { said.text = (said.text + ev.s).slice(-400); actOut(said.text); }
+      break;
+    case 'outfit':      // /outfit in her terminal, or a clothes [tag] she wrote (src: tag)
+      if (ev.src === 'tag') { if (gmode.clothes !== 'off') clothes(ev, 'her'); }
+      else clothes(ev, 'command');
       break;
     case 'gesture':     // a [tag] she wrote, a move she described, the meaning check, or /portrait wave
       if (ev.src === 'tag' || ev.src === 'meaning' || ev.src === 'aside') {
@@ -343,6 +360,7 @@ function handle(ev) {
       break;
     case 'gesture_mode':   // switched in the settings pane or /portrait gestures
       gmode.mode = ev.mode; gmode.chat = ev.chat !== false;
+      if (ev.clothes) gmode.clothes = ev.clothes;
       break;
     case 'chat':        // stream chat and Discord: !hug, hi, lol...
       if (gmode.chat) fromChat(ev);
@@ -356,6 +374,7 @@ function handle(ev) {
       mind.label = typeof ev.label === 'string' ? ev.label : '';
       mind.row = typeof ev.row === 'string' ? ev.row : '';
       mind.tame = !!ev.tame;      // live on a stream with lewd off: no lewd moves
+      if (mind.tame) outfits?.wear?.('dressed');   // and nothing comes off while it's on
       mind.face = ev.face && typeof ev.face === 'object' ? ev.face : null;
       mind.idle = Array.isArray(ev.idle) ? ev.idle : [];
       // A held pose (walked away: "sulk"). Let go of it when the mood
@@ -554,6 +573,58 @@ function fromYou(text) {
 }
 let waveBack = false;
 
+// What she has on is kept per model in this browser, so a reload doesn't
+// dress her again, and told to Luna (life/clothes.py) after every change.
+function wireOutfits(o) {
+  const key = 'luna.outfit.' + (cfg.model || '');
+  const keep = () => {
+    try { localStorage.setItem(key, JSON.stringify(o.pieces().filter(p => !p.on).map(p => p.id))); } catch (e) {}
+  };
+  const tell = () => {
+    const off = o.pieces().filter(p => !p.on);
+    fetch('outfit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wearing: o.has ? o.state() : 'none', off: off.map(p => p.label),
+                             pieces: o.pieces().map(p => p.label) }) }).catch(() => {});
+  };
+  if (o.has && !mind.tame) {
+    try { for (const id of JSON.parse(localStorage.getItem(key) || '[]')) o.set(id, false); } catch (e) {}
+  }
+  let timer = 0;
+  o.onChange(() => { keep(); clearTimeout(timer); timer = setTimeout(tell, 300); });   // kept at once, told a moment later
+  tell();
+}
+
+// Her clothes (outfits.js, on a human model whose clothes come off):
+//   from /outfit, from you in plain words ("take off your top", clothes_talk.js),
+//   from her own *slips her top off*, or a [top_off] tag she wrote (clothes.py);
+//   portrait.clothes picks which of the conversation ones count. Putting things on always works;
+//   taking them off never in tame mode, never for stream chat or a guest,
+//   and not on your word while she's cool with you, holding a grudge or has
+//   walked off - then it's up to her (her own action still counts).
+function clothes(a, who) {
+  if (!a || !outfits?.has) return false;
+  const off = a.wear === 'underwear' || (Array.isArray(a.off) && a.off.length);
+  if (off) {
+    if (mind.tame || (who !== 'command' && !said.private)) return false;
+    if (who === 'you' && (mind.row === 'grudge' || warmthBand() === 'cool' || mind.hold)) return false;
+  }
+  let did = false;
+  if (a.wear === 'dressed' || a.wear === 'underwear') did = outfits.wear(a.wear);
+  for (const p of [].concat(a.off || [])) did = outfits.set(String(p), false) || did;
+  for (const p of [].concat(a.on || [])) did = outfits.set(String(p), true) || did;
+  return did;
+}
+// Each finished action in her reply so far (*...* or (...)), once a turn
+function clothesFromHer(text) {
+  if (!outfits?.has) return;
+  for (const m of text.matchAll(/\*([^*\n]{3,160})\*|\(([^()\n]{3,160})\)/g)) {
+    const act = (m[1] || m[2]).trim();
+    if (said.clothes.has(act)) continue;
+    said.clothes.add(act);
+    clothes(clothesActed(act), 'her');
+  }
+}
+
 // You asked her to turn: "turn around", "show me your ass", "turn left",
 // "turn 90", "face me" (turns.js). True if it was a turn.
 function turnFromYou(text) {
@@ -603,9 +674,11 @@ function fromChat(ev) {
 }
 
 // She acts out what she writes: *hugs*, *waves*, *jumps*, 🤗, 👋 ...
-const said = { text: '', done: new Set(), tagged: false, turned: false };
-// How her replies set gestures off (gestures.py): tags, meaning, keywords, off.
-const gmode = { mode: cfg.gestures || 'keywords', chat: cfg.chat_gestures !== false };
+const said = { text: '', done: new Set(), tagged: false, turned: false, raw: '', clothes: new Set(), private: true };
+const OPENED = Date.now() / 1000;      // when this page opened: older events are a replay of how things stood
+// How her replies set gestures off (gestures.py): tags, meaning, keywords, off;
+// and how the conversation changes her clothes (clothes.py): tags, keywords, off.
+const gmode = { mode: cfg.gestures || 'keywords', chat: cfg.chat_gestures !== false, clothes: cfg.clothes || 'keywords' };
 // Built from each gesture file's "keywords" (and clips.json's): a word
 // inside an action she writes (*beckons you closer*) or an emoji anywhere.
 // A keyword matches as the start of a word, so "hug" also catches hugs,
@@ -1370,6 +1443,7 @@ function buildBumBlush() {
     layer.position.copy(o.position); layer.quaternion.copy(o.quaternion); layer.scale.copy(o.scale);
     o.parent.add(layer);
     layer.bind(o.skeleton, o.bindMatrix);
+    mat.userData.on = layer; mat.userData.from = o;     // a sibling, not a child: follows the piece it's made from by hand (updateSpank)
     spank.layers.push(mat);
   });
 }
@@ -1412,7 +1486,13 @@ function updateSpank(dt) {
   if (!spank.hold) spank.n = Math.max(0, spank.n - dt / SPANK_FORGET);
   spank.flash = Math.max(0, spank.flash - dt * 2.5);
   const a = mind.tame ? 0 : Math.min(0.97, spankLevel() + spank.flash * 0.25);
-  for (const m of spank.layers) { m.opacity = a; m.visible = a > 0.003; }
+  // a layer made from a piece of clothing (her shorts) goes with it: taken off
+  // (outfits.js), the glow mustn't float where it was
+  for (const m of spank.layers) {
+    m.opacity = a;
+    m.visible = a > 0.003;
+    if (m.userData.on) m.userData.on.visible = m.userData.from ? m.userData.from.visible : true;
+  }
 }
 
 function touch(zone, side) {
@@ -1450,6 +1530,7 @@ function touch(zone, side) {
 // goes, so "on the head, 3 times" is right; the cooldown is hers.
 let studio = null;      // the pose studio (studio.js), debug viewer only
 let props = null;       // things in her hands (props.js): the morning mug
+let outfits = null;     // her clothes, piece by piece (outfits.js); null for a model without separate clothes
 
 function tell(zone) {
   if (params.get('demo')) return;
@@ -1498,6 +1579,8 @@ try {
   vrm = await load(cfg.model);
   moves = createGestures(THREE, vrm, () => view.target ?? orbit.yaw);      // where the camera is, or is heading
   props = createProps({ THREE, GLTFLoader, vrm, fx: vrm.meta?.metaVersion === '0' ? -1 : 1 });
+  // not awaited: looking for <model>.outfits.json mustn't hold up her first frame
+  createOutfits({ THREE, vrm, url: cfg.model }).then(o => { outfits = o; wireOutfits(o); }).catch(e => { console.error(e); outfits = null; });
   earRange = cfg.vrm?.ear_range ?? (ears.some(e => /catear/i.test(e.node.name)) ? 0.3 : 1);
   fx = vrm.meta?.metaVersion === '0' ? -1 : 1;
   frame();
@@ -1506,7 +1589,7 @@ try {
   // the debug page's frame picker: bust / face / full without reloading (the studio keeps going)
   const setFrame = f => { if (['bust', 'face', 'full'].includes(f)) { framing = f; frame(); } };
   window.portrait = { setFrame, get fan() { return fan?.status(); }, handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
-                      touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank, get props() { return props; },
+                      touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank, get props() { return props; }, get outfits() { return outfits; },
                       get lights() { return lights; }, setLights };
   if (cfg.fan?.cast && !params.has('nocast'))
     fan = createFan({ THREE, renderer, scene, cfg: { ...cfg.fan, ...(params.get('fanframe') ? { framing: params.get('fanframe') } : {}) }, place: placeFan });
