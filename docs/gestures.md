@@ -333,7 +333,7 @@ export default {
 | `about: "..."` | When to use it. Offers it to her as a tag in tags mode, and is what meaning mode compares with. Without it she won't choose it herself, but it still plays from buttons, commands and idle |
 | `keywords: [...]` | Words that play it when she writes them inside an `*action*`, and emoji that play it anywhere |
 | `lights: [[0, 0], [8, 0.9], [10, 0.3]]` | Her light strips throb while it plays: seconds and how hard (0 to 2, about 1.4 at a peak), joined smoothly; the throb gets faster as it gets brighter. A chain's curve runs over the whole chain. Only shows with light strips on |
-| `idle: true` or `idle: ['warm', 'loving']` | One of the things she does on her own when nothing's happening: `true` in any mood, a list only in those mood bands (`grudge`, `cool`, `neutral`, `warm`, `loving`, `lewd`). The pose studio's Details tab has a box for each. The debug panel shows what she'd pick from in the mood you set, with **▶ play an idle** to try one |
+| `idle: true` or `idle: ['warm', 'loving']` | One of the things she does on her own when nothing's happening: `true` in any mood, a list only in those mood bands (`grudge`, `cool`, `neutral`, `warm`, `loving`, `lewd`). The pose studio's Details tab has a box for each. The control panel shows what she'd pick from in the mood you set, with **▶ play an idle** to try one |
 | `private: true` | Never triggered from stream chat, and only offered to her in your own conversations |
 | `left: true` | Also make a mirrored copy, `<name>_left` |
 | `full: true` | It only reads with all of her on screen (her legs): offered to her, and played as an idle move, only while the portrait is framed full body. In the bust view it would be a tag that shows nothing |

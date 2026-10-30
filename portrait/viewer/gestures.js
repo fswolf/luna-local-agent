@@ -106,12 +106,18 @@ export function sample(keys, name, t) {
   const n = Math.max(prev[1].length, next[1].length);
   return Array.from({ length: n }, (_, i) => (prev[1][i] ?? 0) + ((next[1][i] ?? 0) - (prev[1][i] ?? 0)) * k);
 }
+// One face channel's value at time t, from [[t, v], ...]. Before the first
+// point it holds the first value: a track starting later than 0 (blush from
+// 2.4 s) used to divide by zero there, and a NaN expression weight makes the
+// whole face mesh vanish.
 export function sampleScalar(v, t) {
   if (!Array.isArray(v)) return v;
+  if (!v.length) return 0;
+  if (t <= v[0][0]) return v[0][1];
   let prev = v[0], next = null;
   for (const kv of v) { if (kv[0] <= t) prev = kv; else { next = kv; break; } }
-  if (!next) return prev[1];
-  return prev[1] + (next[1] - prev[1]) * ease((t - prev[0]) / (next[0] - prev[0]));
+  if (!next || next[0] <= prev[0]) return prev[1];
+  return prev[1] + (next[1] - prev[1]) * ease(Math.min(1, Math.max(0, (t - prev[0]) / (next[0] - prev[0]))));
 }
 
 // How far to turn her (radians about her hips) so her back ('away') or front ('me')

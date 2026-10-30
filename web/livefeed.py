@@ -168,6 +168,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._save_gesture()
         elif self.path == "/portrait/props/save":
             self._save_prop()
+        elif self.path in ("/portrait/cards/save", "/portrait/cards/import", "/portrait/cards/load", "/portrait/cards/delete"):
+            self._card(self.path.rsplit("/", 1)[1])
         elif self.path == "/portrait/fan/frame":
             self._fan_frame()
         elif not self._page("POST") and not self._mounted("POST"):
@@ -281,6 +283,54 @@ class _Handler(BaseHTTPRequestHandler):
         os.replace(path + ".tmp", path)
         logbook.info("portrait", "pose studio saved gestures/%s.js", name)
         return self._json(200, {"ok": True, "name": name})
+
+    def _card(self, what):
+        """The pose studio's Cards tab (web/cards.py): save one from what she
+        looks like now, take in one dropped on the studio, or put one on (the
+        page reloads after, from the settings the card wrote)."""
+        from web import cards
+        import base64
+
+        kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            length = 0
+        limit = cards.MAX_CARD if what == "import" else 16 * 1024 * 1024
+        if length <= 0 or length > limit:
+            return self._json(413 if length > limit else 400, {"ok": False, "error": "too big, or empty"})
+        body = self.rfile.read(length)
+        try:
+            if what == "import":
+                if kind != "image/png":
+                    raise ValueError("a card is a PNG")
+                from urllib.parse import unquote
+                name = unquote(self.headers.get("X-Card-Name") or "") or None    # sent encoded: a header can't carry every letter
+                return self._json(200, {"ok": True, "card": cards.add(body, name)})
+            if kind != "application/json":
+                raise ValueError("JSON only")
+            data = json.loads(body or b"{}")
+            if not isinstance(data, dict):
+                raise ValueError("expected a JSON object")
+            if what == "save":
+                image = str(data.get("image") or "")
+                if not image.startswith("data:image/png;base64,"):
+                    raise ValueError("the picture has to be a PNG")
+                out = cards.pack(data.get("name"), base64.b64decode(image.split(",", 1)[1]),
+                                 data.get("carry") or {}, data.get("gestures") or [],
+                                 model=str(data.get("model") or "") or None)
+                logbook.info("portrait", "card saved: %s (%s)", out["name"], ", ".join(out["carries"]))
+                return self._json(200, dict(out, ok=True))
+            if what == "delete":
+                cards.remove(data.get("name"))
+                logbook.info("portrait", "card deleted: %s", data.get("name"))
+                return self._json(200, {"ok": True})
+            out = cards.apply(data.get("name"))
+            logbook.info("portrait", "card put on: %s", data.get("name"))
+            emit("reload", model=out.get("model") or "")
+            return self._json(200, dict(out, ok=True))
+        except (ValueError, TypeError, OSError) as e:
+            return self._json(400, {"ok": False, "error": str(e)[:200]})
 
     def _save_prop(self):
         """The pose studio's prop tab: where a prop sits in her hand, kept in
@@ -428,6 +478,21 @@ class _Handler(BaseHTTPRequestHandler):
                     if top != sdir:
                         found.setdefault(os.path.relpath(top, sdir).replace(os.sep, "/").lower(), []).append(url)
             return self._body(json.dumps(found).encode(), "application/json")
+
+        if rel == "cards/index.json":
+            from web import cards
+            return self._body(json.dumps(cards.cards()).encode(), "application/json")
+        if rel == "cards/yours.json":
+            from web import cards
+            return self._body(json.dumps(cards.own_gestures()).encode(), "application/json")
+        if rel.startswith("cards/thumb/") and rel.endswith(".png"):
+            from web import cards
+            try:
+                return self._body(cards.picture(rel[12:-4]), "image/png")
+            except (ValueError, OSError):
+                self.send_response(404)
+                self.end_headers()
+                return
 
         if rel == "models.json":
             return self._body(json.dumps(portrait_models()).encode(), "application/json")

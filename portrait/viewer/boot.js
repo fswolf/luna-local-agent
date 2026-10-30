@@ -84,6 +84,7 @@ function script(src) {
 // previews (?model=...); it doesn't change which one Luna uses.
 if (new URLSearchParams(location.search).get('debug')) {
   document.body.classList.add('debug');   // now, so a model that won't load can still be switched away from
+  document.title = 'Studio';             // the browser tab: the control panel and pose studio, not the portrait itself
   panelLayout();
   const pick = document.getElementById('dmodel');
   fetch('models.json').then(r => r.json()).then(list => {
@@ -127,11 +128,11 @@ if (new URLSearchParams(location.search).get('debug')) {
   toggle('demo', 'demo', !!q.get('demo'));
 }
 
-// The debug panel: drag it by its title bar, resize it from its corner,
+// The control panel (debug_panel.js): drag it by its title bar, resize it from its corner,
 // fold it or tuck it into the dock (windows.js). Where it was comes back on reload.
 async function panelLayout() {
   const { makeWindow } = await import('./windows.js');
-  makeWindow(document.getElementById('debug'), document.getElementById('dbar'), 'box', 'debug');
+  makeWindow(document.getElementById('debug'), document.getElementById('dbar'), 'box', 'control panel');
 }
 
 function setParam(key, value) {

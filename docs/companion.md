@@ -843,6 +843,6 @@ road; 2 is never). Or keep it but hide it on stream with the
 | She's stuck sulky | A grudge: `/mood` shows the minutes left. Apologise, or `/mood reset` |
 | She stopped talking | She walked away. Make up, wait 10 minutes, or `/mood reset` |
 | A touch does nothing | That zone has no entry for her current mood (hover in the debug viewer shows it), or the cooldown, or a full-body gesture in bust framing |
-| A gesture never plays | 🧍 needs full-body framing; 🔒 never from chat; 🔥 not on a tame stream. The debug panel's red text lists files that didn't load |
+| A gesture never plays | 🧍 needs full-body framing; 🔒 never from chat; 🔥 not on a tame stream. The control panel's red text lists files that didn't load |
 | A sound doesn't play | Is the file in `portrait/sounds/` with the name the gesture uses? A browser may want one click on the page before it plays audio |
 | She says "N-Y-A" | Add the word to `pronounce` in agent.json |

@@ -89,7 +89,7 @@ open portrait straight away:
   early or late far from there). South of the equator the seasons flip; the
   page guesses which side you're on from your time zone. Missing pictures fall back: night to day, a
   holiday to its season, nothing to her gradient. The folder's README lists
-  the names. The debug panel's background menu previews any of them, and
+  the names. The control panel's background menu previews any of them, and
   `&bgdate=2026-12-24T21:00` on the address shows what a date would pick.
 
 It's `portrait.background` in config.json (`""`, `"none"`, `"seasonal"`,
@@ -411,7 +411,7 @@ well; `&holo=1` or `&holo=0` on the URL only sets how the page starts.
 | "couldn't load Live2D's Cubism Core" | Your machine can't reach Live2D's CDN. Run `bash portrait/viewer/vendor/get_cubism_core.sh` once. |
 | She doesn't react | Open `http://127.0.0.1:8792/portrait/?debug=1`. Its buttons fire each reaction by hand, so you can tell the model from the events. |
 | Too much or too little of her shows | Add `"crop": {"top": 0.02, "height": 0.42}` under `portrait.live2d`. A bigger `height` shows more; `crop_face` does the same for `?frame=face`. |
-| Ears don't twitch | The debug panel lists the ear parameters it found. Name them in `portrait.live2d.ear_params` if it found none. |
+| Ears don't twitch | The control panel lists the ear parameters it found. Name them in `portrait.live2d.ear_params` if it found none. |
 | The window doesn't float on Hyprland | `windowrulev2 = float, title:^Luna( . Mozilla Firefox)?$`, plus `pin` to keep it on every workspace. |
 
 ## VRM (3D) models
@@ -444,7 +444,7 @@ glow and react:
 Switch them with `/lights` (or `/lights on`, `/lights off`), the **lights
 enabled** row in the settings pane's Portrait section, or `/settings`. All of it is live.
 To try them without Luna running, open the viewer with `&lights=1` on the
-address, or use the debug panel's **light strips** buttons: *light tour* (every reaction in turn, with a caption saying which; press again to stop), *lights on/off*,
+address, or use the control panel's **light strips** buttons: *light tour* (every reaction in turn, with a caption saying which; press again to stop), *lights on/off*,
 *throb* (a 10 s build and release, dark between beats) and *flicker*. Her state buttons (talk,
 listen, think) and moods drive them too.
 
@@ -511,16 +511,18 @@ and does small things on her own:
 
 <img width="1210" alt="The debug viewer: the gesture list on the left, her full-body model in the middle, and the pose studio on the right with a timeline, view buttons and sliders to turn each bone" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/pose-studio.jpg" />
 
-The debug viewer (`?debug=1`) has two windows. The **portrait debug** one on
-the left *plays* things; the **pose studio** on the right *makes and changes*
-gestures (the 🎬 button in the debug panel brings it back). Both drag by
+The debug viewer (`?debug=1`, "Studio" in the browser tab) has two windows. The **control panel** on the
+left *plays* things (its **Model** tab) and keeps her looks as pictures (its
+**Cards** tab, see [Cards](cards.md)); the **pose studio** on
+the right *makes and changes* gestures (the 🎬 button in the control panel brings
+it back). Both drag by
 their title bar, resize from the corner, fold to their title bar (▾) or tuck
 into the dock at the bottom left (–); they remember where they were.
 
 **First steps: change a gesture**
 
 1. Pick it in the studio's **gesture** menu at the top (or pick it in the
-   debug panel's gestures menu and press **✎ edit**). It opens on its first
+   control panel's gestures menu and press **✎ edit**). It opens on its first
    key, with her holding that pose.
 2. Go to the moment you want on the **timeline** under it: click it, or
    *◀ key* / *key ▶* to jump between keys (the diamonds).
@@ -552,7 +554,7 @@ touching a slider starts it). Then the tabs:
   what this key moves (click one to pick it). *hand* curls all the
   fingers at once (*open*, *fist*). *face* sets blush, smile, mouth,
   blink... at that moment. *copy bone* / *copy pose* give lines to paste.
-  Switching bust / face / full body on the debug panel no longer reloads,
+  Switching bust / face / full body on the control panel no longer reloads,
   and any other reload (model, hologram...) picks your work back up.
 - **Keys** - the keys in this gesture (click one to go there), *+ key here*,
   *copy* / *paste key*, *delete key*, move a key by half a second, and the
@@ -588,6 +590,10 @@ touching a slider starts it). Then the tabs:
 - **Clothes** - her clothes piece by piece, on a model whose clothes are
   separate pieces (a VRoid export keeps them separate): a box per piece
   (*top*, *tie*, *bottoms*...) and *dressed* / *underwear* for all of them.
+  The boxes follow along while a gesture takes something off. **👕 dress
+  her** under the gesture menu puts everything back on too, and playing an
+  undress gesture (from the menu or ▶ in the studio) puts back what it takes
+  off first, so it can be played again and again.
   Taking a piece off hides it; the body underneath is whole, so nothing is
   reloaded. Which piece is which is guessed from where it sits on her; a
   model can name its own in `<model>.outfits.json` next to it,
@@ -605,6 +611,12 @@ like everything else on the portrait server.
 Torso and head bones are `'+'` (added on top of her breathing), like the
 gesture files write them. Made from helpers like `both()` in code? A gesture
 saved from the studio comes out as plain numbers, which is fine.
+
+### Cards
+
+The control panel's **Cards** tab saves her look as a picture: a trading card
+that carries her model, look, clothes map, voice and your own gestures, to
+switch between looks or share one. See [Cards](cards.md).
 
 ### Writing a gesture in code
 

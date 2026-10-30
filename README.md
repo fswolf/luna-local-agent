@@ -260,6 +260,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [The companion](docs/companion.md): the whole companion side in depth: her moods and how they move, touch, gestures, saying no
 - [Moods](docs/moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking
+- [Cards](docs/cards.md): her look as a picture, to switch looks or share one
 - [Gestures](docs/gestures.md): how her body moves, what sets it off, writing your own
 - [Hologram fans](docs/fans.md): Luna live on a Holoscope WiFi fan or an HDMI fan, and which to buy
 - [Home automation](docs/home.md): Home Assistant on your own network, setup, what always asks, local devices

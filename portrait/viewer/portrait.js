@@ -416,8 +416,11 @@ function handle(ev) {
       mind.voice.push({ env: ev.env || [], zcr: ev.zcr || [], fps: ev.fps || 30, start: performance.now() });
       if (mind.voice.length > 3) mind.voice.shift();
       break;
-    case 'reload':      // /portrait use switched the model
-      location.reload();
+    case 'reload':      // /portrait use switched the model, or a card was put on
+      // a page opened on ?model=... follows to the card's model rather than reopening the old one
+      if (ev.model && new URL(location.href).searchParams.has('model')) {
+        const u = new URL(location.href); u.searchParams.set('model', ev.model); location.replace(u.toString());
+      } else location.reload();
       break;
     case 'done':
       tilt.target = 0;
