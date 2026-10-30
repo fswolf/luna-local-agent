@@ -25,8 +25,9 @@ Each is its own patch, so one can be tested and rolled back without touching the
 1. Talk to her as usual, and keep the good replies (`/good`) or your better version
    (`/fix <reply>`).
 2. Look through them on the examples page now and then: approve, drop, edit.
-3. With a few hundred approved, stop Luna and the model server and run
-   `training/train.sh gesture` (or `habit`) overnight.
+3. With a few hundred approved, stop Luna and the model server, check with
+   `training/train.sh gesture --check`, then run `training/train.sh gesture` (or `habit`).
+   Leave it running; overnight is a good time.
 4. Restart `llama/start.sh`. The new patch loads by itself, for the model it was made for.
 5. Try it with `/patches`, at half strength first if you like.
 
@@ -65,8 +66,8 @@ Newest first, each with what you said, her reply, and your version if you fixed 
 ## Training a patch
 
 By hand, when there are enough approved examples. Training needs the whole graphics
-card, so stop Luna, `llama/start.sh` and LM Studio first. The script checks and won't
-start while any of them still holds a model.
+card, so stop Luna, `llama/start.sh` and LM Studio first. The script won't start while
+her model servers or LM Studio still hold a model (`FORCE=1` to try anyway).
 
 ```
 training/train.sh gesture --check    check first: lists anything missing
@@ -80,7 +81,8 @@ What it does:
    every time.
 2. Builds the trainer container the first time (`training/Containerfile`: Unsloth with
    PyTorch for ROCm, in podman or docker), so nothing is installed on your system.
-3. Trains, in the container, with your graphics card passed through.
+3. Trains, in the container, with your graphics card passed through. It prints how many
+   examples it used, how many it left out and why, and the loss as it goes.
 4. Turns the result into a GGUF patch in `llama/patches/`, with a `.json` beside it
    saying which model it was made for, how many examples, and when.
 
@@ -151,13 +153,18 @@ they carry over to every model you use.
 - **Not yet run on a real card.** The scripts, the export, the masking and the loading
   are tested, but no full training run has been done. It's Linux only, on an AMD card
   through ROCm for now.
+- **Luna's own model server only.** Patches are loaded by `llama/start.sh` (llama.cpp's
+  server). LM Studio and other servers don't load them; `/patches` can only change the
+  strength on llama.cpp's server.
 - **AMD cards.** ROCm support for the RX 6000 series is listed as limited, and 4-bit
   loading on AMD is newer than on NVIDIA. If the model won't load in 4 bits, that's
   where to look first.
 - **Tools.** The examples don't carry the tool list she's given, and turns where she
   called tools aren't collected yet, so a patch never sees tools while it trains. Keep
   patches gentle and check tools still work after loading one (`/tooltest`).
-- **Gesture tagging.** Gesture examples have to be tagged by hand for now. Tagging her
-  real replies automatically, and scripted practice conversations, are planned.
+- **Gesture tagging.** Gesture examples have to be tagged by hand for now: `/fix` with
+  the tags where they belong (or edit them in on the examples page), then switch the
+  example to **gesture** there; `/good` and `/fix` keep examples as habits. Tagging her real
+  replies automatically, and scripted practice conversations, are planned.
 - **No before-and-after check yet.** Compare her with the patch at 0 and at 1 yourself
   until the automatic test run exists.
