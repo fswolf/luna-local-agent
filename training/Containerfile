@@ -1,0 +1,16 @@
+# The patch trainer: Unsloth on an AMD card (ROCm), in a container so none of
+# it touches your system Python. training/train.sh builds it once
+# (podman or docker) and runs it with the GPU passed through.
+# Install steps from Unsloth's AMD guide (unsloth.ai/docs, Install > AMD).
+FROM docker.io/library/python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends git build-essential && rm -rf /var/lib/apt/lists/*
+ARG ROCM=rocm6.4
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache "torch<2.15" torchvision torchaudio --index-url https://download.pytorch.org/whl/${ROCM} && \
+    uv pip freeze --system | grep -E '^(torch|torchvision|torchaudio)==' > /torch-pins.txt && \
+    echo "triton ; sys_platform == 'never'" >> /torch-pins.txt && \
+    echo "xformers ; sys_platform == 'never'" >> /torch-pins.txt && \
+    uv pip install --system --no-cache "unsloth[amd]" --overrides /torch-pins.txt && \
+    uv pip install --system --no-cache gguf sentencepiece --overrides /torch-pins.txt
+ENV HF_HUB_DISABLE_XET=1 TOKENIZERS_PARALLELISM=false PYTHONUNBUFFERED=1
+WORKDIR /work

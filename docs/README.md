@@ -28,6 +28,7 @@ Everything the README only touches on, one subject per page.
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](learning.md): lessons, episodes, fact cleanup, calibration
+- [Patches](patches.md) (experimental): collecting examples, training a patch (LoRA) for her model, loading it, changing models
 - [The companion](companion.md): the whole companion side in one place - persona, every mood and the exact numbers, the lewd and grudge rows, touches, gestures, sounds, settings, recipes
 - [Moods](moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking

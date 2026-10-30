@@ -5,8 +5,9 @@
 // undress), not as a gesture of its own.
 import { both, open, fingers, REST } from './_pose.js';
 
-const KNOT = { rightUpperArm: [0.25, 0.55, 0.42], rightLowerArm: [0, 2.45, 0, -1.2], rightHand: [0, 0.3, 0.7], ...fingers('right', 0.7) };
-const TUG = { rightUpperArm: [0.25, 0.5, 0.55], rightLowerArm: [0, 2.2, 0, -1.2], rightHand: [0, 0.3, 0.7], ...fingers('right', 0.7) };
+// elbow down by her side, fingers on the knot at her collar
+const KNOT = { rightUpperArm: [0.4, 0.8, 0.95], rightLowerArm: [0, 2.6, 0, -1.4], rightHand: [0, 0.4, 0.5], ...fingers('right', 0.7) };
+const TUG = { rightUpperArm: [0.4, 0.8, 1.05], rightLowerArm: [0, 2.4, 0, -1.4], rightHand: [0, 0.4, 0.5], ...fingers('right', 0.7) };
 const OVER = { ...both({ rightUpperArm: [0, 0.0, -0.95], rightLowerArm: [0, 1.6, 0], rightHand: [0, 0.2, 0] }),
                ...fingers('right', 0.7), ...fingers('left', 0.7) };
 const TOSS = { rightUpperArm: [0, 0.6, 0.55], rightLowerArm: [0, 0.5, 0], rightHand: [0, 0, 0.3], ...open('right') };
