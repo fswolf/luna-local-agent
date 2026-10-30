@@ -12,7 +12,7 @@ const post = (what, body, headers = { 'Content-Type': 'application/json' }) =>
 
 const MAX_CARD = 96 * 1024 * 1024;           // web/cards.py's limit, checked here first
 const PARTS = [['model', 'model', true, 'the .vrm itself (16-22 MB). Off: a light card, for someone who has the model already'],
-               ['look', 'look', true, 'background, framing, hologram, light strips (as saved in settings)'],
+               ['look', 'look', true, 'background, framing, hologram, and light strips on her robot model (as saved in settings)'],
                ['clothes', 'clothes map', true, "the model's outfits.json, if it has one"],
                ['voice', 'voice', false, 'her Kokoro voice and speed']];
 
