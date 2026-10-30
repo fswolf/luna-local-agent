@@ -293,6 +293,7 @@ SETTINGS = {
     "portrait.size":              ("PORTRAIT_SIZE",                True),
     "portrait.frame":             ("PORTRAIT_FRAME",               True),
     "portrait.background":        ("PORTRAIT_BACKGROUND",          True),
+    "portrait.match_light":       ("PORTRAIT_MATCH_LIGHT",         True),
     "portrait.touch_talk":        ("PORTRAIT_TOUCH_TALK",          True),
     "portrait.coffee.enabled":    ("PORTRAIT_COFFEE",              True),
     "portrait.coffee.from":       ("PORTRAIT_COFFEE_FROM",         True),
@@ -430,6 +431,12 @@ def _coerce(path, raw):
             return max(0.0, min(2.0, float(text)))
         except ValueError:
             raise ValueError(f"{path} is a number from 0 to 2 - {raw!r} isn't one") from None
+
+    if path == "portrait.match_light":
+        try:
+            return max(0.0, min(1.0, float(text)))
+        except ValueError:
+            raise ValueError(f"{path} is a number from 0 to 1 - {raw!r} isn't one") from None
 
     if path == "camera.device":   # a number, a /dev path or a URL
         return int(text) if text.lstrip("-").isdigit() else text

@@ -113,6 +113,18 @@ export function debugPanel() {
     r2.oninput = () => { blush.test = +r2.value < 0 ? null : +r2.value; out2.textContent = blush.test == null ? ' auto' : ` ${r2.value}`; };
     row2.append(r2, out2);
     row.after(row2);
+    // her lights from the room behind her (ambient.js): a preview; portrait.match_light keeps it
+    const row3 = document.createElement('label');
+    row3.style.display = 'block';
+    row3.textContent = 'light from the room ';
+    row3.title = 'how much her lights take on the colours of the picture behind her (portrait.match_light saves it)';
+    const r3 = document.createElement('input');
+    Object.assign(r3, { type: 'range', min: 0, max: 1, step: 0.05, value: ctx.ambient?.amount ?? 0.6 });
+    const out3 = document.createElement('span');
+    out3.textContent = ` ${r3.value}`;
+    r3.oninput = () => { ctx.ambient?.set(+r3.value); out3.textContent = ` ${r3.value}`; };
+    row3.append(r3, out3);
+    row2.after(row3);
   }
   // a button for every gesture file, labelled by its file name (blow_kiss.js -> "blow kiss"),
   // with a hover line saying what it is: about, touch zones, moods, and

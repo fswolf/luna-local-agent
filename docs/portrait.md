@@ -98,6 +98,16 @@ you change it. The OBS page
 (`?bg=transparent`) stays see-through and the hologram fans stay black
 whatever it's set to.
 
+**Light from the room.** Her lights take on the colours of the picture (or
+colour) behind her: candlelight makes her warmer, a cold blue room cooler. The
+picture is read once when it changes, at a tiny size: its overall colour lights
+her from above, the floor's from below, and its brightest spots (a lamp, a
+window, candles) become her key and rim light. It costs nothing while she runs.
+`portrait.match_light` sets how much, from 0 (her own white and pink light) to 1
+(the room's); 0.6 by default. The control panel's **light from the room** slider
+previews it, and `?matchlight=0` on the address turns it off for that page. Her
+gradient, see-through and the fans keep her own light.
+
 ## Touching her
 
 Click a part of her and she reacts (3D models). The cursor turns into a

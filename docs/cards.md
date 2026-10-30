@@ -25,7 +25,7 @@ You tick what goes on a card when you save it:
 | Part | What | Ticked at first |
 |---|---|---|
 | model | the model file itself, as big as the model (Luna's are 16-22 MB). Untick it for a light card, for someone who has the model already | yes |
-| look | background, framing, hologram, and the light strip settings for Luna's robot model (the only model that has strips) | yes |
+| look | background, framing, light from the room, hologram, and the light strip settings for Luna's robot model (the only model that has strips) | yes |
 | clothes map | the model's `<model>.outfits.json`, if it has one | yes |
 | voice | her Kokoro voice and speed | no |
 | your gestures | any you tick, from the ones you made yourself | none |

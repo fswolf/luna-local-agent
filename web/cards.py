@@ -37,7 +37,7 @@ MAX_IMAGE = 8 * 1024 * 1024
 MAX_GESTURES = 40
 
 # Everything a card may set, and nothing else.
-LOOK = ("portrait.background", "portrait.frame",
+LOOK = ("portrait.background", "portrait.frame", "portrait.match_light",
         "portrait.hologram.enabled", "portrait.hologram.tint", "portrait.hologram.mix",
         "portrait.hologram.intensity", "portrait.hologram.glitch", "portrait.hologram.base",
         "portrait.lights.enabled", "portrait.lights.color", "portrait.lights.brightness",

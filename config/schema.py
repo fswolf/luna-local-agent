@@ -155,6 +155,7 @@ SCHEMA = {
     "portrait.frame": ("choice", "How much of her the camera shows: bust (head and shoulders), full, or face (close crop)",
                        ("bust", "full", "face")),
     "portrait.background": ("text", "What's behind her: default (her dark gradient), none (see-through), seasonal (a picture from portrait/backgrounds/seasonal/ by the date and time of day), a colour like #1a1025, or a picture in portrait/backgrounds/"),
+    "portrait.match_light": ("float", "How much her lights take on the colours of the picture or colour behind her: 0 her own white and pink light, 1 the room's (candlelight makes her warm, a winter night cool)"),
     "portrait.live2d": ("dict", "Live2D only: which model expression is which mood, and which parameters are the ears"),
     "portrait.touch_talk": ("bool", "When you touch her portrait, she also answers out loud in one short line"),
     "portrait.touch_talk_cooldown": ("float", "Seconds between spoken touch lines"),

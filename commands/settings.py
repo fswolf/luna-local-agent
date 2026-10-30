@@ -9,7 +9,6 @@ import config
 from core import logbook
 import plugins
 from web import portrait_window
-from voice import ptt
 import ui
 
 from . import ctx
@@ -103,10 +102,12 @@ def handle(text):
             ui.add_message("system", f"Couldn't write config.json: {e}")
             return True
 
-        # stt.mode has a live switch of its own - flipping the constant
-        # isn't enough, the hands-free loop has to be told.
-        if path == "stt.mode":
-            ptt.set_mode(applied)
+        # What the settings pane does after a change, the same here: stt.mode
+        # tells the hands-free loop, the portrait's settings tell an open
+        # portrait (background, framing, lights...). It says if that fails.
+        from ui import settings_pane
+
+        settings_pane._after(path, applied)
 
         ui.add_message(
             "system",
