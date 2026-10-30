@@ -19,7 +19,7 @@
 - [Memory](memory.md)
 - [Her reasoning](reasoning.md)
 - [Learning from herself](learning.md)
-- [Patches](patches.md)
+- [Patches (experimental)](patches.md)
 - [The companion](companion.md)
 - [Moods](moods.md)
 - [Portrait](portrait.md)

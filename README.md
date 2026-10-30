@@ -67,6 +67,7 @@ What she does:
 - **Light strips:** the LEDs on her robot model glow in her mood's colour, breathe, pulse with her voice and sweep while she thinks; chest and groin stay dark on a tame stream ([details](docs/portrait.md#light-strips))
 - **On a hologram fan:** live over WiFi on a Holoscope fan (P56, PD42), or on any HDMI fan as a screen; she floats in the air ([details](docs/fans.md))
 - **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
+- **Patches (experimental):** keep the replies you like with `/good`, or correct one with `/fix`, and train a small patch (a LoRA) for her model overnight that teaches her those habits. Only patches made for the model you're running get loaded ([details](docs/patches.md))
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
 - **Plays games:** chess against you on a board you drag the pieces around on, and Minecraft, Zork, Vibe City and REALITI on her own when you go quiet; she remembers how she felt about them ([details](docs/games.md))
 - **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
@@ -255,6 +256,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](docs/reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](docs/learning.md): lessons, episodes, fact cleanup, calibration
+- [Patches](docs/patches.md) (experimental): collecting examples, training a patch (LoRA) for her model, loading it, changing models
 - [The companion](docs/companion.md): the whole companion side in depth: her moods and how they move, touch, gestures, saying no
 - [Moods](docs/moods.md): the moods file, intensity, quick feelings she shows for a moment
 - [Portrait](docs/portrait.md): Live2D and VRM, looking and thinking

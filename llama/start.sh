@@ -213,6 +213,27 @@ args=(
 )
 
 [ "$KV_UNIFIED" = 1 ] && args+=(--kv-unified)
+
+# Her patches: the ones made for this model (their .json says which, by
+# file name), so changing MODEL never loads a patch that doesn't fit.
+# The model's name goes in patches/.current_model for training/train.sh.
+mkdir -p patches
+echo "$(basename "$MODEL" .gguf)" > patches/.current_model
+patch_lines=()
+if [ "${PATCHES:-auto}" != off ]; then
+    for p in patches/*.gguf; do
+        [ -f "$p" ] || continue
+        name="$(basename "$p" .gguf)"
+        if [ "${PATCHES:-auto}" != auto ] && [[ " $PATCHES " != *" $name "* ]]; then continue; fi
+        made_for="$(sed -n 's/.*"for": *"\([^"]*\)".*/\1/p' "patches/$name.json" 2>/dev/null | head -1)"
+        if [ "$made_for" = "$(basename "$MODEL" .gguf)" ]; then
+            args+=(--lora "$p")
+            patch_lines+=("  patch: $name")
+        else
+            patch_lines+=("  patch left out: $name (made for ${made_for:-an unknown model})")
+        fi
+    done
+fi
 [ "${#cache_ram[@]}" -gt 0 ] && args+=("${cache_ram[@]}" "${CACHE_RAM:-2048}")
 [ -n "$MMPROJ" ] && args+=(--mmproj "$MMPROJ")
 
@@ -231,6 +252,7 @@ if [ -n "$MMPROJ" ]; then
 else
     echo "  vision: off - no mmproj next to the model (see MMPROJ in server.env)"
 fi
+[ "${#patch_lines[@]}" -gt 0 ] && printf '%s\n' "${patch_lines[@]}"
 echo "  http://$HOST:$PORT  (Ctrl+C stops them all)"
 echo
 

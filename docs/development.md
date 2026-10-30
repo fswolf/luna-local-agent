@@ -82,7 +82,10 @@ ai-voice/
 │   ├── models/       #   Live2D folders and .vrm files
 │   ├── animations/   #   .vrma clips (clips.json)
 │   └── add_live2d.py
-├── training/         # patches (LoRA): dataset.py keeps the examples (/good, /fix) - docs/patches.md
+├── training/         # patches (LoRA, experimental) - docs/patches.md
+│                     #   dataset.py the examples (/good, /fix); export.py them for training;
+│                     #   train.sh + Containerfile + train.py the run (Unsloth, ROCm);
+│                     #   patches.py what's on disk and loaded (/patches)
 ├── introspection/    # injected-thought experiments - make_vectors, trial, report, blind
 ├── memory-manager/
 │   ├── manager.py

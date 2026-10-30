@@ -374,7 +374,7 @@ function handle(ev) {
       mind.label = typeof ev.label === 'string' ? ev.label : '';
       mind.row = typeof ev.row === 'string' ? ev.row : '';
       mind.tame = !!ev.tame;      // live on a stream with lewd off: no lewd moves
-      if (mind.tame) outfits?.wear?.('dressed');   // and nothing comes off while it's on
+      if (mind.tame && outfits?.has) { if (undressPlaying()) stopUndressing(); else undressing.token++; outfits.wear('dressed'); }   // and nothing comes off while it's on
       mind.face = ev.face && typeof ev.face === 'object' ? ev.face : null;
       mind.idle = Array.isArray(ev.idle) ? ev.idle : [];
       // A held pose (walked away: "sulk"). Let go of it when the mood
@@ -545,6 +545,8 @@ function gesture(name, publicOnly = false) {
   // one that takes clothes off (tie_off...): only on a model with them still on, never in tame mode
   const takes = [].concat(...[].concat(GESTURES[name]?.clothes || []).map(e => [].concat(e.off || [])));
   if (takes.length && !name.startsWith('__') && (mind.tame || !outfits?.has || !takes.some(isOn))) return false;   // (the studio's own preview always plays)
+  // halfway out of her top: a giggle or a wave from her reply waits, it would pull her arms away
+  if (!takes.length && undressPlaying() && movesArms(name)) return false;
   if (name === 'wave' && !moves.hasClip('wave')) name = Math.random() < 0.7 ? 'wave' : 'wave_left';
   if (moves.play(name, publicOnly)) {
     idle.next = clock.elapsedTime + rand(20, 40);
@@ -560,8 +562,10 @@ function gesture(name, publicOnly = false) {
     }
     // clothes coming off (or on) at a moment in it: { at: seconds, off: ['top'] }
     if (g && Array.isArray(g.clothes) && outfits?.has) {
+      const token = undressing.token;
       for (const e of g.clothes) setTimeout(() => {
-        if (!outfits) return;
+        // cut short, or dressed again since: nothing happens
+        if (!outfits || token !== undressing.token || !moves.playing().includes(name)) return;
         for (const p of [].concat(e.off || [])) if (!mind.tame) outfits.set(String(p), false);
         for (const p of [].concat(e.on || [])) outfits.set(String(p), true);
       }, (+e.at || 0) * 1000);
@@ -621,7 +625,8 @@ function clothes(a, who) {
     if (mind.tame || (who !== 'command' && !said.private)) return false;
     if (who === 'you' && (mind.row === 'grudge' || warmthBand() === 'cool' || mind.hold)) return false;
   }
-  if (a.wear === 'dressed') { undressing.token++; return outfits.wear('dressed'); }
+  if (a.wear === 'dressed' || [].concat(a.on || []).length) stopUndressing();   // stops what's still coming off
+  if (a.wear === 'dressed') return outfits.wear('dressed');
   for (const p of [].concat(a.on || [])) outfits.set(String(p), true);
   // off: each piece with its gesture where there is one (tie_off, top_off...)
   const pieces = a.wear === 'underwear' ? outfits.pieces().filter(p => p.on).map(p => p.label) : [].concat(a.off || []).map(String);
@@ -637,6 +642,9 @@ const ORDER = ['tie', 'ribbon', 'top', 'bottoms', 'shoes', 'socks'];
 const undressing = { token: 0 };
 const kind = label => String(label).replace(/ \d+$/, '');          // "top 2" -> "top"
 const isOn = piece => outfits.pieces().some(p => p.on && (p.label === piece || kind(p.label) === piece));
+const undressPlaying = () => (moves?.playing() || []).some(n => Array.isArray(GESTURES[n]?.clothes));
+// her arms come down too, rather than finishing a pull that no longer takes anything off
+function stopUndressing() { undressing.token++; if (undressPlaying()) moves.stop(); }
 function undressGesture(piece) {
   for (const [n, g] of Object.entries(GESTURES))
     if (!n.endsWith('_left') && Array.isArray(g.clothes) && g.clothes.some(e => [].concat(e.off || []).includes(piece))) return n;
@@ -646,13 +654,16 @@ function undress(pieces) {
   const list = [...new Set(pieces.map(kind))].sort((x, y) => (ORDER.indexOf(x) + 1 || 99) - (ORDER.indexOf(y) + 1 || 99));
   const token = ++undressing.token;
   const next = () => {
-    if (token !== undressing.token || !outfits) return;
+    if (token !== undressing.token || !outfits || mind.tame) return;   // dressed again, or tame mode came on
     const piece = list.shift();
     if (!piece) return;
     if (!isOn(piece)) return next();                                 // gone already (the tie goes with the top)
     const name = undressGesture(piece);
-    if (name && gesture(name)) setTimeout(() => { if (isOn(piece)) outfits.set(piece, false); next(); }, lengthOf(GESTURES[name]) * 1000);
-    else { outfits.set(piece, false); next(); }
+    if (name && gesture(name)) {
+      // its own moment takes the piece; this is for when it was cut short
+      setTimeout(() => { if (token !== undressing.token || mind.tame) return; if (isOn(piece)) outfits.set(piece, false); next(); },
+                 lengthOf(GESTURES[name]) * 1000);
+    } else { outfits.set(piece, false); next(); }
   };
   next();
 }

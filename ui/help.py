@@ -95,9 +95,12 @@ _HELP_SECTIONS = [
         ("/good", "keep her last reply as an example of how she should talk"),
         ("/fix <reply>", "keep your better version of her last reply instead"),
         ("/examples", "how many examples there are, and the page to look through them"),
+        ("/patches", "the trained patches: loaded, waiting, or made for another model"),
+        ("/patches <name> <0-1>", "change a loaded patch's strength while she runs"),
         "examples train her patches: small add-ons that teach a habit,",
         "like where gestures go. She never sees these commands, and the",
-        "examples stay in agent/dataset/, never committed. docs/patches.md",
+        "examples stay in agent/dataset/, never committed. Train one with",
+        "training/train.sh gesture|habit (overnight, GPU free). docs/patches.md",
     ]),
     ("Memory", [
         ("/facts", "what she remembers, and which backend holds it"),
