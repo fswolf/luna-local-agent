@@ -240,7 +240,7 @@ The installer asks before anything that touches your system, and can be run agai
 
 - [Install](docs/install.md): the installer, the model picked for your GPU, LM Studio or llama.cpp, the voice server, first run
 - [Models](docs/models.md): which models work, what's been tested, graphics memory, quants, context, using your own
-- [What she runs on](docs/parts.md): the six pieces she uses, what each costs, and how to leave one out or move it to the CPU
+- [What she runs on](docs/parts.md): the six pieces she uses, what each costs, how to leave one out or move it to the CPU, and how she scales from a 9B on your desktop to a 70B on a server
 - [Configuration](docs/configuration.md): the settings page and presets, config.json, changing settings live, logging
 - [Controls and voice](docs/controls.md): keys, voice modes, speech detection, barge-in, wake word
 - [Tool calling](docs/tools.md): every tool, her own manual, turning them off, MCP servers
