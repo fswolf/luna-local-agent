@@ -533,15 +533,18 @@ function busyHands(name) {
 }
 
 function gesture(name, publicOnly = false) {
-  if (!moves) return;
+  if (!moves) return false;
   if (GESTURES[name] && GESTURES[name].view != null) {
     const deg = +GESTURES[name].view || 0;
     turnTo(deg === 180 && facingAway() ? 0 : deg);      // "turn around" while turned round: back to you
-    return;
+    return true;
   }
-  if (moves.playing().some(n => n.replace('_left', '') === name)) return;   // already doing it
-  if (busyHands(name)) return;
-  if (mind.tame && GESTURES[name]?.lewd) return;
+  if (moves.playing().some(n => n.replace('_left', '') === name)) return false;   // already doing it
+  if (busyHands(name)) return false;
+  if (mind.tame && GESTURES[name]?.lewd) return false;
+  // one that takes clothes off (tie_off...): only on a model with them still on, never in tame mode
+  const takes = [].concat(...[].concat(GESTURES[name]?.clothes || []).map(e => [].concat(e.off || [])));
+  if (takes.length && !name.startsWith('__') && (mind.tame || !outfits?.has || !takes.some(isOn))) return false;   // (the studio's own preview always plays)
   if (name === 'wave' && !moves.hasClip('wave')) name = Math.random() < 0.7 ? 'wave' : 'wave_left';
   if (moves.play(name, publicOnly)) {
     idle.next = clock.elapsedTime + rand(20, 40);
@@ -555,13 +558,23 @@ function gesture(name, publicOnly = false) {
         setTimeout(() => { if (moves.playing().includes(name)) { emoteLast = -99; emote(e.name); } }, (+e.at || 0) * 1000);
       }
     }
+    // clothes coming off (or on) at a moment in it: { at: seconds, off: ['top'] }
+    if (g && Array.isArray(g.clothes) && outfits?.has) {
+      for (const e of g.clothes) setTimeout(() => {
+        if (!outfits) return;
+        for (const p of [].concat(e.off || [])) if (!mind.tame) outfits.set(String(p), false);
+        for (const p of [].concat(e.on || [])) outfits.set(String(p), true);
+      }, (+e.at || 0) * 1000);
+    }
     if (g && (g.wag || g.tail_up)) {
       if (g.tail_up) moves.wag(+g.tail_up, 0); else moves.wag(+g.wag);
       setTimeout(() => { if (!moves.playing().includes(name)) moves.wag(0); }, lengthOf(g) * 1000 + 300);
     }
     if (/wave|hug|jump|bounce/.test(name)) { moves.wag(name === 'hug' ? 0.5 : 1); setTimeout(() => moves.wag(0), 3500); }
     if (name === 'look_back') { moves.wag(0.6); setTimeout(() => moves.wag(0), 6000); }   // a slow swish while she's bent over
+    return true;
   }
+  return false;
 }
 
 // You say hi, bye, or ask for a hug.
@@ -608,11 +621,40 @@ function clothes(a, who) {
     if (mind.tame || (who !== 'command' && !said.private)) return false;
     if (who === 'you' && (mind.row === 'grudge' || warmthBand() === 'cool' || mind.hold)) return false;
   }
-  let did = false;
-  if (a.wear === 'dressed' || a.wear === 'underwear') did = outfits.wear(a.wear);
-  for (const p of [].concat(a.off || [])) did = outfits.set(String(p), false) || did;
-  for (const p of [].concat(a.on || [])) did = outfits.set(String(p), true) || did;
-  return did;
+  if (a.wear === 'dressed') { undressing.token++; return outfits.wear('dressed'); }
+  for (const p of [].concat(a.on || [])) outfits.set(String(p), true);
+  // off: each piece with its gesture where there is one (tie_off, top_off...)
+  const pieces = a.wear === 'underwear' ? outfits.pieces().filter(p => p.on).map(p => p.label) : [].concat(a.off || []).map(String);
+  if (pieces.length) undress(pieces);
+  return true;
+}
+
+// Taking pieces off one after another, each with the gesture that takes it
+// off (a gesture file's clothes: [{ at, off: [...] }]); a piece without one,
+// or when she can't move right now (holding her mug), just goes. A new
+// "get dressed" stops the rest.
+const ORDER = ['tie', 'ribbon', 'top', 'bottoms', 'shoes', 'socks'];
+const undressing = { token: 0 };
+const kind = label => String(label).replace(/ \d+$/, '');          // "top 2" -> "top"
+const isOn = piece => outfits.pieces().some(p => p.on && (p.label === piece || kind(p.label) === piece));
+function undressGesture(piece) {
+  for (const [n, g] of Object.entries(GESTURES))
+    if (!n.endsWith('_left') && Array.isArray(g.clothes) && g.clothes.some(e => [].concat(e.off || []).includes(piece))) return n;
+  return '';
+}
+function undress(pieces) {
+  const list = [...new Set(pieces.map(kind))].sort((x, y) => (ORDER.indexOf(x) + 1 || 99) - (ORDER.indexOf(y) + 1 || 99));
+  const token = ++undressing.token;
+  const next = () => {
+    if (token !== undressing.token || !outfits) return;
+    const piece = list.shift();
+    if (!piece) return;
+    if (!isOn(piece)) return next();                                 // gone already (the tie goes with the top)
+    const name = undressGesture(piece);
+    if (name && gesture(name)) setTimeout(() => { if (isOn(piece)) outfits.set(piece, false); next(); }, lengthOf(GESTURES[name]) * 1000);
+    else { outfits.set(piece, false); next(); }
+  };
+  next();
 }
 // Each finished action in her reply so far (*...* or (...)), once a turn
 function clothesFromHer(text) {

@@ -44,7 +44,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   // -- what's being made -----------------------------------------------------
   const fresh = () => ({ name: '', about: '', keywords: '', dur: 3, fade: [0.4, 0.5],
                          keys: [], expr: {}, private: false, lewd: false, full: false, idle: [],
-                         touch: [], moods: [], sound: { name: '', from: '', len: '' }, emote: [],
+                         touch: [], moods: [], sound: { name: '', from: '', len: '' }, emote: [], clothes: [],
                          tail: 'none', tailLevel: 0.8, chain: [], extra: {} });
   let A = fresh();
   const st = { on: false, live: null, bone: 'rightUpperArm', t: 0, playing: false, loop: false, timer: 0 };
@@ -229,6 +229,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
   const soundFrom = el('input', { type: 'text', placeholder: 'from: random or seconds', style: 'width:120px' });
   const soundLen = el('input', { type: 'number', step: 0.5, min: 0, placeholder: 'length', style: 'width:62px' });
   const emoteBox = el('div');
+  const clothesBox = el('div');
   const tailSel = el('select');
   for (const [v, l] of [['none', 'tail: as it is'], ['wag', 'tail: swishes'], ['tail_up', 'tail: lifted and held']]) tailSel.add(new Option(l, v));
   const tailLvl = el('input', { type: 'range', min: 0.1, max: 1, step: 0.05, value: 0.8, style: 'width:100px' });
@@ -240,7 +241,11 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     el('div', { className: 'dim', textContent: 'in these moods (none ticked: any mood)' }), bands, row('', moodIn),
     row('sound', soundSel), row('', soundFrom, soundLen),
     el('div', { className: 'row' }, el('span', { className: 'l', textContent: 'emotes' }), btn('+ emote', () => { A.emote.push({ name: 'hearts', at: +st.t.toFixed(2) }); drawEmotes(); })),
-    emoteBox, row('tail', tailSel, tailLvl));
+    emoteBox,
+    el('div', { className: 'row' }, el('span', { className: 'l', textContent: 'clothes' }),
+       btn('+ clothes', () => { A.clothes.push({ way: 'off', piece: 'top', at: +st.t.toFixed(2) }); drawClothes(); }),
+       el('span', { className: 'dim', textContent: ' a piece comes off (or on) at a moment' })),
+    clothesBox, row('tail', tailSel, tailLvl));
 
   // -- link page -----------------------------------------------------------------
   const linkSel = el('select');
@@ -875,6 +880,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     }
     g.font = '11px system-ui';
     for (const e of A.emote) { g.fillStyle = '#e07ac8'; g.fillText({ hearts: '♥', sweat: '💧', anger: '💢', question: '?' }[e.name] || '•', x(e.at) - 4, 54); }
+    for (const c of A.clothes) { g.fillStyle = c.way === 'off' ? '#ffb86b' : '#8fd18f'; g.fillText(c.way === 'off' ? '▼' : '▲', x(c.at) - 4, 44); }
     // keys
     for (const k of A.keys) {
       const cx = x(k.t), on = near(k.t, st.t);
@@ -1029,6 +1035,27 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
                           btn('✕', () => { A.emote.splice(i, 1); drawEmotes(); })));
     });
   }
+  // the pieces this model has (outfits.js), and the usual ones for models it doesn't know
+  function clothesPieces() {
+    const have = (O()?.pieces?.() || []).map(p => p.label.replace(/ \d+$/, ''));
+    return [...new Set([...have, 'tie', 'top', 'bottoms', 'shoes', 'socks'])];
+  }
+  function drawClothes() {
+    clothesBox.textContent = '';
+    A.clothes.forEach((c, i) => {
+      const way = el('select'), piece = el('select');
+      for (const w of ['off', 'on']) way.add(new Option(w, w));
+      for (const n of clothesPieces()) piece.add(new Option(n, n));
+      if (![...piece.options].some(o => o.value === c.piece)) piece.add(new Option(c.piece, c.piece));
+      way.value = c.way; piece.value = c.piece;
+      way.onchange = () => { c.way = way.value; drawTimeline(); };
+      piece.onchange = () => { c.piece = piece.value; };
+      const at = el('input', { type: 'number', step: 0.1, min: 0, value: c.at, style: 'width:62px' });
+      at.onchange = () => { c.at = Math.max(0, +at.value || 0); drawTimeline(); };
+      clothesBox.append(row('', piece, way, el('span', { className: 'dim', textContent: ' at ' }), at, el('span', { className: 'dim', textContent: 's ' }),
+                            btn('✕', () => { A.clothes.splice(i, 1); drawClothes(); drawTimeline(); })));
+    });
+  }
   function drawChain() {
     chainBox.textContent = '';
     if (!A.chain.length) chainBox.append(el('div', { className: 'dim', textContent: 'nothing linked yet' }));
@@ -1088,7 +1115,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     fillSounds(); soundSel.value = A.sound.name || ''; soundFrom.value = A.sound.from ?? ''; soundLen.value = A.sound.len ?? '';
     tailSel.value = A.tail; tailLvl.value = A.tailLevel;
     durN.value = A.dur; time.max = A.dur;
-    drawEmotes(); drawChain(); drawPropUse();
+    drawEmotes(); drawClothes(); drawChain(); drawPropUse();
   }
   function refreshAll() { aToForm(); seek(0); show(); }
 
@@ -1110,6 +1137,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       g.sound = s;
     }
     if (A.emote.length) g.emote = A.emote.map(e => ({ name: e.name, at: e.at }));
+    if (A.clothes.length) g.clothes = A.clothes.map(c => ({ at: c.at, [c.way]: [c.piece] }));
     if (A.tail === 'wag') g.wag = A.tailLevel;
     if (A.tail === 'tail_up') g.tail_up = A.tailLevel;
     return { ...A.extra, ...g };
@@ -1137,6 +1165,9 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     const s = typeof g.sound === 'string' ? { name: g.sound } : g.sound || {};
     A.sound = { name: s.name || '', from: s.from ?? '', len: s.len ?? '' };
     A.emote = [].concat(g.emote || []).map(e => (typeof e === 'string' ? { name: e, at: 0 } : { name: e.name, at: +e.at || 0 }));
+    A.clothes = [];
+    for (const e of [].concat(g.clothes || []))
+      for (const way of ['off', 'on']) for (const p of [].concat(e[way] || [])) A.clothes.push({ way, piece: String(p), at: +e.at || 0 });
     if (g.tail_up) { A.tail = 'tail_up'; A.tailLevel = g.tail_up; } else if (g.wag) { A.tail = 'wag'; A.tailLevel = g.wag; }
     for (const k of ['then', 'left', 'osc', 'add', 'prop', 'prop_at', 'hold', 'lights', 'face']) if (g[k] != null) A.extra[k] = g[k];
     // made with a prop: in her hand straight away (the menu isn't filled yet, so say which first)

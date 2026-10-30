@@ -195,6 +195,28 @@ class Tags(unittest.TestCase):
             emit.assert_not_called()
 
 
+class UndressGestures(unittest.TestCase):
+    """Gestures that take a piece off at a moment (tie_off, top_off, bottoms_off)."""
+
+    def test_studio_saves_clothes_checked(self):
+        from web import livefeed
+
+        k = [[0, {"rightHand": [0, 0, 0]}]]
+        _n, text = livefeed.gesture_file({"name": "s", "keys": k, "clothes": [
+            {"at": 1.5, "off": ["top", "<b>"]}, {"at": 2, "on": ["tie"]}, {"at": 3, "off": []}, "junk"]})
+        self.assertIn('clothes: [{"at": 1.5, "off": ["top"]}, {"at": 2.0, "on": ["tie"]}]', text.replace("2,", "2.0,"))
+
+    def test_built_ins_take_off_what_they_say(self):
+        from life import gestures
+
+        found = gestures.builtin()
+        for name, piece in (("tie_off", "tie"), ("top_off", "top"), ("bottoms_off", "bottoms")):
+            self.assertIn(name, found)
+            self.assertFalse(found[name]["about"], name)          # never offered as a move of its own
+            with open(os.path.join(HERE, "portrait", "gestures", name + ".js"), encoding="utf-8") as f:
+                self.assertRegex(f.read(), r"clothes: \[\{ at: [\d.]+, off: \[[^\]]*'%s'" % piece)
+
+
 CASES_YOU = {
     "take off your top": {"off": ["top"]},
     "take your shirt off": {"off": ["top"]},

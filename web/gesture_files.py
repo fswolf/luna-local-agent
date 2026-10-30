@@ -13,6 +13,7 @@ import config
 _GNAME = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
 _BONE = re.compile(r"^\+?[A-Za-z][A-Za-z0-9]{0,40}$")
 _WORD = re.compile(r"^[A-Za-z0-9_\- ]{1,40}$")
+_PIECE = re.compile(r"^[a-z][a-z0-9 _-]{0,23}$")      # a piece of clothing's label (outfits.js)
 _IDLE_BANDS = {"grudge", "cool", "neutral", "warm", "loving", "lewd"}
 _ZONES = {"head", "nose", "mouth", "chest", "tummy", "groin", "legs", "neck", "arms", "back", "butt", "tail"}
 
@@ -110,6 +111,21 @@ def gesture_file(data):
         emotes.append({"name": _words([str(e["name"])], 1)[0], "at": _num(e.get("at", 0), 0, 600)})
     if emotes:
         g["emote"] = emotes if len(emotes) > 1 else emotes[0]
+    # clothes coming off or on at a moment in it (portrait.js): [{at, off: [piece]}]
+    clothes = []
+    for e in (data.get("clothes") or [])[:8]:
+        if not isinstance(e, dict):
+            continue
+        one = {"at": _num(e.get("at", 0), 0, 600)}
+        for way in ("off", "on"):
+            pieces = [str(x).strip().lower() for x in (e.get(way) or [])][:6]
+            pieces = [x for x in pieces if _PIECE.match(x)]
+            if pieces:
+                one[way] = pieces
+        if len(one) > 1:
+            clothes.append(one)
+    if clothes:
+        g["clothes"] = clothes
     for k in ("wag", "tail_up"):
         if data.get(k):
             g[k] = _num(data[k], 0, 1)

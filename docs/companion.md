@@ -666,6 +666,17 @@ Putting clothes on always works. Taking them off doesn't happen:
 - on your word while she's cool with you, holding a grudge or has walked
   off. Then it's up to her: her own `*slips her top off*` still counts.
 
+**She takes them off, not just vanishes them.** Each piece that comes off
+plays the gesture that takes it off, and the piece goes at the right moment
+in it: `tie_off` (loosens the knot, lifts it over her head), `top_off`
+(pulls it up over her head; the tie goes with it, since it sits on the
+collar) and `bottoms_off` (pushes her shorts or skirt down and steps out).
+"Strip" plays them one after another. A piece without a gesture just goes,
+and so does one while her hands are busy (her mug). These three are rough
+first passes, to refine in the pose studio; any gesture can take a piece
+off with `clothes: [{ at: 2.0, off: ['top'] }]`, and the studio's Details
+tab sets it (**+ clothes**: the piece, off or on, and when).
+
 "Don't take your top off", "keep your shirt on" and her `*starts to take off
 her top*` or `*teases at the hem*` change nothing. What she has on is kept
 in the browser per model, so a reload doesn't dress her again, and Luna
