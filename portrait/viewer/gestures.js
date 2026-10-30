@@ -22,6 +22,9 @@
 //   then       another gesture to flow into as this one ends ('pant')
 //   sound      a clip from portrait/sounds/ to play with it: 'name' or { name, from, len }
 //   emote      'sweat', { name, at: seconds in }, or a list of them - emotes while it plays
+//   clothes    [{ at: seconds in, off: ['top'] }] (or on: [...]): her clothes at a moment
+//              in it, on a model whose clothes come off (tie_off, top_off, bottoms_off).
+//              Taking a piece off plays the gesture that has it (portrait.js undress)
 //   wag        0-1: her tail swishes while it plays
 //   tail_up    0-1: her tail lifts and holds up, still, while it plays
 //   lewd       true: never plays while a stream with lewd off is live
