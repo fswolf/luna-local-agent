@@ -26,6 +26,7 @@ import { createFan } from './fan.js';
 import { createProps } from './props.js';
 import { createOutfits } from './outfits.js';
 import { createLights } from './lights.js';
+import { createAmbient } from './ambient.js';
 import { turnAsked } from './turns.js';
 import { clothesAsked, clothesActed } from './clothes_talk.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
@@ -48,6 +49,7 @@ bindDebugPanel({
   get has() { return has; },
   get holo() { return holo; },
   get idlePool() { return idlePool; },
+  get ambient() { return ambient; },
   get lights() { return lights; },
   get lightsCfg() { return lightsCfg; },
   get mind() { return mind; },
@@ -110,13 +112,17 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(22, innerWidth / innerHeight, 0.05, 20);
 
-scene.add(new THREE.HemisphereLight(0xf3e6ff, 0x2a1838, 1.35));
+const hemi = new THREE.HemisphereLight(0xf3e6ff, 0x2a1838, 1.35);
+scene.add(hemi);
 const key = new THREE.DirectionalLight(0xfff4f8, 1.6);
 key.position.set(-0.6, 1.2, 1.4);
 scene.add(key);
 const rim = new THREE.DirectionalLight(0xd070ff, 1.4);  // the wallpaper's magenta back-light
 rim.position.set(0.8, 0.6, -1.2);
 scene.add(rim);
+// her lights take on the colours of the picture behind her (ambient.js); ?matchlight=0 for her own
+const ambient = createAmbient({ THREE, hemi, key, rim,
+  amount: params.has('matchlight') ? +params.get('matchlight') : (cfg.match_light ?? 0.6) });
 const emotes = createEmotes(THREE, scene);   // hearts, sweat drop... beside her head
 
 // The hologram look: config.json "hologram": {"enabled": true}, or ?holo=1.
@@ -295,6 +301,9 @@ function handle(ev) {
   switch (ev.t) {
     case 'background':  // /settings: what's behind her, picked by you
       window.lunaBackground?.(ev.value);
+      break;
+    case 'match_light': // /settings: how much her lights take on the room's colours
+      if (!params.has('matchlight')) ambient.set(ev.value);
       break;
     case 'stage': {
       const next = stageOf(ev.status);

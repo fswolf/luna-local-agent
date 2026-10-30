@@ -40,6 +40,12 @@ PORTRAIT_FRAME = str(_portrait_cfg.get("frame", "bust")).lower()
 # picture from portrait/backgrounds/seasonal/ by the date and time of day - the
 # one thing that changes on its own). OBS (?bg=transparent) and the fans ignore it.
 PORTRAIT_BACKGROUND = str(_portrait_cfg.get("background", "") or "").strip()
+# Her lights take on the colours of a background picture or colour
+# (portrait/viewer/ambient.js): 0 her own white and pink light, 1 the room's.
+try:
+    PORTRAIT_MATCH_LIGHT = max(0.0, min(1.0, float(_portrait_cfg.get("match_light", 0.6))))
+except (TypeError, ValueError):
+    PORTRAIT_MATCH_LIGHT = 0.6
 if PORTRAIT_FRAME not in FRAMES + ("face",):
     PORTRAIT_FRAME = "bust"
 # Live2D only: which expression is which (portrait/add_live2d.py fills it

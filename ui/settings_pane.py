@@ -420,6 +420,10 @@ def _after(path, value):
             from web import livefeed
 
             livefeed.emit("background", value=value)
+        elif path == "portrait.match_light":
+            from web import livefeed
+
+            livefeed.emit("match_light", value=value)
         elif path == "portrait.model":
             from web import livefeed
 

@@ -179,6 +179,7 @@ def portrait_config(preview=None):
             "lights": lights_config(),
             "moods": _mood_list(),
             "background": str(getattr(config, "PORTRAIT_BACKGROUND", "") or ""),
+            "match_light": float(getattr(config, "PORTRAIT_MATCH_LIGHT", 0.6)),
             "seasonal": config.seasonal_backgrounds(),
             "fan": dict(getattr(config, "PORTRAIT_FAN", {}) or {},
                         cast=bool(getattr(config, "PORTRAIT_FAN_CAST", False))),
