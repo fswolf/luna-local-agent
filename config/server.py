@@ -52,7 +52,7 @@ LLAMA_KEY_FILE = os.path.join(BASE_DIR, "llama", ".api_key")
 
 def _llama_key():
     try:
-        with open(LLAMA_KEY_FILE) as f:
+        with open(LLAMA_KEY_FILE, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
 

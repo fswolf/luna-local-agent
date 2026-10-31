@@ -55,7 +55,7 @@ def _today():
 
 def had_today():
     try:
-        with open(STATE_FILE) as f:
+        with open(STATE_FILE, encoding="utf-8") as f:
             return json.load(f).get("date") == _today()
     except (OSError, ValueError):
         return False
@@ -64,7 +64,7 @@ def had_today():
 def _mark_today():
     try:
         os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
-        with open(STATE_FILE, "w") as f:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump({"date": _today()}, f)
     except OSError as e:
         logbook.warn("coffee", "couldn't note today's cup: %s", e)

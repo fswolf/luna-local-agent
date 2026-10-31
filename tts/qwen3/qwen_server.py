@@ -299,7 +299,7 @@ def register_voices():
 
         if os.path.exists(text_file):
             try:
-                with open(text_file) as handle:
+                with open(text_file, encoding="utf-8") as handle:
                     transcript = handle.read().strip()
             except OSError:
                 pass

@@ -48,7 +48,7 @@ def _budget():
     ceiling a long think block runs into, so each turn can say how
     close it got."""
     try:
-        with open(os.path.join(BASE_DIR, "config.json")) as f:
+        with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
             return int(json.load(f).get("generation", {}).get("max_tokens") or 0)
     except Exception:
         return 0

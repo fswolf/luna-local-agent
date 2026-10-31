@@ -142,7 +142,7 @@ def enabled():
         _seen[0] = stamp
 
         try:
-            with open(CONFIG_FILE) as f:
+            with open(CONFIG_FILE, encoding="utf-8") as f:
                 block = json.load(f).get("thoughts", {})
 
             if isinstance(block, dict) and "enabled" in block:

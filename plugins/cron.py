@@ -140,7 +140,7 @@ def _load():
     """Missing file is no jobs; a broken one is an error, not no jobs - a
     stray comma shouldn't look like everything got cancelled."""
     try:
-        with open(JOBS_FILE) as f:
+        with open(JOBS_FILE, encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:
         data = []
@@ -163,7 +163,7 @@ def _save():
     os.makedirs(os.path.dirname(JOBS_FILE), exist_ok=True)
     tmp = JOBS_FILE + ".tmp"
 
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         # Skipped entries go back as they were: a typo in one you wrote by
         # hand shouldn't cost you the job the next time she saves.
         json.dump([{k: v for k, v in j.items() if not k.startswith("_")} for j in _jobs]

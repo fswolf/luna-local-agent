@@ -51,7 +51,7 @@ def load(paths):
     rows = []
 
     for path in paths:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             rows += [json.loads(line) for line in f if line.strip()]
 
     return rows
@@ -235,7 +235,7 @@ the rise in "yes" to questions whose answer is no.</p>
 <h2>What she said - nothing injected</h2>{none}
 </body></html>"""
 
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(page)
 
 

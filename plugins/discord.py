@@ -85,7 +85,7 @@ def _credentials():
     """(token, {owner ids}). Raises ValueError on a file that exists but
     is broken - a stray comma shouldn't look like "no token"."""
     try:
-        with open(CREDENTIALS_FILE) as f:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:
         data = {}

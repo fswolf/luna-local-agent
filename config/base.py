@@ -40,7 +40,7 @@ def _load_json(path, on_missing=None):
     them being JSON, so a typo shouldn't be fatal.
     """
     try:
-        with open(path, "r") as file:
+        with open(path, "r", encoding="utf-8") as file:
             return json.load(file)
     except FileNotFoundError:
         return {} if on_missing is None else on_missing()

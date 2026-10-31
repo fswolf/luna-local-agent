@@ -11,7 +11,6 @@ window if it's set. Either way it stops by itself about twenty seconds after the
 last studio page is closed (studio.sh and studio.cmd run it in the background, so
 there's no terminal to close). Port 8793, or LUNA_VIEW_PORT; it runs beside Luna fine."""
 import os
-import shlex
 import subprocess
 import sys
 import time
@@ -35,6 +34,7 @@ if sys.stdout is None:
 config.MONITOR_ENABLED = True
 config.MONITOR_PORT = int(os.environ.get("LUNA_VIEW_PORT", 8793))
 
+from core.machine import split_command  # noqa: E402
 from web import livefeed, portrait_window  # noqa: E402
 
 W, H = 1600, 960
@@ -48,7 +48,7 @@ def window(url):
         return None
     try:
         own = getattr(config, "PORTRAIT_BROWSER", "")
-        cmd = (shlex.split(own.format(url=url, w=W, h=H)) if own
+        cmd = (split_command(own.format(url=url, w=W, h=H)) if own
                else portrait_window.command(url, W, H, profile="luna-studio"))
     except (OSError, ValueError, KeyError) as e:
         print(f"couldn't set up a window for it ({e}): opening it in your browser")

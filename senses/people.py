@@ -70,7 +70,7 @@ def _path(name):
 
 def load(name):
     try:
-        with open(_path(name)) as file:
+        with open(_path(name), encoding="utf-8") as file:
             data = json.load(file)
         return data if isinstance(data, dict) else None
     except (OSError, ValueError):
@@ -88,7 +88,7 @@ def everyone():
     for entry in names:
         if entry.endswith(".json"):
             try:
-                with open(os.path.join(FOLDER, entry)) as file:
+                with open(os.path.join(FOLDER, entry), encoding="utf-8") as file:
                     data = json.load(file)
                 if isinstance(data, dict) and data.get("name"):
                     found[data["name"]] = data
@@ -100,7 +100,7 @@ def everyone():
 def save(person):
     os.makedirs(FOLDER, exist_ok=True)
     tmp = _path(person["name"]) + ".tmp"
-    with open(tmp, "w") as file:
+    with open(tmp, "w", encoding="utf-8") as file:
         json.dump(person, file)
     os.replace(tmp, _path(person["name"]))
 

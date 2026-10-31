@@ -28,10 +28,10 @@ def build(name, model):
     neg_file = os.path.join(lab.VECTORS, f"{name}.negative.txt")
     out = os.path.join(lab.VECTORS, f"{name}.gguf")
 
-    with open(pos_file, "w") as f:
+    with open(pos_file, "w", encoding="utf-8") as f:
         f.write("\n".join(pos) + "\n")
 
-    with open(neg_file, "w") as f:
+    with open(neg_file, "w", encoding="utf-8") as f:
         f.write("\n".join(neg) + "\n")
 
     e = lab.env()
@@ -42,7 +42,7 @@ def build(name, model):
 
     print(f"  {name}: building from {len(pos)} prompt pairs ...", flush=True)
 
-    with open(os.path.join(lab.RESULTS, "make_vectors.log"), "a") as log:
+    with open(os.path.join(lab.RESULTS, "make_vectors.log"), "a", encoding="utf-8") as log:
         done = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
 
     if done.returncode != 0 or not os.path.exists(out):

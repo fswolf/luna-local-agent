@@ -406,7 +406,7 @@ def _check(full, content):
             # The script on stdin, not the path: -n parses without running
             # anything either way, and this checks exactly what she wrote.
             done = subprocess.run([bash, "-n"], input=content, capture_output=True,
-                                  text=True, timeout=5)
+                                  text=True, encoding="utf-8", errors="replace", timeout=5)
 
             if done.returncode:
                 detail = " ".join(line.split("bash: ", 1)[-1]

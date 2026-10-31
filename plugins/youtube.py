@@ -96,7 +96,7 @@ def _api_key():
         return key
 
     try:
-        with open(CREDENTIALS_FILE) as handle:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as handle:
             parsed = json.load(handle)
     except FileNotFoundError:
         return ""

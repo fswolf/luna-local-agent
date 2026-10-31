@@ -57,7 +57,7 @@ def backend():
     """What config.json says right now, downgraded to json if this
     python's sqlite can't actually serve it."""
     try:
-        with open(CONFIG_FILE) as f:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
             wanted = str(
                 json.load(f).get("long_term_memory", {}).get("backend", "json")
             ).lower()
@@ -77,7 +77,7 @@ def backend():
 # ---------------------------------------------------------------------------
 def _load_memory():
     try:
-        with open(MEMORY_FILE) as f:
+        with open(MEMORY_FILE, encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
         data = {}
@@ -88,7 +88,7 @@ def _load_memory():
 
 
 def _save_memory(data):
-    with open(MEMORY_FILE, "w") as f:
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
 

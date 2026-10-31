@@ -89,7 +89,7 @@ def start(args):
     sealed = {"condition": condition, "started": datetime.now().isoformat(timespec="seconds"),
               "options": available + ["nothing"]}
 
-    with open(SEALED, "w") as f:
+    with open(SEALED, "w", encoding="utf-8") as f:
         json.dump(sealed, f)
 
     os.chmod(SEALED, 0o600)
@@ -109,7 +109,7 @@ def reveal(args):
     if not os.path.exists(SEALED):
         sys.exit("Nothing sealed - start a session with blind.py start.")
 
-    with open(SEALED) as f:
+    with open(SEALED, encoding="utf-8") as f:
         sealed = json.load(f)
 
     guess = (args.guess or "").strip().lower() or None
@@ -145,7 +145,7 @@ def reveal(args):
 
     print(f"Labelled {labelled} turn(s) in the thought log - search the viewer for 'blind session'.")
 
-    with open(LOG, "a") as f:
+    with open(LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps({**sealed, "revealed": datetime.now().isoformat(timespec="seconds"),
                             "guess": guess, "truth": truth, "turns": labelled}) + "\n")
 
@@ -154,7 +154,7 @@ def reveal(args):
 
 def tally(_args):
     try:
-        with open(LOG) as f:
+        with open(LOG, encoding="utf-8") as f:
             sessions = [json.loads(line) for line in f if line.strip()]
     except FileNotFoundError:
         sys.exit("No blind sessions yet.")

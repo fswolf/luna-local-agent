@@ -22,7 +22,7 @@ def _save():
     try:
         os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
 
-        with open(STATE_FILE, "w") as handle:
+        with open(STATE_FILE, "w", encoding="utf-8") as handle:
             json.dump({"energy": round(S.energy, 3),
                        "warmth": round(S.warmth, 3),
                        "desire": round(S.desire, 3),
@@ -42,7 +42,7 @@ def _restore():
     """
 
     try:
-        with open(STATE_FILE) as handle:
+        with open(STATE_FILE, encoding="utf-8") as handle:
             saved = json.load(handle)
 
         away = max(0.0, time.time() - float(saved["at"]))
