@@ -157,6 +157,21 @@
             "watch": false,
             "terminal": ""
         },
+        "gameboy": {
+            "enabled": false,
+            "rom": "",
+            "roms": "",
+            "saves": "",
+            "step_seconds": 6,
+            "max_steps": 300,
+            "speak": true,
+            "web": true,
+            "pictures": "auto",
+            "guide": true,
+            "window": false,
+            "sound": false,
+            "turn_seconds": 150
+        },
         "vibecity": {
             "enabled": false,
             "url": "http://127.0.0.1:47823/mcp",
