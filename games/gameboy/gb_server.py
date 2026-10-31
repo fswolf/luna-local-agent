@@ -35,11 +35,6 @@ import sys
 import threading
 import time
 
-try:
-    from mcp.server.fastmcp import FastMCP          # mcp 1.x
-except ImportError:
-    from mcp.server.mcpserver import MCPServer as FastMCP   # mcp 2.x renamed it
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
@@ -232,6 +227,11 @@ def _report(console):
 def build():
     if not ARGS.rom or not os.path.isfile(ARGS.rom):
         sys.exit(f"no Game Boy ROM at {ARGS.rom!r} (--rom FILE)")
+    try:
+        from mcp.server.fastmcp import FastMCP          # mcp 1.x
+    except ImportError:
+        from mcp.server.mcpserver import MCPServer as FastMCP   # mcp 2.x renamed it
+
     console = Console(ARGS.rom, ARGS.saves, ARGS.window, ARGS.sound, ARGS.scale)
     mcp = FastMCP("gameboy")
 
