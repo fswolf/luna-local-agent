@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luna plays the Game Boy</title>
+<style>
+  :root { --bg: #120d1c; --panel: #1a1328; --text: #d9d4ec; --dim: #8880a8; --accent: #e07ac8; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 18px; display: grid; gap: 18px;
+         grid-template-columns: minmax(0, 480px) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  h1 { grid-column: 1 / -1; margin: 0; font-size: 18px; color: var(--accent); font-weight: 600; }
+  .screen { background: #000; border-radius: 12px; padding: 14px; box-shadow: 0 0 0 1px #3a2d55; }
+  .screen img { display: block; width: 100%; image-rendering: pixelated; aspect-ratio: 160 / 144; }
+  .panel { background: var(--panel); border: 1px solid #3a2d55; border-radius: 10px; padding: 12px 14px; }
+  .said { font-size: 16px; min-height: 3em; }
+  .dim { color: var(--dim); font-size: 13px; }
+  ul { margin: 6px 0 0; padding-left: 18px; color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Game Boy</h1>
+  <div class="screen"><img id="screen" alt="The Game Boy's screen"></div>
+  <div>
+    <div class="panel"><div class="dim" id="turn">waiting...</div><div class="said" id="said"></div></div>
+    <div class="panel" style="margin-top:12px"><div class="dim">her last moves</div><ul id="notes"></ul></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let last = '';
+async function tick() {
+  try {
+    const s = await (await fetch('state', { cache: 'no-store' })).json();
+    $('title').textContent = 'Luna plays ' + (s.title || 'the Game Boy');
+    $('turn').textContent = (s.playing ? 'playing' : 'paused') + (s.turn ? ` · turn ${s.turn}` : '');
+    $('said').textContent = s.said || '';
+    $('notes').replaceChildren(...(s.notes || []).slice().reverse().map(n => Object.assign(document.createElement('li'), { textContent: n })));
+  } catch (_) { $('turn').textContent = 'the Game Boy is off'; }
+  const img = new Image();
+  img.onload = () => { $('screen').src = img.src; };
+  img.src = 'screen.png?t=' + Date.now();
+}
+tick();
+setInterval(tick, 1500);
+</script>
+</body>
+</html>

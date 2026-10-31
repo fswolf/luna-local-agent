@@ -2,8 +2,9 @@
 
 She can play: Minecraft through an MCP bot, Zork I through a real
 interpreter, mayor in your open Vibe City window, and resident in
-REALITI Relax, a world of rooms made for AI agents, and chess against
-you on a board you drag the pieces around on. Each one keeps its own
+REALITI Relax, a world of rooms made for AI agents, chess against
+you on a board you drag the pieces around on, and Game Boy games you
+own through an emulator. Each one keeps its own
 notes, plays on its own when the conversation goes quiet, and can be
 watched while she does. How plugins work in general is on
 [Plugins](plugins.md).
@@ -404,6 +405,87 @@ chess program or lichess's analysis board can open.
 opens the board with `/chess on`, and `think_seconds` is a short pause
 before her move so it doesn't snap in. Needs `pip install chess` and the
 live monitor (`monitor.enabled`, on by default).
+
+## Game Boy
+
+```
+/gameboy game ~/roms/pokemon_red.gb    pick a game by its path, the first time
+/gameboy games                         the games in that folder, numbered
+/gameboy game red                      pick one by name or number (remembered)
+/gameboy on                            switch the Game Boy on
+/gameboy play                          she plays on her own while you're quiet
+/gameboy pause                         stop taking turns (the game stays where it is)
+/gameboy watch                         the screen and what she says, in your browser
+/gameboy off                           put it away (saved for next time)
+```
+
+She plays Game Boy and Game Boy Color games through PyBoy, an emulator
+written in Python. Install it with the installer's `gameboy` extra, or
+`pip install pyboy mcp`. The game is yours: Luna never ships or
+downloads one, you point her at a `.gb` or `.gbc` file you have.
+
+**Picking a game.** The first time, give the path to a ROM. After that
+the folder it's in is your ROM folder: `/gameboy games` lists what's
+there and `/gameboy game 2` or `/gameboy game fantasy` picks one, by
+number or any part of its name. Drop a new game in the folder and it's
+on the list. `"roms"` sets the folder yourself.
+
+**How she sees the game.** Whenever her model can see (her vision
+adapter), she gets the screen as a picture, so she can look at the
+people and monsters and talk about them. A game with a *reader* also
+comes to her as text, read from the Game Boy's memory: where she is, her
+team or stats, and the words on screen, dialogue and menus with the
+cursor included. The text is what she plays by, since it's exact where a
+small picture isn't; the picture is what she sees.
+
+| Game | How she sees it |
+|---|---|
+| Pokemon Red and Blue | As text: the map she's on and where, her money and badges, her team with levels, HP, status and moves, the battle, and the text on screen. Plus the picture of what each move did, when her model can see |
+| Anything else | The screen as a picture: she looks before each move, so it needs a model that can see |
+
+A reader for another game is one small file in `games/gameboy/readers/`,
+picked up by itself by the cartridge's title. The Pokemon one is the
+example to copy.
+
+**Turns.** Slower games suit her best. Each turn she reads the game,
+presses a few buttons with `gb_press` ("up 3", "down, a"), says what she
+did and why, and the game waits until her next turn. Notes she writes
+with `game_note` come back when she's in the same place again, and
+`agent/knowledge/<game>/` works as her guide, like Zork's.
+
+**Watching.** `/gameboy watch` opens a page with the screen, what she
+said and her last moves; add it to OBS as a browser source. With
+`"window": true` the Game Boy's own screen opens instead and the game
+runs in real time (`"sound": true` for its music), which looks better
+on stream but keeps going while she thinks.
+
+**Your own save.** The game's battery save sits beside the ROM as
+`<rom name>.ram`. Put a save dumped from your own cartridge there
+(rename the `.sav`) and she carries on your game. On a real cartridge,
+dump the save before you change its battery: the save lives on that
+battery and is gone the moment it comes out.
+
+**Saves.** Her autosave (every few presses, and when it's put away) and
+her own `gb_save` slots go in `~/.local/share/ai-voice/gameboy/<game>/`,
+outside the repo; `"saves"` moves them.
+
+```json
+"gameboy": {
+    "enabled": false,
+    "rom": "",              // the game: a .gb or .gbc file
+    "roms": "",             // your ROM folder; "" = the folder of the last game picked by path
+    "saves": "",            // "" = ~/.local/share/ai-voice/gameboy
+    "step_seconds": 6,      // quiet needed before her next turn
+    "max_steps": 300,       // turns per /gameboy play, then she pauses
+    "speak": true,          // narrate each turn out loud
+    "web": true,            // she may look things up
+    "pictures": "auto",     // auto: whenever her model can see; never
+    "guide": true,          // her notes in agent/knowledge/<game>/
+    "window": false,        // the Game Boy screen in a window, in real time
+    "sound": false,         // with the window: the game's sound
+    "turn_seconds": 150     // a turn that runs longer is cut short
+}
+```
 
 ## Her memory of a game
 
