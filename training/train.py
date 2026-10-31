@@ -110,7 +110,7 @@ def main():
 
     model.save_pretrained(a.out)
     tok.save_pretrained(a.out)
-    with open(os.path.join(a.out, "luna-patch.json"), "w") as f:
+    with open(os.path.join(a.out, "luna-patch.json"), "w", encoding="utf-8") as f:
         json.dump({"kind": a.kind, "base": a.base, "examples": len(rows), "left_out": too_long + odd,
                    "rank": a.rank, "epochs": a.epochs, "lr": a.lr, "max_len": a.max_len,
                    "loss": round(float(stats.training_loss), 4),

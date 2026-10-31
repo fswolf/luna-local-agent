@@ -21,7 +21,7 @@ import subprocess
 
 def _read(path, cast=int):
     try:
-        with open(path) as handle:
+        with open(path, encoding="utf-8") as handle:
             return cast(handle.read().strip())
     except (OSError, ValueError):
         return None
@@ -150,7 +150,7 @@ def memory():
     values = {}
 
     try:
-        with open("/proc/meminfo") as handle:
+        with open("/proc/meminfo", encoding="utf-8") as handle:
             for line in handle:
                 key, _, rest = line.partition(":")
                 parts = rest.split()
@@ -246,3 +246,17 @@ def describe():
         pass
 
     return "\n".join(lines)
+
+
+def split_command(text):
+    """A command line you typed in a setting (portrait.browser, camera hooks,
+    a terminal), split into its words. shlex reads it the Unix way, where a
+    backslash escapes the next letter; on Windows that eats the backslashes in
+    "C:\\Program Files\\...", so there it's split the Windows way: spaces part
+    words, double quotes keep a path with spaces together, backslashes stay."""
+    import shlex
+
+    if os.name != "nt":
+        return shlex.split(text)
+    return [w[1:-1] if len(w) > 1 and w[0] == w[-1] == '"' else w
+            for w in shlex.split(text, posix=False)]

@@ -50,7 +50,6 @@ import base64
 import contextlib
 import glob
 import re
-import shlex
 import subprocess
 import sys
 import threading
@@ -275,7 +274,9 @@ def _run_command(which, device):
     if not command:
         return
     try:
-        args = [a.replace("{device}", str(device)) for a in shlex.split(command)]
+        from core.machine import split_command
+
+        args = [a.replace("{device}", str(device)) for a in split_command(command)]
     except ValueError as e:
         logbook.warn("camera", "camera.%s isn't a command I can read (%s)", which, e)
         return

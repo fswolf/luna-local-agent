@@ -18,7 +18,9 @@ def command(inner, title, chosen=""):
     chosen = str(chosen or "").strip()
 
     if chosen:
-        return shlex.split(chosen) + inner
+        from core.machine import split_command
+
+        return split_command(chosen) + inner
 
     if sys.platform == "darwin":
         kitty = shutil.which("kitty") or "/Applications/kitty.app/Contents/MacOS/kitty"

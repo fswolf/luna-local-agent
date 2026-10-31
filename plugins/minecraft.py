@@ -339,7 +339,7 @@ def _world():
 
 def _load():
     try:
-        with open(SPOTS_FILE) as f:
+        with open(SPOTS_FILE, encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
@@ -355,7 +355,7 @@ def _save_spots(spots):
     data[_world()] = spots
     os.makedirs(os.path.dirname(SPOTS_FILE), exist_ok=True)
     tmp = SPOTS_FILE + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     os.replace(tmp, SPOTS_FILE)
 

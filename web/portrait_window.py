@@ -89,9 +89,9 @@ def _installed(firefox=False):
 def _firefox_profile(base):
     """A profile folder with the prefs and the toolbar-hiding CSS in it."""
     os.makedirs(os.path.join(base, "chrome"), exist_ok=True)
-    with open(os.path.join(base, "user.js"), "w") as f:
+    with open(os.path.join(base, "user.js"), "w", encoding="utf-8") as f:
         f.write(_FIREFOX_PREFS)
-    with open(os.path.join(base, "chrome", "userChrome.css"), "w") as f:
+    with open(os.path.join(base, "chrome", "userChrome.css"), "w", encoding="utf-8") as f:
         f.write(_FIREFOX_CSS)
     return base
 
@@ -161,7 +161,6 @@ _window = {"proc": None}
 def toggle(obs=False):
     """/portrait opens her portrait in a small window of its own, and
     closes it again. /portrait obs prints the URL for a browser source."""
-    import shlex
     import subprocess
 
     import config
@@ -195,7 +194,9 @@ def toggle(obs=False):
 
     try:
         if config.PORTRAIT_BROWSER:
-            cmd = shlex.split(config.PORTRAIT_BROWSER.format(url=url, w=w, h=h))
+            from core.machine import split_command
+
+            cmd = split_command(config.PORTRAIT_BROWSER.format(url=url, w=w, h=h))
         else:
             cmd = command(url, w, h)
     except (OSError, ValueError, KeyError) as e:

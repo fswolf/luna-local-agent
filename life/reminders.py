@@ -84,7 +84,7 @@ def load():
         return
 
     try:
-        with open(REMINDERS_FILE, "r") as f:
+        with open(REMINDERS_FILE, "r", encoding="utf-8") as f:
             loaded = json.load(f)
     except (json.JSONDecodeError, OSError):
         _reminders = []
@@ -106,7 +106,7 @@ def save():
         snapshot = list(_reminders)
 
     try:
-        with open(REMINDERS_FILE, "w") as f:
+        with open(REMINDERS_FILE, "w", encoding="utf-8") as f:
             json.dump(snapshot, f, indent=2)
     except OSError:
         pass  # best effort; a failed save shouldn't kill the turn

@@ -136,7 +136,7 @@ def settings():
 def _credentials():
     """(sasl_user, sasl_password) from outside the repo, or ("", "")."""
     try:
-        with open(CREDENTIALS_FILE) as handle:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as handle:
             parsed = json.load(handle)
     except FileNotFoundError:
         return "", ""

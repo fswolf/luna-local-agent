@@ -3,6 +3,7 @@ no page is watching, which needs the live feed to notice a page closing."""
 import socket
 import types
 import unittest
+from unittest import mock
 
 from tests.offline import FAKE  # noqa: F401  (first: no real servers)
 
@@ -42,6 +43,20 @@ class ClosedPage(unittest.TestCase):
         finally:
             a.close()
             b.close()
+
+
+class SplitCommand(unittest.TestCase):
+    def test_unix(self):
+        from core.machine import split_command
+        with mock.patch("os.name", "posix"):
+            self.assertEqual(split_command('firefox --kiosk "{url}"'), ["firefox", "--kiosk", "{url}"])
+
+    def test_windows_keeps_backslashes(self):
+        from core.machine import split_command
+        with mock.patch("os.name", "nt"):
+            self.assertEqual(split_command(r'"C:\Program Files\Mozilla Firefox\firefox.exe" --new-window http://x/'),
+                             [r"C:\Program Files\Mozilla Firefox\firefox.exe", "--new-window", "http://x/"])
+            self.assertEqual(split_command(r"C:\Tools\cam.exe on"), [r"C:\Tools\cam.exe", "on"])
 
 
 if __name__ == "__main__":

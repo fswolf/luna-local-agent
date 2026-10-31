@@ -46,7 +46,7 @@ def load():
 
     if os.path.exists(HISTORY_FILE):
         try:
-            with open(HISTORY_FILE, "r") as f:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
                 _data = json.load(f)
         except (json.JSONDecodeError, OSError):
             _data = {"summary": "", "messages": []}
@@ -87,7 +87,7 @@ def save():
         snapshot = json.dumps(_data, indent=2)
 
     try:
-        with open(HISTORY_FILE, "w") as f:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
             f.write(snapshot)
     except OSError:
         pass  # best effort; a failed save shouldn't kill the turn

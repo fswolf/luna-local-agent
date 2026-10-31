@@ -35,7 +35,7 @@ def _own_pids():
         pids.add(pid)
 
         try:
-            with open(f"/proc/{pid}/stat") as f:
+            with open(f"/proc/{pid}/stat", encoding="utf-8") as f:
                 pid = int(f.read().rsplit(")", 1)[1].split()[1])
         except (OSError, ValueError, IndexError):
             break

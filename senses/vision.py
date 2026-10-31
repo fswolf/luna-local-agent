@@ -83,7 +83,7 @@ def _own_pids():
         pids.add(pid)
 
         try:
-            with open(f"/proc/{pid}/stat") as stat:
+            with open(f"/proc/{pid}/stat", encoding="utf-8") as stat:
                 # comm can contain spaces and brackets, so ppid is read
                 # from after the closing one, not by splitting the lot.
                 fields = stat.read().rsplit(")", 1)[1].split()

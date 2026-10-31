@@ -63,7 +63,7 @@ def _clean(name):
 def _run(cmd):
     try:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=5, creationflags=flags).stdout
+        return subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=5, creationflags=flags).stdout
     except Exception:
         return ""
 
@@ -83,7 +83,7 @@ def _neighbors():
 
         if not text:                                   # no iproute2: the kernel's own table
             try:
-                with open("/proc/net/arp") as f:
+                with open("/proc/net/arp", encoding="utf-8") as f:
                     for line in f.read().splitlines()[1:]:
                         bits = line.split()
                         if len(bits) >= 4 and bits[3] != "00:00:00:00:00:00":

@@ -215,7 +215,7 @@ def detect_gpu():
         return "mps" if platform.machine() == "arm64" else "cpu", "Apple " + platform.machine()
     if SYSTEM == "Linux":
         try:
-            with open("/proc/bus/pci/devices") as f:
+            with open("/proc/bus/pci/devices", encoding="utf-8") as f:
                 data = f.read()
         except OSError:
             data = ""
@@ -630,7 +630,7 @@ def detect_vram():
         sizes = []
         for f in glob.glob("/sys/class/drm/card*/device/mem_info_vram_total"):
             try:
-                with open(f) as fh:
+                with open(f, encoding="utf-8") as fh:
                     sizes.append(int(fh.read().strip()))
             except (OSError, ValueError):
                 continue
@@ -836,7 +836,7 @@ def launchers(state):
             warn(f"{link} already exists and isn't ours - left alone")
     if SYSTEM == "Darwin":
         cmd = os.path.join(ROOT, "Luna.command")
-        with open(cmd, "w") as f:
+        with open(cmd, "w", encoding="utf-8") as f:
             f.write(f'#!/bin/bash\nexec "{script}" "$@"\n')
         os.chmod(cmd, 0o755)
         ok("Luna.command - double-click it in Finder")
@@ -844,7 +844,7 @@ def launchers(state):
         apps = os.path.expanduser("~/.local/share/applications")
         os.makedirs(apps, exist_ok=True)
         entry = os.path.join(apps, "luna.desktop")
-        with open(entry, "w") as f:
+        with open(entry, "w", encoding="utf-8") as f:
             f.write("[Desktop Entry]\nType=Application\nName=Luna\nComment=Local AI voice companion\n"
                     f'Exec="{script}"\nPath={ROOT}\nTerminal=true\nCategories=Utility;\n'
                     + (f"Icon={os.path.join(ROOT, 'assets', 'icon.png')}\n"

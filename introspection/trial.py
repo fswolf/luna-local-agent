@@ -225,7 +225,7 @@ def main():
 
                 record["seconds"] = round(time.time() - started, 1)
 
-                with open(path, "a") as f:
+                with open(path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
                 top = max(record["choice"].items(), key=lambda kv: kv[1] or 0)

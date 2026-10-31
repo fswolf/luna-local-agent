@@ -72,7 +72,7 @@ def _run(args):
     if not shutil.which(args[0]):
         return None, f"{args[0]} isn't here"
     try:
-        p = subprocess.run(args, capture_output=True, text=True, timeout=TIMEOUT,
+        p = subprocess.run(args, capture_output=True, text=True, errors="replace", timeout=TIMEOUT,
                            env={**os.environ, "LC_ALL": "C", "SYSTEMD_COLORS": "0", "SYSTEMD_PAGER": ""})
     except subprocess.TimeoutExpired:
         return None, f"{args[0]} took too long"
@@ -171,7 +171,7 @@ def _load():
 def _swap():
     values = {}
     try:
-        with open("/proc/meminfo") as f:
+        with open("/proc/meminfo", encoding="utf-8") as f:
             for line in f:
                 k, _, rest = line.partition(":")
                 if rest.split():
@@ -186,7 +186,7 @@ def _disks():
     """(mount, free GB, total GB, % free) for real filesystems, one per device."""
     out, seen = [], set()
     try:
-        with open("/proc/mounts") as f:
+        with open("/proc/mounts", encoding="utf-8") as f:
             mounts = [ln.split()[:3] for ln in f]
     except OSError:                               # not Linux: just the home folder's disk
         mounts = [["home", os.path.expanduser("~"), "ext4"]]
@@ -210,7 +210,7 @@ def _cpu_temp():
     best = None
     for hw in sorted(_hwmon()):
         try:
-            with open(os.path.join(hw, "name")) as f:
+            with open(os.path.join(hw, "name"), encoding="utf-8") as f:
                 name = f.read().strip()
         except OSError:
             continue
@@ -221,12 +221,12 @@ def _cpu_temp():
                 continue
             label = ""
             try:
-                with open(os.path.join(hw, label_file.replace("_input", "_label"))) as f:
+                with open(os.path.join(hw, label_file.replace("_input", "_label")), encoding="utf-8") as f:
                     label = f.read().strip()
             except OSError:
                 pass
             try:
-                with open(os.path.join(hw, label_file)) as f:
+                with open(os.path.join(hw, label_file), encoding="utf-8") as f:
                     value = int(f.read()) / 1000
             except (OSError, ValueError):
                 continue

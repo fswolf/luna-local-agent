@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Speak text through the kokoro-reader server.
+r"""Speak text through the kokoro-reader server.
 
 Anything you can select, Luna can read - the Claude desktop app, a man
 page, a code review, a wall of docs.
@@ -91,7 +91,7 @@ def clipboard():
 def stop_playing():
     """Kill a previous run. Returns True if something was talking."""
     try:
-        with open(PID_FILE) as f:
+        with open(PID_FILE, encoding="utf-8") as f:
             pid = int(f.read().strip())
     except (OSError, ValueError):
         return False
@@ -249,7 +249,7 @@ def main():
     if hasattr(os, "setpgrp"):
         os.setpgrp()
 
-    with open(PID_FILE, "w") as f:
+    with open(PID_FILE, "w", encoding="utf-8") as f:
         f.write(str(os.getpid()))
 
     try:

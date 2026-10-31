@@ -63,16 +63,16 @@ def run(records, system):
     e = lab.env()
     with tempfile.TemporaryDirectory() as out:
         src = os.path.join(out, "prompts.txt")
-        with open(src, "w") as f:
+        with open(src, "w", encoding="utf-8") as f:
             for text in records:
                 f.write(f"@@system\n{system}\n@@user\n{text}\n@@end\n")
         cmd = [reader(), "-m", lab.model_path(), "-ngl", e.get("NGL", "99"), "-t", e.get("THREADS", "8"),
                "--in", src, "--out", out, "--after", AFTER]
-        with open(os.path.join(lab.RESULTS, "read.log"), "a") as log:
+        with open(os.path.join(lab.RESULTS, "read.log"), "a", encoding="utf-8") as log:
             done = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
         if done.returncode != 0:
             sys.exit("read-acts failed - see introspection/results/read.log")
-        layers = [int(x) for x in open(os.path.join(out, "layers.txt")).read().split()]
+        layers = [int(x) for x in open(os.path.join(out, "layers.txt"), encoding="utf-8").read().split()]
         acts = []
         for i in range(len(records)):
             path = os.path.join(out, f"{i}.npy")
@@ -167,7 +167,7 @@ def main():
 
     prompts = list(args.prompts)
     if args.file:
-        with open(args.file) as f:
+        with open(args.file, encoding="utf-8") as f:
             prompts += [ln.strip() for ln in f if ln.strip()]
     if not prompts and not args.check:
         ap.error("give a prompt, or --file, or --check")
@@ -208,7 +208,7 @@ def main():
         report.append(row)
 
     out = os.path.join(lab.RESULTS, f"read-{time.strftime('%Y%m%d-%H%M%S')}.json")
-    with open(out, "w") as f:
+    with open(out, "w", encoding="utf-8") as f:
         json.dump({"system": system, "bands": bands, "readings": report}, f, indent=2)
     print(f"\nz = baseline standard deviations; +2 or more is clearly there. Saved: {out}")
 

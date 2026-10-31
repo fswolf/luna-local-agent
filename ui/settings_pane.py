@@ -42,7 +42,7 @@ def _example_values():
         import config
 
         try:
-            with open(os.path.join(config.BASE_DIR, "config.example.json")) as file:
+            with open(os.path.join(config.BASE_DIR, "config.example.json"), encoding="utf-8") as file:
                 _example = dict(_leaves(json.load(file)))
         except (OSError, ValueError):
             _example = {}

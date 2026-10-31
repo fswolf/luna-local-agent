@@ -559,7 +559,7 @@ def reset_setting(path):
 
     del node[parts[-1]]
 
-    with open(CONFIG_FILE, "w") as file:
+    with open(CONFIG_FILE, "w", encoding="utf-8") as file:
         json.dump(stored, file, indent=4)
         file.write("\n")
 
@@ -590,7 +590,7 @@ def _store(path, value):
 
     node[parts[-1]] = value
 
-    with open(CONFIG_FILE, "w") as file:
+    with open(CONFIG_FILE, "w", encoding="utf-8") as file:
         json.dump(stored, file, indent=4)
         file.write("\n")
 

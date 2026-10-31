@@ -96,7 +96,7 @@ def _stored():
     key", which sends you hunting for a key that was there all along.
     """
     try:
-        with open(CREDENTIALS_FILE) as handle:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as handle:
             parsed = json.load(handle)
     except FileNotFoundError:
         return {}, ""

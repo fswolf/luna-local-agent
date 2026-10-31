@@ -39,7 +39,7 @@ def env():
         if not os.path.exists(path):
             continue
 
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 m = re.match(r"\s*([A-Z_]+)=(.*)", line)
 
@@ -92,7 +92,7 @@ def binary(name):
 
 def api_key():
     try:
-        with open(os.path.join(LLAMA, ".api_key")) as f:
+        with open(os.path.join(LLAMA, ".api_key"), encoding="utf-8") as f:
             return f.read().strip()
     except OSError:
         return ""
@@ -165,7 +165,7 @@ class Server:
         self.proc = None
 
     def __enter__(self):
-        self.log = open(os.path.join(RESULTS, "server.log"), "a")
+        self.log = open(os.path.join(RESULTS, "server.log"), "a", encoding="utf-8")
         self.proc = subprocess.Popen(self.args, stdout=self.log, stderr=subprocess.STDOUT)
         deadline = time.time() + 180
 
@@ -206,7 +206,7 @@ class Server:
 def persona():
     """Luna as she is in agent/agent.json - the experiments ask *her*."""
     try:
-        with open(os.path.join(ROOT, "agent", "agent.json")) as f:
+        with open(os.path.join(ROOT, "agent", "agent.json"), encoding="utf-8") as f:
             agent = json.load(f)
     except (OSError, ValueError):
         agent = {}
