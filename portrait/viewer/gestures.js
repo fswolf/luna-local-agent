@@ -63,7 +63,7 @@ const BUILT_IN = ['dance', 'jog', 'pant', 'sultry_beckon', 'wink', 'shh', 'wave'
 export const FAILED = {};      // name -> why it didn't load (shown on the debug page)
 const list = await fetch('gestures/index.json').then(r => r.ok ? r.json() : null).catch(() => null);
 if (!list || !list.length) FAILED['(the list)'] = "the server didn't list any gesture files, so only the built-ins loaded - "
-  + 'restart Luna or ./viewer.sh (an older copy is still running)';
+  + 'restart Luna or ./studio.sh (an older copy is still running)';
 
 export const GESTURES = {};
 export const ABOUT = {};

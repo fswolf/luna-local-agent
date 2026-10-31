@@ -535,17 +535,43 @@ class _Handler(BaseHTTPRequestHandler):
             with _lock:
                 _subs.add(q)
 
+            quiet = 0
             while True:
                 try:
-                    self._send(q.get(timeout=15))
+                    self._send(q.get(timeout=1))
+                    quiet = 0
                 except queue.Empty:
-                    self.wfile.write(b": ping\n\n")  # keeps proxies and the tab awake
-                    self.wfile.flush()
+                    if self._gone():
+                        break
+                    quiet += 1
+                    if quiet >= 15:
+                        quiet = 0
+                        self.wfile.write(b": ping\n\n")  # keeps proxies and the tab awake
+                        self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
             with _lock:
                 _subs.discard(q)
+
+    def _gone(self):
+        """The page closed its end (a closed tab or window): known within a
+        second, instead of at the next write, so watching() is up to date."""
+        import select
+        import socket
+
+        try:
+            ready, _, _ = select.select([self.connection], [], [], 0)
+        except (OSError, ValueError):                # closed under us
+            return True
+        if not ready:
+            return False
+        try:
+            return self.connection.recv(1, socket.MSG_PEEK) == b""
+        except ValueError:                           # a socket that can't peek (TLS): the next write tells
+            return False
+        except OSError:
+            return True
 
     def _send(self, event):
         self.wfile.write(b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n\n")

@@ -77,7 +77,7 @@ source with "Shutdown source when not visible" ticked. If two pages are
 open, the first one keeps the fan and the other rests. This works with 3D
 (VRM) models only.
 
-The debug viewer (`./viewer.sh`) shows the fan under **hologram fan**: which
+The debug viewer (`./studio.sh`) shows the fan under **hologram fan**: which
 model it is, its address, frames a second, the JPEG quality and any error.
 A fan that goes quiet for 12 seconds (unplugged, out of range) is let go,
 and it connects again by itself when it comes back.

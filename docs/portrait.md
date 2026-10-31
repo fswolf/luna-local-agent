@@ -238,14 +238,28 @@ On the debug page (`?debug=1`) the zone under the cursor and her mood
 band show beside it, with *(nothing set)* where the file has nothing.
 Live2D models don't have touching yet.
 
-## Trying models without Luna
+## Trying models without Luna: the studio
 
 ```bash
-./viewer.sh
+./studio.sh          # Linux and macOS
+studio.cmd           # Windows (not tested there yet)
 ```
 
 It serves the portrait on its own (port 8793, so it works while Luna
-runs too) and opens the debug page. Everything is in the panel:
+runs too) and opens the debug page, "Studio", in a window of its own with
+no address bar, the way `/portrait` opens hers: a Chromium-style browser's
+app window if you have one (Chrome, Brave, Chromium, Edge or Vivaldi, on the
+PATH, as a Flatpak, in `/Applications` on a Mac or in Program Files on
+Windows, where Edge always is), else Firefox with its toolbars hidden. It runs in
+the background, so there's no terminal to keep open, and it stops by itself
+about twenty seconds after you close the window (a reload doesn't stop it).
+`./studio.sh --tab` opens it in your usual browser instead, and stops the same
+way when the tab is closed. `./studio.sh --fg` keeps it in the terminal, to
+watch what it says (Ctrl+C stops it); otherwise that goes to
+`~/.cache/ai-voice/studio.log` (on Windows, in `.cache\ai-voice` in your user
+folder). `portrait.browser` picks the browser for both
+windows. `./viewer.sh`, its old name, still works.
+Everything is in the panel:
 
 - **model**: everything in `portrait/models`
 - **view**: bust, face or full body; hologram, see-through background,
