@@ -492,7 +492,8 @@ outside the repo; `"saves"` moves them.
 Each game turn starts fresh, so on their own her turns would only know
 what happened in the last few. Each game she plays also has a
 **project** of its own (see [Learning](learning.md)): "Zork playthrough",
-"Vibe City as mayor", "Minecraft world", made the first time she plays.
+"Vibe City as mayor", "Minecraft world", "Pokemon Red/Blue", made the
+first time she plays.
 
 - Every turn of that game shows her that project: the goal, her latest
   notes and her plan.
@@ -507,8 +508,9 @@ what happened in the last few. Each game she plays also has a
   an answer without her checking.
 - `/zork new` marks the old playthrough done and starts a fresh
   project. The old one is retired, not deleted: `/projects restore <n>`.
-- In Zork and REALITI, which have rooms, she also gets back her older
-  notes about the room she's in. A note from forty moves ago about the
+- In Zork, REALITI and Game Boy games with a reader that knows where
+  she is (Pokemon's towns and routes), she also gets back her older
+  notes about the place she's in. A note from forty moves ago about the
   Troll Room shows up again when she walks back into the Troll Room,
   even though it has dropped off her latest notes.
 
@@ -521,7 +523,9 @@ the memory manager show them ([details](learning.md#episodic-memory-and-continui
 
 **Her guide.** Notes you give her about a game go in
 `agent/knowledge/<game>/`: `agent/knowledge/zork/` for Zork,
-`agent/knowledge/realiti/` for REALITI. Each turn she sees what they say
+`agent/knowledge/realiti/` for REALITI, and for a Game Boy game a
+folder named after its reader (`agent/knowledge/pokemon-red-blue/`, with
+headings like "Viridian City" or "Route 1"). Each turn she sees what they say
 about the room she's in, found by the room's name: a heading with that
 name and what's under it, or list items that start with it ("- Troll
 Room: south to the Cellar..."). It needs no search server, and it's
@@ -576,7 +580,7 @@ your memory stay out of game turns either way.
 
 ## Reading a game back
 
-Every game (Minecraft, Zork, Vibe City) writes what she says on each of
+Every game (Minecraft, Zork, Vibe City, REALITI, chess, Game Boy) writes what she says on each of
 her turns to a text file, one per game per day:
 
 ```
@@ -589,4 +593,6 @@ narration and her one-line report, as she said them. For Zork her words
 also go into the game's own `agent/zork/transcript.txt`, between the
 commands and the game's replies, so the watch window and the file show
 the whole playthrough: what she typed, what the game answered, and what
-she made of it. The folder is gitignored.
+she made of it. The Game Boy keeps the same kind of record, every press
+and what came of it, in `transcript.txt` in its saves folder. The
+folder is gitignored.

@@ -89,7 +89,7 @@ unfinished. The notes also show on screen as **Last time (…)**. Turn the
 greeting off with `/set self.greet false` and you keep the notes.
 
 Time she spends playing on her own (Zork, Minecraft, Vibe City,
-REALITI) becomes an episode too. Each of her game turns adds a line to
+REALITI, Game Boy) becomes an episode too. Each of her game turns adds a line to
 the session: the tools she used and what came back (for REALITI, the
 recorded actions), and anything she said. When she stops (you pause
 the game, put it away, or she runs out of turns), or after 20 minutes
