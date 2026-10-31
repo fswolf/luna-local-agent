@@ -22,6 +22,19 @@ _APP_FLATPAKS = ("com.brave.Browser", "org.chromium.Chromium", "com.google.Chrom
                  "com.vivaldi.Vivaldi")
 _FIREFOX_FLATPAK = "org.mozilla.firefox"
 
+# Where macOS and Windows put them, since there they're seldom on the PATH:
+# (folder under /Applications or ~/Applications, the program inside it) on a
+# Mac, and a path under Program Files or the user's own AppData on Windows.
+# Edge comes with Windows, so a Windows machine always has an app window.
+_MAC_APPS = (("Google Chrome.app", "Google Chrome"), ("Brave Browser.app", "Brave Browser"),
+             ("Chromium.app", "Chromium"), ("Microsoft Edge.app", "Microsoft Edge"),
+             ("Vivaldi.app", "Vivaldi"))
+_MAC_FIREFOX = ("Firefox.app", "firefox")
+_WIN_APPS = (r"Google\Chrome\Application\chrome.exe", r"BraveSoftware\Brave-Browser\Application\brave.exe",
+             r"Chromium\Application\chrome.exe", r"Vivaldi\Application\vivaldi.exe",
+             r"Microsoft\Edge\Application\msedge.exe")
+_WIN_FIREFOX = r"Mozilla Firefox\firefox.exe"
+
 # A Firefox profile of her own with every toolbar hidden: the nearest Firefox
 # gets to Chromium's --app window (it has no app mode of its own)
 _FIREFOX_PREFS = """user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
@@ -53,6 +66,26 @@ def _flatpak_has(app):
         return False
 
 
+def _installed(firefox=False):
+    """A browser where macOS or Windows installs it, or None (and None on Linux,
+    where they're on the PATH or a Flatpak)."""
+    home = os.path.expanduser("~")
+    if sys.platform == "darwin":
+        for folder in ("/Applications", os.path.join(home, "Applications")):
+            for app, exe in ((_MAC_FIREFOX,) if firefox else _MAC_APPS):
+                path = os.path.join(folder, app, "Contents", "MacOS", exe)
+                if os.path.isfile(path):
+                    return path
+    elif sys.platform.startswith("win"):
+        roots = [os.environ.get(v) for v in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")]
+        for rel in ((_WIN_FIREFOX,) if firefox else _WIN_APPS):
+            for root in filter(None, roots):
+                path = os.path.join(root, rel)
+                if os.path.isfile(path):
+                    return path
+    return None
+
+
 def _firefox_profile(base):
     """A profile folder with the prefs and the toolbar-hiding CSS in it."""
     os.makedirs(os.path.join(base, "chrome"), exist_ok=True)
@@ -63,37 +96,39 @@ def _firefox_profile(base):
     return base
 
 
-def command(url, w, h):
+def command(url, w, h, profile="luna-portrait"):
     """The command that opens the portrait in a window of its own, with no
     address bar, or None. A Chromium-style browser's --app window first (on
     the PATH, then as a Flatpak), else Firefox with a profile that hides
     its toolbars. Each gets its own profile, so it's its own process: one
-    /portrait can close again, not a tab in a browser that's already open."""
+    /portrait can close again, not a tab in a browser that's already open.
+    profile names that profile: the studio (./studio.sh) has its own, so
+    it's a window of its own beside the portrait's."""
     import shutil
 
     home = os.path.expanduser("~")
     app = [f"--app={url}", f"--window-size={w},{h}", "--no-first-run", "--no-default-browser-check"]
 
-    found = next((b for b in _APP_BROWSERS if shutil.which(b)), None)
+    found = next((b for b in _APP_BROWSERS if shutil.which(b)), None) or _installed()
     if found:
-        return [found, f"--user-data-dir={os.path.join(home, '.cache', 'luna-portrait')}"] + app
+        return [found, f"--user-data-dir={os.path.join(home, '.cache', profile)}"] + app
 
     for flatpak in _APP_FLATPAKS:
         if _flatpak_has(flatpak):
             # inside the sandbox it can always write its own ~/.var/app folder
-            profile = os.path.join(home, ".var", "app", flatpak, "cache", "luna-portrait")
-            return ["flatpak", "run", flatpak, f"--user-data-dir={profile}"] + app
+            folder = os.path.join(home, ".var", "app", flatpak, "cache", profile)
+            return ["flatpak", "run", flatpak, f"--user-data-dir={folder}"] + app
 
-    firefox = shutil.which("firefox")
+    firefox = shutil.which("firefox") or _installed(firefox=True)
     if firefox:
-        profile = _firefox_profile(os.path.join(home, ".cache", "luna-portrait-firefox"))
-        return [firefox, "--new-instance", "--no-remote", "--profile", profile,
+        folder = _firefox_profile(os.path.join(home, ".cache", profile + "-firefox"))
+        return [firefox, "--new-instance", "--no-remote", "--profile", folder,
                 "--width", str(w), "--height", str(h), url]
     if _flatpak_has(_FIREFOX_FLATPAK):
-        profile = _firefox_profile(os.path.join(home, ".var", "app", _FIREFOX_FLATPAK,
-                                                "cache", "luna-portrait"))
+        folder = _firefox_profile(os.path.join(home, ".var", "app", _FIREFOX_FLATPAK,
+                                               "cache", profile))
         return ["flatpak", "run", _FIREFOX_FLATPAK, "--new-instance", "--no-remote",
-                "--profile", profile, "--width", str(w), "--height", str(h), url]
+                "--profile", folder, "--width", str(w), "--height", str(h), url]
     return None
 
 

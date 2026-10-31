@@ -750,7 +750,7 @@ chat](chat.md).
 
 ## Making your own: the pose studio
 
-The debug viewer (`./viewer.sh`, or `?debug=1`) has a **pose studio**
+The debug viewer (`./studio.sh`, or `?debug=1`) has a **pose studio**
 window: pose her with sliders (click a part of her to pick the bone),
 lay keyframes on a timeline, set every detail on this page (touches,
 moods, flags, sound, emotes, tail), link gestures into chains, and

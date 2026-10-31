@@ -74,7 +74,7 @@ with `_` are helpers or notes and are never loaded as gestures.
 2. It loads each file and reads its settings. `left: true` makes a mirrored
    copy called `<name>_left`, `idle` adds it to her idle moves,
    `private: true` keeps it away from stream chat.
-3. The viewer (`./viewer.sh`) makes a button for every gesture it found. A
+3. The viewer (`./studio.sh`) makes a button for every gesture it found. A
    file with a mistake in it gets a pink line in the panel saying which
    file and what's wrong, instead of a missing button.
 
@@ -408,7 +408,7 @@ export default {
 };
 ```
 
-Run `./viewer.sh`, click **hand on heart**, drag round to look from the
+Run `./studio.sh`, click **hand on heart**, drag round to look from the
 side. The upper arm should come down and forward.
 
 **2. Add the forearm.** Bend it towards her chest:
@@ -451,7 +451,7 @@ hand_on_heart` works.
 
 | You see | Why | Fix |
 |---------|-----|-----|
-| No button for your gesture | A typo in the file, or a viewer started before an update | Look for a pink line under the buttons; restart `./viewer.sh` once after updating Luna |
+| No button for your gesture | A typo in the file, or a viewer started before an update | Look for a pink line under the buttons; restart `./studio.sh` once after updating Luna |
 | Her left arm goes the wrong way | Left uses the right's numbers with y and z flipped | Flip the signs of y and z, or write the right side and use `both()` |
 | She leans over like a falling tower | `'+hips'` rotates her whole body from the hips | Use plain `hips: [x, y, z]` (metres) to move her |
 | Palm faces the wrong way | The forearm and wrist need a roll | Change `rightHand` x, or add a 4th number to `rightLowerArm`; steps of 0.3 |

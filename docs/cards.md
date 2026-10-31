@@ -11,7 +11,7 @@ someone and their Luna can wear it too.
 ## Where to find them
 
 On the debug viewer, in the control panel's **Cards** tab. Open the viewer with
-`./viewer.sh`, or with Luna running at `http://127.0.0.1:8792/portrait/?debug=1`
+`./studio.sh`, or with Luna running at `http://127.0.0.1:8792/portrait/?debug=1`
 (the browser tab says "Studio"). The control panel is on the left, the
 [pose studio](portrait.md#the-pose-studio-making-gestures-without-code) on the
 right.
@@ -89,7 +89,7 @@ save, never as code, and nothing outside the table above is read from it.
 
 | What you see | Why, and what to do |
 |---|---|
-| "not saved" or "not added" with a network error, or every gesture listed as yours, after updating Luna | The server is still the old one: restart Luna (or `./viewer.sh`) and reload the page |
+| "not saved" or "not added" with a network error, or every gesture listed as yours, after updating Luna | The server is still the old one: restart Luna (or `./studio.sh`) and reload the page |
 | "a picture, but not a Luna card" | Only the picture made it: it was re-saved on the way. Ask for the file itself |
 | "clothes map: this model doesn't have one" | Nothing's wrong: its clothes are found by where they sit on her, so there's no map to carry |
 | Her new look has the old background | The card carries the background saved in settings, not a preview: save it there and make the card again |

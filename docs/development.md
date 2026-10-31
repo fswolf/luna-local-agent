@@ -76,7 +76,7 @@ ai-voice/
 │   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
 │   │                 #   face_layers.js (blush, tears, brows), debug_panel.js (?debug=1), studio.js,
 │   │                 #   look.js (where she looks), emotes.js (hearts, sweat drop...),
-│   │                 #   hologram.js / hologram3d.js, view.py (./viewer.sh),
+│   │                 #   hologram.js / hologram3d.js, view.py (./studio.sh),
 │   │                 #   vendor/ (bundled three.js and pixi.js; build.sh rebuilds them)
 │   ├── gestures/     #   one file per gesture (wave.js, hug.js...), _pose.js helpers
 │   ├── models/       #   Live2D folders and .vrm files

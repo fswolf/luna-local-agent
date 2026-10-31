@@ -388,7 +388,7 @@ the hearts), `slide` (slips down, like the sweat drop), `throb` (pulses
 in place, like the anger mark) or `bob` (pops up and bobs, like the
 question mark). A new name (`"emote": "stars"`) only needs its PNG,
 and floats unless its JSON says otherwise. The debug page
-(`./viewer.sh`) has a button for each under **emotes**.
+(`./studio.sh`) has a button for each under **emotes**.
 `/set mood.emotes false` turns them off.
 
 ## Walking away
