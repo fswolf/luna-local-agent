@@ -4,7 +4,7 @@
 ai-voice/
 │
 ├── installer/        # install.sh, install.ps1, install.py, uninstall.py, requirements.txt
-├── launch.py         # what start.sh / luna / luna.cmd run: voice server, then Luna
+├── launch.py         # what start.sh / start.cmd / luna / luna.cmd run: voice server, then Luna
 ├── ai-voice-ctl.py
 ├── config.json
 ├── core/             # the core loop:

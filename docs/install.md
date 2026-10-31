@@ -68,7 +68,7 @@ system:
 Then start her:
 
 ```bash
-luna            # or ./start.sh, or luna.cmd on Windows
+luna            # or ./start.sh, or luna.cmd (or start.cmd) on Windows
 ```
 
 The launcher starts her voice server too if the installer set one up,
@@ -461,7 +461,7 @@ Point `tts.url` at the new port and nothing else changes.
 # Run the Assistant
 
 ```bash
-luna            # or ./start.sh, or luna.cmd on Windows
+luna            # or ./start.sh, or luna.cmd (or start.cmd) on Windows
 ```
 
 These find the virtualenv themselves, work from any directory, and pass
