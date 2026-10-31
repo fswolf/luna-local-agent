@@ -220,7 +220,7 @@ powershell -ExecutionPolicy Bypass -File installer\install.ps1    # Windows
 Then start her:
 
 ```bash
-luna            # or ./start.sh, or luna.cmd on Windows
+luna            # or ./start.sh, or luna.cmd (or start.cmd) on Windows
 ```
 
 The installer looks at your graphics card and offers the biggest model
