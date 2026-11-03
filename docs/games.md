@@ -441,6 +441,7 @@ small picture isn't; the picture is what she sees.
 | Game | How she sees it |
 |---|---|
 | Pokemon Red and Blue | As text: the map she's on and where, her money and badges, her team with levels, HP, status and moves, the battle, and the text on screen. Plus the picture of what each move did, when her model can see |
+| The Final Fantasy Legend | As text: her party with race, HP, stats and weapons with their uses left, her gold and bag, the enemy groups and their HP in a battle, and the text on screen with the menu cursor. Places are map numbers, apart from the first town and the world around it. Plus the picture, when her model can see |
 | Anything else | The screen as a picture: she looks before each move, so it needs a model that can see |
 
 A reader for another game is one small file in `games/gameboy/readers/`,

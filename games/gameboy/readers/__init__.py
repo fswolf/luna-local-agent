@@ -10,6 +10,7 @@ A reader is a module here with:
     def describe(memory) -> str                 # memory[addr] -> byte
 and optionally
     GOAL = "..."                                # her goal for a playthrough
+    EXACT = True                                # the title must match whole ("SAGA", not "SAGA2")
     def place(memory) -> str                    # where she is, for her notes
 
 A new one is picked up by itself: drop the file here.
@@ -37,6 +38,7 @@ def find(title):
     """The reader for a cartridge title ("POKEMON RED"), or None."""
     title = str(title or "").strip().upper()
     for module in all_readers():
-        if any(title.startswith(t.upper()) for t in getattr(module, "TITLES", ())):
+        titles = [t.upper() for t in getattr(module, "TITLES", ())]
+        if title in titles or (not getattr(module, "EXACT", False) and any(title.startswith(t) for t in titles)):
             return module
     return None

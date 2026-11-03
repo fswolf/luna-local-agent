@@ -18,9 +18,10 @@ adapter), so she can look at the people and monsters and talk about them. A
 game with a reader in games/gameboy/readers/ also comes to her as text from
 the game's memory: where she is, her team or stats, and the words on screen,
 dialogue and menus included - the part she plays by, reliable even when the
-picture is small. Pokemon Red and Blue have one; readers for other games drop
-into that folder. Without a reader, the picture is all she has, so a game
-like that needs a model that can see.
+picture is small. Pokemon Red and Blue have one, and so does The Final
+Fantasy Legend; readers for other games drop into that folder. Without a
+reader, the picture is all she has, so a game like that needs a model that
+can see.
 
 Slower games suit her best: she takes a turn, then the game waits. With
 "window" on, the Game Boy's own screen opens and runs in real time instead,
@@ -56,7 +57,7 @@ import config
 from plugins import _game
 
 NAME = "gameboy"
-SUMMARY = "she plays Game Boy games (Pokemon Red and Blue read as text)"
+SUMMARY = "she plays Game Boy games (Pokemon Red/Blue and Final Fantasy Legend read as text)"
 
 SERVER = "gameboy"
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -17,6 +17,7 @@ sys.path.insert(0, GB)
 
 import readers  # noqa: E402
 from readers import pokemon_gen1 as red  # noqa: E402
+from readers import saga1  # noqa: E402
 
 
 def _server():
@@ -109,6 +110,86 @@ class PokemonReader(unittest.TestCase):
         self.assertEqual(red.place(m), "Pallet Town")
         m[red.CUR_MAP] = 200
         self.assertEqual(red.place(m), "map 200")
+
+
+class SagaReader(unittest.TestCase):
+    """The Final Fantasy Legend, with memory laid out the way the real cartridge has it."""
+
+    @staticmethod
+    def font(text):
+        return [0x7F if c == " " else 0x0A + ord(c) - 65 if c.isupper() else 0x24 + ord(c) - 97 if c.islower()
+                else int(c) if c.isdigit() else 0x73 for c in text]
+
+    def memory(self, battle=False):
+        m = [0] * 0x10000
+
+        def poke(a, values):
+            m[a:a + len(values)] = values
+        m[0xFF40] = 0b11000011                             # LCD on, background at 0x9800, no window
+        poke(0x9800, [0x80] * 0x400)                        # map tiles
+        poke(0x9800 + 5 * 32 + 1, self.font("Welcome!!"))
+        poke(0xFE00, [0] * 0xA0)
+        poke(0xFE00, [16 + 7 * 8, 8 + 8, saga1.CURSOR_TILE, 0])   # the hand, at row 7 column 1
+        poke(0x9800 + 7 * 32 + 3, self.font("OK"))
+        lead = saga1.PARTY
+        poke(lead, [0, 0x8A + 17, 0x8A + 24, 0x8A + 0, 0x8A + 13, 0xB1, 48, 0, 60, 0, 0x83, 8, 1, 4, 0])
+        poke(lead + 0xF, [0x21, 50, 0x5E, 0xFE] + [0xFF] * 12)
+        poke(lead + 0x1F, [0xFF] * 0x1F)                    # an empty slot
+        mon = lead + 2 * 0x1F
+        poke(mon, [0, 0x8A + 6, 0x8A + 14, 0x8A + 1, 0xFF, 0x4E, 0, 0, 20, 0, 0, 5, 6, 8, 3])
+        poke(mon + 0xF, [0xFF] * 16)
+        poke(lead + 3 * 0x1F, [0xFF] * 0x1F)
+        poke(saga1.BAG, [0x00, 3] + [0xFF] * 14)
+        poke(saga1.GOLD, [0x01, 0x23, 0x40])
+        poke(saga1.MAP, [1, 36, 18])
+        m[saga1.MODE] = 8 if battle else 1
+        if battle:
+            poke(saga1.BATTLE_PARTY, [0, 0, 0, 35, 0, 60, 0])
+            poke(saga1.BATTLE_PARTY + 0x20, [0, 0, 0xFF])
+            poke(saga1.BATTLE_PARTY + 0x40, [0, 0, 0, 12, 0, 20, 0])
+            for k in range(saga1.ENEMY_SLOTS):
+                poke(saga1.BATTLE_ENEMY + k * 0x20, [0, 0, 0xFF])
+            for k, hp in enumerate((19, 0)):
+                e = saga1.BATTLE_ENEMY + k * 0x20
+                poke(e, [0, 2, 0, hp, 0, 19, 0]); m[e + 0x1F] = 0x9B
+            poke(saga1.GROUPS, [0x9B, 2, 0xFF, 0, 0xFF, 0])
+        return m
+
+    def test_found_by_title(self):
+        self.assertIs(readers.find("SAGA"), saga1)
+        self.assertIsNone(readers.find("SAGA2"))            # Final Fantasy Legend II is another game
+
+    def test_walking(self):
+        text = saga1.describe(self.memory())
+        self.assertIn("Where: the town you start in, x 9, y 18", text)
+        self.assertIn("Gold: 12340GP", text)
+        self.assertIn("1. RYAN (HUMAN M) HP 48/60 - Str 8, Def 1, Agl 4, Mana 0 - LONG x50, BRONZE", text)
+        self.assertIn("3. GOB (GOBLIN) HP 0/20 DOWN", text)
+        self.assertNotIn("2. ", text)
+        self.assertIn("Bag: POTION x3", text)
+        self.assertNotIn("battle", text)
+        self.assertNotIn("Against", text)
+        self.assertIn(" Welcome!!", text)
+        self.assertIn("  >OK", text)
+
+    def test_battle(self):
+        text = saga1.describe(self.memory(battle=True))
+        self.assertIn("in a battle", text)
+        self.assertIn("1. RYAN (HUMAN M) HP 35/60", text)          # the battle's own HP
+        self.assertIn("3. GOB (GOBLIN) HP 12/20", text)
+        self.assertIn("Against: ASIGARU x2 (HP 19/19, 0/19)", text)
+
+    def test_new_game(self):
+        text = saga1.describe([0] * 0x10000)                 # memory before a game is set up
+        self.assertIn("Party: nobody yet", text)
+        self.assertIn("Bag: empty", text)
+
+    def test_names(self):
+        self.assertEqual(saga1.kind(0x9B), "ASIGARU")
+        self.assertEqual(saga1.kind(0xAD), "HUMAN M")
+        self.assertEqual(saga1.item(0x21), "LONG")
+        self.assertEqual(saga1.item(0x00), "POTION")
+        self.assertEqual(saga1.item(0x400), "item 1024")
 
 
 class Plugin(unittest.TestCase):
