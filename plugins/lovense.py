@@ -61,6 +61,7 @@ import urllib.request
 
 import config
 from core import logbook
+from core import safe
 
 from plugins import _toys
 
@@ -98,22 +99,34 @@ def settings():
 
 
 def _caps():
-    """(max strength, max seconds) from config, kept inside what the API allows."""
+    """(max strength, max seconds) from config, kept inside what the API allows.
+    A cap that isn't a number ("10%", NaN) falls back to half strength
+    and half a minute, never to the most the toy can do."""
     s = settings()
 
-    try:
-        return max(0, min(20, int(s["max_strength"]))), max(1, min(600, int(s["max_seconds"])))
-    except (TypeError, ValueError):
-        return 20, 60
+    return safe.whole(s["max_strength"], 10, 0, 20), safe.whole(s["max_seconds"], 30, 1, 600)
 
 
 def _motion_caps():
-    """(max motion 0-20, ramp seconds) for machines."""
+    """(max motion 0-20, ramp seconds) for machines; the same careful
+    fallbacks as _caps."""
     s = settings()
+    return safe.whole(s["max_motion"], 5, 0, 20), safe.number(s["ramp_seconds"], 3.0, 0.0, 30.0)
+
+
+def _couldnt_stop(e):
+    """A stop that didn't reach the toy, said where it can't be missed:
+    it may run on until its timer ends."""
+    text = (f"lovense: COULDN'T STOP the toys ({e}). They may keep going until their "
+            "timer runs out - switch them off by hand or in the Remote app.")
+    logbook.error(NAME, "stop failed: %s", e)
     try:
-        return max(0, min(20, int(s["max_motion"]))), max(0.0, min(30.0, float(s["ramp_seconds"])))
-    except (TypeError, ValueError):
-        return 10, 3.0
+        import ui
+
+        ui.add_message("system", text)
+    except Exception:
+        pass
+    return text
 
 
 def stop_all_toys():
@@ -124,7 +137,7 @@ def stop_all_toys():
         _post({"command": "Function", "action": "Stop", "apiVer": 1})
         return True, "lovense: stopped all toys"
     except Exception as e:
-        return False, f"lovense: couldn't stop - {e}"
+        return False, _couldnt_stop(e)
 
 
 def available():
@@ -172,18 +185,19 @@ def stop():
     # Switching off mid-vibration stops the toys too, rather than leaving
     # them running until their timer ends. The tools hide themselves once
     # this is off (available=running), so nothing needs unregistering.
+    failed = None
     if _state["connected"]:
         try:
             _post({"command": "Function", "action": "Stop", "apiVer": 1})
         except Exception as e:
-            logbook.warn(NAME, "couldn't stop the toys on the way out: %s", e)
+            failed = _couldnt_stop(e)
 
     _stop.set()
     _state["connected"] = False
     with _plan_lock:
         _plan.clear()
 
-    return True, "lovense: stopped"
+    return (False, failed) if failed else (True, "lovense: stopped")
 
 
 def status():
@@ -384,13 +398,26 @@ def _apply(key):
 def _drive():
     """Keep each target's command current: a ramp climbing, or vibration
     or motion running out while the other carries on."""
+    failing = 0
     while not _stop.is_set():
+        # While the app can't be reached, one warning until it answers
+        # again: a line every quarter second filled the log. The pace
+        # stays the same, so a stop is never late.
         _stop.wait(0.25)
+        failed = None
         for key in list(_plan) + [k for k in list(_sent) if k not in _plan]:
             try:
                 _apply(key)
             except Exception as e:
-                logbook.warn(NAME, "couldn't update a toy: %s", e)
+                failed = e
+        if failed is None:
+            if failing:
+                logbook.info(NAME, "the Remote app answers again")
+            failing = 0
+        else:
+            if not failing:
+                logbook.warn(NAME, "couldn't update a toy: %s", failed)
+            failing += 1
 
 
 def _watch():
@@ -423,7 +450,7 @@ def _register_tools():
         try:
             strength = max(0, min(top, int(strength)))
             seconds = max(1, min(longest, int(seconds)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):   # inf too
             return "strength and seconds must be numbers"
         key = str(toy or "")
         with _plan_lock:
@@ -449,7 +476,7 @@ def _register_tools():
         try:
             speed = max(0, min(top, int(speed)))
             seconds = max(1, min(_caps()[1], int(seconds)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):   # inf too
             return "speed and seconds must be numbers"
         now = time.monotonic()
         with _plan_lock:
@@ -489,7 +516,7 @@ def _register_tools():
 
         try:
             seconds = max(1, min(_caps()[1], int(seconds)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):   # inf too
             return "seconds must be a number"
 
         with _plan_lock:

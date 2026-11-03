@@ -4,13 +4,13 @@ waiting for the wake word.
 Part of the voice package; voice/speech.py is the front door.
 """
 import sounddevice as sd
-from core import logbook
+from core import logbook, safe
 import ui
 import config
 from config import SAMPLE_RATE
 from voice.listen import VAD_BLOCK_SIZE, _rms, levels
 from voice import listen
-from voice.playback import _afplay, _close_mic, _open_mic
+from voice.playback import _afplay, _close_mic, _open_mic, _read_mic
 
 
 # ---------------------------------------------------------------------------
@@ -70,9 +70,12 @@ def _watch_for_barge_in(done, stop):
     error - failing to offer barge-in is a missing nicety, but crashing
     the speaker thread would lose the reply.
     """
-    threshold = min(0.95, config.STT_VAD_THRESHOLD + config.STT_BARGE_IN_BOOST)
+    # Clamped: an inf here raised OverflowError before the try below and
+    # took barge-in away without a word.
+    threshold = safe.number(config.STT_VAD_THRESHOLD + config.STT_BARGE_IN_BOOST, 0.8, lo=0.1, hi=0.95)
+    margin = safe.number(config.STT_BARGE_IN_MARGIN, 2.5, lo=0.1, hi=100)
     block_seconds = VAD_BLOCK_SIZE / SAMPLE_RATE
-    needed = max(1, int(config.STT_BARGE_IN_SECONDS / block_seconds))
+    needed = safe.whole(safe.seconds(config.STT_BARGE_IN_SECONDS, 0.35, hi=10) / block_seconds, 1, lo=1)
 
     bleed = []
     calibrating = max(1, int(BARGE_IN_CALIBRATION_SECONDS / block_seconds))
@@ -98,7 +101,7 @@ def _watch_for_barge_in(done, stop):
 
     try:
         while not done.is_set() and not stop.speaking.is_set():
-            audio, _overflow = stream.read(VAD_BLOCK_SIZE)
+            audio, _overflow = _read_mic(stream, VAD_BLOCK_SIZE)
             block = audio[:, 0].copy()
             level = _rms(block)
 
@@ -128,14 +131,14 @@ def _watch_for_barge_in(done, stop):
                         "barge-in", "calibrated | her level at the mic=%.4f "
                         "(floor %.4f) | you need %.4f to cut in",
                         baseline, BARGE_IN_FLOOR,
-                        baseline * config.STT_BARGE_IN_MARGIN,
+                        baseline * margin,
                     )
 
                 continue
 
             levels["barge_peak"] = max(levels["barge_peak"], level)
 
-            if level < baseline * config.STT_BARGE_IN_MARGIN:
+            if level < baseline * margin:
                 streak = 0
                 continue
 
@@ -162,7 +165,7 @@ def _watch_for_barge_in(done, stop):
                     "barge-in",
                     "fired | level=%.4f baseline=%.4f needed>%.4f "
                     "speech=%.2f threshold=%.2f held=%.2fs",
-                    level, baseline, baseline * config.STT_BARGE_IN_MARGIN,
+                    level, baseline, baseline * margin,
                     probability, threshold, streak * block_seconds,
                 )
                 stop.barged_in = True
@@ -193,7 +196,8 @@ def wait_for_wake_word(should_stop):
     """Block until the wake word is heard.
 
     Returns True if it fired, False if `should_stop()` asked us to give
-    up. Nothing else runs while this does - no Whisper, no model, just
+    up, None if the microphone wouldn't open or stopped working (the
+    hands-free loop backs off and, after a few, says so once). Nothing else runs while this does - no Whisper, no model, just
     a 1.5MB classifier over 80ms frames - so it can sit here all day.
     """
     from voice import wakeword
@@ -207,18 +211,20 @@ def wait_for_wake_word(should_stop):
     try:
         stream = _open_mic(wakeword.FRAME_SIZE)
     except Exception as e:
-        ui.add_message("system", f"Wake word listener couldn't open the mic: {e}")
-        return True
+        # Logged, not shown: returning True here sent a failing mic round
+        # the hands-free loop with a new message every second and a half.
+        logbook.warn("wakeword", "couldn't open the mic: %s", e)
+        return None
 
     try:
         while not should_stop():
-            audio, _overflow = stream.read(wakeword.FRAME_SIZE)
+            audio, _overflow = _read_mic(stream, wakeword.FRAME_SIZE)
 
             if wakeword.heard(audio[:, 0].copy()):
                 return True
     except Exception as e:
-        ui.add_message("system", f"Wake word listener stopped: {e}")
-        return True
+        logbook.warn("wakeword", "listener stopped: %s", e)
+        return None
     finally:
         _close_mic(stream)
 

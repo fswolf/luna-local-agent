@@ -90,7 +90,16 @@ def account():
 def _imap(acct):
     box = imaplib.IMAP4_SSL(acct["imap_host"], int(acct["imap_port"]),
                             ssl_context=ssl.create_default_context(), timeout=TIMEOUT)
-    box.login(acct["user"], acct["password"])
+
+    try:
+        box.login(acct["user"], acct["password"])
+    except Exception:
+        # A refused password left the connection open, one per try.
+        try:
+            box.shutdown()
+        except Exception:
+            pass
+        raise
 
     return box
 
@@ -264,7 +273,7 @@ def _why_send():
 def _limit(n, default=8):
     try:
         return max(1, min(int(n or default), int(getattr(config, "EMAIL_MAX", 20))))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return default
 
 
@@ -396,7 +405,7 @@ def _search_email(query, days=30, limit=8, folder="INBOX"):
 
     try:
         days = max(1, min(int(days or 30), 3650))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         days = 30
 
     since = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
@@ -536,9 +545,12 @@ def _send_email(to, body, subject="", reply_to=""):
             server = smtplib.SMTP_SSL(acct["smtp_host"], port, context=context, timeout=TIMEOUT)
         else:
             server = smtplib.SMTP(acct["smtp_host"], port, timeout=TIMEOUT)
-            server.starttls(context=context)
 
+        # `with` from here, so a failed starttls closes the connection too.
         with server:
+            if port != 465:
+                server.starttls(context=context)
+
             server.login(acct["user"], acct["password"])
             server.send_message(msg)
     except Exception as e:

@@ -41,6 +41,7 @@ from collections import deque
 
 from core import interrupts
 from core import logbook
+from core import safe
 
 from config import AGENT_NAME
 
@@ -129,10 +130,13 @@ class ChatRoom:
         self._reply = reply
 
         self.tools = allowed_tools(settings.get("tools"))
-        self.cooldown = float(settings.get("cooldown_seconds", 8))
-        self.user_cooldown = float(settings.get("user_cooldown_seconds", 30))
-        self.max_chars = int(settings.get("max_message_chars", 300))
-        self.context_lines = int(settings.get("context_lines", 12))
+        # Clamped: these come from a settings file someone can type in.
+        # A NaN cooldown made time.sleep() raise and took the answering
+        # thread down; inf or a typo'd 1e12 did much the same.
+        self.cooldown = safe.seconds(settings.get("cooldown_seconds", 8), 8, hi=3600)
+        self.user_cooldown = safe.seconds(settings.get("user_cooldown_seconds", 30), 30, hi=86400)
+        self.max_chars = safe.whole(settings.get("max_message_chars", 300), 300, lo=1, hi=10000)
+        self.context_lines = safe.whole(settings.get("context_lines", 12), 12, lo=0, hi=50)
         self.ignore = tuple(settings.get("ignore", ()))
 
         # Whether her answer is read out loud. A stream room wants it;
@@ -250,43 +254,55 @@ class ChatRoom:
             except queue.Empty:
                 continue
 
-            if not self._wait_for_a_gap():
-                logbook.info(self.name, "dropped %s's question - busy too long", who)
-                continue
-
-            if self._stop.is_set():
-                break
-
-            if time.time() - queued_at > STALE_AFTER_SECONDS:
-                logbook.info(self.name, "dropped %s's question - too old", who)
-                continue
-
+            # Everything past the queue is guarded as a whole: one bad
+            # message used to end the thread with a traceback over the
+            # screen, and chat silently stopped being answered. The sleep
+            # keeps a fault that repeats from spinning.
             try:
-                self._last_reply_at = time.time()
-
-                answer = assistant.respond_to_chat(
-                    self.prompt_for(who, message),
-                    model,
-                    source=self.name,
-                    who=who,
-                    said=message,
-                    context=self.context_messages(),
-                    tools_allowed=self.tools,
-                    speak=self.speak,
-                )
-                self.answered += 1
+                self._handle(assistant, model, who, message, queued_at)
             except Exception:
-                logbook.exception(self.name, "failed to answer a chat message")
-                continue
+                logbook.exception(self.name, "chat worker hit an error, carrying on")
+                time.sleep(1)
 
-            # Separately, and after the count: she has already said it
-            # out loud by here, so a transport that can't post the reply
-            # back is a degraded room, not a failed turn.
-            if self._reply and answer:
-                try:
-                    self._reply(who, answer)
-                except Exception:
-                    logbook.exception(self.name, "couldn't post the reply back")
+    def _handle(self, assistant, model, who, message, queued_at):
+        """One queued message: wait for a gap, answer, post the reply."""
+        if not self._wait_for_a_gap():
+            logbook.info(self.name, "dropped %s's question - busy too long", who)
+            return
+
+        if self._stop.is_set():
+            return
+
+        if time.time() - queued_at > STALE_AFTER_SECONDS:
+            logbook.info(self.name, "dropped %s's question - too old", who)
+            return
+
+        try:
+            self._last_reply_at = time.time()
+
+            answer = assistant.respond_to_chat(
+                self.prompt_for(who, message),
+                model,
+                source=self.name,
+                who=who,
+                said=message,
+                context=self.context_messages(),
+                tools_allowed=self.tools,
+                speak=self.speak,
+            )
+            self.answered += 1
+        except Exception:
+            logbook.exception(self.name, "failed to answer a chat message")
+            return
+
+        # Separately, and after the count: she has already said it
+        # out loud by here, so a transport that can't post the reply
+        # back is a degraded room, not a failed turn.
+        if self._reply and answer:
+            try:
+                self._reply(who, answer)
+            except Exception:
+                logbook.exception(self.name, "couldn't post the reply back")
 
     def _wait_for_a_gap(self):
         """Hold until the global cooldown has passed and she's free.

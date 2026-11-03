@@ -15,6 +15,7 @@ never sees. Everything returns a string; exceptions become error strings
 rather than propagating, because a failed tool should be something the
 model can talk about, not something that kills the turn.
 """
+import inspect
 import json
 
 import config
@@ -374,12 +375,26 @@ def call(name, arguments):
 
     if isinstance(arguments, str):
         try:
-            arguments = json.loads(arguments or "{}")
-        except json.JSONDecodeError:
-            return f"Error: arguments for {name} were not valid JSON: {arguments!r}"
+            # NaN and Infinity aren't JSON, but json.loads takes them, and a
+            # tool doing int() on one gets an OverflowError: refused here.
+            arguments = json.loads(arguments or "{}", parse_constant=_no_constant,
+                                   parse_float=_finite)
+        except (json.JSONDecodeError, ValueError):
+            return f"Error: arguments for {name} were not valid JSON: {str(arguments)[:300]!r}"
 
     if not isinstance(arguments, dict):
         return f"Error: arguments for {name} must be an object"
+
+    # Checked before the call, so a TypeError from deep inside a tool (a
+    # bug) is reported as one instead of as the model's wrong arguments.
+    try:
+        inspect.signature(entry["run"]).bind(**arguments)
+    except TypeError as e:
+        if name in OUTSIDE:
+            _mark_outside(name)
+        return f"Error: wrong arguments for {name}: {e}"
+    except ValueError:
+        pass    # no signature to read (a builtin): let the call say
 
     try:
         result = str(entry["run"](**arguments))
@@ -388,13 +403,28 @@ def call(name, arguments):
             routing.note_used(name, group_of)
 
         return result
-    except TypeError as e:
-        return f"Error: wrong arguments for {name}: {e}"
     except Exception as e:
+        from core import logbook
+
+        logbook.exception("tools", "%s failed", name)
         return f"Error running {name}: {e}"
     finally:
         if name in OUTSIDE:
             _mark_outside(name)
+
+
+def _no_constant(word):
+    raise ValueError(f"{word} is not a number a tool can use")
+
+
+def _finite(text):
+    """A JSON float, refused when it overflows to infinity (1e999)."""
+    value = float(text)
+
+    if value in (float("inf"), float("-inf")):
+        raise ValueError(f"{text} is too big a number")
+
+    return value
 
 
 def _mark_outside(name):

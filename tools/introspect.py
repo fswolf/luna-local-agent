@@ -71,7 +71,7 @@ def _introspect(turns_back=1):
 
     try:
         back = max(1, min(int(turns_back or 1), 50))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         back = 1
 
     rows = thoughtlog.rows(limit=1, offset=back - 1)
@@ -543,6 +543,19 @@ def _save_skill(name, when, steps):
 MAX_ACTIVE_PROJECTS = 6
 
 
+def _find_project(ref):
+    """projects.find(), with an id too big for SQLite read as no match
+    rather than an OverflowError from inside the database call."""
+    from mind import projects
+
+    digits = str(ref or "").strip().lstrip("#")
+
+    if digits.isdigit() and (len(digits) > 19 or int(digits) > 2 ** 63 - 1):
+        return None
+
+    return projects.find(ref)
+
+
 def _projects_on():
     from mind import projects
 
@@ -607,7 +620,7 @@ def _update_project(project, tried="", found="", decided="", next="", status="")
 
     from mind import projects
 
-    p = projects.find(project)
+    p = _find_project(project)
 
     if not p:
         names = ", ".join(f"#{x['id']} {x['title']}" for x in projects.projects()[:8]) or "none"
@@ -653,7 +666,7 @@ def _project_notes(project):
 
     from mind import projects
 
-    p = projects.find(project)
+    p = _find_project(project)
 
     if not p:
         return f"No project matches '{project}'."

@@ -546,14 +546,17 @@ def _greet(gap):
 
         if assistant.busy() or interrupts.recording() or mood.away():
             return
+        # Imported before the turn is taken: one that failed after it left
+        # the turn held and every later turn waiting for it.
+        from core import history
+        import llm
+        import ui
+        from voice.speech import speak
+
         if not assistant._turn.acquire(blocking=False):
             return
     except Exception:
         return
-    from core import history
-    import llm
-    import ui
-    from voice.speech import speak
 
     if _state.get("stranger"):
         assistant._turn.release()         # someone she doesn't know: not the owner coming back

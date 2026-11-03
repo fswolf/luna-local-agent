@@ -349,13 +349,24 @@ def _read(conn):
                 _s.error = f"the fan reported error {p[2]}"
 
 
+def _fps():
+    """portrait.fan.fps, 8 to 25. Anything else ("fast", NaN) is 15: a word
+    there used to raise here on every frame, and the loop restarted and
+    logged it every two seconds for as long as Luna ran."""
+    try:
+        fps = float(_setting("fps", 15) or 15)
+    except (TypeError, ValueError, OverflowError):
+        return 15.0
+    return 15.0 if fps != fps else max(8.0, min(25.0, fps))
+
+
 def _cast_loop(_server):
     """Heartbeat while idle; while frames come, cast them on a steady beat
     (the last one again if no new one came - the fan needs one every 130 ms)."""
     last_beat = last_sent = 0.0
     count, count_t, beat = 0, time.monotonic(), time.monotonic()
     while True:
-        fps = max(8.0, min(25.0, float(_setting("fps", 15) or 15)))
+        fps = _fps()
         beat = max(beat + 1.0 / fps, time.monotonic())   # a steady rate, not sleep + send time
         time.sleep(max(0.0, beat - time.monotonic()))
         now = time.monotonic()

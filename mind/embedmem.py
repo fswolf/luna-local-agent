@@ -35,6 +35,7 @@ import requests
 
 import config
 from core import logbook
+from core import safe
 
 DB_FILE = os.path.join(config.BASE_DIR, "agent", "embeddings.db")
 TIMEOUT = 2.0      # per request; a turn waits this long at most
@@ -296,7 +297,7 @@ def select(query, facts, limit):
     # The floor still decides what's a match at all, so the reranker
     # never brings in more than the embedding alone would have.
     if len(passing) > slots:
-        better = rerank(query, passing[:max(slots, int(getattr(config, "RERANK_CANDIDATES", 24)))])
+        better = rerank(query, passing[:max(slots, safe.whole(getattr(config, "RERANK_CANDIDATES", 24), 24, lo=1, hi=1000))])
 
         if better is not None:
             passing = better

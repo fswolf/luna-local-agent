@@ -47,6 +47,7 @@ import requests
 from core import chatroom
 import config
 from core import logbook
+from core import safe
 from core import timeutil
 
 NAME = "youtube"
@@ -108,11 +109,30 @@ def _api_key():
     return str(parsed.get("api_key", "")).strip() if isinstance(parsed, dict) else ""
 
 
+def _credentials_problem():
+    """Why the credentials file can't be used, or "" (missing is fine).
+    A broken file should say so, not look like "no key"."""
+    try:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as handle:
+            parsed = json.load(handle)
+    except FileNotFoundError:
+        return ""
+    except (ValueError, OSError) as e:
+        return f"{CREDENTIALS_FILE} couldn't be read: {e}"
+
+    return "" if isinstance(parsed, dict) else f"{CREDENTIALS_FILE} should be one {{...}} object"
+
+
 def available():
     return not why_unavailable()
 
 
 def why_unavailable():
+    problem = _credentials_problem()
+
+    if problem:
+        return problem
+
     if not _api_key():
         return (f'no API key - put {{"api_key": "AIza..."}} in {CREDENTIALS_FILE} '
                 "(Google Cloud Console, YouTube Data API v3)")
@@ -242,7 +262,10 @@ def _quota_reset():
     return midnight.timestamp()
 
 
-def _poll_loop():
+def _poll_loop(stop):
+    """stop is this start's own: a loop left over from before a quick
+    off and on (mid-request when it happened) can't carry on as a second
+    poller, answering everything twice and spending quota twice."""
     global _chat_id, _video_id, _title, _last_error, _polls, _messages
     global _last_poll_at, _quota_until
 
@@ -250,9 +273,9 @@ def _poll_loop():
     first = True
     backoff = 5
 
-    while not _stop.is_set():
+    while not stop.is_set():
         if _quota_until and time.time() < _quota_until:
-            _stop.wait(60)
+            stop.wait(60)
             continue
 
         try:
@@ -297,12 +320,14 @@ def _poll_loop():
             if data.get("offlineAt"):
                 _last_error = "the stream has ended"
                 _chat_id = ""
-                _stop.wait(60)
+                stop.wait(60)
                 continue
 
-            wait = max(float(settings().get("poll_seconds", 5)),
-                       int(data.get("pollingIntervalMillis") or 0) / 1000)
-            _stop.wait(wait)
+            # Both clamped: NaN here made wait() return at once (polling
+            # flat out, burning the day's quota) and 1e10 raised OverflowError.
+            wait = max(safe.seconds(settings().get("poll_seconds"), 5, lo=1, hi=600),
+                       safe.seconds(data.get("pollingIntervalMillis"), 0, hi=600000) / 1000)
+            stop.wait(wait)
 
         except _ApiError as e:
             _last_error = str(e)
@@ -313,13 +338,15 @@ def _poll_loop():
                 _last_error = "daily quota used up - waits for midnight Pacific"
             elif e.reason in ("liveChatEnded", "liveChatNotFound", "liveChatDisabled"):
                 _chat_id = ""
-                _stop.wait(30)
+                stop.wait(30)
             elif e.status in (400, 403) and e.reason in ("keyInvalid", "accessNotConfigured", "forbidden"):
                 logbook.warn(NAME, "%s - stopping", e)
+                logbook.tell(f"youtube: the API key was refused ({e.reason}). Stopped trying - "
+                             "fix it, then /youtube off and /youtube on.")
                 break  # retrying a bad key only burns quota
             else:
                 logbook.warn(NAME, "%s", e)
-                _stop.wait(backoff)
+                stop.wait(backoff)
                 backoff = min(backoff * 2, 120)
 
         except LookupError as e:
@@ -327,12 +354,12 @@ def _poll_loop():
             # again in a minute, which costs 1 unit with "video" set and
             # nothing with "channel".
             _last_error = str(e)
-            _stop.wait(60)
+            stop.wait(60)
 
         except Exception as e:
             _last_error = f"{type(e).__name__}: {e}"[:140]
             logbook.warn(NAME, "%s", _last_error)
-            _stop.wait(backoff)
+            stop.wait(backoff)
             backoff = min(backoff * 2, 120)
 
 
@@ -340,7 +367,7 @@ def _poll_loop():
 # The plugin interface
 # ---------------------------------------------------------------------------
 def start(model):
-    global _room, _thread, _running, _chat_id, _quota_until, _polls, _messages
+    global _stop, _room, _thread, _running, _chat_id, _quota_until, _polls, _messages
 
     with _lock:
         if _running:
@@ -361,8 +388,8 @@ def start(model):
         )
         _room.start(model)
 
-        _stop.clear()
-        _thread = threading.Thread(target=_poll_loop, daemon=True)
+        _stop = threading.Event()
+        _thread = threading.Thread(target=_poll_loop, args=(_stop,), daemon=True)
         _thread.start()
         _running = True
 
@@ -405,6 +432,8 @@ def status():
 
     if _chat_id:
         where = f"reading {_video_id}" + (f" - {_title[:50]}" if _title else "")
+    elif _thread is not None and not _thread.is_alive():
+        where = f"stopped trying ({_last_error or 'unknown'}) - /youtube off, then on"
     else:
         where = f"waiting ({_last_error or 'finding the stream'})"
 

@@ -91,6 +91,11 @@ def _credentials():
         data = {}
     except ValueError as e:
         raise ValueError(f"{CREDENTIALS_FILE} isn't valid JSON: {e}") from None
+    except OSError as e:
+        raise ValueError(f"{CREDENTIALS_FILE} couldn't be read: {e}") from None
+
+    if not isinstance(data, dict):
+        raise ValueError(f"{CREDENTIALS_FILE} should be one {{...}} object")
 
     token = str(data.get("token") or os.environ.get("DISCORD_TOKEN", "")).strip()
     ids = data.get("owner_ids", data.get("owner_id", []))
@@ -191,7 +196,10 @@ def _ask_in_discord(kind, title, body, guarded):
     if channel is None or _loop is None:
         return False
 
-    timeout = max(30, int(settings().get("approval_timeout", 300)))
+    from core import safe
+
+    # Clamped: 1e10 here was an OverflowError in wait(), a quiet "no".
+    timeout = safe.whole(settings().get("approval_timeout"), 300, 30, 24 * 3600)
     full = "\n".join(str(line) for line in body)
     shown = full.replace(FENCE, "'''")
     # Too long for one message: the whole thing goes along as a file,
@@ -410,6 +418,10 @@ def _run(token, owners):
         _error = f"{type(e).__name__}: {e}"
         logbook.exception(NAME, "client stopped")
     finally:
+        # start() only said "connecting": a failure has to be said here,
+        # or it only shows in /discord status.
+        if _error:
+            logbook.tell(f"discord: couldn't connect - {_error}")
         try:
             loop.run_until_complete(client.close())
         except Exception:

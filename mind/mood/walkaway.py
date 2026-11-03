@@ -8,6 +8,7 @@ import threading
 import time
 import config
 from core import logbook
+from core import safe
 from mind.mood.core import S, _away_lock, _lock, _walk, walk_away_on
 from mind.mood import appraise, drift, exchange, show
 
@@ -56,7 +57,9 @@ def _count_hostility(rating, warmth):
         return
 
     now = time.time()
-    minutes = max(1.0, float(getattr(config, "MOOD_WALK_AWAY_MINUTES", 10)))
+    # Clamped: a hand-edited 1e999 made Timer() overflow in its own thread
+    # and left her away for good.
+    minutes = safe.number(getattr(config, "MOOD_WALK_AWAY_MINUTES", 10), 10, lo=1, hi=24 * 60)
 
     with _away_lock:
         if S.away_state["until"]:
@@ -72,7 +75,7 @@ def _count_hostility(rating, warmth):
 
         # Decided and claimed in one step, so two appraisals finishing
         # together can't both walk her out (two timers, two log lines).
-        leaving = S.away_state["hostile"] >= max(1, int(getattr(config, "MOOD_WALK_AWAY_AFTER", 3)))
+        leaving = S.away_state["hostile"] >= safe.whole(getattr(config, "MOOD_WALK_AWAY_AFTER", 3), 3, lo=1, hi=1000)
 
         if leaving:
             S.away_state.update(until=now + minutes * 60, said=False, hostile=0)

@@ -69,8 +69,16 @@ def _serve(server, model, handlers):
         if handler:
             try:
                 handler(model)
-            except Exception:
-                pass
+            except Exception as e:
+                # A hotkey that does nothing is a mystery; one that says
+                # why in the log and the conversation is a fix.
+                try:
+                    from core import logbook
+
+                    logbook.exception("control", "%r failed", line)
+                    logbook.tell(f"The {line.strip().lower()} hotkey failed: {e}")
+                except Exception:
+                    pass
 
 
 def _start_unix():

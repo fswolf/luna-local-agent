@@ -47,6 +47,7 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 import requests
+import urllib3
 
 import config
 
@@ -343,7 +344,9 @@ def fetch(url, limit=None, looking_for=None):
         # Read with a ceiling rather than trusting Content-Length - it
         # can be absent, wrong, or enormous.
         raw = response.raw.read(_MAX_DOWNLOAD, decode_content=True) or b""
-    except requests.exceptions.RequestException as e:
+    except (requests.exceptions.RequestException, urllib3.exceptions.HTTPError, OSError) as e:
+        # Reading .raw goes straight to urllib3, whose timeouts and broken
+        # connections requests doesn't wrap: without these they escaped.
         return None, f"the download failed ({e})"
     finally:
         response.close()

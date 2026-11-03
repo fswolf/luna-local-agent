@@ -66,6 +66,7 @@ import time
 
 import config
 from core import logbook
+from core import safe
 
 from plugins import _toys
 
@@ -103,23 +104,22 @@ def settings():
 
 
 def _caps():
-    """(max intensity 0-1, max seconds) from config, kept sane."""
+    """(max intensity 0-1, max seconds) from config, kept sane. A cap that
+    isn't a number ("80%", NaN) falls back to half intensity and half a
+    minute, never to full power (NaN used to compare its way to 1.0)."""
     s = settings()
 
-    try:
-        return max(0.0, min(1.0, float(s["max_intensity"]) / 100.0)), max(1, min(600, int(s["max_seconds"])))
-    except (TypeError, ValueError):
-        return 1.0, 60
+    return (safe.number(s["max_intensity"], 50, 0, 100) / 100.0,
+            safe.whole(s["max_seconds"], 30, 1, 600))
 
 
 def _motion_caps():
-    """(max motion speed 0-1, ramp seconds) for machines and strokers."""
+    """(max motion speed 0-1, ramp seconds) for machines and strokers,
+    with the same careful fallbacks."""
     s = settings()
 
-    try:
-        return max(0.0, min(1.0, float(s["max_motion"]) / 100.0)), max(0.0, min(30.0, float(s["ramp_seconds"])))
-    except (TypeError, ValueError):
-        return 0.5, 3.0
+    return (safe.number(s["max_motion"], 25, 0, 100) / 100.0,
+            safe.number(s["ramp_seconds"], 3.0, 0.0, 30.0))
 
 
 def _moves(dev):
@@ -191,6 +191,10 @@ def _reader(ws):
                 _state["error"] = f"connection lost: {e}"
                 logbook.warn(NAME, "connection to Intiface lost: %s", e)
                 _state.update(ws=None, connected=False)
+                # Intiface stops the devices when its client goes; said so
+                # you know her toy tools are gone until /buttplug on.
+                logbook.tell("buttplug: lost the connection to Intiface Central. "
+                             "/buttplug on to connect again.")
             return
 
         try:
@@ -199,24 +203,38 @@ def _reader(ws):
             continue
 
         for message in messages if isinstance(messages, list) else []:
-            for kind, body in message.items():
-                body = body or {}
+            try:
+                _handle(message)
+            except Exception as e:
+                # One odd message must not end the reader: without it every
+                # command, stop included, waits 5s and fails.
+                logbook.warn(NAME, "skipped a message from Intiface: %s", e)
 
-                if kind == "DeviceAdded":
-                    _add_device(body)
-                    logbook.info(NAME, "device added: %s", _name(body))
-                elif kind == "DeviceRemoved":
-                    _state["devices"].pop(body.get("DeviceIndex"), None)
-                elif kind == "DeviceList":
-                    _state["devices"] = {}
-                    for d in body.get("Devices") or []:
-                        _add_device(d)
 
-                slot = _waiting.pop(body.get("Id"), None)
+def _handle(message):
+    """One message from Intiface: devices coming and going, or the reply
+    a _send is waiting for."""
+    if not isinstance(message, dict):
+        return
 
-                if slot:
-                    slot[1] = (kind, body)
-                    slot[0].set()
+    for kind, body in message.items():
+        body = body if isinstance(body, dict) else {}
+
+        if kind == "DeviceAdded":
+            _add_device(body)
+            logbook.info(NAME, "device added: %s", _name(body))
+        elif kind == "DeviceRemoved":
+            _state["devices"].pop(body.get("DeviceIndex"), None)
+        elif kind == "DeviceList":
+            _state["devices"] = {}
+            for d in body.get("Devices") or []:
+                _add_device(d)
+
+        slot = _waiting.pop(body.get("Id"), None)
+
+        if slot:
+            slot[1] = (kind, body)
+            slot[0].set()
 
 
 def _pinger(ws, every):
@@ -322,12 +340,14 @@ def _close():
 
 def stop():
     # Everything stops before the socket closes, never left running.
+    failed = None
     if _state["connected"]:
-        stop_all_devices()
+        ok, message = stop_all_devices()
+        failed = None if ok else message
 
     _close()
 
-    return True, "buttplug: stopped"
+    return (False, failed) if failed else (True, "buttplug: stopped")
 
 
 def stop_all_devices():
@@ -341,7 +361,17 @@ def stop_all_devices():
         _send("StopAllDevices")
         return True, "buttplug: stopped all devices"
     except Exception as e:
-        return False, f"buttplug: couldn't stop - {e}"
+        # Said where it can't be missed: a device may run on.
+        text = (f"buttplug: COULDN'T STOP the devices ({e}). Switch them off by hand, "
+                "or stop them in Intiface Central.")
+        logbook.error(NAME, "stop failed: %s", e)
+        try:
+            import ui
+
+            ui.add_message("system", text)
+        except Exception:
+            pass
+        return False, text
 
 
 def status():
@@ -636,7 +666,7 @@ def _stroke(devs, seconds, speed):
 def _seconds(value, default=10):
     try:
         return max(1, min(_caps()[1], int(value if value not in (None, "") else default)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):   # inf too
         return None
 
 
@@ -659,7 +689,7 @@ def _register_tools():
 
         try:
             level = min(_caps()[0], max(0.0, float(intensity) / 100.0))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):   # inf too
             return "intensity and seconds must be numbers"
 
         _play(devs, secs, lambda t: level)
@@ -682,7 +712,7 @@ def _register_tools():
         secs = _seconds(seconds, 15)
         try:
             peak = min(_caps()[0], max(0.0, float(intensity) / 100.0))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):   # inf too
             secs = None
         if secs is None:
             return "intensity and seconds must be numbers"
@@ -703,7 +733,7 @@ def _register_tools():
         secs = _seconds(seconds)
         try:
             pace = min(_motion_caps()[0], max(0.0, float(speed) / 100.0))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):   # inf too
             secs = None
         if secs is None:
             return "speed and seconds must be numbers"

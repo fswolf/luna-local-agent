@@ -29,8 +29,28 @@ _PRESETS = {"1": "assistant", "2": "companion", "3": "streamer"}
 
 
 def needed():
-    """True on a first start: agent.json has no user block at all."""
-    return "user" not in (config.agent or {})
+    """True on a first start: agent.json has no user block at all.
+
+    Not when agent.json is there but can't be read. A typo makes config
+    load it as {}, which looks exactly like a fresh install - and the
+    setup's answers would then be written over the whole file."""
+    if "user" in (config.agent or {}):
+        return False
+    return not _unreadable(config.AGENT_FILE)
+
+
+def _unreadable(path):
+    """Why agent.json exists but can't be used, or "" if it's fine or absent."""
+    if not os.path.exists(path):
+        return ""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        return f"{os.path.basename(path)} can't be read ({e})"
+    if not isinstance(data, dict):
+        return f"{os.path.basename(path)} should hold a {{...}} block, not a {type(data).__name__}"
+    return ""
 
 
 def active():
@@ -118,10 +138,15 @@ def save_user(name, pronouns):
     """Write agent.json's user block (keeping everything else) and apply it
     now: the prompt's who-you're-talking-to line reads these."""
     path = config.AGENT_FILE
+    # Never write over a file that didn't parse: the fallback below would
+    # replace your persona and settings with a lone user block.
+    broken = _unreadable(path)
+    if broken:
+        raise ValueError(f"{broken} - fix it first, nothing was changed")
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, ValueError):
+    except FileNotFoundError:
         data = dict(config.agent or {})
 
     user = {}
@@ -159,7 +184,7 @@ def _finish(preset=None, skipped=False):
 
     try:
         save_user(name, pronouns)
-    except OSError as e:
+    except (OSError, ValueError) as e:
         _note(f"Couldn't save that to agent/agent.json: {e}")
         return
 

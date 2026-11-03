@@ -243,6 +243,11 @@ def _setup_then_connect():
 
         ok, message = _connect()
         _game.say(message if ok else f"REALITI: {message}")
+    except Exception as e:
+        # On its own thread: without this the failure reached nobody.
+        _state["error"] = str(e)[:200]
+        logbook.exception(NAME, "setup")
+        _game.say(f"REALITI: setting up failed ({e}). /realiti on to try again.")
     finally:
         _state["setup"] = ""
 
@@ -285,6 +290,16 @@ def _connect():
                   "/realiti visit lets her explore on her own.")
 
 
+def _goodbye():
+    """Say goodbye to the world, for at most a few seconds: a world that
+    hangs could otherwise hold /realiti off for a whole minute."""
+    if _game.server_problem(SERVER):
+        return
+    done = threading.Thread(target=_door, args=("goodbye",), daemon=True, name="realiti-goodbye")
+    done.start()
+    done.join(5)
+
+
 def stop():
     global _connected
     from core import mcpclient
@@ -293,7 +308,7 @@ def stop():
     _state["visiting"] = False
 
     if _connected:
-        _door("goodbye")      # the departure snapshot, so she's remembered where she was
+        _goodbye()            # the departure snapshot, so she's remembered where she was
         mcpclient.disconnect_server(SERVER)
         _transcript.mark("she leaves")
 
@@ -313,7 +328,10 @@ def status():
              + (f" - visiting, turn {_state['steps']}/{s['max_steps']}" if _state["visiting"] else
                 " - resting" if _connected else "")]
 
-    if _connected:
+    gone = _game.server_problem(SERVER) if _connected else ""
+    if gone:
+        lines.append(f"  the world's server isn't answering ({gone[:150]}) - /realiti off, then on")
+    elif _connected:
         where = _door("where").split(". Near you")[0]
         if where:
             lines.append(f"  {where}")
@@ -371,7 +389,7 @@ def _update():
         try:
             was_in = _connected
             if was_in:
-                _door("goodbye")
+                _goodbye()
                 mcpclient.disconnect_server(SERVER)
                 _connected = False
             problem = _run(["git", "-C", _path(), "pull", "--ff-only"]) or _install()
@@ -382,6 +400,10 @@ def _update():
                 _game.say(message)
             elif not problem:
                 _game.say("REALITI: up to date.")
+        except Exception as e:
+            _state["error"] = str(e)[:200]
+            logbook.exception(NAME, "update")
+            _game.say(f"REALITI: the update failed ({e}). /realiti on to go back in.")
         finally:
             _state["setup"] = ""
 
@@ -497,13 +519,14 @@ def _step():
 
     _game.record(NAME, "REALITI Relax", _state["steps"], answer, lines=_last["lines"])
 
-    if _state["steps"] >= int(s["max_steps"]):
+    if _state["steps"] >= _game.whole(s["max_steps"], DEFAULTS["max_steps"]):
         _state["visiting"] = False
         _game.say(f"REALITI: {_state['steps']} turns - she's resting. /realiti visit to carry on.")
 
 
 _loop = _game.Loop(NAME, _state, lambda: _step(), playing=lambda: _connected and _state["visiting"],
-                   quiet=lambda: settings()["step_seconds"])
+                   quiet=lambda: settings()["step_seconds"], server=SERVER,
+                   pause=lambda: _state.update(visiting=False), title="REALITI")
 
 
 # ---------------------------------------------------------------------------

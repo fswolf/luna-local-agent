@@ -389,7 +389,7 @@ def _crashes(since_us, until_us):
 def last_boot(back=1):
     try:
         back = max(1, min(10, int(back)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         back = 1
 
     tail = _journal("-b", f"-{back}", "-n", "60")

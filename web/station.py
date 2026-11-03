@@ -457,11 +457,17 @@ def _tidy():
 # ---------------------------------------------------------------------------
 class _Server(ThreadingHTTPServer):
     """Errors (a browser hanging up, plain http on the https port) go to the
-    log, never over the terminal."""
+    log, never over the terminal. Those are ordinary and get one quiet
+    line; any other error is a bug in a handler, logged with its traceback
+    so it can't pass for a dropped connection."""
     daemon_threads = True
 
     def handle_error(self, request, client_address):
-        logbook.info("station", "connection from %s dropped: %s", client_address[0], sys.exc_info()[1])
+        error = sys.exc_info()[1]
+        if isinstance(error, (ConnectionError, TimeoutError, ssl.SSLError)):
+            logbook.info("station", "connection from %s dropped: %s", client_address[0], error)
+        else:
+            logbook.exception("station", "a request from %s failed: %s", client_address[0], error)
 
 
 class _TLSServer(_Server):

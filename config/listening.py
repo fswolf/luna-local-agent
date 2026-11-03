@@ -2,7 +2,7 @@
 
 Part of the config package (it was one config.py); see config/__init__.py.
 """
-from .base import setting
+from .base import flag, setting
 
 # -------------------------
 # Speech-to-text / voice activity detection
@@ -74,7 +74,7 @@ STT_SETTLE_SECONDS = float(_stt_cfg.get("settle_seconds", 0.6))
 # measured and used as the baseline: you have to be noticeably louder
 # than she is at the microphone. On headphones that's trivially true.
 # On speakers, turn the volume down or raise the margin.
-STT_BARGE_IN = bool(_stt_cfg.get("barge_in", True))
+STT_BARGE_IN = flag(_stt_cfg.get("barge_in", True))
 # How long you have to keep talking before she stops. Too low and a
 # cough cuts her off; too high and you're talking over her for a
 # second before she notices.
@@ -103,7 +103,7 @@ STT_BARGE_IN_BOOST = float(_stt_cfg.get("barge_in_boost", 0.25))
 # name of one of theirs (hey_jarvis, alexa, hey_mycroft, hey_rhasspy).
 # There is no pretrained "hey Luna" - see voice/wakeword.py.
 _wake_cfg = setting("wake_word", {})
-WAKE_WORD_ENABLED = bool(_wake_cfg.get("enabled", False))
+WAKE_WORD_ENABLED = flag(_wake_cfg.get("enabled", False))
 WAKE_WORD_MODEL = _wake_cfg.get("model", "hey_jarvis")
 # Raise if it fires at the television, lower if it ignores you.
 WAKE_WORD_THRESHOLD = float(_wake_cfg.get("threshold", 0.5))

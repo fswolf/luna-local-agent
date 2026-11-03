@@ -95,20 +95,43 @@ def _connect():
     if _unavailable:
         return None
 
+    db = None
+
     try:
         os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
-        db = sqlite3.connect(DB_FILE, check_same_thread=False)
+        # timeout: the memory manager is another process on the same file
+        db = sqlite3.connect(DB_FILE, timeout=10, check_same_thread=False)
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(_SCHEMA)
         db.commit()
         _db = db
         logbook.info("factstore", "open: %s", DB_FILE)
-    except sqlite3.OperationalError as e:
-        # Almost always an sqlite built without FTS5. Remember why, say
-        # so once, and let mind/longterm.py quietly stay on JSON.
-        _unavailable = str(e)
-        logbook.warn("factstore", "unavailable (%s) - staying on json", e)
+    except sqlite3.DatabaseError as e:
+        if db is not None:
+            db.close()
 
+        # Busy is passing: try again next time rather than giving up on
+        # the table for the whole session.
+        if "locked" in str(e) or "busy" in str(e):
+            logbook.warn("factstore", "busy (%s) - trying again later", e)
+            return None
+
+        # Almost always an sqlite built without FTS5. Remember why, say
+        # so once, and let mind/longterm.py quietly stay on JSON. A
+        # corrupt file (DatabaseError, not OperationalError) used to
+        # escape from here and fail every turn.
+        _unavailable = str(e)
+
+        if isinstance(e, sqlite3.OperationalError):
+            logbook.warn("factstore", "unavailable (%s) - staying on json", e)
+        else:
+            logbook.error("factstore", "facts.db can't be opened (%s) - staying on json", e)
+            logbook.tell(f"agent/facts.db can't be opened ({e}). Memory is using memory.json "
+                         "for now; move facts.db aside and restart to start a fresh one.")
+
+        return None
+    except OSError as e:
+        logbook.warn("factstore", "unavailable (%s) - staying on json", e)
         return None
 
     return _db
@@ -288,11 +311,11 @@ def add(fact, subject=""):
         if dupe:
             return False
 
-        db.execute(
-            "INSERT INTO facts(fact, subject, created_at) VALUES (?, ?, ?)",
-            (fact, str(subject or "").strip().lower(), _now()),
-        )
-        db.commit()
+        with db:    # commits, or rolls back on an error (locked, disk full)
+            db.execute(
+                "INSERT INTO facts(fact, subject, created_at) VALUES (?, ?, ?)",
+                (fact, str(subject or "").strip().lower(), _now()),
+            )
 
     return True
 
@@ -321,15 +344,19 @@ def replace(old_fact, new_fact, subject=""):
             return False
 
         old_id, old_subject = row
-        cursor = db.execute(
-            "INSERT INTO facts(fact, subject, created_at) VALUES (?, ?, ?)",
-            (new_fact, str(subject or old_subject or "").strip().lower(), _now()),
-        )
-        db.execute(
-            "UPDATE facts SET superseded_at = ?, superseded_by = ? WHERE id = ?",
-            (_now(), cursor.lastrowid, old_id),
-        )
-        db.commit()
+
+        # Both or neither: a failure between them used to leave the shared
+        # connection mid-transaction, and the next commit anywhere saved
+        # the new fact without retiring the old one.
+        with db:
+            cursor = db.execute(
+                "INSERT INTO facts(fact, subject, created_at) VALUES (?, ?, ?)",
+                (new_fact, str(subject or old_subject or "").strip().lower(), _now()),
+            )
+            db.execute(
+                "UPDATE facts SET superseded_at = ?, superseded_by = ? WHERE id = ?",
+                (_now(), cursor.lastrowid, old_id),
+            )
 
     return True
 
@@ -340,12 +367,12 @@ def update(old_fact, new_fact):
     db = _connect()
 
     with _lock:
-        cursor = db.execute(
-            "UPDATE facts SET fact = ? "
-            "WHERE fact = ? AND superseded_at IS NULL",
-            (str(new_fact or "").strip(), str(old_fact or "").strip()),
-        )
-        db.commit()
+        with db:
+            cursor = db.execute(
+                "UPDATE facts SET fact = ? "
+                "WHERE fact = ? AND superseded_at IS NULL",
+                (str(new_fact or "").strip(), str(old_fact or "").strip()),
+            )
 
     return cursor.rowcount > 0
 
@@ -357,10 +384,10 @@ def remove(fact):
     db = _connect()
 
     with _lock:
-        cursor = db.execute(
-            "DELETE FROM facts WHERE fact = ?", (str(fact or "").strip(),)
-        )
-        db.commit()
+        with db:
+            cursor = db.execute(
+                "DELETE FROM facts WHERE fact = ?", (str(fact or "").strip(),)
+            )
 
     return cursor.rowcount > 0
 
@@ -377,12 +404,12 @@ def set_row(fact_id, fact, subject):
     db = _connect()
 
     with _lock:
-        cursor = db.execute(
-            "UPDATE facts SET fact = ?, subject = ? WHERE id = ?",
-            (str(fact or "").strip(), str(subject or "").strip().lower(),
-             int(fact_id)),
-        )
-        db.commit()
+        with db:
+            cursor = db.execute(
+                "UPDATE facts SET fact = ?, subject = ? WHERE id = ?",
+                (str(fact or "").strip(), str(subject or "").strip().lower(),
+                 int(fact_id)),
+            )
 
     return cursor.rowcount > 0
 
@@ -391,12 +418,12 @@ def retire_row(fact_id):
     db = _connect()
 
     with _lock:
-        cursor = db.execute(
-            "UPDATE facts SET superseded_at = ? "
-            "WHERE id = ? AND superseded_at IS NULL",
-            (_now(), int(fact_id)),
-        )
-        db.commit()
+        with db:
+            cursor = db.execute(
+                "UPDATE facts SET superseded_at = ? "
+                "WHERE id = ? AND superseded_at IS NULL",
+                (_now(), int(fact_id)),
+            )
 
     return cursor.rowcount > 0
 
@@ -405,12 +432,12 @@ def restore_row(fact_id):
     db = _connect()
 
     with _lock:
-        cursor = db.execute(
-            "UPDATE facts SET superseded_at = NULL, superseded_by = NULL "
-            "WHERE id = ?",
-            (int(fact_id),),
-        )
-        db.commit()
+        with db:
+            cursor = db.execute(
+                "UPDATE facts SET superseded_at = NULL, superseded_by = NULL "
+                "WHERE id = ?",
+                (int(fact_id),),
+            )
 
     return cursor.rowcount > 0
 
@@ -419,8 +446,8 @@ def delete_row(fact_id):
     db = _connect()
 
     with _lock:
-        cursor = db.execute("DELETE FROM facts WHERE id = ?", (int(fact_id),))
-        db.commit()
+        with db:
+            cursor = db.execute("DELETE FROM facts WHERE id = ?", (int(fact_id),))
 
     return cursor.rowcount > 0
 
@@ -435,7 +462,7 @@ def import_facts(facts):
     db = _connect()
     added = 0
 
-    with _lock:
+    with _lock, db:
         for fact in facts:
             fact = str(fact or "").strip()
 
@@ -453,8 +480,6 @@ def import_facts(facts):
                     (fact, _now()),
                 )
                 added += 1
-
-        db.commit()
 
     return added
 

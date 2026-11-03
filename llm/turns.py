@@ -31,6 +31,16 @@ from .streaming import _last_raw
 
 _window_cache = {"at": 0.0, "n": 0}
 
+# How a server says the model itself can't take tools, as opposed to one
+# tool call going wrong. Only these switch tools off for the session.
+_NO_TEMPLATE_SIGNS = ("template", "jinja", "not support", "unsupported", "doesn't support",
+                      "does not support", "tools param requires")
+
+
+def _no_tool_template(error):
+    text = str(error).lower()
+    return "tool" in text and any(sign in text for sign in _NO_TEMPLATE_SIGNS)
+
 
 def _window():
     """The context length, asked for at most once a minute - it's an
@@ -303,19 +313,26 @@ def _ask(text, model, on_text=None, on_sentence=None,
                     f"off in agent.json. ({e})"
                 ) from e
 
-            # Most likely this model has no tool template. Drop tools for
-            # the rest of the session and retry the same turn without
-            # them, so the user sees an answer rather than an error.
             if "tool" not in str(e).lower():
                 raise
 
-            session._tools_supported = False
             payload.pop("tools", None)
             payload["messages"] = messages
 
-            _log_tool_call(
-                "tools", "unsupported by this model - using keyword triggers"
-            )
+            if _no_tool_template(e):
+                # This model has no tool template. Drop tools for the rest
+                # of the session and retry the same turn without them, so
+                # the user sees an answer rather than an error.
+                session._tools_supported = False
+                _log_tool_call(
+                    "tools", "unsupported by this model - using keyword triggers"
+                )
+            else:
+                # Anything else that mentions tools ("failed to parse tool
+                # call arguments") is one bad generation, not the model:
+                # this turn goes without, the next one gets them back.
+                logbook.warn("llm", "tool round failed, answering this turn without tools: %s", e)
+                _log_tool_call("tools", "that went wrong, answering without tools this once")
 
             answer = _generate(payload, on_text, on_sentence)
     else:

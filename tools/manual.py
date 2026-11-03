@@ -107,7 +107,7 @@ def search(query, limit=3):
 def _read_manual(query, limit=3):
     try:
         limit = max(1, min(6, int(limit or 3)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         limit = 3
 
     found = search(query, limit)

@@ -34,10 +34,13 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
+import threading
 import time
 
 import config
 from core import logbook
+from core import safe
 from core import turnctx
 
 from . import tool
@@ -45,6 +48,11 @@ from .files import HOME, Refused, _display, resolve
 
 
 WINDOWS = os.name == "nt"
+
+# Past this much output the command is stopped: `yes` or a runaway log for
+# a minute is gigabytes, and all of it used to be held in memory before the
+# cap above cut it down to a few thousand characters.
+MAX_OUTPUT_BYTES = 20 * 1024 * 1024
 
 
 def _powershell():
@@ -147,27 +155,89 @@ def _cap(text, limit):
     return f"{text[:head]}\n[... {skipped} characters left out ...]\n{text[-tail:]}"
 
 
+class _Output:
+    """The start and the end of a command's output, read as it arrives, so
+    memory stays at a few times the cap however much it prints."""
+
+    def __init__(self, keep):
+        self.keep = keep
+        self.head = bytearray()
+        self.tail = bytearray()
+        self.total = 0
+
+    def add(self, chunk):
+        self.total += len(chunk)
+        room = self.keep - len(self.head)
+
+        if room > 0:
+            self.head += chunk[:room]
+            chunk = chunk[room:]
+
+        if chunk:
+            self.tail += chunk
+
+            if len(self.tail) > self.keep:
+                del self.tail[:-self.keep]
+
+    def text(self):
+        skipped = self.total - len(self.head) - len(self.tail)
+        middle = f"\n[... {skipped} bytes left out ...]\n".encode() if skipped > 0 else b""
+
+        return (bytes(self.head) + middle + bytes(self.tail)).decode("utf-8", "replace")
+
+
+def _pump(stream, out, flood):
+    """Reader thread: everything the command prints, into out."""
+    try:
+        while True:
+            chunk = stream.read1(65536)
+
+            if not chunk:
+                break
+
+            out.add(chunk)
+
+            if out.total > MAX_OUTPUT_BYTES:
+                flood.set()
+    except (OSError, ValueError):
+        pass
+
+
 def _start_detached(command, cwd):
     """An app or a server: its own session, so neither a timeout nor
     Luna quitting takes it down, and no pipe to wait on. Only a quick
     failure (bad name, missing binary) is reported back."""
+    # stderr to a file, not a pipe: the pipe was closed after two seconds,
+    # and an app that logged to stderr after that died of SIGPIPE.
+    try:
+        err_file = tempfile.TemporaryFile()
+    except OSError as e:
+        return f"Couldn't start it: {e}"
+
     try:
         proc = subprocess.Popen(
             _argv(command), cwd=cwd, start_new_session=not WINDOWS,
             creationflags=_DETACHED,
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=err_file,
             env=dict(os.environ, HOME=HOME),
         )
-    except OSError as e:
+    except (OSError, ValueError, TypeError) as e:
+        err_file.close()
         return f"Couldn't start it: {e}"
 
     try:
         code = proc.wait(timeout=2)
     except subprocess.TimeoutExpired:
-        proc.stderr.close()
+        err_file.close()      # the child keeps its own copy of the descriptor
         return f"$ {command}\n(started in the background - still running after 2s, so it's up)"
 
-    err = (proc.stderr.read() or b"").decode("utf-8", "replace").strip()[-600:]
+    try:
+        err_file.seek(0)
+        err = err_file.read(64 * 1024).decode("utf-8", "replace").strip()[-600:]
+    except OSError:
+        err = ""
+    finally:
+        err_file.close()
 
     if code == 0:
         # A launcher that hands off and exits (xdg-open, Start-Process, a single-instance
@@ -232,7 +302,7 @@ def _run_command(command, folder="~", why="", background=False):
     if not os.path.isdir(cwd):
         return f"{_display(cwd)} isn't a folder."
 
-    timeout = max(1.0, float(getattr(config, "SHELL_TIMEOUT", 60)))
+    timeout = safe.seconds(getattr(config, "SHELL_TIMEOUT", 60), 60, lo=1.0)
     body = [f"$ {line}" if i == 0 else f"  {line}"
             for i, line in enumerate(command.splitlines())]
     background = str(background).lower() in ("true", "1", "yes")
@@ -313,28 +383,55 @@ def _run_command(command, folder="~", why="", background=False):
             creationflags=_NEW_GROUP,
             env=_env(command),
         )
-    except OSError as e:
+    except (OSError, ValueError, TypeError) as e:
         return f"Couldn't start it: {e}"
 
-    timed_out = False
+    limit = safe.whole(getattr(config, "SHELL_MAX_OUTPUT", 6000), 6000, lo=500, hi=1_000_000)
+    out = _Output(limit * 4)        # bytes, with room for multi-byte characters
+    flood = threading.Event()
+    reader = threading.Thread(target=_pump, args=(proc.stdout, out, flood), daemon=True,
+                              name="shell-output")
+    reader.start()
+    timed_out = flooded = False
+    deadline = time.monotonic() + timeout
 
-    try:
-        out, _ = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-
-        _kill_tree(proc)
-
+    while True:
         try:
-            out, _ = proc.communicate(timeout=10)
-        except subprocess.TimeoutExpired:   # a grandchild still holding the pipe
-            out = b""
+            proc.wait(timeout=0.2)
+            break
+        except subprocess.TimeoutExpired:
+            if flood.is_set():
+                flooded = True
+            elif time.monotonic() >= deadline:
+                timed_out = True
+            else:
+                continue
+
+            _kill_tree(proc)
+
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+            break
+
+    # A grandchild still holding the pipe would keep the reader going; its
+    # output is not worth waiting more than a few seconds for.
+    reader.join(timeout=10)
+
+    if not reader.is_alive():
+        try:
+            proc.stdout.close()
+        except OSError:
+            pass
 
     seconds = time.monotonic() - started
-    text = (out or b"").decode("utf-8", "replace").rstrip()
-    text = _cap(text, max(500, int(getattr(config, "SHELL_MAX_OUTPUT", 6000))))
+    text = _cap(out.text().rstrip(), limit)
 
-    if timed_out:
+    if flooded:
+        status = (f"stopped after {seconds:.1f}s - it printed more than "
+                  f"{MAX_OUTPUT_BYTES // (1024 * 1024)} MB")
+    elif timed_out:
         status = f"stopped after {timeout:g}s (timeout) - it may have needed input, or just ran long"
     else:
         status = f"exit code {proc.returncode} after {seconds:.1f}s"

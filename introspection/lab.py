@@ -166,22 +166,29 @@ class Server:
 
     def __enter__(self):
         self.log = open(os.path.join(RESULTS, "server.log"), "a", encoding="utf-8")
-        self.proc = subprocess.Popen(self.args, stdout=self.log, stderr=subprocess.STDOUT)
-        deadline = time.time() + 180
+        try:
+            self.proc = subprocess.Popen(self.args, stdout=self.log, stderr=subprocess.STDOUT)
+            deadline = time.time() + 180
 
-        while time.time() < deadline:
-            if self.proc.poll() is not None:
-                raise RuntimeError("llama-server exited while loading - see introspection/results/server.log")
+            while time.time() < deadline:
+                if self.proc.poll() is not None:
+                    raise RuntimeError("llama-server exited while loading - see introspection/results/server.log")
 
-            try:
-                if requests.get(f"http://{HOST}:{PORT}/health", timeout=1).ok:
-                    return self
-            except requests.RequestException:
-                pass
+                try:
+                    if requests.get(f"http://{HOST}:{PORT}/health", timeout=1).ok:
+                        return self
+                except requests.RequestException:
+                    pass
 
-            time.sleep(0.5)
+                time.sleep(0.5)
 
-        raise RuntimeError("llama-server didn't come up in 3 minutes")
+            raise RuntimeError("llama-server didn't come up in 3 minutes")
+        except BaseException:
+            # __exit__ never runs when __enter__ fails: without this a server
+            # that was slow to load (or Ctrl+C while it loaded) stays running,
+            # holding the GPU, and the next condition can't take its port
+            self.__exit__(None, None, None)
+            raise
 
     def __exit__(self, *exc):
         if self.proc and self.proc.poll() is None:

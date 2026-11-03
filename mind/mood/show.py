@@ -5,6 +5,7 @@ the tame mode that steps the lewd row down while a stream is live.
 Part of mind/mood (see mind/mood/__init__.py).
 """
 import config
+from core import safe
 from mind.mood.core import S, _extra, _grudging, _intensity, _lock, _row_of, _state, _walk
 from mind.mood.files import moods
 from mind.mood import walkaway
@@ -105,7 +106,7 @@ def _cell():
     if _grudging():
         row = list(grudge["row"])
     elif warmth_band == len(grid) - 1:
-        enter = float(lewd.get("enter", 0.6))
+        enter = safe.number(lewd.get("enter"), 0.6)     # hand-edited: "high" mustn't break every turn
         if S.desire >= enter or (S.label in lewd["row"] and S.desire >= enter - 0.1):
             row = list(lewd["row"])
 
@@ -262,8 +263,8 @@ def voice_tint():
     # The mood's own tint from moods.json if it has one, else a little
     # slower when tired and quicker when wired, straight off the dial.
     voice = _state(name).get("voice") or {}
-    speed = float(voice.get("speed", 1.0 + 0.07 * energy)) - 1.0
-    pitch = float(voice.get("pitch", 0.45 * energy))
+    speed = safe.number(voice.get("speed"), 1.0 + 0.07 * energy) - 1.0
+    pitch = safe.number(voice.get("pitch"), 0.45 * energy)
     k = _intensity()
 
     return 1.0 + max(-0.07, min(0.07, speed * k)), max(-0.45, min(0.45, pitch * k))
@@ -279,7 +280,7 @@ def face():
 
     k = min(1.0, _intensity())
 
-    return {f: round(float(v) * k, 3) for f, v in (_state(name).get("face") or {}).items()}
+    return {f: round(safe.number(v, 0) * k, 3) for f, v in (_state(name).get("face") or {}).items()}
 
 
 def idle():

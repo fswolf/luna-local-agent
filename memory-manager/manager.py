@@ -75,11 +75,26 @@ def backend():
 # the file, so holding a copy would only widen the window for clobbering
 # whatever the assistant wrote in between.
 # ---------------------------------------------------------------------------
-def _load_memory():
+def _load_memory(strict=False):
+    """memory.json as a dict. A missing file is an empty memory. One that
+    can't be read (a typo, or caught half-written) is an error when about
+    to save (strict): saving what we have would be saving {} over every
+    fact and preference in it. For showing the page it's an empty one."""
     try:
         with open(MEMORY_FILE, encoding="utf-8") as f:
             data = json.load(f)
-    except Exception:
+    except FileNotFoundError:
+        data = {}
+    except (OSError, ValueError) as e:
+        if strict:
+            raise ValueError(f"agent/memory.json can't be read ({e}) - nothing was saved, "
+                             "so nothing in it is lost. Fix the file, then try again.") from None
+        data = {}
+
+    if not isinstance(data, dict) or not isinstance(data.get("long_term_facts", []), list):
+        if strict:
+            raise ValueError("agent/memory.json isn't in the shape it should be - nothing was saved. "
+                             "Fix the file, then try again.")
         data = {}
 
     data.setdefault("long_term_facts", [])
@@ -88,8 +103,12 @@ def _load_memory():
 
 
 def _save_memory(data):
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+    """Written whole to a file beside it, then swapped in: the assistant
+    reading it at that moment sees the old file or the new one, never half."""
+    tmp = MEMORY_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
+    os.replace(tmp, MEMORY_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +142,11 @@ def state():
             "edits made here the next time it saves. The sqlite backend "
             "doesn't have this problem."
         )
+
+    try:
+        _load_memory(strict=True)
+    except ValueError as e:
+        warning = str(e)    # shown empty, and saying why, rather than looking like no memories
 
     return {
         "backend": which,
@@ -199,7 +223,7 @@ def apply(action, body):
             raise ValueError("preferences must be a JSON object")
 
         with _json_lock:
-            data = _load_memory()
+            data = _load_memory(strict=True)
             data["user_preferences"] = prefs
             _save_memory(data)
 
@@ -232,7 +256,7 @@ def apply(action, body):
 
     # json backend: the id is the list index
     with _json_lock:
-        data = _load_memory()
+        data = _load_memory(strict=True)
         facts = data["long_term_facts"]
         index = int(body.get("id", -1))
 
@@ -295,6 +319,18 @@ def _request_ok(handler, post=False):
     return True
 
 
+MAX_BODY = 1024 * 1024      # a fact, a note or the preferences: far less than this
+
+
+def _length(headers):
+    """Content-Length, 0 to MAX_BODY. Negative or broken is 0: read(-1)
+    would wait until the page hung up."""
+    try:
+        return max(0, min(int(headers.get("Content-Length") or 0), MAX_BODY))
+    except ValueError:
+        return 0
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass  # quiet - it's a local page, not a service
@@ -316,7 +352,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/":
             self._send(200, PAGE, "text/html")
         elif self.path == "/api/state":
-            self._send(200, json.dumps(state()))
+            try:
+                body = json.dumps(state())
+            except Exception as e:
+                # the sqlite file locked or broken: the page says why, the
+                # server doesn't print a traceback for every refresh
+                self._send(500, json.dumps({"error": f"couldn't read her memory: {e}"}))
+                return
+            self._send(200, body)
         else:
             self._send(404, '{"error": "not found"}')
 
@@ -332,8 +375,10 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            length = int(self.headers.get("Content-Length", 0))
+            length = _length(self.headers)
             body = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(body, dict):
+                raise ValueError("expected a JSON object")
             apply(self.path[5:], body)
             self._send(200, '{"ok": true}')
         except Exception as e:

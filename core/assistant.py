@@ -13,6 +13,7 @@ from voice.speech import record_audio, transcribe
 
 from core import interrupts
 from core import logbook
+from core import safe
 from senses import people
 from voice import speech
 from core import turnctx
@@ -275,7 +276,11 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
             logbook.warn("assistant", "job %s ran past %ss - cut short", job, time_limit)
             stop.stop(speaking=False, generating=True)
 
-        timer = threading.Timer(float(time_limit), overtime) if time_limit else None
+        # Clamped: the limit is a plugin setting someone can type, and a
+        # Timer handed 1e12 or inf raises OverflowError in its own thread
+        # (a traceback over the screen, every game turn); NaN fires at once.
+        limit = safe.seconds(time_limit, 0) if time_limit else 0
+        timer = threading.Timer(limit, overtime) if limit > 0 else None
         if timer:
             timer.daemon = True
             timer.start()
@@ -494,6 +499,10 @@ def _spoken_turn(model, mode, stop):
         return True
     except Exception as e:
         logbook.exception("turn", "spoken turn failed")
-        ui.set_status(f"Error: {e}")
+        # In the conversation as well as the status bar: the status is
+        # replaced by the next thing that happens, and the error often
+        # carries the hint (/clear, raise the context) that fixes it.
+        ui.add_message("system", f"Error: {e}" if str(e) else f"Error: {type(e).__name__}")
+        ui.set_status("Error (see the conversation)")
 
         return False

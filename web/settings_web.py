@@ -163,7 +163,7 @@ def reset(path):
         return False, f"unknown setting {path!r}", None
     try:
         removed = config.reset_setting(path)
-    except OSError as e:
+    except (OSError, ValueError) as e:
         return False, f"couldn't write config.json: {e}", None
     return True, ("back to the default after a restart" if removed else "already the default"), entry(path)
 

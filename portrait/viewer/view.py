@@ -32,7 +32,10 @@ if sys.stdout is None:
     sys.stdout = sys.stderr = open(log, "a", buffering=1, encoding="utf-8")
 
 config.MONITOR_ENABLED = True
-config.MONITOR_PORT = int(os.environ.get("LUNA_VIEW_PORT", 8793))
+try:
+    config.MONITOR_PORT = int(os.environ.get("LUNA_VIEW_PORT", 8793))
+except ValueError:
+    sys.exit(f"LUNA_VIEW_PORT is {os.environ.get('LUNA_VIEW_PORT')!r}: it has to be a port number, like 8794")
 
 from core.machine import split_command  # noqa: E402
 from web import livefeed, portrait_window  # noqa: E402
@@ -74,8 +77,13 @@ if not livefeed.start():
     try:
         urllib.request.urlopen(f"http://127.0.0.1:{config.MONITOR_PORT}/portrait/config.json", timeout=3)
     except Exception:
-        sys.exit(f"couldn't serve on port {config.MONITOR_PORT} and nothing there answers as a portrait "
-                 "(LUNA_VIEW_PORT=8794 ./studio.sh for another port)")
+        # 8793 is also the relay stations' default port (station.port): with
+        # them switched on in a running Luna, they're what holds it
+        clash = (" (Luna's relay stations use it when they're on: station.port)"
+                 if str(config.MONITOR_PORT) == str(getattr(config, "STATION_PORT", 8793)) else "")
+        sys.exit(f"couldn't serve on port {config.MONITOR_PORT}: something else has it{clash}, and it "
+                 "doesn't answer as a portrait. Start the studio on another port: "
+                 "LUNA_VIEW_PORT=8794 ./studio.sh")
     print(time.strftime("%Y-%m-%d %H:%M ") + f"the studio is already running: {address}", flush=True)
     window(address)
     sys.exit(0)

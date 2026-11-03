@@ -35,6 +35,17 @@ def handle(text):
     from . import app, life, memory, patches, people, plugins, portrait, reminders, settings, voice
 
     for area in (app, reminders, settings, voice, life, portrait, memory, people, patches, plugins):
-        if area.handle(text):
+        try:
+            if area.handle(text):
+                return True
+        except Exception as e:
+            # Typed input is also guarded in ui.app.submit(); this covers the
+            # other ways in (a remote, a plugin) so a failing command is a
+            # line in the conversation, never a traceback over the screen.
+            from core import logbook
+            import ui
+
+            logbook.exception("commands", "%s failed", text.split()[0] if text.split() else text)
+            ui.add_message("system", f"{(text.split() or [text])[0]} failed: {e}")
             return True
     return False

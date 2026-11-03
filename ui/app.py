@@ -379,8 +379,8 @@ def run(on_submit, on_hotkey=None):
     def accept(buffer):
         text = buffer.text.strip()
 
-        if text and view.on_submit:
-            view.on_submit(text)
+        if text:
+            submit(text)
 
         return False  # clear the input box
 
@@ -618,11 +618,59 @@ def run(on_submit, on_hotkey=None):
 
     view.app.after_render += _prime
 
+    def _pre_run():
+        import asyncio
+
+        import config
+
+        config.STARTED_UI[0] = True
+        asyncio.get_running_loop().set_exception_handler(_loop_error)
+
     saved = _stderr_to_file()
     try:
-        view.app.run()
+        # prompt_toolkit's own handler leaves the screen, prints the
+        # traceback and waits for Enter - and when the error is in a
+        # redraw, the next redraw does it again, forever. Ours logs it and
+        # says so once in the conversation, and the screen stays up.
+        view.app.run(pre_run=_pre_run, set_exception_handler=False)
     finally:
         _stderr_back(saved)
+
+
+def submit(text):
+    """Hand a typed line (or a launcher pick) to main. A command that
+    raises is reported in the conversation instead of taking the screen."""
+    if not view.on_submit:
+        return
+    try:
+        view.on_submit(text)
+    except Exception as e:
+        from core import logbook
+
+        word = text.split()[0] if text.split() else text
+        logbook.exception("ui", "%s failed", word[:40])
+        add_message("system", f"{word[:40]} failed: {type(e).__name__}: {e} (details: /log)")
+
+
+def _loop_error(loop, context):
+    """Anything that goes wrong inside the screen's event loop: a key
+    handler, a redraw, a task. Logged with its traceback, told once."""
+    from core import logbook
+
+    error = context.get("exception")
+    message = context.get("message") or "error in the screen's event loop"
+    if error is None:
+        logbook.error("ui", "%s", message)
+        return
+    logbook.error("ui", "%s: %r", message, error)
+    try:
+        import traceback
+
+        for line in "".join(traceback.format_exception(type(error), error, error.__traceback__)).splitlines():
+            logbook.error("ui", "    %s", line)
+    except Exception:
+        pass
+    logbook.tell(f"The screen hit an error: {type(error).__name__}: {error}")
 
 
 # Libraries write to the terminal from native code, past Python entirely:

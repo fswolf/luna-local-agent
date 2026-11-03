@@ -106,10 +106,10 @@ def _my_ip():
     it only asks the OS which interface it would use."""
     for probe in ("192.168.0.1", "10.0.0.1", "172.16.0.1"):
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect((probe, 9))
-            ip = s.getsockname()[0]
-            s.close()
+            # `with`: a connect that raised (no route) used to leave it open.
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect((probe, 9))
+                ip = s.getsockname()[0]
 
             if _private(ip):
                 return ip

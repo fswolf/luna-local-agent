@@ -27,6 +27,8 @@ import requests
 from datetime import datetime, timedelta
 
 import config
+from core import logbook
+from core import safe
 from core import timeutil
 
 from config import (
@@ -41,6 +43,7 @@ REMINDERS_DIR = os.path.join(BASE_DIR, "reminders")
 REMINDERS_FILE = os.path.join(REMINDERS_DIR, "reminders.json")
 
 MAX_DELIVERY_ATTEMPTS = 3
+MAX_SNOOZE_MINUTES = 24 * 60     # a snooze past a day is a typo, and past 9999 AD a crash
 
 _lock = threading.Lock()
 _reminders = []
@@ -86,9 +89,17 @@ def load():
     try:
         with open(REMINDERS_FILE, "r", encoding="utf-8") as f:
             loaded = json.load(f)
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        logbook.warn("reminders", "couldn't read %s: %s", REMINDERS_FILE, e)
         _reminders = []
         return
+
+    # A hand-edited file can hold anything; keep the records that are records.
+    if not isinstance(loaded, list):
+        logbook.warn("reminders", "%s isn't a list - ignoring it", REMINDERS_FILE)
+        loaded = []
+
+    loaded = [item for item in loaded if isinstance(item, dict)]
 
     # Tolerate records written by the older version, which had no ids.
     for item in loaded:
@@ -100,16 +111,19 @@ def load():
 
 
 def save():
-    os.makedirs(REMINDERS_DIR, exist_ok=True)
-
     with _lock:
         snapshot = list(_reminders)
 
     try:
+        os.makedirs(REMINDERS_DIR, exist_ok=True)
+
         with open(REMINDERS_FILE, "w", encoding="utf-8") as f:
             json.dump(snapshot, f, indent=2)
-    except OSError:
-        pass  # best effort; a failed save shouldn't kill the turn
+    except (OSError, TypeError, ValueError) as e:
+        # Best effort, so a failed save doesn't kill the turn - but said,
+        # because a reminder that wasn't saved is gone after a restart.
+        logbook.warn("reminders", "couldn't save reminders: %s", e)
+        logbook.tell(f"Couldn't save reminders: {e}")
 
 
 def pending():
@@ -117,7 +131,9 @@ def pending():
     with _lock:
         items = list(_reminders)
 
-    return sorted(items, key=lambda r: r.get("due_at", ""))
+    # str(): a hand-edited due_at of null or a number would otherwise make
+    # the sort itself raise, inside the scanner.
+    return sorted(items, key=lambda r: str(r.get("due_at") or ""))
 
 
 def count():
@@ -149,6 +165,8 @@ def cancel(index):
 # ---------------------------------------------------------------------------
 def human_delta(seconds):
     """Kept for callers that only have a number of seconds."""
+    seconds = safe.number(seconds, 0, lo=-10 ** 9, hi=10 ** 9)   # timedelta's own limit is ~2.7 million years
+
     return timeutil.relative(datetime.now() + timedelta(seconds=seconds))
 
 
@@ -169,8 +187,8 @@ def describe(reminder, now=None):
     """
     try:
         due = datetime.fromisoformat(reminder["due_at"])
-    except (KeyError, ValueError):
-        return reminder.get("text", "?")
+    except (KeyError, ValueError, TypeError):
+        return str(reminder.get("text", "?"))
 
     now = now or datetime.now()
     repeat = reminder.get("repeat")
@@ -323,6 +341,18 @@ def add(text, due, repeat, kind="reminder"):
 
 
 def _extract_reminder(model, text):
+    """Its own thread: anything that goes wrong is said, not left as a
+    dead thread and a reminder that silently never existed."""
+    import ui
+
+    try:
+        _extract_and_add(model, text)
+    except Exception as e:
+        logbook.exception("reminders", "reminder extraction failed")
+        ui.add_message("system", f"Couldn't check that for a reminder: {e}")
+
+
+def _extract_and_add(model, text):
     import ui
 
     try:
@@ -350,6 +380,11 @@ def _extract_reminder(model, text):
             "That looked like a reminder but the time didn't make sense - "
             "try \"in 10 minutes\" or \"at 17:30\".",
         )
+        return
+
+    if timeutil.too_frequent(repeat):
+        ui.add_message("system", "That looked like a repeating reminder, but repeats "
+                       "have to be at least a minute apart - nothing was set.")
         return
 
     reminder = add(str(data.get("text", "")).strip(), due, repeat)
@@ -521,7 +556,7 @@ def _due_now():
             try:
                 if datetime.fromisoformat(reminder["due_at"]) <= now:
                     due.append(reminder)
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, TypeError):
                 continue
 
     return due
@@ -548,15 +583,22 @@ def _retire(reminder, delivered):
     if delivered and repeat:
         try:
             anchor = datetime.fromisoformat(reminder["due_at"])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             anchor = datetime.now()
 
-        reminder["due_at"] = timeutil.next_occurrence(
-            repeat, anchor
-        ).isoformat(timespec="seconds")
-        reminder["attempts"] = 0
-        save()
-        return
+        upcoming = timeutil.next_occurrence(repeat, anchor) if isinstance(repeat, dict) else None
+
+        if upcoming is not None:
+            reminder["due_at"] = upcoming.isoformat(timespec="seconds")
+            reminder["attempts"] = 0
+            save()
+            return
+
+        # No next time it can name (past the year 9999, or a repeat that
+        # makes no sense): dropped, and said, rather than due forever.
+        logbook.warn("reminders", "no next time for %r - removing it", reminder.get("text"))
+        logbook.tell(f"Reminder \"{reminder.get('text', '?')}\" has no next time it can "
+                     "work out, so it was removed.")
 
     with _lock:
         _reminders[:] = [r for r in _reminders if r.get("id") != reminder.get("id")]
@@ -568,16 +610,22 @@ def _seconds_until_next():
     items = pending()
 
     if not items:
-        return REMINDER_CHECK_INTERVAL_SECONDS
+        return _interval()
 
     try:
         due = datetime.fromisoformat(items[0]["due_at"])
-    except (KeyError, ValueError):
-        return REMINDER_CHECK_INTERVAL_SECONDS
+    except (KeyError, ValueError, TypeError):
+        return _interval()
 
     remaining = (due - datetime.now()).total_seconds()
 
-    return max(0.5, min(remaining, REMINDER_CHECK_INTERVAL_SECONDS))
+    # Clamped: config.json can hold anything, and wait() raises past ~292
+    # years or on NaN - which ended the scanner, and every reminder with it.
+    return safe.seconds(min(remaining, _interval()), 1, lo=0.5, hi=3600)
+
+
+def _interval():
+    return safe.seconds(REMINDER_CHECK_INTERVAL_SECONDS, 600, lo=1, hi=3600)
 
 
 def _note_away(kind, text):
@@ -636,15 +684,17 @@ ALARM_GRACE_MINUTES = 10
 
 
 def _deliver_alarm(model, item, stale=False):
-    """Ring, and honour a snooze by putting it back a few minutes."""
+    """Ring. Returns the snooze in minutes (0 for none) for the scanner
+    to schedule - after the alarm counts as delivered, so a snooze that
+    fails can never ring the same alarm again."""
     from life import alarm
     import ui
 
     try:
-        late = (datetime.now()
-                - datetime.fromisoformat(item["due_at"])).total_seconds() / 60
-    except (KeyError, ValueError):
-        late = 0
+        due_at = datetime.fromisoformat(item["due_at"])
+        late = (datetime.now() - due_at).total_seconds() / 60
+    except (KeyError, ValueError, TypeError):
+        due_at, late = None, 0
 
     if not config.ALARMS_ENABLED:
         # Not "ignore it" - you still wanted telling, you just didn't
@@ -652,7 +702,7 @@ def _deliver_alarm(model, item, stale=False):
         # which says it once at the normal volume.
         _deliver(model, [item.get("text", "wake up")])
 
-        return
+        return 0
 
     if late > ALARM_GRACE_MINUTES:
         # It came due while the app was shut. Waking someone at 11am for
@@ -661,19 +711,53 @@ def _deliver_alarm(model, item, stale=False):
             "system",
             "Alarm \"{}\" was due {} - too late to ring, skipping it.".format(
                 item.get("text", "?"),
-                timeutil.relative(datetime.fromisoformat(item["due_at"])),
+                timeutil.relative(due_at),
             ),
         )
 
-        return
+        return 0
 
     minutes = alarm.ring(model, item)
     _note_away("alarm", f'the alarm "{item.get("text", "wake up")}" rang'
                + (f", snoozed {minutes} minutes" if minutes else ""))
 
+    return minutes
+
+
+def _snooze(item, minutes):
+    """Put a snoozed alarm back. Clamped: /snooze 99999999 used to raise
+    OverflowError here, which counted as a failed ring and rang it again."""
+    minutes = safe.whole(minutes, 0, lo=0, hi=MAX_SNOOZE_MINUTES)
+
     if minutes:
-        due = datetime.now() + timedelta(minutes=minutes)
-        add(item.get("text", "wake up"), due, None, kind="alarm")
+        add(item.get("text", "wake up"), datetime.now() + timedelta(minutes=minutes), None, kind="alarm")
+
+
+def _failed(reminder, error):
+    """A delivery that didn't work. Tried again later, not straight away
+    (a minute, then two), and after MAX_DELIVERY_ATTEMPTS a one-off is
+    dropped while a repeating one skips to its next time - one failed
+    morning shouldn't delete "every weekday at 7"."""
+    import ui
+
+    attempts = safe.whole(reminder.get("attempts"), 0, lo=0, hi=100) + 1
+    reminder["attempts"] = attempts
+    text = reminder.get("text", "?")
+
+    if attempts < MAX_DELIVERY_ATTEMPTS:
+        reminder["due_at"] = (datetime.now() + timedelta(minutes=attempts)).isoformat(timespec="seconds")
+        save()
+        return
+
+    if reminder.get("repeat"):
+        ui.add_message("system", f"Couldn't deliver reminder \"{text}\" after "
+                       f"{MAX_DELIVERY_ATTEMPTS} tries ({error}) - skipping this one, it "
+                       "stays scheduled for next time.")
+        _retire(reminder, delivered=True)
+    else:
+        ui.add_message("system", f"Giving up on reminder \"{text}\" after "
+                       f"{MAX_DELIVERY_ATTEMPTS} tries: {error}")
+        _retire(reminder, delivered=False)
 
 
 def run_scanner(model):
@@ -697,52 +781,83 @@ def run_scanner(model):
     first_pass = True
 
     while True:
-        if config.REMINDERS_ENABLED:
-            due = _due_now()
-
-            if due:
-                # An alarm always goes on its own. Batching it with
-                # reminders would bury the thing that is supposed to be
-                # impossible to ignore inside a list of things that
-                # aren't - and a missed alarm is not worth ringing about
-                # hours later, so an overdue one at startup is retired
-                # rather than fired.
-                alarms = [r for r in due if is_alarm(r)]
-
-                if alarms:
-                    batch = alarms[:1]
-                elif first_pass and len(due) > 1:
-                    batch = due
-                else:
-                    batch = due[:1]
-
-                try:
-                    if alarms:
-                        _deliver_alarm(model, batch[0])
-                    else:
-                        _deliver(model, [r["text"] for r in batch],
-                                 missed=first_pass)
-
-                    for reminder in batch:
-                        _retire(reminder, delivered=True)
-                except Exception as e:
-                    for reminder in batch:
-                        reminder["attempts"] = reminder.get("attempts", 0) + 1
-
-                        if reminder["attempts"] >= MAX_DELIVERY_ATTEMPTS:
-                            ui.add_message(
-                                "system",
-                                f"Giving up on reminder \"{reminder['text']}\" "
-                                f"after {MAX_DELIVERY_ATTEMPTS} tries: {e}",
-                            )
-                            _retire(reminder, delivered=False)
-
-                    save()
-                    ui.set_status("Idle")
-
-            first_pass = False
+        # The whole pass is guarded: a bad record or a failed save used to
+        # end this thread, and every reminder and alarm with it, silently.
+        try:
+            if config.REMINDERS_ENABLED:
+                _scan_once(model, first_pass)
+                first_pass = False
+        except Exception as e:
+            logbook.exception("reminders", "reminder scan failed")
+            logbook.tell(f"Reminders hit an error: {e}")
+            time.sleep(5)
 
         # Sleep until the next one is actually due. _wake fires early when
         # a reminder is added or cancelled.
-        _wake.wait(timeout=_seconds_until_next())
+        try:
+            _wake.wait(timeout=_seconds_until_next())
+        except Exception:
+            logbook.exception("reminders", "reminder wait failed")
+            time.sleep(5)
+
         _wake.clear()
+
+
+def _scan_once(model, first_pass):
+    import ui
+
+    due = _due_now()
+
+    if not due:
+        return
+
+    # An alarm always goes on its own. Batching it with reminders would
+    # bury the thing that is supposed to be impossible to ignore inside a
+    # list of things that aren't - and a missed alarm is not worth ringing
+    # about hours later, so an overdue one at startup is retired rather
+    # than fired.
+    alarms = [r for r in due if is_alarm(r)]
+
+    if alarms:
+        batch = alarms[:1]
+    elif first_pass and len(due) > 1:
+        batch = due
+    else:
+        batch = due[:1]
+
+    snooze = 0
+
+    try:
+        if alarms:
+            snooze = _deliver_alarm(model, batch[0])
+        else:
+            _deliver(model, [str(r.get("text", "?")) for r in batch], missed=first_pass)
+    except Exception as e:
+        logbook.exception("reminders", "delivery failed")
+
+        for reminder in batch:
+            _failed(reminder, e)
+
+        ui.set_status("Idle")
+        return
+
+    # Delivered. Nothing after this line may deliver it again: what used
+    # to fail here (a snooze out of range) counted as a failed delivery,
+    # and the same alarm rang three times in a row.
+    for reminder in batch:
+        try:
+            _retire(reminder, delivered=True)
+        except Exception:
+            logbook.exception("reminders", "couldn't reschedule %r", reminder.get("text"))
+
+            with _lock:
+                _reminders[:] = [r for r in _reminders if r is not reminder]
+
+            save()
+
+    if alarms:
+        try:
+            _snooze(batch[0], snooze)
+        except Exception as e:
+            logbook.exception("reminders", "snooze failed")
+            ui.add_message("system", f"Couldn't snooze that alarm: {e}")

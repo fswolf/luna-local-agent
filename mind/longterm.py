@@ -1,7 +1,9 @@
 import json
 import os
 import re
+import shutil
 import threading
+import time
 import requests
 
 import config
@@ -17,6 +19,104 @@ MEMORY_FILE = os.path.join(BASE_DIR, "agent", "memory.json")
 _lock = threading.Lock()
 
 memory.setdefault("long_term_facts", [])
+
+
+# ---------------------------------------------------------------------------
+# memory.json on disk
+#
+# Two processes write it (this one and the memory manager), and a crash or
+# a full disk mid-write used to leave half a file. That half file loaded as
+# {} at the next start, and the first fact learned then overwrote it: every
+# fact gone. So: it's written to a temp file and swapped in; a copy that
+# can't be read is kept aside as memory.json.bad-<time> before anything is
+# written over it; and edits made elsewhere are picked up before changing it.
+# ---------------------------------------------------------------------------
+_disk = {"mtime": None, "blocked": ""}
+
+
+def _mtime():
+    try:
+        return os.path.getmtime(MEMORY_FILE)
+    except OSError:
+        return None
+
+
+def _keep_bad_copy(error):
+    """The file on disk can't be read: copy it aside and say so. If even
+    that fails, block saving, so the only copy is never overwritten."""
+    keep = f"{MEMORY_FILE}.bad-{time.strftime('%Y%m%d-%H%M%S')}"
+
+    try:
+        shutil.copy2(MEMORY_FILE, keep)
+    except OSError as e:
+        _disk["blocked"] = f"memory.json can't be read ({error}) and couldn't be backed up ({e})"
+        logbook.error("longterm", "%s - not saving over it", _disk["blocked"])
+        logbook.tell(f"Memory isn't being saved: {_disk['blocked']}. Fix or move agent/memory.json and restart.")
+        return
+
+    logbook.error("longterm", "memory.json unreadable (%s) - kept as %s", error, keep)
+    logbook.tell(f"agent/memory.json couldn't be read ({error}). It was kept as "
+                 f"{os.path.basename(keep)}; new facts go into a fresh memory.json.")
+
+
+def _sync():
+    """Pick up the file if something else changed it since we last read or
+    wrote it (the memory manager). Caller holds _lock."""
+    stamp = _mtime()
+
+    if stamp is None or stamp == _disk["mtime"]:
+        return
+
+    _disk["mtime"] = stamp      # looked at: a bad file is reported once, not every save
+
+    try:
+        with open(MEMORY_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            raise ValueError(f"it holds a {type(data).__name__}, not a {{...}} block")
+    except (OSError, ValueError) as e:
+        _keep_bad_copy(e)
+        return
+
+    if not isinstance(data.get("long_term_facts", []), list):
+        data["long_term_facts"] = []
+
+    # In place: llm/prompts.py holds the same dict.
+    memory.clear()
+    memory.update(data)
+    memory.setdefault("long_term_facts", [])
+
+
+def _write():
+    """memory as it is now, atomically. Caller holds _lock."""
+    if _disk["blocked"]:
+        logbook.warn("longterm", "not saving: %s", _disk["blocked"])
+        return False
+
+    try:
+        os.makedirs(os.path.dirname(MEMORY_FILE), exist_ok=True)
+        temp = MEMORY_FILE + ".tmp"
+
+        with open(temp, "w", encoding="utf-8") as f:
+            json.dump(memory, f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(temp, MEMORY_FILE)
+        _disk["mtime"] = _mtime()
+        return True
+    except (OSError, TypeError, ValueError) as e:
+        logbook.error("longterm", "saving memory.json failed: %s", e)
+        logbook.tell(f"Couldn't save memory: {e}")
+        return False
+
+
+# A memory.json that didn't load at startup is backed up now, before
+# anything can be written over it.
+if not memory.get("long_term_facts") and _mtime() is not None:
+    with _lock:
+        _sync()
 
 
 # ---------------------------------------------------------------------------
@@ -318,12 +418,13 @@ def forget_fact(phrase):
         return (found, []) if removed else (None, [])
 
     with _lock:
+        _sync()
         facts = memory.setdefault("long_term_facts", [])
 
-        if index >= len(facts):
+        if found not in facts:      # changed on disk since it was found
             return None, []
 
-        removed = facts.pop(index)
+        removed = facts.pop(facts.index(found))
 
     save()
     _announce()
@@ -359,13 +460,14 @@ def update_fact(phrase, replacement):
         return None, []
 
     with _lock:
+        _sync()
         facts = memory.setdefault("long_term_facts", [])
 
-        if index >= len(facts):
+        if found not in facts:      # changed on disk since it was found
             return None, []
 
-        old = facts[index]
-        facts[index] = replacement
+        old = found
+        facts[facts.index(found)] = replacement
 
     save()
 
@@ -374,8 +476,7 @@ def update_fact(phrase, replacement):
 
 def save():
     with _lock:
-        with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(memory, f, indent=4)
+        return _write()
 
 
 def _looks_like_valid_fact(fact: str) -> bool:
@@ -409,6 +510,7 @@ def add_fact(fact: str, subject: str = "") -> bool:
         return stored
     stored = False
     with _lock:
+        _sync()
         facts = memory.setdefault("long_term_facts", [])
         if fact not in facts:  # simple exact-match de-dupe
             facts.append(fact)
@@ -496,8 +598,11 @@ def _extract_fact_sqlite(model, user_text, answer):
 
     try:
         raw = _ask_extractor(model, prompt)
-    except Exception:
-        return  # extraction failing shouldn't ever break the conversation
+    except Exception as e:
+        # Never breaks the conversation, but say why in the log: a wrong
+        # model name here means no fact is ever learned.
+        logbook.info("longterm", "fact extraction failed: %s", e)
+        return
 
     # A reasoning model may think out loud first; the answer is the
     # last non-empty line once any <think> block is gone.
@@ -597,7 +702,8 @@ def _extract_fact(model, user_text, answer):
             timeout=120,
         )
         result = _strip_think(response.json()["choices"][0]["message"].get("content") or "")
-    except Exception:
+    except Exception as e:
+        logbook.info("longterm", "fact extraction failed: %s", e)
         return  # extraction failing shouldn't ever break the conversation
 
     if _looks_like_valid_fact(result):
@@ -621,7 +727,12 @@ def extract_in_background(model, user_text, answer):
         pass
 
     def run():
-        with turnctx.begin(source="extract", private=True, speaker=speaker):
-            _extract_fact(model, user_text, answer)
+        # Its own thread: a locked facts.db or a full disk here printed a
+        # traceback over the screen, once per turn.
+        try:
+            with turnctx.begin(source="extract", private=True, speaker=speaker):
+                _extract_fact(model, user_text, answer)
+        except Exception:
+            logbook.exception("longterm", "fact extraction failed")
 
     threading.Thread(target=run, daemon=True).start()

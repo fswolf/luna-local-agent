@@ -289,7 +289,7 @@ def _step():
     elif line.upper().startswith("STUCK"):
         _state["paused"] = True
         _game.say(f"Minecraft: she's stuck and paused - {line}. /minecraft resume to let her try again.")
-    elif _state["steps"] >= int(s["max_steps"]):
+    elif _state["steps"] >= _game.whole(s["max_steps"], DEFAULTS["max_steps"]):
         _state["paused"] = True
         _game.say(f"Minecraft: {_state['steps']} steps on this goal - paused. /minecraft resume to keep going.")
 
@@ -304,7 +304,8 @@ def _guide(query):
 
 _loop = _game.Loop(NAME, _state, _step,
                    playing=lambda: _connected and bool(_state["goal"]) and not _state["paused"],
-                   quiet=lambda: settings()["step_seconds"])
+                   quiet=lambda: settings()["step_seconds"], server=SERVER,
+                   pause=lambda: _state.update(paused=True), title="Minecraft")
 
 
 # ---------------------------------------------------------------------------
@@ -375,7 +376,7 @@ def _register_spot_tool():
             return f"Forgot {name}."
         try:
             spot = {"x": round(float(x)), "y": round(float(y)), "z": round(float(z))}
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):       # inf and NaN too
             return "x, y and z need to be numbers - get-position gives yours."
         if note:
             spot["note"] = " ".join(str(note).split())[:80]

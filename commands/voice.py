@@ -2,6 +2,8 @@
 
 Part of the commands package; see commands/__init__.py.
 """
+import threading
+
 import requests
 
 import config
@@ -103,6 +105,9 @@ def handle(text):
                 data = requests.get(
                     f"{config.TTS_URL}/voices", timeout=5
                 ).json()
+
+                if not isinstance(data, dict):
+                    raise ValueError("it didn't answer with a list of voices")
             except Exception as e:
                 return f"Couldn't ask {config.TTS_URL} what voices it has: {e}"
 
@@ -135,7 +140,14 @@ def handle(text):
             return "\n".join(lines)
 
         if not wanted:
-            ui.add_message("system", show())
+            # Off the UI thread: asking the voice server can take seconds.
+            def ask():
+                try:
+                    ui.add_message("system", show())
+                except Exception as e:
+                    ui.add_message("system", f"Couldn't list voices: {e}")
+
+            threading.Thread(target=ask, daemon=True, name="voice-list").start()
             return True
 
         was = config.VOICE

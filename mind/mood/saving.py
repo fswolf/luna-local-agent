@@ -8,7 +8,7 @@ import os
 import time
 from core import logbook
 from config import BASE_DIR
-from mind.mood.core import S, _clamp, _lock, _settle
+from mind.mood.core import GRUDGE_MAX, S, _clamp, _lock, _settle
 from mind.mood import drift
 
 
@@ -21,15 +21,22 @@ STATE_FILE = os.path.join(BASE_DIR, "agent", "mood.json")
 def _save():
     try:
         os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        state = {"energy": round(S.energy, 3),
+                 "warmth": round(S.warmth, 3),
+                 "desire": round(S.desire, 3),
+                 "grudge_until": round(min(S.grudge_until, time.time() + GRUDGE_MAX)),
+                 "at": time.time()}
 
-        with open(STATE_FILE, "w", encoding="utf-8") as handle:
-            json.dump({"energy": round(S.energy, 3),
-                       "warmth": round(S.warmth, 3),
-                       "desire": round(S.desire, 3),
-                       "grudge_until": round(S.grudge_until),
-                       "at": time.time()}, handle)
-    except OSError:
-        pass  # a mood is not worth failing a turn over
+        # Written beside it and swapped in, so a crash mid-write leaves
+        # the old file rather than half of a new one.
+        temp = STATE_FILE + ".tmp"
+        with open(temp, "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+        os.replace(temp, STATE_FILE)
+    except (OSError, ValueError, OverflowError, TypeError) as e:
+        # A mood is not worth failing a turn over. ValueError/OverflowError:
+        # round() of a NaN or infinite dial, which used to fail every turn.
+        logbook.warn("mood", "couldn't save the mood: %s", e)
 
 
 def _restore():
@@ -56,7 +63,8 @@ def _restore():
         S.energy = _clamp(energy + (drift._energy_baseline() - energy) * faded)
         S.warmth = _clamp(warmth + (drift._warmth_baseline() - warmth) * faded)
         S.desire = max(0.0, desire * 0.5 ** (away / 1200.0))
-        S.grudge_until = grudge if grudge > time.time() else 0.0
+        # "Infinity" in the file would otherwise be a grudge for ever
+        S.grudge_until = min(grudge, time.time() + GRUDGE_MAX) if grudge > time.time() else 0.0
         _settle()
 
     logbook.info("mood", "restored after %.1f min away (%.0f%% faded)",

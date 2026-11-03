@@ -233,7 +233,11 @@ def speak_queue(inbox, stop=None):
                 ui.add_message("system", str(e))
                 return
             except Exception as e:
+                # Skipped so one bad chunk doesn't cost the rest, but said
+                # once (rate-limited): when every chunk fails the same way
+                # she went silent and nothing on screen said why.
                 logbook.warn("tts", "a chunk couldn't be made or decoded, skipped: %s", e)
+                logbook.tell(f"Couldn't play her voice: {type(e).__name__}: {e}. The reply is on screen.")
                 continue
 
             if stop.speaking.is_set() or not _play(samples, rate, stop):

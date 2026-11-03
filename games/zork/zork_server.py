@@ -105,11 +105,15 @@ class Game:
             raise RuntimeError(f"no story file at {ARGS.story}")
 
         os.makedirs(ARGS.saves, exist_ok=True)
+        # A fresh queue for each dfrotz: the last one's end-of-output
+        # marker (and anything it said last) would otherwise be read as
+        # this one's intro, and every reply after it lands one late.
+        self.out = queue.Queue()
         self.proc = subprocess.Popen(
             [dfrotz, "-m", "-p", "-q", "-w", "200", "-R", ARGS.saves, ARGS.story],
             cwd=ARGS.saves, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, bufsize=0)
-        threading.Thread(target=self._pump, daemon=True).start()
+        threading.Thread(target=self._pump, args=(self.proc, self.out), daemon=True).start()
         intro = self._read()
 
         if os.path.exists(self._path(AUTOSAVE)):
@@ -121,13 +125,18 @@ class Game:
         transcript("=" * 60 + "\n" + clean(intro))
         return intro
 
-    def _pump(self):
+    @staticmethod
+    def _pump(proc, out):
+        """One dfrotz's output into its own queue."""
         while True:
-            chunk = self.proc.stdout.read(1)
+            try:
+                chunk = proc.stdout.read(1)
+            except (OSError, ValueError):     # closed under it
+                chunk = b""
             if not chunk:
-                self.out.put(None)
+                out.put(None)
                 return
-            self.out.put(chunk)
+            out.put(chunk)
 
     def alive(self):
         return self.proc is not None and self.proc.poll() is None
@@ -140,6 +149,11 @@ class Game:
             except Exception:
                 pass
             self.proc.kill()
+        if self.proc is not None:
+            try:
+                self.proc.wait(timeout=2)     # reaped, not left a zombie
+            except Exception:
+                pass
         self.proc = None
 
     # -- talking to it -----------------------------------------------------

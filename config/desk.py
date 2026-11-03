@@ -4,7 +4,7 @@ Part of the config package (it was one config.py); see config/__init__.py.
 """
 import os
 
-from .base import setting
+from .base import flag, setting
 
 # -------------------------
 # Control socket (Hyprland / Wayland push-to-talk)
@@ -21,7 +21,7 @@ CONTROL_SOCKET = os.environ.get(
 # the terminal can only hand drags to one of them. Off by default,
 # because a window full of log lines you can't copy is worse than one
 # you scroll with PgUp.
-UI_MOUSE = bool(setting("ui", {}).get("mouse", False))
+UI_MOUSE = flag(setting("ui", {}).get("mouse", False))
 
 # -------------------------
 # TUI theme

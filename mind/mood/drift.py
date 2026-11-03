@@ -9,7 +9,8 @@ import threading
 import time
 from datetime import datetime
 import config
-from mind.mood.core import S, _away_lock, _ceiling, _clamp, _grudging, _intensity, _lock, _settle
+from core import safe
+from mind.mood.core import GRUDGE_MAX, S, _away_lock, _ceiling, _clamp, _grudging, _intensity, _lock, _settle
 from mind.mood import exchange, saving, show
 
 
@@ -360,7 +361,8 @@ def set_mood(energy=None, warmth=None, desire=None, grudge_minutes=None):
             S.desire = max(0.0, min(1.0, float(desire)))
 
         if grudge_minutes is not None:
-            S.grudge_until = time.time() + float(grudge_minutes) * 60 if grudge_minutes else 0.0
+            minutes = safe.number(grudge_minutes, 0, lo=0, hi=GRUDGE_MAX / 60)
+            S.grudge_until = time.time() + minutes * 60 if minutes else 0.0
             _settle()
 
     show._announce()

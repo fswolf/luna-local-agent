@@ -26,6 +26,7 @@ from core import logbook
 WEB_TOOLS = ["web_search", "research"]
 
 ERROR_PAUSE = 30        # seconds after a failed turn, so a broken connection doesn't spin
+MAX_FAILURES = 3        # failed turns in a row, then she stops and says why once
 
 
 def settings(name, defaults):
@@ -34,6 +35,46 @@ def settings(name, defaults):
     s = dict(defaults)
     s.update({k: v for k, v in config.plugin_settings(name).items() if k in defaults})
     return s
+
+
+def seconds(value, default, hi=3600):
+    """A duration from the plugin's settings, safe to wait on: a typo,
+    a negative number, NaN or 1e10 in config.json comes back as the
+    default or inside 0..hi, never as an OverflowError in a turn."""
+    from core import safe
+
+    return safe.seconds(value, default, 0, hi)
+
+
+def whole(value, default, lo=1, hi=100000):
+    """A count from the settings (max_steps, max_rounds): a whole number
+    in lo..hi, or the default when it isn't one."""
+    from core import safe
+
+    return safe.whole(value, default, lo, hi)
+
+
+def turn_limit(value, default):
+    """turn_seconds as respond_to_job's time_limit: None for no limit (0,
+    or a negative number meant as "no limit"), else at most an hour. A
+    negative one passed on would cut every turn off before it started."""
+    from core import safe
+
+    limit = safe.number(value, default, 0, 3600)
+    return limit or None
+
+
+def server_problem(server):
+    """"" while the game's MCP server is connected, else why not."""
+    try:
+        from core import mcpclient
+
+        if mcpclient.connected(server):
+            return ""
+        entry = getattr(mcpclient, "_servers", {}).get(server) or {}
+        return str(entry.get("error") or "it stopped")
+    except Exception as e:
+        return str(e) or "it stopped"
 
 
 def say(text):
@@ -107,12 +148,21 @@ class Loop:
     state is the plugin's own dict: the loop keeps state["busy"] and
     state["error"] there, so status() and the plugin read them as before.
     after() runs once each turn is over, playing or not.
+
+    Giving up: MAX_FAILURES failed turns in a row, or (with server given)
+    the game's MCP server gone, and pause() is called (the plugin stops
+    playing) and the reason is said once. Without that, a dead game got a
+    "Job:" turn every few seconds until max_steps, each one about errors.
+    title is the game's name in that line.
     """
 
-    def __init__(self, name, state, step, playing, quiet=None, after=None, ends_session=True):
+    def __init__(self, name, state, step, playing, quiet=None, after=None, ends_session=True,
+                 server=None, pause=None, title=None):
         self.name, self.state, self.step = name, state, step
         self.playing, self.quiet, self.after = playing, quiet, after
         self.ends_session = ends_session
+        self.server, self.pause, self.title = server, pause, title or name
+        self.failures = 0
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._thread = None
@@ -146,25 +196,59 @@ class Loop:
     def _due(self):
         if self.state.get("busy") or not self.playing():
             return False
+        if self.server:
+            problem = server_problem(self.server)
+            if problem:
+                self._give_up(f"the game's server is gone ({problem[:150]}). "
+                              f"/{self.name} off, then /{self.name} on to start it again.")
+                return False
         if self.quiet is None:
             return True
         from mind import reflect
 
-        return reflect.idle_seconds() >= float(self.quiet() or 0)
+        return reflect.idle_seconds() >= seconds(self.quiet(), 20, hi=86400)
+
+    def _give_up(self, why):
+        """Stop playing and say why, once (the next play starts afresh)."""
+        self.failures = 0
+        self.state["error"] = why[:200]
+        logbook.warn(self.name, "stopped playing: %s", why)
+        if self.pause:
+            try:
+                self.pause()
+            except Exception:
+                logbook.exception(self.name, "pausing")
+        else:
+            self._stop.set()
+        say(f"{self.title}: stopped playing - {why}")
 
     def _run(self, stop):
         while not stop.is_set():
             self._wake.wait(2)
             self._wake.clear()
-            if stop.is_set() or not self._due():
+            if stop.is_set():
+                continue
+            try:
+                # A setting that isn't a number (step_seconds "20s") used
+                # to end this thread here, silently, with "playing" on.
+                if not self._due():
+                    continue
+            except Exception:
+                logbook.exception(self.name, "checking for a turn")
+                stop.wait(ERROR_PAUSE)
                 continue
             self.state["busy"] = True
             try:
                 self.step()
+                self.failures = 0
             except Exception as e:
                 self.state["error"] = str(e)[:200]
                 logbook.exception(self.name, "turn failed")
-                stop.wait(ERROR_PAUSE)
+                self.failures += 1
+                if self.failures >= MAX_FAILURES:
+                    self._give_up(f"{MAX_FAILURES} turns in a row failed ({str(e)[:150] or type(e).__name__}).")
+                else:
+                    stop.wait(ERROR_PAUSE)
             finally:
                 self.state["busy"] = False
                 if self.after:

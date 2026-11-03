@@ -1,5 +1,8 @@
 import os
+import time
+
 import ui
+from core import logbook
 
 from voice.ptt import toggle
 
@@ -67,23 +70,84 @@ def _on_key_evdev(event, model):
         toggle(model)
 
     elif keycode == ESC_KEYCODE:
-        os._exit(0)
+        _escape()
 
 
-def _run_evdev(model):
+def _escape():
+    """Esc read globally. While the window is up it's the window's: there
+    Esc closes a pane or answers a popup with no, and only quits from the
+    conversation - and evdev sees every Esc on the desktop, so quitting
+    here killed her when you closed a pane. os._exit also left the
+    terminal in raw mode with mouse reporting on. Before the window
+    exists (still starting) it still quits, as it always did."""
+    if ui.view.app is not None:
+        return
+    os._exit(0)
+
+
+# Reopening the keyboards after they went away (unplugged, suspend/resume):
+# this many tries, waiting longer each time, before the hotkey gives up.
+REOPEN_TRIES = 6
+
+
+def _listen(keyboards, model):
+    """Read keys until a device errors (OSError), which is raised."""
     import selectors
-
-    keyboards = _find_keyboards_evdev()  # raises if none readable
 
     selector = selectors.DefaultSelector()
 
-    for keyboard in keyboards:
-        selector.register(keyboard, selectors.EVENT_READ)
+    try:
+        for keyboard in keyboards:
+            selector.register(keyboard, selectors.EVENT_READ)
+
+        while True:
+            for selector_key, _ in selector.select():
+                try:
+                    events = list(selector_key.fileobj.read())
+                except BlockingIOError:
+                    continue
+
+                for event in events:
+                    try:
+                        _on_key_evdev(event, model)
+                    except Exception:
+                        # one bad press must not take the hotkey away for good
+                        logbook.exception("keyboard", "HOME handler failed")
+    finally:
+        selector.close()
+        for keyboard in keyboards:
+            try:
+                keyboard.close()
+            except Exception:
+                pass
+
+
+def _run_evdev(model):
+    keyboards = _find_keyboards_evdev()  # raises if none readable
+    tries = 0
 
     while True:
-        for selector_key, _ in selector.select():
-            for event in selector_key.fileobj.read():
-                _on_key_evdev(event, model)
+        try:
+            _listen(keyboards, model)
+        except OSError as e:
+            # The device went away. This used to end the thread quietly and
+            # the global HOME was gone until a restart.
+            tries += 1
+            logbook.warn("keyboard", "keyboard read failed (%s); reopening, try %d", e, tries)
+
+        while True:
+            if tries > REOPEN_TRIES:
+                logbook.warn("keyboard", "gave up on the global HOME key; it still works in the window")
+                ui.set_controls("No global HOME key any more (the keyboard went away). "
+                                "HOME still works in this window.")
+                return
+            time.sleep(min(30.0, 2.0 ** tries))
+            try:
+                keyboards = _find_keyboards_evdev()
+                break
+            except (OSError, RuntimeError) as e:
+                tries += 1
+                logbook.warn("keyboard", "no keyboard to reopen yet: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +162,7 @@ def _run_pynput(model):
             if key == keyboard.Key.home:
                 toggle(model)
             elif key == keyboard.Key.esc:
-                os._exit(0)
+                _escape()
         except Exception as e:
             ui.set_status(f"Keyboard error: {e}")
 

@@ -32,6 +32,7 @@ import queue
 import re
 import threading
 import time
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import config
 from web import holofan
@@ -91,6 +92,19 @@ def emit(kind, **data):
     """One event to every open page. Safe from any thread; never raises."""
     event = dict(data, t=kind, at=round(time.time(), 3))
 
+    if kind not in _SNAPSHOT_KINDS and not _subs:
+        return
+
+    # Made into its line once, here. An event that can't be (a value JSON has
+    # no word for, even as text) is a log line, not a failure in every page's
+    # stream - and never kept for replay, or each page that reconnects would
+    # fail on it again.
+    try:
+        line = _line(event)
+    except (TypeError, ValueError, OverflowError) as e:
+        logbook.warn("monitor", "dropped a %s event the pages can't be sent: %s", kind, e)
+        return
+
     if kind in _SNAPSHOT_KINDS:
         # one prop event kept per prop (her mug, her book), so a page that
         # connects later puts each one where it should be
@@ -106,12 +120,38 @@ def emit(kind, **data):
     with _lock:
         for q in list(_subs):
             try:
-                q.put_nowait(event)
+                q.put_nowait(line)
             except queue.Full:
                 pass  # a page that stopped reading loses events, not the turn
 
 
+def _line(event):
+    """One server-sent event. default=str: a stray number type or a path
+    goes as text rather than not at all."""
+    return b"data: " + json.dumps(event, ensure_ascii=False, default=str).encode() + b"\n\n"
+
+
+class _Server(ThreadingHTTPServer):
+    """A request that fails goes to the log, never over the terminal: the
+    default prints a traceback to stderr for each one, and a page that
+    keeps reconnecting (the portrait, a tab left open) would repeat it
+    forever. A page hanging up is ordinary and noted quietly; anything
+    else is a bug, logged with its traceback."""
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        import sys
+
+        error = sys.exc_info()[1]
+        if isinstance(error, (ConnectionError, TimeoutError)):
+            logbook.debug("monitor", "a page hung up: %s", error)
+        else:
+            logbook.exception("monitor", "a request failed: %s", error)
+
+
 class _Handler(BaseHTTPRequestHandler):
+    timeout = 60          # a connection that sends nothing doesn't hold a thread forever
+
     def log_message(self, *args):
         pass
 
@@ -192,13 +232,13 @@ class _Handler(BaseHTTPRequestHandler):
             body = b""
             if method == "POST":
                 try:
-                    body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 65536))
-                except (ValueError, OSError):
+                    body = self.rfile.read(self._length(65536))
+                except OSError:
                     body = b""
             try:
                 code, kind, out = handler(method, path[len(prefix):], body)
             except Exception as e:
-                logbook.warn("monitor", "the %s page failed: %s", name, e)
+                logbook.exception("monitor", "the %s page failed: %s", name, e)
                 code, kind, out = 500, "text/plain; charset=utf-8", f"the {name} page failed: {e}"
             if isinstance(out, str):
                 out = (with_switcher(out, name) if kind.startswith("text/html") else out).encode()
@@ -220,7 +260,7 @@ class _Handler(BaseHTTPRequestHandler):
         send that - and the zone must be one she knows."""
         kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         try:
-            length = min(int(self.headers.get("Content-Length", 0)), 1024)
+            length = self._length(1024)
             zone = str(json.loads(self.rfile.read(length) or b"{}").get("zone", "")) if kind == "application/json" else ""
         except (ValueError, AttributeError):
             zone = ""
@@ -242,7 +282,7 @@ class _Handler(BaseHTTPRequestHandler):
         /outfit and her situation line (life/clothes.py). JSON only."""
         kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         try:
-            length = min(int(self.headers.get("Content-Length", 0)), 2048)
+            length = self._length(2048)
             data = json.loads(self.rfile.read(length) or b"{}") if kind == "application/json" else {}
         except (ValueError, AttributeError):
             data = {}
@@ -264,23 +304,28 @@ class _Handler(BaseHTTPRequestHandler):
         goes to portrait/gestures/backup/ first."""
         kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         try:
-            length = min(int(self.headers.get("Content-Length", 0)), 512 * 1024)
+            length = self._length(512 * 1024)
             data = json.loads(self.rfile.read(length) or b"{}") if kind == "application/json" else None
             name, text = gesture_file(data)
         except (ValueError, TypeError, KeyError, AttributeError) as e:
             return self._json(400, {"ok": False, "error": str(e)[:200]})
         gdir = os.path.join(config.BASE_DIR, "portrait", "gestures")
         path = os.path.join(gdir, name + ".js")
-        if os.path.exists(path):
-            if not data.get("overwrite"):
-                return self._json(409, {"ok": False, "error": f"{name} already exists", "exists": True})
-            bdir = os.path.join(gdir, "backup")
-            os.makedirs(bdir, exist_ok=True)
-            import shutil
-            shutil.copy2(path, os.path.join(bdir, f"{name}.{time.strftime('%Y%m%d-%H%M%S')}.js"))
-        with open(path + ".tmp", "w", encoding="utf-8") as f:
-            f.write(text)
-        os.replace(path + ".tmp", path)
+        try:
+            if os.path.exists(path):
+                if not data.get("overwrite"):
+                    return self._json(409, {"ok": False, "error": f"{name} already exists", "exists": True})
+                bdir = os.path.join(gdir, "backup")
+                os.makedirs(bdir, exist_ok=True)
+                import shutil
+                shutil.copy2(path, os.path.join(bdir, f"{name}.{time.strftime('%Y%m%d-%H%M%S')}.js"))
+            with open(path + ".tmp", "w", encoding="utf-8") as f:
+                f.write(text)
+            os.replace(path + ".tmp", path)
+        except OSError as e:
+            # a full disk or a read-only folder: the studio says so, not a dropped request
+            logbook.warn("portrait", "couldn't save gestures/%s.js: %s", name, e)
+            return self._json(500, {"ok": False, "error": f"couldn't save it: {e}"[:200]})
         logbook.info("portrait", "pose studio saved gestures/%s.js", name)
         return self._json(200, {"ok": True, "name": name})
 
@@ -329,7 +374,8 @@ class _Handler(BaseHTTPRequestHandler):
             logbook.info("portrait", "card put on: %s", data.get("name"))
             emit("reload", model=out.get("model") or "")
             return self._json(200, dict(out, ok=True))
-        except (ValueError, TypeError, OSError) as e:
+        except (ValueError, TypeError, OSError, KeyError, AttributeError, zipfile.BadZipFile) as e:
+            # KeyError and BadZipFile: a card whose zip is missing a part or broken
             return self._json(400, {"ok": False, "error": str(e)[:200]})
 
     def _save_prop(self):
@@ -337,7 +383,7 @@ class _Handler(BaseHTTPRequestHandler):
         portrait/props/props.json (JSON in, checked, numbers out)."""
         kind = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         try:
-            length = min(int(self.headers.get("Content-Length", 0)), 4096)
+            length = self._length(4096)
             data = json.loads(self.rfile.read(length) or b"{}") if kind == "application/json" else None
             name, entry = prop_entry(data)
         except (ValueError, TypeError, AttributeError) as e:
@@ -346,15 +392,24 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             with open(path, encoding="utf-8") as f:
                 saved = json.load(f)
-            if not isinstance(saved, dict):
-                saved = {}
-        except (OSError, ValueError):
+        except FileNotFoundError:
             saved = {}
+        except (OSError, ValueError) as e:
+            # Starting from nothing would throw away every other prop's place.
+            return self._json(409, {"ok": False, "error": f"portrait/props/props.json can't be read ({e}); "
+                                                          "fix or remove it first"[:200]})
+        if not isinstance(saved, dict):
+            return self._json(409, {"ok": False, "error": "portrait/props/props.json isn't a JSON object; "
+                                                          "fix or remove it first"})
         saved[name] = entry
-        with open(path + ".tmp", "w", encoding="utf-8") as f:
-            json.dump(saved, f, indent=2)
-            f.write("\n")
-        os.replace(path + ".tmp", path)
+        try:
+            with open(path + ".tmp", "w", encoding="utf-8") as f:
+                json.dump(saved, f, indent=2)
+                f.write("\n")
+            os.replace(path + ".tmp", path)
+        except OSError as e:
+            logbook.warn("portrait", "couldn't save props.json: %s", e)
+            return self._json(500, {"ok": False, "error": f"couldn't save it: {e}"[:200]})
         logbook.info("portrait", "pose studio placed the %s prop", name)
         return self._json(200, {"ok": True, "name": name, **entry})
 
@@ -365,7 +420,7 @@ class _Handler(BaseHTTPRequestHandler):
         except ValueError:
             return self._json(400, {"ok": False, "error": "no length"})
         if not holofan.enabled():
-            self.rfile.read(min(n, holofan.PACKET))
+            self.rfile.read(min(max(n, 0), holofan.PACKET))     # never read(-1): that waits for the page to hang up
             return self._json(409, {"ok": False, "error": "portrait.fan.cast is off"})
         if n <= 0 or n > holofan.MAX_JPEG:
             self.rfile.read(min(max(n, 0), 1 << 20))
@@ -374,6 +429,14 @@ class _Handler(BaseHTTPRequestHandler):
         ok, active = holofan.push(self.rfile.read(n), str(self.headers.get("X-Fan-Sender", ""))[:40])
         # active False: another page has the fan, or none is connected - this one can rest
         self._json(200 if ok else 400, {"ok": ok, "active": active})
+
+    def _length(self, cap):
+        """The body's Content-Length, from 0 to cap. A missing, broken or
+        negative one is 0: read(-1) would wait until the page hung up."""
+        try:
+            return max(0, min(int(self.headers.get("Content-Length") or 0), cap))
+        except ValueError:
+            return 0
 
     def _json(self, code, obj):
         body = json.dumps(obj).encode()
@@ -530,7 +593,10 @@ class _Handler(BaseHTTPRequestHandler):
 
         try:
             for event in list(_snapshot.values()):
-                self._send(event)
+                try:
+                    self._send(_line(event))
+                except (TypeError, ValueError, OverflowError):
+                    pass        # emit() checked it; one odd value isn't worth the stream
 
             with _lock:
                 _subs.add(q)
@@ -560,8 +626,18 @@ class _Handler(BaseHTTPRequestHandler):
         import select
         import socket
 
+        # poll, not select: select refuses a socket numbered 1024 or more,
+        # which a long run with many files open reaches, and every page
+        # would then look closed and reconnect in a loop. (Windows has no
+        # poll; its select has no such limit on the number.)
         try:
-            ready, _, _ = select.select([self.connection], [], [], 0)
+            fd = self.connection.fileno()
+            if hasattr(select, "poll"):
+                p = select.poll()
+                p.register(fd, select.POLLIN)
+                ready = bool(p.poll(0))
+            else:
+                ready = bool(select.select([fd], [], [], 0)[0])
         except (OSError, ValueError):                # closed under us
             return True
         if not ready:
@@ -573,8 +649,9 @@ class _Handler(BaseHTTPRequestHandler):
         except OSError:
             return True
 
-    def _send(self, event):
-        self.wfile.write(b"data: " + json.dumps(event, ensure_ascii=False).encode() + b"\n\n")
+    def _send(self, line):
+        """One event, already made into its line by emit()."""
+        self.wfile.write(line)
         self.wfile.flush()
 
 
@@ -656,7 +733,7 @@ def start():
         return False
 
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", port()), _Handler)
+        server = _Server(("127.0.0.1", port()), _Handler)
     except OSError as e:
         logbook.warn("monitor", "live monitor not started on :%s: %s", port(), e)
         return False
@@ -720,7 +797,7 @@ def main():
         webbrowser.open(target)
         print(target)
         return
-    server = ThreadingHTTPServer(("127.0.0.1", port()), _Handler)
+    server = _Server(("127.0.0.1", port()), _Handler)
     server.daemon_threads = True
     print(f"{url()}  - live, /portrait/, /thoughts/, /memory/  (Ctrl+C stops it)")
     threading.Timer(0.4, lambda: webbrowser.open(target)).start()

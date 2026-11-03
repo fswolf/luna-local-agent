@@ -99,6 +99,7 @@ class Console:
         self.jobs = queue.Queue()
         self.presses = 0
         self.alive = True
+        self.broken = ""
         if os.path.exists(self._slot("autosave")):
             try:
                 with open(self._slot("autosave"), "rb") as f:
@@ -122,7 +123,11 @@ class Console:
             try:
                 job = self.jobs.get(timeout=1 / 60 if self.realtime else None)
             except queue.Empty:
-                self._frames(1)         # real time: the game keeps going between her moves
+                try:
+                    self._frames(1)     # real time: the game keeps going between her moves
+                except Exception as e:  # the emulator broke: say so, don't hang every tool
+                    self.alive = False
+                    self.broken = str(e) or type(e).__name__
                 continue
             fn, done = job
             try:
@@ -132,6 +137,10 @@ class Console:
             done["event"].set()
 
     def do(self, fn, timeout=120):
+        # Nobody left to run it (the window was closed, or the emulator
+        # broke): an answer now, not two minutes of waiting for one.
+        if not (self.alive and self.thread.is_alive()):
+            raise RuntimeError(f"the Game Boy is off ({self.broken or 'its window was closed'})")
         done = {"event": threading.Event()}
         self.jobs.put((fn, done))
         if not done["event"].wait(timeout):
@@ -215,6 +224,13 @@ def _log(text):
         pass
 
 
+def _off(console):
+    """"Error: ..." when the emulator can't answer any more, else ""."""
+    if console.alive and console.thread.is_alive():
+        return ""
+    return f"Error: the Game Boy is off ({console.broken or 'its window was closed'})"
+
+
 def _report(console):
     state, path = console.do(console.look)
     head = f"[{console.title}]"
@@ -244,8 +260,8 @@ def build():
             steps = parse(buttons)
         except ValueError as e:
             return f"Error: {e}"
-        if not console.alive:
-            return "Error: the Game Boy is off (its window was closed)"
+        if _off(console):
+            return _off(console)
         console.do(lambda: console.press(steps))
         out = _report(console)
         _log(f"> {buttons}\n{out}")
@@ -255,6 +271,8 @@ def build():
     def gb_wait(seconds: float = 2) -> str:
         """Let the game run without pressing anything (text scrolling, an animation,
         a battle playing out), up to 10 seconds, then see what happened."""
+        if _off(console):
+            return _off(console)
         console.do(lambda: console.wait(seconds))
         out = _report(console)
         _log(f"> (wait {seconds}s)\n{out}")
@@ -263,17 +281,21 @@ def build():
     @mcp.tool()
     def gb_look() -> str:
         """What's on the Game Boy right now, without pressing anything."""
-        return _report(console)
+        return _off(console) or _report(console)
 
     @mcp.tool()
     def gb_save(slot: str = "quick") -> str:
         """Save the whole game as it is right now to a named slot."""
+        if _off(console):
+            return _off(console)
         console.do(lambda: console._save(slot))
         return f"[saved to {slot}]"
 
     @mcp.tool()
     def gb_load(slot: str = "quick") -> str:
         """Go back to a slot saved with gb_save ("autosave" is the last automatic one)."""
+        if _off(console):
+            return _off(console)
         try:
             console.do(lambda: console._load(slot))
         except FileNotFoundError:

@@ -74,7 +74,16 @@ code until you set it, and `config.example.json` shows it so you can.
 ```
 
 A syntax error in either file is reported and skipped rather than being
-fatal: hand-editing them is the whole point of their being JSON.
+fatal: hand-editing them is the whole point of their being JSON. While
+config.json has one, `/set` and the settings page refuse to save rather
+than write over it, and say why. On/off values can be written as
+`true`/`false`, `"on"`/`"off"` or `"yes"`/`"no"`. Numbers that mean
+nothing (`inf`, `NaN`, `1e999`) are refused, and ones from a hand-edited
+file are kept to sensible limits where they're used.
+
+When something goes wrong while she's running, the screen stays up: the
+conversation gets one short line about it (once, however often it
+repeats) and the full story goes to the log, which `/log` shows.
 
 ## Changing settings without leaving the terminal
 

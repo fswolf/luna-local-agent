@@ -34,6 +34,7 @@ import re
 
 import config
 from core import logbook
+from core import safe
 
 MIN_FACTS = 3
 PER_PASS = 3
@@ -235,7 +236,7 @@ def relevant(query, limit=None):
         return []
     if limit is None:
         v = config.current("self.pages_in_prompt")
-        limit = 2 if v is None else int(v)                  # 0 means none, not the default
+        limit = 2 if v is None else safe.whole(v, 2, lo=0, hi=20)   # 0 means none, not the default
     all_pages = pages()
     if not all_pages or limit <= 0:
         return []

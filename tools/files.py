@@ -96,6 +96,9 @@ _DENY_NAMES = re.compile(r"^\.env($|\.)|credential|(^|[._-])(tokens?|secrets?)([
 MAX_READ_BYTES = 200 * 1024
 MAX_PROMPT_CHARS = 12000  # what read_file hands back; the rest is a note
 MAX_WRITE_BYTES = 512 * 1024
+# The biggest existing file write_file/edit_file will open to show a diff.
+# A multi-GB log was read whole, then difflib ran on it and the turn hung.
+MAX_EDIT_BYTES = 2 * 1024 * 1024
 
 
 class Refused(Exception):
@@ -331,6 +334,43 @@ def _ask(action, full, body_lines, note=""):
                        "and ~/.local still ask.")
 
     return bool(answer)
+
+
+def _too_big(full):
+    """'' or why the existing file is too big to diff."""
+    try:
+        size = os.path.getsize(full)
+    except OSError:
+        return ""
+
+    if size > MAX_EDIT_BYTES:
+        return (f"Error: {_display(full)} is {size // 1024} KB - too big to change from here "
+                f"(limit {MAX_EDIT_BYTES // 1024} KB). Tell the user.")
+
+    return ""
+
+
+def _save(full, text):
+    """Write text to full through a temporary file beside it, so a write
+    that fails halfway (a full disk) leaves the old file as it was instead
+    of truncated. Keeps the old file's permissions."""
+    folder = os.path.dirname(full)
+    temp = os.path.join(folder, f".{os.path.basename(full)}.luna-tmp")
+
+    try:
+        with open(temp, "w", encoding="utf-8") as handle:
+            handle.write(text)
+
+        if os.path.exists(full):
+            shutil.copymode(full, temp)
+
+        os.replace(temp, full)
+    finally:
+        if os.path.exists(temp):
+            try:
+                os.remove(temp)
+            except OSError:
+                pass
 
 
 def _diff(old, new, name):
@@ -598,8 +638,11 @@ def _read_file(path):
         return f"{_display(full)} is {size // 1024} KB - too big to read " \
                f"(limit {MAX_READ_BYTES // 1024} KB)"
 
-    with open(full, "rb") as handle:
-        data = handle.read()
+    try:
+        with open(full, "rb") as handle:
+            data = handle.read(MAX_READ_BYTES + 1)
+    except OSError as e:
+        return f"Couldn't read {_display(full)}: {e.strerror}"
 
     if not _is_text(data):
         return f"{_display(full)} is binary, not text"
@@ -669,6 +712,9 @@ def _write_file(path, content, executable=False):
     if executable:
         notes.append("marked executable")
 
+    if exists and _too_big(full):
+        return _too_big(full)
+
     if exists:
         try:
             with open(full, "rb") as handle:
@@ -696,9 +742,7 @@ def _write_file(path, content, executable=False):
 
     try:
         os.makedirs(parent, exist_ok=True)
-
-        with open(full, "w", encoding="utf-8") as handle:
-            handle.write(content)
+        _save(full, content)
 
         if executable:
             mode = os.stat(full).st_mode
@@ -756,6 +800,9 @@ def _edit_file(path, find, replace):
     if not find:
         return "Refused: `find` is empty - say what to replace"
 
+    if _too_big(full):
+        return _too_big(full)
+
     try:
         with open(full, "rb") as handle:
             data = handle.read()
@@ -765,7 +812,14 @@ def _edit_file(path, find, replace):
     if not _is_text(data):
         return f"{_display(full)} is binary - can't edit it"
 
-    old = data.decode("utf-8", errors="replace")
+    # Strict: decoding with "replace" and writing back as UTF-8 turned every
+    # byte that wasn't UTF-8 (a Latin-1 file, say) into U+FFFD for good.
+    try:
+        old = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return (f"Error: {_display(full)} isn't UTF-8 text, so editing it here would damage it. "
+                "Tell the user.")
+
     hits = old.count(find)
 
     if hits == 0:
@@ -786,8 +840,7 @@ def _edit_file(path, find, replace):
         return f"Denied by the user - {_display(full)} was not changed. Do not retry."
 
     try:
-        with open(full, "w", encoding="utf-8") as handle:
-            handle.write(new)
+        _save(full, new)
     except OSError as e:
         return f"Couldn't write {_display(full)}: {e.strerror}"
 

@@ -37,7 +37,7 @@ def handle(text):
         removed = reminders.cancel(int(parts[1]))
         ui.add_message(
             "system",
-            f"Cancelled: {removed['text']}" if removed else "No reminder with that number.",
+            f"Cancelled: {removed.get('text', '?')}" if removed else "No reminder with that number.",
         )
         return True
 
@@ -73,6 +73,10 @@ def handle(text):
         if text.startswith("/snooze"):
             argument = text[7:].strip()
             minutes = int(argument) if argument.isdigit() else config.ALARM_SNOOZE_MINUTES
+
+            if argument.isdigit() and not 1 <= minutes <= 24 * 60:
+                ui.add_message("system", "Snooze is 1 to 1440 minutes (a day at most).")
+                return True
 
             if not alarm.dismiss(minutes):
                 ui.add_message("system", "Nothing is ringing.")
@@ -114,6 +118,10 @@ def handle(text):
                 f"{argument!r} -> not a time I can read. Try /when {argument} "
                 "to see how the parser reads it.",
             )
+            return True
+
+        if timeutil.too_frequent(repeat):
+            ui.add_message("system", "Repeats have to be at least a minute apart - no alarm set.")
             return True
 
         ui.add_message(

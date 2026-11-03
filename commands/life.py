@@ -2,8 +2,11 @@
 
 Part of the commands package; see commands/__init__.py.
 """
+import threading
+
 from life import coffee
 import config
+from core import logbook
 from mind import mood
 from life import reading
 import ui
@@ -79,8 +82,18 @@ def handle(text):
         elif word == "unmute":
             ui.add_message("system", f"Unmuted {offers.unmute_all()} - she may bring them up again.")
         elif word == "now":
-            offers.scan()
-            ui.add_message("system", offers.status())
+            # Off the UI thread: the scan runs systemctl and reads the
+            # journal, up to half a minute with the screen frozen.
+            def scan():
+                try:
+                    offers.scan()
+                    ui.add_message("system", offers.status())
+                except Exception as e:
+                    logbook.exception("offers", "/offers now failed")
+                    ui.add_message("system", f"Couldn't check for offers: {e}")
+
+            ui.add_message("system", "Looking around...")
+            threading.Thread(target=scan, daemon=True, name="offers-now").start()
         else:
             ui.add_message("system", offers.status())
         return True
