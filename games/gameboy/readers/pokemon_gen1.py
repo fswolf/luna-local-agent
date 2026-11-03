@@ -36,7 +36,7 @@ BORDER = set(range(0x79, 0x7F))   # the text box's frame
 MAPS = ["Pallet Town", "Viridian City", "Pewter City", "Cerulean City", "Lavender Town",
         "Vermilion City", "Celadon City", "Fuchsia City", "Cinnabar Island", "Indigo Plateau",
         "Saffron City", "", *[f"Route {n}" for n in range(1, 26)],
-        "your house, downstairs", "your house, upstairs", "your rival's house", "Professor Oak's lab"]
+        "your house (downstairs)", "your house (upstairs)", "your rival's house", "Professor Oak's lab"]
 
 MOVES = [None, "Pound", "Karate Chop", "Double Slap", "Comet Punch", "Mega Punch", "Pay Day", "Fire Punch",
          "Ice Punch", "Thunder Punch", "Scratch", "Vise Grip", "Guillotine", "Razor Wind", "Swords Dance",
