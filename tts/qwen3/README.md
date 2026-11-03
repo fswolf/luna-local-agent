@@ -41,7 +41,7 @@ fails loudly; there's no silent fall back to CPU.
 ## Install
 
 ```bash
-cd ~/ai-voice/server-qwen3
+cd ~/luna-ai/server-qwen3
 chmod +x setup.sh run.sh
 ./setup.sh      # clone + cmake + ~1.3 GB of weights
 ./run.sh

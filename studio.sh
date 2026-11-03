@@ -9,7 +9,7 @@ cd "$(dirname "$(realpath "$0" 2>/dev/null || echo "$0")")" || exit 1   # realpa
 
 python=python3
 for py in "$(python3 -c 'import json;print(json.load(open("install.json")).get("venv_python",""))' 2>/dev/null)" \
-          "$VIRTUAL_ENV/bin/python" ~/ai-voice-venv/bin/python ./ai-voice-venv/bin/python ./venv/bin/python ./.venv/bin/python; do
+          "$VIRTUAL_ENV/bin/python" ~/luna-ai-venv/bin/python ~/ai-voice-venv/bin/python ./ai-voice-venv/bin/python ./venv/bin/python ./.venv/bin/python; do
     if [ -n "$py" ] && [ -x "$py" ]; then
         python="$py"
         break

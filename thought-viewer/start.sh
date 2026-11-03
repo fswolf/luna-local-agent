@@ -6,7 +6,7 @@
 cd "$(dirname "$(realpath "$0")")/.." || exit 1
 
 if [ -z "$VIRTUAL_ENV" ]; then
-    for venv in ~/ai-voice-venv ./ai-voice-venv ./venv ./.venv; do
+    for venv in ~/luna-ai-venv ~/ai-voice-venv ./ai-voice-venv ./venv ./.venv; do
         if [ -f "$venv/bin/activate" ]; then
             # shellcheck disable=SC1090
             source "$venv/bin/activate"

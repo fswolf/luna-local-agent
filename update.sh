@@ -10,7 +10,7 @@ cd "$(dirname "$(realpath "$0" 2>/dev/null || echo "$0")")" || exit 1
 
 if [ ! -d .git ]; then
     echo "This folder isn't a git clone, so there's nothing to pull. Clone it again with:"
-    echo "  git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice"
+    echo "  git clone https://github.com/fswolf/luna-local-agent.git ~/luna-ai"
     exit 1
 fi
 

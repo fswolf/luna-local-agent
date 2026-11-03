@@ -329,7 +329,8 @@ def python():
     py = s.get("venv_python")
     if py and os.path.exists(py):
         return py
-    for cand in (os.environ.get("VIRTUAL_ENV"), os.path.expanduser("~/ai-voice-venv"),
+    for cand in (os.environ.get("VIRTUAL_ENV"), os.path.expanduser("~/luna-ai-venv"),
+                 os.path.expanduser("~/ai-voice-venv"),
                  os.path.join(ROOT, "ai-voice-venv"), os.path.join(ROOT, "venv"), os.path.join(ROOT, ".venv")):
         if cand:
             p = os.path.join(cand, "Scripts", "python.exe") if WIN else os.path.join(cand, "bin", "python")

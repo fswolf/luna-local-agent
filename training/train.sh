@@ -34,7 +34,7 @@ lack() { if [ -n "$CHECK" ]; then problems+=("$*"); else fail "$*"; fi; }
 # Luna's own Python (the export reads her settings), as start.sh finds it
 PY=python3
 for py in "$(python3 -c 'import json;print(json.load(open("install.json")).get("venv_python",""))' 2>/dev/null)" \
-          "${VIRTUAL_ENV:-}/bin/python" ~/ai-voice-venv/bin/python ./ai-voice-venv/bin/python ./venv/bin/python ./.venv/bin/python; do
+          "${VIRTUAL_ENV:-}/bin/python" ~/luna-ai-venv/bin/python ~/ai-voice-venv/bin/python ./ai-voice-venv/bin/python ./venv/bin/python ./.venv/bin/python; do
     if [ -n "$py" ] && [ -x "$py" ]; then PY="$py"; break; fi
 done
 

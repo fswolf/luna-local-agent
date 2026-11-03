@@ -71,7 +71,7 @@ def enabled():
 
 def resolve(folder):
     """A folder as written (~/notes, agent/knowledge) -> its full path. A
-    relative one is inside the ai-voice folder, wherever Luna was started from."""
+    relative one is inside Luna's folder, wherever Luna was started from."""
     path = os.path.expanduser(str(folder))
     return os.path.realpath(path if os.path.isabs(path) else os.path.join(config.BASE_DIR, path))
 

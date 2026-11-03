@@ -35,7 +35,7 @@ address. Anything else adds its servers:
 Outlook and iCloud work the same way. An app password only reaches
 mail, and you can revoke it without changing anything else.
 
-Restart Luna and the email tools appear in the tools pane under Email.
+Restart Luna and the email tools appear in the tools pane under Email. On a fresh install they start switched off: switch them on there (Tab twice).
 
 ## What she can do
 

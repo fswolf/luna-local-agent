@@ -1,8 +1,8 @@
 # Install
 
 ```bash
-git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
-cd ~/ai-voice
+git clone https://github.com/fswolf/luna-local-agent.git ~/luna-ai
+cd ~/luna-ai
 ./installer/install.sh                 # Linux, macOS
 ```
 
@@ -19,8 +19,8 @@ system:
    zypper, brew or winget): PortAudio for audio, espeak-ng for the
    voice, git. On Linux it also offers grim, slurp, wl-clipboard and
    unrar. It shows the exact command first.
-3. **Luna's Python environment.** It reuses `~/ai-voice-venv` if you
-   already have one, otherwise it makes `.venv`. PyTorch comes as the
+3. **Luna's Python environment.** It reuses `~/luna-ai-venv` (or an
+   older `~/ai-voice-venv`) if you already have one, otherwise it makes `.venv`. PyTorch comes as the
    small CPU build, since only voice detection uses it here.
 4. **Her voice.** It clones [kokoro-reader](https://github.com/fswolf/kokoro-reader)
    next to this folder, in its own environment, with PyTorch for your GPU
@@ -45,8 +45,15 @@ system:
    | 6-7 GB | Qwen3.5 4B, Q6_K, sees | 4 GB |
    | less, or none | Qwen3.5 4B, Q4_K_M (runs on the CPU) | 3 GB |
 
-   Apple Silicon counts about two thirds of its shared memory. You can
-   pick another from the list. With llama.cpp it downloads the model
+   Apple Silicon counts about two thirds of its shared memory. The
+   card is shared, so it counts what else goes on it: her voice server
+   on the GPU takes about 0.8 GB first, and the embedding model and
+   reranker (extras below, about 0.8 GB each) only go on the card when
+   her model still fits with them. Otherwise they run on the CPU
+   (`EMBED_NGL=0`, `RERANK_NGL=0`), which a 0.6B model barely notices,
+   rather than cost her a size. On a card under 16 GB the chat server
+   also gets a smaller batch (`UBATCH=512`), which shrinks the scratch
+   space llama.cpp sets aside on the card. You can pick another model from the list. With llama.cpp it downloads the model
    into `llama/models` and points `llama/server.local.env` at it; with
    LM Studio it fetches it through LM Studio's own `lms` command, or
    tells you what to search for. All Apache-2.0, with tool calling.
@@ -130,7 +137,7 @@ nobody has run her there much yet, so reports are welcome.
 ### By hand
 
 ```bash
-python3.12 -m venv ~/ai-voice-venv && source ~/ai-voice-venv/bin/activate
+python3.12 -m venv ~/luna-ai-venv && source ~/luna-ai-venv/bin/activate
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install -r installer/requirements.txt
 ```
@@ -304,8 +311,8 @@ The model is Qwen3-Embedding-0.6B. Either download it into
 `llama/models`:
 
 ```bash
-mkdir -p ~/ai-voice/llama/models
-curl -L -o ~/ai-voice/llama/models/Qwen3-Embedding-0.6B-Q8_0.gguf \
+mkdir -p ~/luna-ai/llama/models
+curl -L -o ~/luna-ai/llama/models/Qwen3-Embedding-0.6B-Q8_0.gguf \
   https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf
 ```
 
@@ -330,7 +337,7 @@ facts match than there's room for. The similarity floor still decides
 what counts as a match.
 
 ```bash
-curl -L -o ~/ai-voice/llama/models/qwen3-reranker-0.6b-q8_0.gguf \
+curl -L -o ~/luna-ai/llama/models/qwen3-reranker-0.6b-q8_0.gguf \
   https://huggingface.co/ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/resolve/main/qwen3-reranker-0.6b-q8_0.gguf
 ```
 
@@ -371,7 +378,7 @@ own copy.
 ```bash
 git clone https://github.com/fswolf/kokoro-reader.git ~/kokoro-reader
 
-source ~/ai-voice-venv/bin/activate
+source ~/luna-ai-venv/bin/activate
 KOKORO_VOICE=af_bella python3 ~/kokoro-reader/server/kokoro_server.py
 ```
 
@@ -475,6 +482,6 @@ tells you why it'll be quiet.
 Or without it:
 
 ```bash
-source ~/ai-voice-venv/bin/activate
+source ~/luna-ai-venv/bin/activate
 python main.py
 ```

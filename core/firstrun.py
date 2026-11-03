@@ -163,6 +163,15 @@ def _finish(preset=None, skipped=False):
         _note(f"Couldn't save that to agent/agent.json: {e}")
         return
 
+    try:
+        import tools
+
+        if tools.starter_set():
+            _note("A few tools start switched off (shell commands, network scans, email, desktop control...). "
+                  "/tools lists them; Tab twice switches any on.")
+    except Exception:
+        pass                                  # a first start never fails over a switch
+
     if preset:
         try:
             from web import settings_web

@@ -106,6 +106,16 @@ few hundred tokens each, ~3,000 in total. That's invisible until the
 day a request stops fitting the context window, which is a bad day to
 find out.
 
+**A fresh install starts lean.** The first time she starts, the tools
+that reach further than everyday use are switched off: shell commands,
+network scans, email, desktop control (audio, clipboard, windows),
+texture painting and her self-study tools. Time, reminders, memory,
+files, the web, looking at your screen, the read-only system checks,
+notes, projects, games and her manual stay on. It's an ordinary choice after
+that: switch any of them on and it stays on. An install that already
+had tools switched off keeps its own list. If she reaches for one
+that's off, she tells you, so you know which switch to flip.
+
 **Tab twice** opens the tools pane: every tool, what it costs, and
 space to switch it on or off. At the top, **Permissions** sets read,
 write and execute (allow, ask or off; see [Files](files.md)). The total at the top moves as you go, so

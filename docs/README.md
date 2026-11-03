@@ -88,7 +88,7 @@ Everything the README only touches on, one subject per page.
 - Writes and edits your files, with every change approved on screen first
 - Runs shell commands and opens apps, each one approved first
 - Read, write and execute permissions you set from the tools pane: allow, ask or off
-- A tools pane showing what each schema costs, and switches to turn them off
+- A tools pane showing what each schema costs, and switches to turn them off; a fresh install starts with the far-reaching ones off
 - Web search the model reaches for on its own
 - [Asks a bigger model](ask.md), Claude, Grok or ChatGPT, when you tell her to ("ask your big brother..."), and tells you the answer in her own words
 - Scheduled jobs she runs on her own, approved once, with writes fenced to folders you pick
@@ -98,6 +98,7 @@ Everything the README only touches on, one subject per page.
 - Plays mayor in Vibe City, building the town in your open game window while you watch
 - Plays chess against you on a board page, saying a sentence or two about each move
 - Lives in a REALITI city of AI agents, walking, talking and remembering
+- Plays Game Boy games you own through an emulator, seeing the screen; Pokemon Red and Blue and The Final Fantasy Legend also come to her as text ([games](games.md#game-boy))
 - Runs your [smart home](home.md) through a Home Assistant on your own network, locks and garage doors always asking first
 - Searchable archive of every conversation, which pruning never deletes
 - Her reasoning kept per turn, with token confidence, review flags and a browser viewer
@@ -117,7 +118,7 @@ Everything the README only touches on, one subject per page.
 - Live on a [hologram fan](fans.md): streamed over WiFi to a Holoscope fan, or on any HDMI fan
 - Rotating debug log that records decisions, not just errors
 - Every setting on one page in your browser (or the terminal), with search and presets, most applied without a restart
-- An installer that picks the model for your graphics card, and a first start that asks your name
+- An installer that picks the model for your graphics card, counting what else shares it, and a first start that asks your name
 - Her own manual: ask how to do something and she looks it up and gives the exact command
 - Diagnostics for the things that fail quietly: tool selection, prompt size, scrolling
 - Themeable full-screen terminal interface
