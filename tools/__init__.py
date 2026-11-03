@@ -244,6 +244,41 @@ def grouped():
 # that predates the tool doesn't turn it on by saying nothing.
 OPT_IN = {"look_at_camera"}
 
+# What a fresh install starts with switched off: the shell, the network,
+# email, desktop control and the rarer self-study tools. The everyday ones
+# (time, reminders, memory, files, the web, her screen, notes, projects,
+# games, the manual) stay on, and so do the read-only system checks: her
+# offers ("the disk is filling up") and scheduled jobs lean on them. Written once by the first start
+# (core/firstrun.py) as the off-list, so it's an ordinary choice after that:
+# switch any of them on in the tools pane. An install that already has an
+# off-list keeps it.
+STARTER_OFF = (
+    "run_command", "find_device", "scan_network",
+    "check_email", "read_email", "search_email", "send_email",
+    "control_audio", "clipboard", "focus_window",
+    "introspect", "self_status", "reflect_now", "save_skill",
+    "make_texture",
+)
+
+
+def starter_set():
+    """Switch the STARTER_OFF tools off, unless this install already chose
+    (tools.disabled is in config.json). True if it set them."""
+    if config._stored("tools.disabled") is not None:
+        return False
+    config.TOOLS_DISABLED = sorted(set(config.TOOLS_DISABLED) | set(STARTER_OFF))
+    try:
+        config._store("tools.disabled", config.TOOLS_DISABLED)
+    except Exception:
+        pass
+    return True
+
+
+def switched_off(name):
+    """A tool that exists and could run here but is switched off."""
+    entry = _REGISTRY.get(name)
+    return bool(entry) and name not in _INTERNAL and not enabled(name)
+
 
 def enabled(name):
     if name in OPT_IN:

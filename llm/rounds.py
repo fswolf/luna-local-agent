@@ -146,7 +146,11 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             if name not in offered and tools.attach(name):
                 offered.add(name)
 
-            if name not in offered:
+            mine = turnctx.current().private and turnctx.current().speaker is None
+            if name not in offered and mine and tools.switched_off(name):   # only he hears what's switchable
+                result = (f"Error: {name} is switched off. Tell the user; they can switch it on "
+                          f"in the tools pane (Tab twice) and ask again.")
+            elif name not in offered:
                 result = f"Error: {name} isn't available right now."
                 logbook.warn("tools", "refused %s - not offered this turn", name)
             else:

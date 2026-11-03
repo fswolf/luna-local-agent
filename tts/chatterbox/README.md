@@ -31,7 +31,7 @@ changes *how a line is delivered* rather than how fast it's read.
 ## Install
 
 ```bash
-cd ~/ai-voice/server-chatterbox
+cd ~/luna-ai/server-chatterbox
 chmod +x setup.sh run.sh
 ./setup.sh
 ```

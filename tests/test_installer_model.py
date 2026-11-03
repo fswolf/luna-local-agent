@@ -22,6 +22,47 @@ class Pick(unittest.TestCase):
         for vram, key in expect.items():
             self.assertEqual(install.pick_model(vram)[0], key, f"{vram} GB")
 
+    def test_what_shares_the_card(self):
+        both = ("embeddings", "reranker")
+        # a 12 GB card with the voice on it and both recall models (the first fresh install):
+        # the 9B Q6 stays, the recall models go to the CPU rather than cost her a size
+        m, side_on_gpu = install.plan(12.0, both, voice_gpu=True)
+        self.assertEqual((m[0], side_on_gpu), ("9b-q6", False))
+        # room for everything: they stay on the card
+        self.assertEqual(install.plan(16.0, both)[0][0], "9b")
+        self.assertTrue(install.plan(16.0, both)[1])
+        self.assertTrue(install.plan(24.0, ("embeddings",), voice_gpu=True)[1])
+        # the voice on the card can move her down a size
+        self.assertEqual(install.plan(14.0)[0][0], "9b")
+        self.assertEqual(install.plan(14.0, voice_gpu=True)[0][0], "9b-q6")
+        # nothing extra: the plain tiers
+        self.assertEqual(install.plan(12.0), (install.pick_model(12.0), True))
+        # a model picked by hand: the recall models fit around it or go to the CPU
+        self.assertFalse(install.plan(12.0, both, m=install._model_by_key("9b-q6"))[1])
+        self.assertTrue(install.plan(12.0, both, m=install._model_by_key("9b-q4"))[1])
+
+    def test_a_tight_card_gets_a_smaller_batch_and_cpu_recall(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            os.makedirs(os.path.join(tmp, "llama", "models"))
+            m = install.variant(install._model_by_key("9b-q6"))
+            for f in (m[3], m[5]):
+                open(os.path.join(tmp, "llama", "models", f), "w").close()
+            state = {"backend": "llama", "extras": ["embeddings", "reranker"], "voice": {"device": "cuda"}}
+            args = mock.Mock(model="auto", standard=False, yes=True)
+            with mock.patch.object(install, "ROOT", tmp), mock.patch.object(install, "ARGS", args), \
+                    mock.patch.object(install, "download") as download, \
+                    mock.patch.object(install, "detect_vram", return_value=(12.0, "test")):
+                install.model(state)
+            download.assert_not_called()
+            with open(os.path.join(tmp, "llama", "server.local.env"), encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn(m[3], text)
+            for line in ("EMBED_NGL=0", "RERANK_NGL=0", "UBATCH=512"):
+                self.assertIn(line, text)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_every_pick_fits_with_room(self):
         for m in install.MODELS:
             if m[6]:

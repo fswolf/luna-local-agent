@@ -10,7 +10,7 @@ a separate product. It's the tools she already has, put together:
 | `system_health` | load, RAM and swap, every disk, CPU and GPU temperatures, failed services, errors since boot by program | no, it only reads |
 | `last_boot` | how the previous session ended, and why | no, it only reads |
 | `find_device` / `scan_network` | the IP of a machine on your network, by name or MAC | no, it only looks |
-| `run_command` | a shell, as you | **every command** |
+| `run_command` | a shell, as you (off on a fresh install: switch it on in the tools pane) | **every command** |
 | `read_file` / `list_files` | logs, configs, reports, anywhere under `~` minus the deny list | no (yours to change in the tools pane) |
 | `write_file` / `edit_file` | notes and reports | yes, except a job writing inside `job_write_dirs` |
 | [Scheduled jobs](plugins.md#scheduled-jobs) | work she does on her own, on a timer | once, when the job is created |

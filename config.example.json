@@ -227,24 +227,7 @@
     },
     "tools": {
         "enabled": true,
-        "max_rounds": 4,
-        "disabled": [
-            "cancel_reminder",
-            "clipboard",
-            "control_audio",
-            "edit_file",
-            "focus_window",
-            "list_files",
-            "list_reminders",
-            "project_notes",
-            "read_file",
-            "run_command",
-            "set_alarm",
-            "set_reminder",
-            "start_project",
-            "update_project",
-            "write_file"
-        ]
+        "max_rounds": 4
     },
     "shell": {
         "enabled": true,

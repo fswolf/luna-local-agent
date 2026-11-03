@@ -4,7 +4,7 @@ Wayland compositors don't hand global key grabs to applications, so on
 Hyprland the compositor owns the hotkey and pokes us through this socket
 instead:
 
-    bind = SUPER, HOME, exec, python3 ~/ai-voice/ai-voice-ctl.py ptt
+    bind = SUPER, HOME, exec, python3 ~/luna-ai/ai-voice-ctl.py ptt
 
 On Windows (no unix sockets in its Python) the same commands come in on
 a localhost TCP port instead. The port is random and every command has

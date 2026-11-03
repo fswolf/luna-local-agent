@@ -48,7 +48,7 @@ EXTRAS = {
     "portrait": (["pillow"], "portrait tools: Live2D import, textures"),
     "live2d": ([], "Live2D's runtime saved locally, so the portrait works offline"),
     "embeddings": ([], "recall by meaning: a 600 MB embedding model (llama.cpp backend)"),
-    "reranker": ([], "sharper recall: a 640 MB reranker beside the embedding model (skip on 16 GB machines)"),
+    "reranker": ([], "sharper recall: a 640 MB reranker beside the embedding model (on the CPU if the card is tight)"),
     "chat": (["websocket-client"], "the pomf.tv stream-chat plugin"),
     "documents": (["pypdf"], "PDFs in her knowledge folder (Markdown, text, Word and web pages need nothing)"),
     "toys": (["websocket-client"], "the Buttplug plugin: toys of most brands through Intiface Central"),
@@ -363,7 +363,8 @@ def find_venv(state):
     """Reuse what's there: the one install.json remembers, an active one,
     or the names the README used to suggest."""
     candidates = [state.get("venv"), os.environ.get("VIRTUAL_ENV"),
-                  os.path.expanduser("~/ai-voice-venv"), os.path.join(ROOT, "ai-voice-venv"),
+                  os.path.expanduser("~/luna-ai-venv"), os.path.expanduser("~/ai-voice-venv"),
+                  os.path.join(ROOT, "ai-voice-venv"),
                   os.path.join(ROOT, "venv"), os.path.join(ROOT, ".venv")]
     for c in candidates:
         if c and os.path.exists(venv_python(c)):
@@ -665,6 +666,28 @@ def pick_model(vram):
     return MODELS[-1]
 
 
+# What else shares the card with her model. The voice server on the GPU is
+# PyTorch plus the Kokoro model; the two recall models are small llama.cpp
+# servers of their own. Measured roughly, rounded up.
+VOICE_GPU_GB = 0.8
+SIDE_GB = {"embeddings": 0.8, "reranker": 0.8}
+SMALL_CARD = 16          # under this, a smaller llama.cpp batch, so its scratch space on the card shrinks
+
+
+def plan(vram, extras=(), voice_gpu=False, m=None):
+    """(model row, recall models on the GPU?) for this card: the biggest model
+    that fits beside the voice server, with the recall models on the GPU only
+    when the model still fits with them there. When they'd cost her a size,
+    they go on the CPU instead (a 0.6B model barely notices). m: a model
+    already chosen, to place the recall models around it."""
+    room = vram - (VOICE_GPU_GB if voice_gpu else 0)
+    side = sum(SIDE_GB.get(e, 0) for e in extras)
+    if m is None:
+        alone, together = pick_model(room), pick_model(room - side)
+        m = alone if MODELS.index(alone) < MODELS.index(together) else together
+    return m, not side or not vram or m[6] + side <= room
+
+
 def _model_by_key(key):
     return next((m for m in MODELS if m[0] == key), None)
 
@@ -704,10 +727,12 @@ def model(state):
             ok(f"{done[1]} (set up last time; --model <size> picks another)")
             return
 
-    m = _model_by_key(choice) if choice != "auto" else pick_model(vram)
+    extras = state.get("extras") or ()
+    voice_gpu = (state.get("voice") or {}).get("device") == "cuda"
+    m = _model_by_key(choice) if choice != "auto" else plan(vram, extras, voice_gpu)[0]
     if m is None:
         warn(f"no model called {choice} - picking for this machine")
-        m = pick_model(vram)
+        m = plan(vram, extras, voice_gpu)[0]
 
     if not ARGS.yes and choice == "auto" and not ARGS.standard:
         uncensored = choose("Uncensored or standard?", [
@@ -718,15 +743,17 @@ def model(state):
 
     key, label, repo, file, size, mmproj, _least, ctx, lms_name = variant(m, uncensored)
     if vram:
-        ok(f"{vram} GB to work with ({where})")
+        ok(f"{vram} GB to work with ({where})"
+           + (f", about {VOICE_GPU_GB} GB of it for her voice" if voice_gpu else ""))
     else:
         warn(f"{where} - picking a small model that also runs on the CPU (slower)")
     print(f"  {label}: {size} GB{', with vision' if mmproj else ''}, {ctx // 1024}k context")
 
     if not ARGS.yes and choice == "auto":
         rows = [variant(r, uncensored) for r in MODELS]
+        room = vram - (VOICE_GPU_GB if voice_gpu else 0)
         options = [(r[0], f"{r[1]} ({r[4]} GB{', sees' if r[5] else ''})"
-                    + (" - too big for this machine" if vram and r[6] > vram else "")) for r in rows]
+                    + (" - too big for this machine" if vram and r[6] > room else "")) for r in rows]
         key = choose("Which model?", options, key)
         key, label, repo, file, size, mmproj, _least, ctx, lms_name = variant(_model_by_key(key), uncensored)
 
@@ -745,7 +772,14 @@ def model(state):
             note("model", True, f"{label} in llama/models (server.local.env left as it was)")
             return
         mm = os.path.join(dest_dir, mmproj) if mmproj and os.path.exists(os.path.join(dest_dir, mmproj)) else "off"
-        _write_local_env({"MODEL": dest, "MMPROJ": mm, "CTX": ctx, "ALIAS": ""})
+        values = {"MODEL": dest, "MMPROJ": mm, "CTX": ctx, "ALIAS": ""}
+        _, side_on_gpu = plan(vram, extras, voice_gpu, _model_by_key(key))
+        if not side_on_gpu:
+            values.update(EMBED_NGL=0, RERANK_NGL=0)
+            ok("the recall models run on the CPU, so her model has the card to itself")
+        if vram and vram < SMALL_CARD:
+            values.update(BATCH=2048, UBATCH=512)
+        _write_local_env(values)
         state["model"] = key
         note("model", True, f"{label}, set in llama/server.local.env")
         return

@@ -35,10 +35,10 @@ for LM Studio (this repo used to be called *LM-Studio-AI-Voice*) and
 grew from there.
 
 ```bash
-git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
+git clone https://github.com/fswolf/luna-local-agent.git ~/luna-ai
 ```
 
-(The folder is still `~/ai-voice`; every path below assumes it.)
+(Every path below assumes `~/luna-ai`. An older install in `~/ai-voice` works just the same: only the folder name differs.)
 
 Powered by:
 
@@ -56,7 +56,7 @@ What she does:
 - **Talk from another room:** an old phone or tablet becomes a relay station, paired by QR code, nothing to install. Dedicated voice devices (ESPHome satellites) are experimental ([details](docs/stations.md))
 - **Reminders and real alarms:** she wakes you up, and nags until you're up
 - **Email:** checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
-- **Files and commands:** writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane
+- **Files and commands:** writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane. A fresh install starts with the everyday tools on and the far-reaching ones (shell, network scans, email, desktop control) off until you switch them on
 - **Hard to steer:** a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
 - **Moods and feelings:** she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md), [the companion side](docs/companion.md))
 - **Long-term memory:** optional permanent SQLite store with its own browser editor
@@ -69,7 +69,7 @@ What she does:
 - **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
 - **Patches (experimental):** keep the replies you like with `/good`, or correct one with `/fix`, then train a small patch (a LoRA) for her model that teaches her those habits. Her model server loads only the patches made for the model it's running. Linux and AMD cards for now, and not yet tried on a real training run ([details](docs/patches.md))
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
-- **Plays games:** chess against you on a board you drag the pieces around on, and Minecraft, Zork, Vibe City, REALITI and Game Boy games you own on her own when you go quiet; she remembers how she felt about them ([details](docs/games.md))
+- **Plays games:** chess against you on a board you drag the pieces around on, and Minecraft, Zork, Vibe City, REALITI and Game Boy games you own (Pokemon Red and Blue and The Final Fantasy Legend come to her as text too) on her own when you go quiet; she remembers how she felt about them ([details](docs/games.md))
 - **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
 - **Adult toys (18+):** Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
 - **From your phone:** Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
@@ -195,8 +195,8 @@ On first start she makes the folder for you:
 
 | System | Folder |
 |--------|--------|
-| Linux, macOS | `~/ai-voice/agent/knowledge` |
-| Windows | `ai-voice\agent\knowledge`, wherever you installed her |
+| Linux, macOS | `~/luna-ai/agent/knowledge` |
+| Windows | `luna-ai\agent\knowledge`, wherever you installed her |
 
 Drop files in, or `/knowledge add` any folder you already keep notes
 in. It all stays on your machine, and keys and credentials are skipped
@@ -208,8 +208,8 @@ even if they're in there ([details](docs/knowledge.md)).
 
 
 ```bash
-git clone https://github.com/fswolf/luna-local-agent.git ~/ai-voice
-cd ~/ai-voice
+git clone https://github.com/fswolf/luna-local-agent.git ~/luna-ai
+cd ~/luna-ai
 ./installer/install.sh                 # Linux, macOS
 ```
 
@@ -225,7 +225,9 @@ luna            # or ./start.sh, or luna.cmd (or start.cmd) on Windows
 
 The installer looks at your graphics card and offers the biggest model
 that fits (Qwen 3.5, from 4B up to 27B, uncensored unless you pick the
-standard release). That's my pick, not a requirement: any model with
+standard release), counting what else shares the card: her voice, and
+the two small recall models, which go on the CPU when they'd cost her a
+size. That's my pick, not a requirement: any model with
 tool calling on LM Studio or llama.cpp should work, and
 [docs/models.md](docs/models.md) says what's been tested and how to use
 your own. The first time she starts, she

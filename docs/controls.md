@@ -326,12 +326,12 @@ the browser in front) there's a control socket at
 
 ```conf
 # hyprland.conf
-bind = SUPER, HOME, exec, python3 ~/ai-voice/ai-voice-ctl.py ptt
+bind = SUPER, HOME, exec, python3 ~/luna-ai/ai-voice-ctl.py ptt
 ```
 
 ```lua
 -- hyprland.lua
-hl.bind("SUPER + HOME", hl.dsp.exec_cmd("python3 ~/ai-voice/ai-voice-ctl.py ptt"))
+hl.bind("SUPER + HOME", hl.dsp.exec_cmd("python3 ~/luna-ai/ai-voice-ctl.py ptt"))
 ```
 
 `ai-voice-ctl.py` is stdlib-only and needs no virtualenv, which matters
@@ -360,7 +360,7 @@ ignored, which keeps a web page that finds the port from driving her.
 Bind it with [AutoHotkey](https://www.autohotkey.com/) (v2):
 
 ```ahk
-#Home::Run 'pythonw ai-voice-ctl.py ptt', 'C:\Users\you\ai-voice'
+#Home::Run 'pythonw ai-voice-ctl.py ptt', 'C:\Users\you\luna-ai'
 ```
 
 `pythonw` runs it without a console window flashing up.

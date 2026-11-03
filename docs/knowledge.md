@@ -22,7 +22,7 @@ and the index is a cache next to her other caches.
 ## Setting it up
 
 There's nothing to set up. The first time Luna starts she makes
-`agent/knowledge` (inside the ai-voice folder) with a short README in it. Put files in there, in
+`agent/knowledge` (inside Luna's folder) with a short README in it. Put files in there, in
 any folders you like, and she reads them within a few minutes:
 
 ```
@@ -49,7 +49,7 @@ knowledge folder. `/knowledge` lists what she skipped and why.
 
 ## Where the folder lives
 
-The default is `agent/knowledge` inside the ai-voice folder, next to
+The default is `agent/knowledge` inside Luna's folder, next to
 her memory and her other files, made on first start with a short README
 inside. It comes with a starter knowledge base, game guides and the
 like, and it's part of the repo: anything you add there is pushed with
@@ -57,12 +57,12 @@ it, so keep private notes in a folder of your own (`/knowledge add`).
 
 | System | Default folder | Index (a cache she rebuilds) |
 |--------|----------------|------------------------------|
-| Linux | `~/ai-voice/agent/knowledge` | `~/.cache/ai-voice/knowledge.db` (or `$XDG_CACHE_HOME/ai-voice/`) |
-| macOS | `~/ai-voice/agent/knowledge` | `~/.cache/ai-voice/knowledge.db` |
-| Windows | `ai-voice\agent\knowledge`, wherever you installed her | `%LOCALAPPDATA%\ai-voice\knowledge.db` |
+| Linux | `~/luna-ai/agent/knowledge` | `~/.cache/ai-voice/knowledge.db` (or `$XDG_CACHE_HOME/ai-voice/`) |
+| macOS | `~/luna-ai/agent/knowledge` | `~/.cache/ai-voice/knowledge.db` |
+| Windows | `luna-ai\agent\knowledge`, wherever you installed her | `%LOCALAPPDATA%\ai-voice\knowledge.db` |
 
 A folder written without a full path (`agent/knowledge`) is always
-inside the ai-voice folder, whichever folder Luna was started from.
+inside Luna's folder, whichever folder Luna was started from.
 
 **You don't have to move anything into it.** If you already keep notes
 somewhere, point her there instead of copying:

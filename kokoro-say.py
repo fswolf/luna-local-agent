@@ -13,11 +13,11 @@ Bind it to a key and pressing it again while it's talking stops it,
 which is what you actually want when a reply turns out to be long:
 
     # hyprland.lua
-    hl.bind("SUPER + R", hl.dsp.exec_cmd("python3 ~/ai-voice/kokoro-say.py"))
+    hl.bind("SUPER + R", hl.dsp.exec_cmd("python3 ~/luna-ai/kokoro-say.py"))
 
 On Windows, bind it with AutoHotkey (or a shortcut's hotkey field):
 
-    #r::Run "pythonw kokoro-say.py", "C:\path\to\ai-voice"
+    #r::Run "pythonw kokoro-say.py", "C:\path\to\luna-ai"
 
 Stdlib only, so it doesn't need the venv.
 """
