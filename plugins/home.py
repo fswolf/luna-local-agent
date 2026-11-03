@@ -105,8 +105,15 @@ def _token():
     token = ""
 
     if os.path.exists(CREDENTIALS_FILE):
-        with open(CREDENTIALS_FILE, encoding="utf-8") as f:
-            token = str(json.load(f).get("token") or "")   # a broken file raises: say so
+        # A broken file raises ValueError naming it: why_unavailable says so.
+        try:
+            with open(CREDENTIALS_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+        except OSError as e:
+            raise ValueError(f"couldn't read it ({e})") from None
+        if not isinstance(data, dict):
+            raise ValueError('it should be one {"token": "..."} object')
+        token = str(data.get("token") or "")
 
     token = (token or os.environ.get("HASS_TOKEN", "")).strip()
 

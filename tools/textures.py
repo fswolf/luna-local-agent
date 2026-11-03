@@ -80,7 +80,7 @@ def _make_texture(part, description, count=1):
 
     try:
         count = max(1, min(4, int(count or 1)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         count = 1
 
     try:

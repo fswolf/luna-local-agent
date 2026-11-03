@@ -485,7 +485,7 @@ def _step():
                                project=projects.game_block(pid, here=here)),
             _state["model"], "zork", allowed, speak=bool(s["speak"]), project_id=pid,
             max_rounds=4 if s["web"] else 3, exchanges=exchanges,
-            time_limit=float(s["turn_seconds"] or 0) or None) or ""
+            time_limit=_game.turn_limit(s["turn_seconds"], DEFAULTS["turn_seconds"])) or ""
     finally:
         _turn["active"] = False
     # Her memory of the last moves is what she sent and what the game said,
@@ -497,13 +497,14 @@ def _step():
     _game.record(NAME, "Zork I", _state["steps"], answer, exchanges,
                  block=_pretty_turn(_state["steps"], answer), also=[os.path.join(SAVES, "transcript.txt")])
 
-    if _state["steps"] >= int(s["max_steps"]):
+    if _state["steps"] >= _game.whole(s["max_steps"], DEFAULTS["max_steps"]):
         _state["playing"] = False
         _game.say(f"Zork: {_state['steps']} turns - paused. /zork play to keep going.")
 
 
 _loop = _game.Loop(NAME, _state, _step, playing=lambda: _connected and _state["playing"],
-                   quiet=lambda: settings()["step_seconds"])
+                   quiet=lambda: settings()["step_seconds"], server=SERVER,
+                   pause=lambda: _state.update(playing=False), title="Zork")
 
 
 # ---------------------------------------------------------------------------

@@ -88,6 +88,29 @@ def _request_ok(handler, post=False):
     return True
 
 
+MAX_BODY = 1024 * 1024      # a note or an id: far less than this
+MAX_ID = 2 ** 62            # SQLite's integers stop at 2**63: past that it raises OverflowError
+
+
+def _int(text, default=0):
+    """A number from the address (?offset=, ?id=), or default: "abc" or a
+    40-digit one is a bad request, not a traceback from the server."""
+    try:
+        n = int(text) if isinstance(text, int) else int(str(text).strip() or default)
+    except ValueError:
+        return default
+    return max(0, min(n, MAX_ID))
+
+
+def _length(headers):
+    """Content-Length, 0 to MAX_BODY. Negative or broken is 0: read(-1)
+    would wait until the page hung up."""
+    try:
+        return max(0, min(int(headers.get("Content-Length") or 0), MAX_BODY))
+    except ValueError:
+        return 0
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -121,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
             log = _log()
             where = dict(search=arg("q"), kind=arg("kind"), flag=arg("flag"),
                          day=arg("day"), model=arg("model"))
-            offset = max(0, int(arg("offset") or 0))
+            offset = _int(arg("offset"))
             self._send(200, json.dumps({
                 "total": log.count(**where),
                 "stats": log.stats(),
@@ -136,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
                          flag=arg("flag"), day=arg("day"), model=arg("model"))
             self._send(200, report(where), "text/html")
         elif url.path == "/api/tokens":
-            self._send(200, json.dumps({"runs": _log().tokens_for(int(arg("id") or 0))}))
+            self._send(200, json.dumps({"runs": _log().tokens_for(_int(arg("id")))}))
         elif url.path == "/api/export":
             self._send(200, _log().export(), "application/x-ndjson",
                        [("Content-Disposition",
@@ -151,19 +174,21 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            length = int(self.headers.get("Content-Length", 0))
+            length = _length(self.headers)
             body = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(body, dict):
+                raise ValueError("expected a JSON object")
             action = self.path[5:] if self.path.startswith("/api/") else ""
             log = _log()
 
             if action == "delete":
-                log.delete_row(int(body["id"]))
+                log.delete_row(_int(body["id"]))
             elif action == "clear":
                 log.clear(keep_starred=bool(body.get("keep_starred", True)))
             elif action == "star":
-                log.star(int(body["id"]), bool(body.get("on", True)))
+                log.star(_int(body["id"]), bool(body.get("on", True)))
             elif action == "note":
-                log.set_note(int(body["id"]), body.get("note", ""))
+                log.set_note(_int(body["id"]), body.get("note", ""))
             elif action == "recording":
                 log.set_enabled(bool(body.get("on")))
             else:

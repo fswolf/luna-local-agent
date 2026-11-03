@@ -47,6 +47,7 @@ import threading
 
 import config
 from core import logbook
+from core import safe
 
 CALL_TIMEOUT = 60
 CONNECT_TIMEOUT = 30
@@ -79,8 +80,18 @@ def _run_loop():
     global _loop
     _loop = asyncio.new_event_loop()
     asyncio.set_event_loop(_loop)
+    # Left to asyncio's default, a task that fails unseen ("Task exception
+    # was never retrieved") is reported through logging to stderr, which
+    # paints over the screen. The log is where it belongs.
+    _loop.set_exception_handler(_loop_error)
     _started.set()
     _loop.run_forever()
+
+
+def _loop_error(loop, context):
+    error = context.get("exception")
+    logbook.error("mcp", "event loop: %s%s", context.get("message") or "error",
+                  f" ({_reason(error)})" if error is not None else "")
 
 
 def _reason(e):
@@ -158,6 +169,13 @@ async def _serve(name, spec, ready):
     finally:
         entry["session"] = None
         ready.set()
+        # Opened per connection; a server that fails or is reconnected
+        # would otherwise leave one more handle open each time.
+        if entry.get("errlog"):
+            try:
+                entry["errlog"].close()
+            except OSError:
+                pass
 
 
 def _connect(name, spec, timeout=None):
@@ -170,9 +188,18 @@ def _connect(name, spec, timeout=None):
         _servers[name]["stop"] = asyncio.Event()
         asyncio.ensure_future(_serve(name, spec, ready))
 
-    asyncio.run_coroutine_threadsafe(start(), _loop).result(5)
+    if _loop is None:
+        _servers[name]["error"] = "the MCP event loop didn't start"
+        return
 
-    wait = timeout or CONNECT_TIMEOUT
+    try:
+        asyncio.run_coroutine_threadsafe(start(), _loop).result(5)
+    except Exception as e:
+        _servers[name]["error"] = f"couldn't start connecting ({_reason(e)})"
+        logbook.exception("mcp", "%s: couldn't start connecting", name)
+        return
+
+    wait = safe.seconds(timeout or CONNECT_TIMEOUT, CONNECT_TIMEOUT, lo=1, hi=600)
 
     if not ready.wait(wait):
         _servers[name]["error"] = f"didn't answer within {wait:g}s"
@@ -371,7 +398,12 @@ def connect_server(name, spec, timeout=None):
     if entry["session"] is None:
         return False, entry["error"] or "it didn't connect", []
 
-    n = _register(name)
+    try:
+        n = _register(name)
+    except Exception as e:
+        logbook.exception("mcp", "%s: couldn't register its tools", name)
+        return False, f"connected, but its tools couldn't be added ({_reason(e)})", []
+
     logbook.info("mcp", "%s: %d tools (connected live)", name, n)
 
     return True, f"{n} tools", list(entry["registered"])
@@ -466,13 +498,19 @@ def start():
         if not spec.get("url") and not spec.get("command"):
             lines.append(f"MCP {name}: needs a command or a url")
             continue
-        _connect(name, spec)
-        entry = _servers[name]
-        if entry["session"] is None:
-            lines.append(f"MCP {name}: not connected - {entry['error'] or 'unknown error'}")
-        else:
-            n = _register(name)
-            logbook.info("mcp", "%s: %d tools", name, n)
+        # One server's failure is that server's line on the screen, not
+        # the end of the thread connecting the rest (and a traceback).
+        try:
+            _connect(name, spec)
+            entry = _servers[name]
+            if entry["session"] is None:
+                lines.append(f"MCP {name}: not connected - {entry['error'] or 'unknown error'}")
+            else:
+                n = _register(name)
+                logbook.info("mcp", "%s: %d tools", name, n)
+        except Exception as e:
+            logbook.exception("mcp", "%s: failed to start", name)
+            lines.append(f"MCP {name}: failed to start - {_reason(e)}")
     return lines
 
 

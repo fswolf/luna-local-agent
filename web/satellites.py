@@ -184,7 +184,12 @@ class Device:
         self.name = str(spec.get("name") or spec["host"])[:30]
         self.host = str(spec["host"])
         self.key = spec.get("key") or None
-        self.port = int(spec.get("port") or PORT)
+        try:
+            self.port = int(spec.get("port") or PORT)
+        except (TypeError, ValueError):
+            # a typo in one device's port is that device's problem, not every device's
+            logbook.warn("satellite", "%s: port %r isn't a number, using %s", self.name, spec.get("port"), PORT)
+            self.port = PORT
         self.client = None
         self.status = "starting"
         self.listen = None
@@ -250,12 +255,14 @@ class Device:
 
         while not self.stopping:
             gone = asyncio.Event()
-            self.client = APIClient(self.host, self.port, None, noise_psk=self.key, client_info="Luna")
 
             async def on_stop(expected):
                 gone.set()
 
             try:
+                # inside the try: a bad key is refused right here, and outside
+                # it would end this device's loop with nobody told
+                self.client = APIClient(self.host, self.port, None, noise_psk=self.key, client_info="Luna")
                 await self.client.connect(on_stop=on_stop, login=True)
                 self.client.subscribe_voice_assistant(handle_start=self._start, handle_stop=self._stop,
                                                       handle_audio=self._audio)
@@ -267,13 +274,29 @@ class Device:
                 self.status = f"not connected: {e}"[:120]
                 logbook.info("satellite", "%s: %s", self.name, self.status)
             try:
-                await self.client.disconnect()
+                if self.client is not None:
+                    await self.client.disconnect()
             except Exception:
                 pass
             for _ in range(30):                   # try again in half a minute
                 if self.stopping:
                     return
                 await asyncio.sleep(1)
+
+
+def _ended(device):
+    """What a device's loop left behind when it ended: nothing if it was
+    stopped, or the error that ended it, in the log and on the settings
+    page instead of a status stuck at "starting"."""
+    def done(future):
+        if future.cancelled():
+            return
+        try:
+            future.result()
+        except Exception as e:
+            device.status = f"stopped: {e}"[:120]
+            logbook.error("satellite", "%s stopped: %s", device.name, e)
+    return done
 
 
 def start():
@@ -292,7 +315,7 @@ def start():
     for spec in found:
         device = Device(spec)
         _state["devices"][device.name] = device
-        asyncio.run_coroutine_threadsafe(device.run(), loop)
+        asyncio.run_coroutine_threadsafe(device.run(), loop).add_done_callback(_ended(device))
     logbook.info("satellite", "experimental satellites: %s", ", ".join(_state["devices"]))
     return True, f"{len(found)} satellite(s), experimental"
 

@@ -211,6 +211,11 @@ def _handle(payload, channel):
     if not isinstance(payload, dict):
         return
 
+    # "from" is normally {"name": ...}; anything else is treated as no
+    # sender rather than an AttributeError that drops the connection.
+    sender = payload.get("from")
+    sender = sender if isinstance(sender, dict) else {}
+
     _frames += 1
     _last_frame = str(payload.get("type", "?"))[:30]
     _last_frame_at = time.time()
@@ -220,7 +225,7 @@ def _handle(payload, channel):
     # down the socket" is the only question worth asking first.
     logbook.info(
         NAME, "frame type=%s from=%s room=%s: %s",
-        _last_frame, (payload.get("from") or {}).get("name"),
+        _last_frame, sender.get("name"),
         payload.get("roomid"), str(payload.get("message", ""))[:120],
     )
 
@@ -237,10 +242,11 @@ def _handle(payload, channel):
         logbook.info(NAME, "ignoring a message for %s (we want %s)", room, channel)
         return
 
-    _room.saw((payload.get("from") or {}).get("name"), payload.get("message"))
+    _room.saw(sender.get("name"), payload.get("message"))
 
 
-def _connect_once(websocket, channel, user_id, key):
+def _connect_once(websocket, channel, user_id, key, stop):
+    """True if anything arrived down the socket before it ended."""
     global _connected, _last_error
 
     connection = websocket.create_connection(
@@ -271,8 +277,9 @@ def _connect_once(websocket, channel, user_id, key):
         )
 
         last_ping = time.time()
+        heard = False
 
-        while not _stop.is_set():
+        while not stop.is_set():
             # pomf's own client has a notimeout() that sends this, so
             # the server evidently drops connections that go quiet.
             # Nothing else here would notice: a chat with no traffic
@@ -291,6 +298,8 @@ def _connect_once(websocket, channel, user_id, key):
             if not frame:
                 break  # a clean close from the far end
 
+            heard = True
+
             if isinstance(frame, bytes):
                 frame = frame.decode("utf-8", "replace")
 
@@ -304,6 +313,8 @@ def _connect_once(websocket, channel, user_id, key):
                     _handle(json.loads(line), channel)
                 except ValueError:
                     continue
+
+        return heard
     finally:
         _connected = False
 
@@ -313,29 +324,36 @@ def _connect_once(websocket, channel, user_id, key):
             pass
 
 
-def _listen_loop():
+def _listen_loop(stop):
+    """stop is this start's own: a loop left over from before a quick
+    off and on can't see the new one's cleared flag and carry on as a
+    second listener."""
     global _last_error
 
     websocket = _library()
     channel, user_id, key = credentials()
     delay = 2
 
-    while not _stop.is_set():
+    while not stop.is_set():
         try:
-            _connect_once(websocket, channel, user_id, key)
-            delay = 2
+            # Back to a short wait only when frames actually came: a
+            # server that takes the socket and closes it at once (a
+            # refused key) otherwise got a new connection every 2s.
+            if _connect_once(websocket, channel, user_id, key, stop):
+                delay = 2
+            else:
+                _last_error = _last_error or "closed by pomf before anything arrived"
         except Exception as e:
             _last_error = str(e)[:120]
             logbook.warn(NAME, "connection failed: %s", _last_error)
-
-        if _stop.is_set():
-            break
 
         # Backoff with jitter, capped. Reconnecting hard in a loop
         # against someone else's server is how an API key gets blocked,
         # and a dropped websocket is usually the network rather than
         # anything we can fix by trying faster.
-        time.sleep(delay + random.uniform(0, 1))
+        if stop.wait(delay + random.uniform(0, 1)):
+            break
+
         delay = min(delay * 2, 60)
 
 
@@ -343,7 +361,7 @@ def _listen_loop():
 # The plugin interface
 # ---------------------------------------------------------------------------
 def start(model):
-    global _room, _thread, _running
+    global _room, _thread, _running, _stop
 
     with _lock:
         if _running:
@@ -368,8 +386,8 @@ def start(model):
         # the configured "ignore" list by name.
         _room.start(model)
 
-        _stop.clear()
-        _thread = threading.Thread(target=_listen_loop, daemon=True)
+        _stop = threading.Event()
+        _thread = threading.Thread(target=_listen_loop, args=(_stop,), daemon=True)
         _thread.start()
         _running = True
 

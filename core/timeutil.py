@@ -43,6 +43,7 @@ from core.timewords import (  # noqa: F401  re-exported: timeutil.X keeps workin
     WORD_NUMBERS,
 )
 from core.timeparse import (  # noqa: F401  re-exported: timeutil.X keeps working
+    MIN_REPEAT_SECONDS,
     _FILLER,
     _MORNING,
     _add_months,
@@ -65,6 +66,8 @@ from core.timeparse import (  # noqa: F401  re-exported: timeutil.X keeps workin
     next_occurrence,
     next_weekday,
     parse_when,
+    repeat_seconds,
+    too_frequent,
 )
 
 
@@ -205,9 +208,19 @@ def stamp(target, reference=None):
 
 
 def describe_repeat(repeat):
+    """'every weekday at 7:30', 'every 30 minutes'. Never raises: a stored
+    repeat can be hand-edited (an amount of "abc", a weekday of 7), and
+    this runs inside every /reminders listing and every delivery."""
     if not repeat:
         return ""
 
+    try:
+        return _describe_repeat(repeat)
+    except (TypeError, ValueError, KeyError, IndexError, AttributeError):
+        return "on a repeat"
+
+
+def _describe_repeat(repeat):
     if repeat.get("days"):
         days = sorted(set(repeat["days"]))
         at = repeat.get("at", "?")
@@ -231,7 +244,7 @@ def describe_repeat(repeat):
         return f"every {WEEKDAY_NAMES[repeat['weekday']]} at {repeat.get('at', '?')}"
 
     if repeat.get("unit"):
-        amount = repeat["amount"]
+        amount = float(repeat.get("amount", 1))
         amount = f"{amount:g}"
         unit = repeat["unit"]
 

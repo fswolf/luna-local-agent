@@ -363,6 +363,20 @@ def _stored(path):
 
 
 def _coerce(path, raw):
+    """_typed(), refusing numbers nothing can use: inf, NaN, 1e999. Those
+    parse as floats and used to be saved, then raised OverflowError the
+    first time something slept, waited or counted with them."""
+    import math
+
+    value = _typed(path, raw)
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError(f"{path} needs an ordinary number, not {raw!r}")
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and abs(value) > 1e12:
+        raise ValueError(f"{path}: {raw!r} is far too big to mean anything here")
+    return value
+
+
+def _typed(path, raw):
     """Turn terminal text into the type the setting already has.
 
     What the setting is (config/schema.py) decides first: a list is
@@ -541,11 +555,21 @@ def save_any(path, raw):
     return value, False
 
 
+def _write_config(stored):
+    """config.json through a temp file, so a crash or a full disk mid-write
+    never leaves half a file behind."""
+    temp = CONFIG_FILE + ".tmp"
+    with open(temp, "w", encoding="utf-8") as file:
+        json.dump(stored, file, indent=4)
+        file.write("\n")
+    os.replace(temp, CONFIG_FILE)
+
+
 def reset_setting(path):
     """Take a key out of config.json, so the built-in default applies
     (after a restart: the default only lives in the code that reads it).
     Returns True if there was anything to remove."""
-    stored = _load_json(CONFIG_FILE)
+    stored = _load_json(CONFIG_FILE, strict=True)   # a typo in it: say so, don't overwrite it
     node, parts = stored, path.split(".")
 
     for part in parts[:-1]:
@@ -559,9 +583,7 @@ def reset_setting(path):
 
     del node[parts[-1]]
 
-    with open(CONFIG_FILE, "w", encoding="utf-8") as file:
-        json.dump(stored, file, indent=4)
-        file.write("\n")
+    _write_config(stored)
 
     settings.clear()
     settings.update(stored)
@@ -580,7 +602,7 @@ def _store(path, value):
     exist until it has looked in the folder, and a whitelist it can't
     populate isn't a whitelist.
     """
-    stored = _load_json(CONFIG_FILE)
+    stored = _load_json(CONFIG_FILE, strict=True)   # a typo in it: say so, don't overwrite it
     node = stored
     parts = path.split(".")
 
@@ -590,9 +612,7 @@ def _store(path, value):
 
     node[parts[-1]] = value
 
-    with open(CONFIG_FILE, "w", encoding="utf-8") as file:
-        json.dump(stored, file, indent=4)
-        file.write("\n")
+    _write_config(stored)
 
     settings.clear()
     settings.update(stored)

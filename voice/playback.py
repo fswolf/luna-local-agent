@@ -45,19 +45,49 @@ _mic_lock = threading.Lock()
 _mic_streams = [0]
 
 
+# Why the microphone last refused to open ("" once one opens again). The
+# hands-free loop reads it: a spoken turn swallows its own errors, and
+# without this a dead mic looked the same as a quiet room.
+_mic_error = [""]
+
+
+def mic_error():
+    return _mic_error[0]
+
+
+def clear_mic_error():
+    _mic_error[0] = ""
+
+
 def _open_mic(blocksize):
     """A started mono float32 input stream at SAMPLE_RATE, counted."""
     with _mic_lock:
-        stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1,
-                                blocksize=blocksize, dtype="float32")
+        try:
+            stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1,
+                                    blocksize=blocksize, dtype="float32")
+        except Exception as e:
+            _mic_error[0] = str(e) or type(e).__name__
+            raise
         try:
             stream.start()
-        except Exception:
+        except Exception as e:
+            _mic_error[0] = str(e) or type(e).__name__
             stream.close()
             raise
         _mic_streams[0] += 1
+        _mic_error[0] = ""
 
     return stream
+
+
+def _read_mic(stream, frames):
+    """stream.read, noting the error when the device goes away mid-read
+    (unplugged, suspended), so mic_error() reports it like a failed open."""
+    try:
+        return stream.read(frames)
+    except Exception as e:
+        _mic_error[0] = str(e) or type(e).__name__
+        raise
 
 
 def _close_mic(stream):
@@ -235,7 +265,8 @@ def _afplay_once(samples, rate, stop):
     os.close(fd)
 
     try:
-        write(path, rate, (np.clip(samples, -1, 1) * 32767).astype(np.int16))
+        # nan_to_num: NaN cast to int16 is whatever the platform says it is
+        write(path, rate, (np.nan_to_num(np.clip(samples, -1, 1)) * 32767).astype(np.int16))
         proc = subprocess.Popen([AFPLAY, path], stdin=subprocess.DEVNULL,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     except Exception as e:

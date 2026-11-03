@@ -31,6 +31,7 @@ from datetime import datetime
 
 import config
 from core import logbook
+from core import safe
 
 from config import BASE_DIR
 
@@ -272,7 +273,7 @@ def _join(rounds):
 
 
 def _trim(conn):
-    cap = max(1, int(getattr(config, "THOUGHTS_MAX_RECORDS", 2000) or 2000))
+    cap = safe.whole(getattr(config, "THOUGHTS_MAX_RECORDS", 2000) or 2000, 2000, lo=1, hi=10 ** 7)
     conn.execute(
         "DELETE FROM thoughts WHERE id NOT IN "
         "(SELECT id FROM thoughts ORDER BY id DESC LIMIT ?)", (cap,)

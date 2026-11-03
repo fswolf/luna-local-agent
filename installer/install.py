@@ -169,7 +169,11 @@ def _curl(url, tmp):
     curl = shutil.which("curl")
     if not curl:
         return False
-    return subprocess.run([curl, "-fsSL", "--retry", "2", "-A", USER_AGENT, "-o", tmp, url]).returncode == 0
+    # time limits: a server that stops sending would otherwise hang the
+    # installer for good (a model is a few GB, so the whole-transfer limit is generous)
+    return subprocess.run([curl, "-fsSL", "--retry", "2", "--connect-timeout", "20",
+                           "--speed-limit", "1024", "--speed-time", "60",
+                           "-A", USER_AGENT, "-o", tmp, url]).returncode == 0
 
 
 def download(url, dest):
@@ -901,7 +905,15 @@ def set_config(section, key, value):
     try:
         with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
-    except (OSError, ValueError):
+    except FileNotFoundError:
+        return                  # no config.json and no example to start one from: the defaults stand
+    except (OSError, ValueError) as e:
+        # left alone (it's yours), but said: otherwise the setting just isn't there
+        warn(f"config.json can't be read ({e}), so {section}.{key} wasn't set to {value!r}. "
+             "Fix the file and run the installer again, or set it by hand.")
+        return
+    if not isinstance(cfg, dict) or not isinstance(cfg.get(section, {}), dict):
+        warn(f"config.json isn't in the expected shape, so {section}.{key} wasn't set to {value!r}.")
         return
     if cfg.get(section, {}).get(key) == value:
         return

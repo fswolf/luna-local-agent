@@ -43,6 +43,7 @@ from datetime import datetime
 from core import chatroom
 import config
 from core import logbook
+from core import safe
 from core import timeutil
 
 NAME = "twitch"
@@ -131,6 +132,20 @@ def _credentials():
     return user, token
 
 
+def _credentials_problem():
+    """Why the credentials file can't be used, or "" (missing is fine).
+    A broken file should say so, not look like "no key"."""
+    try:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as handle:
+            parsed = json.load(handle)
+    except FileNotFoundError:
+        return ""
+    except (ValueError, OSError) as e:
+        return f"{CREDENTIALS_FILE} couldn't be read: {e}"
+
+    return "" if isinstance(parsed, dict) else f"{CREDENTIALS_FILE} should be one {{...}} object"
+
+
 def available():
     return not why_unavailable()
 
@@ -140,6 +155,9 @@ def why_unavailable():
         return 'no channel set - "twitch": {"channel": "yourname"} under plugins'
 
     block = settings()
+
+    if block.get("post_replies") and _credentials_problem():
+        return _credentials_problem()
 
     if block.get("post_replies") and not all(_credentials()):
         return (f"post_replies needs a bot account - put {{\"username\": ..., "
@@ -213,7 +231,7 @@ def _send(line):
 def _post(text):
     global _posted
 
-    limit = min(int(settings().get("max_reply_chars", 450)), MAX_CHARS)
+    limit = safe.whole(settings().get("max_reply_chars"), 450, 20, MAX_CHARS)
     clean = " ".join("".join(c if ord(c) >= 32 else " " for c in str(text)).split())
 
     # Twitch reads a message starting with "/" or "." as a chat command.
@@ -227,7 +245,7 @@ def _post(text):
         _posted += 1
 
 
-def _connect_once():
+def _connect_once(stop):
     global _sock, _connected, _last_error, _lines, _last_line_at, _login
 
     channel = _channel()
@@ -251,7 +269,7 @@ def _connect_once():
     _sock = connection
 
     try:
-        while not _stop.is_set():
+        while not stop.is_set():
             try:
                 chunk = connection.recv(4096)
             except socket.timeout:
@@ -286,8 +304,11 @@ def _connect_once():
                 elif command == "PRIVMSG" and len(params) >= 2:
                     _message(tags, prefix, params[-1])
     finally:
-        _connected = False
-        _sock = None
+        # Only if it's still ours: after a quick off and on, a newer
+        # connection may already be the one in use.
+        if _sock is connection:
+            _connected = False
+            _sock = None
 
         try:
             connection.close()
@@ -305,28 +326,31 @@ def _message(tags, prefix, text):
     _room.saw(who, text)
 
 
-def _listen_loop():
+def _listen_loop(stop):
+    """stop is this start's own: a loop left over from before a quick
+    off and on can't see the new one's cleared flag and carry on as a
+    second listener (every message answered twice)."""
     global _last_error
 
     delay = 2
 
-    while not _stop.is_set():
+    while not stop.is_set():
         try:
-            _connect_once()
+            _connect_once(stop)
             delay = 2
         except PermissionError as e:
             # Retrying a bad token only gets the account looked at.
             _last_error = str(e)
             logbook.warn(NAME, "%s - stopping", e)
+            logbook.tell(f"twitch: {e}. Stopped trying - fix it, then /twitch off and /twitch on.")
             break
         except Exception as e:
             _last_error = f"{type(e).__name__}: {e}"[:140]
             logbook.warn(NAME, "connection: %s", _last_error)
 
-        if _stop.is_set():
+        if stop.wait(delay + random.uniform(0, 1)):
             break
 
-        time.sleep(delay + random.uniform(0, 1))
         delay = min(delay * 2, 120)
 
 
@@ -334,7 +358,7 @@ def _listen_loop():
 # The plugin interface
 # ---------------------------------------------------------------------------
 def start(model):
-    global _room, _thread, _running
+    global _room, _thread, _running, _stop
 
     with _lock:
         if _running:
@@ -364,8 +388,8 @@ def start(model):
         )
         _room.start(model)
 
-        _stop.clear()
-        _thread = threading.Thread(target=_listen_loop, daemon=True)
+        _stop = threading.Event()
+        _thread = threading.Thread(target=_listen_loop, args=(_stop,), daemon=True)
         _thread.start()
         _running = True
 
@@ -391,10 +415,13 @@ def stop():
         if _room is not None:
             _room.stop()
 
-        if _sock is not None:
-            _send(f"PART #{_channel()}")
-
         _running = False
+
+    # Off to one side: the send throttle and a stuck socket could
+    # otherwise hold /twitch off for half a minute.
+    if _sock is not None:
+        threading.Thread(target=_send, args=(f"PART #{_channel()}",), daemon=True,
+                         name="twitch-part").start()
 
     from mind import mood
     mood.set_tame(NAME, False)
@@ -413,7 +440,12 @@ def status():
         return f"twitch: off ({problem})" if problem else "twitch: off"
 
     block = settings()
-    where = "connected" if _connected else f"reconnecting ({_last_error or 'starting'})"
+    if _connected:
+        where = "connected"
+    elif _thread is not None and not _thread.is_alive():
+        where = f"stopped trying ({_last_error or 'unknown'}) - /twitch off, then on"
+    else:
+        where = f"reconnecting ({_last_error or 'starting'})"
     lines = [f"twitch: {where} to #{_channel()} as {_login or '...'}"]
 
     if _lines:

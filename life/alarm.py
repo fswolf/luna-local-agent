@@ -28,6 +28,7 @@ import numpy as np
 import config
 from core import interrupts
 from core import logbook
+from core import safe
 
 from config import AGENT_NAME, BASE_DIR
 
@@ -136,7 +137,7 @@ def play_tone():
     samples, rate = tone()
 
     try:
-        sd.play(np.clip(samples * config.ALARM_VOLUME, -1.0, 1.0), rate)
+        sd.play(np.clip(samples * safe.number(config.ALARM_VOLUME, 1.0, lo=0.0, hi=4.0), -1.0, 1.0), rate)
 
         while True:
             stream = sd.get_stream()
@@ -166,7 +167,9 @@ def dismiss(snooze_minutes=0):
     if not _ringing.is_set():
         return False
 
-    _snoozed_for[0] = max(0, int(snooze_minutes))
+    # Clamped to a day: /snooze 99999999 is a typo, and past the year 9999
+    # it was an OverflowError that rang the alarm again.
+    _snoozed_for[0] = safe.whole(snooze_minutes, 0, lo=0, hi=24 * 60)
     _dismissed.set()
 
     if _ring_stop[0] is not None:
@@ -227,7 +230,9 @@ def ring(model, alarm):
         _ring_stop[0] = stop
 
         try:
-            for round_number in range(max(1, config.ALARM_REPEATS)):
+            # Through safe: a hand-edited 2.5 here was a TypeError before the
+            # first ring, and the alarm never sounded.
+            for round_number in range(safe.whole(config.ALARM_REPEATS, 5, lo=1, hi=50)):
                 if _dismissed.is_set():
                     break
 
@@ -256,8 +261,9 @@ def ring(model, alarm):
                 # Between rounds. Checked often so a dismissal lands
                 # immediately rather than after another 25 seconds.
                 waited = 0.0
+                gap = safe.seconds(config.ALARM_GAP_SECONDS, 25, hi=600)
 
-                while waited < config.ALARM_GAP_SECONDS:
+                while waited < gap:
                     if _dismissed.is_set() or stop.speaking.wait(0.25):
                         break
 

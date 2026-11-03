@@ -39,6 +39,8 @@ class State:
 
 S = State()
 
+GRUDGE_MAX = 24 * 3600      # the longest a grudge can be set for, in seconds
+
 _lock = threading.Lock()
 
 # Walking away has its own lock: it's touched from the appraisal worker (one
@@ -71,8 +73,9 @@ def _extra(name):
 
 
 def _grudging():
-    """Seconds of grudge left, or 0. Caller holds _lock or doesn't care."""
-    return max(0.0, S.grudge_until - time.time()) if S.grudge_until else 0.0
+    """Seconds of grudge left, or 0. Caller holds _lock or doesn't care.
+    Never more than a day, so round() and the like can't meet infinity."""
+    return max(0.0, min(GRUDGE_MAX, S.grudge_until - time.time())) if S.grudge_until else 0.0
 
 
 def _ceiling():

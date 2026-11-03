@@ -11,7 +11,7 @@ from prompt_toolkit.data_structures import Point
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEventType
 
-from core import logbook
+from core import logbook, safe
 
 from .shared import _approval_lock, _lock, _refresh, state, view
 from .conversation_pane import WHEEL_LINES
@@ -41,6 +41,11 @@ def ask_approval(title, body, note="", timeout=120, allow_all=None):
     if view.app is None:
         return False
 
+    # A timeout someone typed as "inf" or 99999999999 to mean "never" would
+    # raise OverflowError from the wait, leaving the popup up for good and
+    # its countdown failing on every repaint. A day is plenty of "never".
+    wait = safe.seconds(timeout, 120, lo=5)
+
     with _approval_lock:
         answered = threading.Event()
         request = {
@@ -50,7 +55,7 @@ def ask_approval(title, body, note="", timeout=120, allow_all=None):
             "answer": None,
             "allow_all": allow_all,
             "event": answered,
-            "deadline": time.monotonic() + max(5, float(timeout)),
+            "deadline": time.monotonic() + wait,
         }
 
         with _lock:
@@ -67,18 +72,22 @@ def ask_approval(title, body, note="", timeout=120, allow_all=None):
                 _refresh()
                 answered.wait(1.0)
 
-        threading.Thread(target=tick, daemon=True).start()
-        answered.wait(max(5, float(timeout)))
-
-        with _lock:
-            answer = request["answer"]
-            view.approval = None
-            state["status"] = previous_status
+        try:
+            threading.Thread(target=tick, daemon=True).start()
+            answered.wait(wait)
+        finally:
+            # Whatever happened above, the popup comes down: one left up
+            # swallows every key and the input box is dead until a restart.
+            answered.set()
+            with _lock:
+                answer = request["answer"]
+                if view.approval is request:
+                    view.approval = None
+                state["status"] = previous_status
+            _refresh()
 
         if answer is None:
             logbook.warn("ui", "approval timed out: %s", title)
-
-        _refresh()
 
         return "all" if answer == "all" else answer is True
 
@@ -104,7 +113,9 @@ def _approval_title():
     if request is None:
         return "Permission"
 
-    left = max(0, int(request["deadline"] - time.monotonic()))
+    # safe.whole: a deadline that isn't a finite number must not raise in
+    # the middle of a repaint, which prompt_toolkit would repeat forever.
+    left = safe.whole(request["deadline"] - time.monotonic(), 0, lo=0)
 
     if request.get("allow_all"):
         return f"Permission - Y allow, A allow {request['allow_all']}, N deny - {left}s"

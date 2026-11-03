@@ -9,6 +9,8 @@ from prompt_toolkit.data_structures import Point
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEventType
 
+from core import logbook
+
 from .shared import _refresh, view
 from .messages import add_message
 from .text import _rendered_lines
@@ -140,7 +142,7 @@ def _feature_group():
         on = bool(getattr(config, key, False))
         # Only the mood line itself occupies context; the other two
         # cost a model call and nothing respectively.
-        cost = int(len(mood.line() or "") / 3.5) if path == "mood.enabled" else 0
+        cost = _mood_cost(mood) if path == "mood.enabled" else 0
 
         if path == "mood.enabled" and not on:
             cost = 81  # what it would cost switched back on
@@ -150,6 +152,24 @@ def _feature_group():
         live += cost if on else 0
 
     return ("Mood", members, live, total)
+
+
+def _mood_cost(mood):
+    try:
+        return int(len(mood.line() or "") / 3.5)
+    except Exception:
+        return 0
+
+
+def _plugin_says(plugin, ask, fallback):
+    """plugin.<ask>(), or fallback if the plugin raises. These run on every
+    repaint of the pane, and one that raised in a repaint made prompt_toolkit
+    print the error over the screen again on every frame."""
+    try:
+        return getattr(plugin, ask)()
+    except Exception as e:
+        logbook.warn("ui", "plugin %s: %s() failed: %s", getattr(plugin, "name", "?"), ask, e)
+        return fallback
 
 
 def _tool_groups():
@@ -189,19 +209,23 @@ def _with_ask_switches(groups):
     except Exception:
         return groups
 
-    s = config.plugin_settings("ask")
-    running = plugin.running()
-    saved = bool(s.get("enabled"))
-    ready = running or saved or plugin.available()
-    if running:
-        why = "on - asks only when you tell her to, unless on her own is on"
-    elif saved:
-        why = "on, but not running - space switches it off"
-    else:
-        why = plugin.why_unavailable() if not ready else "off - space starts it"
-    alone = s.get("auto") is True
-    line = ask.ALONE_LINE + (ask.SEARCH_FIRST if ask._can_search() else "")
-    cost = int(len(line.format(label="Claude")) / 3.5)
+    try:
+        s = config.plugin_settings("ask") or {}
+        running = _plugin_says(plugin, "running", False)
+        saved = bool(s.get("enabled"))
+        ready = running or saved or _plugin_says(plugin, "available", False)
+        if running:
+            why = "on - asks only when you tell her to, unless on her own is on"
+        elif saved:
+            why = "on, but not running - space switches it off"
+        else:
+            why = _plugin_says(plugin, "why_unavailable", "unavailable") if not ready else "off - space starts it"
+        alone = s.get("auto") is True
+        line = ask.ALONE_LINE + (ask.SEARCH_FIRST if ask._can_search() else "")
+        cost = int(len(line.format(label="Claude")) / 3.5)
+    except Exception as e:
+        logbook.warn("ui", "ask plugin row failed: %s", e)
+        return groups
     try:
         daily = int(s.get("auto_daily", 5))
     except (TypeError, ValueError):
@@ -245,15 +269,18 @@ def _with_plugin_switches(groups):
         if not plugin or not getattr(plugin.module, "SERVER", None):
             continue
 
-        running = plugin.running()
-        saved = bool(config.plugin_settings(plugin.name).get("enabled"))
-        ready = running or saved or plugin.available()
+        running = _plugin_says(plugin, "running", False)
+        try:
+            saved = bool((config.plugin_settings(plugin.name) or {}).get("enabled"))
+        except Exception:
+            saved = False
+        ready = running or saved or _plugin_says(plugin, "available", False)
         if running:
             why = "connected"
         elif saved:
             why = "on, but not connected - space switches it off"
         else:
-            why = plugin.why_unavailable() if not ready else f"space connects - /{name} on"
+            why = _plugin_says(plugin, "why_unavailable", "unavailable") if not ready else f"space connects - /{name} on"
         row = (f"{name} plugin", running or saved, ready, why, 0, "plugin:" + name)
         label = f"MCP: {name}"
 
@@ -278,7 +305,10 @@ def _with_plugin_switches(groups):
             continue
 
         saved = spec.get("enabled", True) is not False
-        live = mcpclient.connected(name)
+        try:
+            live = mcpclient.connected(name)
+        except Exception:
+            live = False
         if live:
             why = "connected - space disconnects it"
         elif saved:
@@ -622,8 +652,16 @@ def _toggle_plugin(name, on):
         return
 
     def go():
+        # A thread of its own, so an error here used to leave "Connecting..."
+        # on screen for good with the traceback only in stderr.log.
         model = getattr(sys.modules.get("__main__"), "MODEL", None)
-        ok, message = _plugin_off(plugin) if on else plugin.start(model)
+        try:
+            ok, message = _plugin_off(plugin) if on else plugin.start(model)
+        except Exception as e:
+            logbook.exception("ui", "plugin %s %s failed", name, "stop" if on else "start")
+            add_message("system", f"{name}: couldn't {'disconnect' if on else 'connect'}: {e}")
+            _refresh()
+            return
 
         if ok:
             try:
@@ -645,7 +683,11 @@ def _toggle_server(name, on):
     from core import mcpclient
 
     def go():
-        _ok, message = mcpclient.set_server(name, not on)
+        try:
+            _ok, message = mcpclient.set_server(name, not on)
+        except Exception as e:
+            logbook.exception("ui", "mcp server %s switch failed", name)
+            message = f"{name}: couldn't {'disconnect' if on else 'connect'}: {e}"
         add_message("system", message)
         _refresh()
 

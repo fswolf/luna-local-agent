@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+from core import logbook
 from web import livefeed
 
 
@@ -59,6 +60,10 @@ def gaze_target():
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
 
+    if not isinstance(clients, list):   # an error as JSON ({"error": ...}), not the windows
+        return None
+    clients = [c for c in clients if isinstance(c, dict)]
+
     ours = _own_pids()
     terminal = next((c for c in clients if c.get("pid") in ours), None)
     # The portrait page's <title> is "Luna"; Chromium's --app window
@@ -91,29 +96,46 @@ def gaze_target():
 
 def _gaze_loop():
     """Twice a second while a page is open: tell the portrait where the
-    terminal is, when that changes. Costs nothing with no page open."""
+    terminal is, when that changes. Costs nothing with no page open.
+
+    A failure (the camera, hyprctl saying something odd) is logged and the
+    loop carries on after a pause: an exception escaping here would end
+    the thread, and her eyes would stop following anyone until a restart."""
     last = object()
+    said = ""
 
     while True:
         time.sleep(0.5)
 
-        if not livefeed._subs:
-            last = object()  # a page that opens later gets a fresh answer
-            continue
+        try:
+            last = _gaze_step(last)
+        except Exception as e:
+            if str(e) != said:            # once per kind of failure, not every pause
+                said = str(e)
+                logbook.exception("monitor", "where she looks: %s", e)
+            last = object()
+            time.sleep(5)
 
-        from senses import presence
 
-        # Someone in front of the webcam: look at them. Otherwise at the
-        # terminal, where the conversation is.
-        target = presence.gaze() or gaze_target()
+def _gaze_step(last):
+    """One look: emits a gaze event if it changed. Returns what she looks at now."""
+    if not livefeed._subs:
+        return object()  # a page that opens later gets a fresh answer
 
-        if target is None:
-            if last is not None:
-                livefeed.emit("gaze", none=True)
-                last = None
-            continue
+    from senses import presence
 
-        if (not isinstance(last, dict) or abs(target["x"] - last["x"]) > 0.02
-                or abs(target["y"] - last["y"]) > 0.02):
-            livefeed.emit("gaze", **target)
-            last = target
+    # Someone in front of the webcam: look at them. Otherwise at the
+    # terminal, where the conversation is.
+    target = presence.gaze() or gaze_target()
+
+    if target is None:
+        if last is not None:
+            livefeed.emit("gaze", none=True)
+        return None
+
+    if (not isinstance(last, dict) or abs(target["x"] - last["x"]) > 0.02
+            or abs(target["y"] - last["y"]) > 0.02):
+        livefeed.emit("gaze", **target)
+        return target
+
+    return last

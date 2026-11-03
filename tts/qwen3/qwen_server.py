@@ -35,6 +35,7 @@ config change and a restart, not a per-request flag.
 import base64
 import io
 import json
+import math
 import os
 import shutil
 import signal
@@ -378,7 +379,18 @@ def stretch(wav_bytes, speed):
     pitch stays put - a resample would make "slightly faster" sound
     like a different, smaller person.
     """
-    if abs(float(speed or 1.0) - 1.0) < 0.02:
+    # Clamped first: at 0 or below the frame loop below never reaches the
+    # end (it ran for ever, growing), NaN or junk isn't a speed at all, and
+    # past 0.25-4 it isn't speech any more.
+    try:
+        speed = float(speed or 1.0)
+    except (TypeError, ValueError):
+        speed = 1.0
+    if not math.isfinite(speed):
+        speed = 1.0
+    speed = min(4.0, max(0.25, speed))
+
+    if abs(speed - 1.0) < 0.02:
         return wav_bytes
 
     try:
@@ -399,7 +411,7 @@ def stretch(wav_bytes, speed):
         # Overlap-add would be better; this is a plain frame-drop with a
         # short crossfade, which at the 0.8-1.25 range anyone actually
         # uses is inaudible and costs nothing.
-        step = float(speed)
+        step = speed
         out = array.array("h")
         position = 0.0
         total = len(samples) // channels

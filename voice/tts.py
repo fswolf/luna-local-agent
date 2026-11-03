@@ -8,7 +8,7 @@ import re
 import unicodedata
 import requests
 import numpy as np
-from core import logbook
+from core import logbook, safe
 import ui
 from scipy.io.wavfile import read as read_wav
 import config
@@ -122,7 +122,9 @@ def _decode(payload):
     else:
         raise RuntimeError(f"unsupported audio format from the TTS server: {dtype}")
 
-    return np.clip(samples, -1.0, 1.0), rate
+    # nan_to_num: a server that hands back NaN would otherwise play as noise
+    # (np.clip keeps NaN) or wrap when it's turned into 16-bit for afplay.
+    return np.clip(np.nan_to_num(samples), -1.0, 1.0), rate
 
 
 # How she's feeling nudges how she sounds - a few percent, on top of
@@ -165,6 +167,10 @@ def _shift_pitch(samples, semitones):
     at 24 kHz the aliasing it introduces sits above anything the voice
     is doing.
     """
+    # More than an octave either way isn't a voice any more, and 2 ** (x/12)
+    # raises OverflowError for a big enough x (NaN raised ValueError below).
+    semitones = safe.number(semitones, 0.0, lo=-12.0, hi=12.0)
+
     if abs(semitones) < 0.01 or len(samples) < 2:
         return samples
 
@@ -225,14 +231,15 @@ def _pronounce(text):
 def _synthesize(text):
     """POST one chunk to /tts and decode the WAV it returns."""
     text = _pronounce(text)
+    # Clamped here as well as on the server: a speed of 0 or less sent one
+    # server into a loop that never ends, and inf isn't valid JSON at all.
+    speed = safe.number(safe.number(config.TTS_SPEED, 1.0) * _mood_speed(), 1.0, lo=0.25, hi=4.0)
     try:
         response = requests.post(
             f"{TTS_URL}/tts",
-            json={"text": text, "voice": config.VOICE,
-                  "speed": config.TTS_SPEED * _mood_speed()},
+            json={"text": text, "voice": config.VOICE, "speed": speed},
             timeout=180,
         )
-        response.raise_for_status()
     except requests.exceptions.RequestException as e:
         _set_reachable(False, str(e))
         logbook.error("tts", "POST %s/tts failed: %s", TTS_URL, e)
@@ -241,12 +248,24 @@ def _synthesize(text):
             f"TTS server unreachable at {TTS_URL}: {e}"
         ) from e
 
+    # It answered, so it isn't unreachable: a 4xx/5xx is the server saying
+    # no (a bad voice name, text it can't read), and calling that "offline"
+    # sent people looking at the wrong thing.
     _set_reachable(True)
 
-    samples, rate = _decode(response.content)
-    samples = _shift_pitch(samples, config.TTS_PITCH + _mood_pitch())
+    if response.status_code >= 400:
+        detail = (response.text or "").strip().replace("\n", " ")[:200]
+        logbook.error("tts", "POST %s/tts answered %s: %s", TTS_URL, response.status_code, detail)
 
-    return np.clip(samples * config.TTS_VOLUME, -1.0, 1.0), rate
+        raise RuntimeError(
+            f"The TTS server at {TTS_URL} refused the request "
+            f"(HTTP {response.status_code}){': ' + detail if detail else ''}"
+        )
+
+    samples, rate = _decode(response.content)
+    samples = _shift_pitch(samples, safe.number(config.TTS_PITCH, 0.0) + _mood_pitch())
+
+    return np.clip(samples * safe.number(config.TTS_VOLUME, 1.0, lo=0.0, hi=10.0), -1.0, 1.0), rate
 
 
 def _lip_sync(samples, rate, fps=30):

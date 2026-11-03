@@ -16,6 +16,20 @@ import ui
 
 from . import ctx
 
+# SQLite's INTEGER tops out here; a bigger id typed by hand was an
+# OverflowError from inside the database call rather than "no such one".
+_MAX_ID = 2 ** 63 - 1
+
+
+def _id(word):
+    """A typed id ("12" or "#12") as an int SQLite can take, or None."""
+    word = word.lstrip("#")
+
+    if not word.isdigit() or len(word) > 19 or int(word) > _MAX_ID:
+        return None
+
+    return int(word)
+
 
 def handle(text):
     """True when text was one of these commands (and it ran)."""
@@ -122,8 +136,12 @@ def handle(text):
         words = text.split()
 
         if len(words) == 3 and words[1] in ("forget", "restore") and words[2].isdigit():
+            if _id(words[2]) is None:
+                ui.add_message("system", f"No lesson {words[2]}.")
+                return True
+
             ok = (notebook.retire_lesson if words[1] == "forget"
-                  else notebook.restore_lesson)(int(words[2]))
+                  else notebook.restore_lesson)(_id(words[2]))
             done = "restored" if words[1] == "restore" else "hidden from her"
             ui.add_message("system", f"Lesson {words[2]} {done}." if ok
                            else f"No lesson {words[2]} to {words[1]}.")
@@ -153,7 +171,11 @@ def handle(text):
         words = text.split()
 
         if len(words) == 3 and words[1] in ("forget", "restore", "show") and words[2].isdigit():
-            n = int(words[2])
+            n = _id(words[2])
+
+            if n is None:
+                ui.add_message("system", f"No recipe {words[2]}.")
+                return True
 
             if words[1] == "show":
                 found = skills.get(n)
@@ -191,11 +213,11 @@ def handle(text):
         verbs = ("show", "done", "pause", "resume", "drop", "restore")
 
         if len(words) == 3 and words[1] in verbs and words[2].lstrip("#").isdigit():
-            n = int(words[2].lstrip("#"))
-            p = projects.get(n)
+            n = _id(words[2])
+            p = projects.get(n) if n is not None else None
 
             if not p:
-                ui.add_message("system", f"No project {n}.")
+                ui.add_message("system", f"No project {words[2]}.")
                 return True
 
             if words[1] == "show":
@@ -300,7 +322,7 @@ def handle(text):
         words = text.split()
 
         if len(words) == 3 and words[1] == "forget" and words[2].isdigit():
-            ok = notebook.delete_episode(int(words[2]))
+            ok = _id(words[2]) is not None and notebook.delete_episode(_id(words[2]))
             ui.add_message("system", f"Episode {words[2]} forgotten." if ok
                            else f"No episode {words[2]}.")
             return True

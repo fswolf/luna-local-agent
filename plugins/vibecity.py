@@ -143,7 +143,9 @@ def stop():
 
     _loop.stop()
 
-    if _state["playing"]:
+    # Not with the game gone: there's nobody to ask, and a hung one
+    # would hold /vibecity off for a minute.
+    if _state["playing"] and not _game.server_problem(SERVER):
         _pause_game()
 
     _state["playing"] = False
@@ -328,7 +330,7 @@ def _step():
     exchanges = []
     answer = assistant.respond_to_job(prompt, _state["model"], "vibecity", allowed,
                                       speak=bool(s["speak"]),
-                                      max_rounds=int(s["max_rounds"] or 12),
+                                      max_rounds=_game.whole(s["max_rounds"], 12, 1, 50),
                                       project_id=pid, exchanges=exchanges) or ""
     _state["briefed"] = True
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
@@ -341,7 +343,7 @@ def _step():
     if "PAUSED" in line.upper() or "took over" in answer.lower():
         _state["playing"] = False
         _game.say("Vibe City: you took over, so she's paused. /vibecity play hands it back.")
-    elif _state["steps"] >= int(s["max_steps"]):
+    elif _state["steps"] >= _game.whole(s["max_steps"], DEFAULTS["max_steps"]):
         _state["playing"] = False
         _state["busy"] = False
         paused = _pause_game()
@@ -356,7 +358,8 @@ def _after_turn():
 
 
 _loop = _game.Loop(NAME, _state, _step, playing=lambda: _connected and _state["playing"],
-                   quiet=lambda: settings()["step_seconds"], after=_after_turn)
+                   quiet=lambda: settings()["step_seconds"], after=_after_turn, server=SERVER,
+                   pause=lambda: _state.update(playing=False), title="Vibe City")
 
 
 # ---------------------------------------------------------------------------

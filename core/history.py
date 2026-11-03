@@ -19,6 +19,7 @@ applies its result when it's ready.
 import json
 import os
 import threading
+import time
 
 import requests
 
@@ -39,19 +40,57 @@ _data = {"summary": "", "messages": []}
 # into a list that has moved on since it started.
 _lock = threading.RLock()
 _summarizing = False
+# Set when the file on disk couldn't be read or moved aside: saving would
+# replace it with this session's (empty) history, so nothing is saved.
+_hold_saves = ""
+# After a failed summary, when the next try may start (time.monotonic()).
+# Without it every turn after a failure started another long request.
+_retry_after = 0.0
+RETRY_SECONDS = 600
 
 
 def load():
-    global _data
+    global _data, _hold_saves
 
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                _data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            _data = {"summary": "", "messages": []}
-    else:
-        _data = {"summary": "", "messages": []}
+    _data = {"summary": "", "messages": []}
+    _hold_saves = ""
+
+    if not os.path.exists(HISTORY_FILE):
+        return
+
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+    except OSError as e:
+        # There but unreadable (permissions, a disk error). Starting empty
+        # is fine; writing an empty history over it is not.
+        _hold_saves = f"couldn't read {HISTORY_FILE}: {e}"
+        logbook.error("history", "%s", _hold_saves)
+        logbook.tell(f"Conversation history couldn't be read, so it won't be saved this "
+                     f"session either (it would overwrite yours): {e}")
+        return
+    except ValueError as e:
+        _set_aside(f"isn't valid JSON ({e})")
+        return
+
+    if not isinstance(loaded, dict):
+        _set_aside(f"holds a {type(loaded).__name__}, not a {{...}} block")
+        return
+
+    # Anything that isn't a {"role", "content"} message would raise on
+    # every turn that reads the history; drop it and say so.
+    messages = loaded.get("messages")
+    messages = messages if isinstance(messages, list) else []
+    kept = [m for m in messages
+            if isinstance(m, dict) and isinstance(m.get("role"), str) and "content" in m]
+
+    if len(kept) != len(messages):
+        logbook.warn("history", "skipped %d malformed message(s)", len(messages) - len(kept))
+
+    summary = loaded.get("summary")
+    loaded["summary"] = summary if isinstance(summary, str) else ""
+    loaded["messages"] = kept
+    _data = loaded
 
     if _repair_arguments():
         # A file written before arguments were truncated safely. Left
@@ -60,6 +99,25 @@ def load():
         # nobody can see.
         logbook.warn("history", "repaired tool arguments that weren't valid JSON")
         save()
+
+
+def _set_aside(why):
+    """A history file that can't be used is kept, renamed, rather than
+    quietly replaced by the next save - a crash mid-write used to cost
+    the whole conversation that way."""
+    global _hold_saves
+
+    backup = f"{HISTORY_FILE}.bad-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+    try:
+        os.replace(HISTORY_FILE, backup)
+        kept = f"kept as {os.path.basename(backup)}"
+    except OSError as e:
+        _hold_saves = f"couldn't set aside {HISTORY_FILE}: {e}"
+        kept = "left in place, and history won't be saved this session"
+
+    logbook.error("history", "%s %s - starting empty, %s", HISTORY_FILE, why, kept)
+    logbook.tell(f"Conversation history {why}. Starting fresh; the old file was {kept}.")
 
 
 def _repair_arguments():
@@ -81,16 +139,26 @@ def _repair_arguments():
 
 
 def save():
-    os.makedirs(HISTORY_DIR, exist_ok=True)
-
-    with _lock:
-        snapshot = json.dumps(_data, indent=2)
+    if _hold_saves:
+        return
 
     try:
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        with _lock:
+            snapshot = json.dumps(_data, indent=2)
+
+        os.makedirs(HISTORY_DIR, exist_ok=True)
+
+        # Written beside it and swapped in, so a crash mid-write leaves
+        # the old file whole instead of a torn one.
+        tmp = HISTORY_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             f.write(snapshot)
-    except OSError:
-        pass  # best effort; a failed save shouldn't kill the turn
+        os.replace(tmp, HISTORY_FILE)
+    except (OSError, TypeError, ValueError) as e:
+        # Best effort - a failed save shouldn't kill the turn - but it
+        # shouldn't be a secret either.
+        logbook.error("history", "save failed: %s", e)
+        logbook.tell(f"Couldn't save the conversation history: {e}")
 
 
 def get_summary() -> str:
@@ -257,10 +325,11 @@ def _ask_model(model, prompt):
                             max_tokens=800),
         timeout=180,
     )
+    response.raise_for_status()
     data = response.json()
 
-    if "choices" not in data:
-        detail = data.get("error", data)
+    if not isinstance(data, dict) or "choices" not in data:
+        detail = data.get("error", data) if isinstance(data, dict) else data
 
         raise RuntimeError(f"LM Studio error during summarization: {detail}")
 
@@ -298,7 +367,7 @@ def _compress(model, summary):
 
 def _fold(model):
     """Move the oldest turns into the summary. Runs on a worker."""
-    global _summarizing
+    global _summarizing, _retry_after
 
     try:
         with _lock:
@@ -338,8 +407,12 @@ def _fold(model):
             _data["messages"] = messages[config.SUMMARIZE_CHUNK:]
 
         save()
-    except Exception:
-        pass  # summarization is a nicety; never let it break a turn
+    except Exception as e:
+        # Summarization is a nicety; never let it break a turn. But a
+        # silent failure retried on every turn hid a dead server and
+        # cost a long request each time, so: log it and wait a while.
+        _retry_after = time.monotonic() + RETRY_SECONDS
+        logbook.warn("history", "summarizing failed, next try in %ds: %s", RETRY_SECONDS, e)
     finally:
         _summarizing = False
 
@@ -355,6 +428,9 @@ def maybe_summarize(model):
 
     with _lock:
         if _summarizing or len(_data.get("messages", [])) <= config.MAX_RAW_MESSAGES:
+            return
+
+        if time.monotonic() < _retry_after:
             return
 
         _summarizing = True

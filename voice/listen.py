@@ -7,13 +7,13 @@ import os
 import tempfile
 import numpy as np
 from core import interrupts
-from core import logbook
+from core import logbook, safe
 import ui
 from scipy.io.wavfile import write
 from collections import deque
 import config
 from config import SAMPLE_RATE, STT_VAD
-from voice.playback import _close_mic, _open_mic
+from voice.playback import _close_mic, _open_mic, _read_mic
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ def _calibrate(stream):
     readings = []
 
     for _ in range(max(1, int(CALIBRATION_SECONDS * SAMPLE_RATE / BLOCK_SIZE))):
-        audio, _overflow = stream.read(BLOCK_SIZE)
+        audio, _overflow = _read_mic(stream, BLOCK_SIZE)
         readings.append(_rms(audio[:, 0]))
 
     readings.sort()
@@ -130,15 +130,19 @@ def _record_energy(mode):
     and prone to cutting off - see _record_silero for the good path."""
     record_immediately = mode == "manual"
     stop_on_silence = mode != "manual"
-    give_up_after = config.STT_NO_SPEECH_TIMEOUT if mode == "auto" else None
-    max_seconds = config.STT_MANUAL_MAX_SECONDS if mode == "manual" else config.STT_MAX_SECONDS
+    # Read through safe: these are typed settings, and a hand-edited inf or
+    # NaN would otherwise record for ever or never stop on silence.
+    give_up_after = safe.seconds(config.STT_NO_SPEECH_TIMEOUT, 8) if mode == "auto" else None
+    max_seconds = safe.seconds(
+        config.STT_MANUAL_MAX_SECONDS if mode == "manual" else config.STT_MAX_SECONDS, 60, lo=1, hi=3600)
+    silence_seconds = safe.seconds(config.STT_SILENCE_SECONDS, 1.2, lo=0.1, hi=60)
 
     stream = _open_mic(BLOCK_SIZE)
 
     try:
         noise = min(_calibrate(stream), NOISE_CEILING)
 
-        sensitivity = max(0.1, config.STT_SENSITIVITY)
+        sensitivity = safe.number(config.STT_SENSITIVITY, 1.0, lo=0.1, hi=100)
         start_threshold = max(ABSOLUTE_FLOOR, noise * START_MULTIPLIER) / sensitivity
         continue_threshold = max(
             ABSOLUTE_FLOOR / 2, noise * CONTINUE_MULTIPLIER
@@ -168,7 +172,7 @@ def _record_energy(mode):
             ui.set_status("Recording...")
 
         while True:
-            audio, _overflow = stream.read(BLOCK_SIZE)
+            audio, _overflow = _read_mic(stream, BLOCK_SIZE)
             block = audio[:, 0].copy()
 
             level = _rms(block)
@@ -202,7 +206,7 @@ def _record_energy(mode):
                     else:
                         silence += block_seconds
 
-                    if silence >= config.STT_SILENCE_SECONDS:
+                    if silence >= silence_seconds:
                         break
 
             if interrupts.current().listening.is_set():     # HOME, or manual's second press
@@ -246,22 +250,27 @@ def _record_silero(mode):
     """
     from silero_vad import VADIterator
 
+    # int(inf * 1000) raised OverflowError here on every turn ("Silero VAD
+    # failed"), so the numbers are clamped before anything counts with them.
+    threshold = safe.number(config.STT_VAD_THRESHOLD, 0.5, lo=0.1, hi=0.9)
+    max_seconds = safe.seconds(config.STT_MAX_SECONDS, 60, lo=1, hi=3600)
+
     iterator = VADIterator(
         _vad_model,
-        threshold=min(0.9, max(0.1, config.STT_VAD_THRESHOLD)),
+        threshold=threshold,
         sampling_rate=SAMPLE_RATE,
-        min_silence_duration_ms=int(config.STT_SILENCE_SECONDS * 1000),
+        min_silence_duration_ms=safe.whole(config.STT_SILENCE_SECONDS * 1000, 1200, lo=100, hi=60000),
         speech_pad_ms=200,
     )
     iterator.reset_states()
 
-    give_up_after = config.STT_NO_SPEECH_TIMEOUT if mode == "auto" else None
+    give_up_after = safe.seconds(config.STT_NO_SPEECH_TIMEOUT, 8) if mode == "auto" else None
     block_seconds = VAD_BLOCK_SIZE / SAMPLE_RATE
 
     levels.update({
         "noise_floor": 0.0,
-        "start": config.STT_VAD_THRESHOLD,
-        "continue": max(0.0, config.STT_VAD_THRESHOLD - 0.15),
+        "start": threshold,
+        "continue": max(0.0, threshold - 0.15),
         "peak": 0.0,
         "speech_seconds": 0.0,
         "triggered": False,
@@ -278,7 +287,7 @@ def _record_silero(mode):
 
     try:
         while True:
-            audio, _overflow = stream.read(VAD_BLOCK_SIZE)
+            audio, _overflow = _read_mic(stream, VAD_BLOCK_SIZE)
             block = audio[:, 0].copy()
 
             elapsed += block_seconds
@@ -309,7 +318,7 @@ def _record_silero(mode):
             if interrupts.current().listening.is_set():     # HOME, or manual's second press
                 break
 
-            if elapsed >= config.STT_MAX_SECONDS:
+            if elapsed >= max_seconds:
                 break
     finally:
         _close_mic(stream)

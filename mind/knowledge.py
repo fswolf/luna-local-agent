@@ -43,6 +43,7 @@ from collections import Counter
 
 import config
 from core import logbook
+from core import safe
 
 TEXT_EXT = {".md", ".markdown", ".txt", ".rst", ".org", ".adoc", ".tex", ".csv", ".tsv",
             ".json", ".yaml", ".yml", ".toml", ".ini", ".conf", ".cfg",
@@ -567,10 +568,16 @@ def _count():
 
 def _watch():
     while True:
-        if enabled():
-            index()
+        # Guarded and clamped: this thread used to die with a traceback on
+        # screen when anything here raised, and wait() overflows on a
+        # hand-edited 1e999. A minute between tries, so a failure can't spin.
+        try:
+            if enabled():
+                index()
+        except Exception:
+            logbook.exception("knowledge", "rescan failed")
 
-        minutes = max(1.0, float(getattr(config, "KNOWLEDGE_RESCAN_MINUTES", 10)))
+        minutes = safe.number(getattr(config, "KNOWLEDGE_RESCAN_MINUTES", 10), 10, lo=1, hi=24 * 60)
         _wake.wait(minutes * 60)
         _wake.clear()
 
@@ -685,7 +692,7 @@ def search(query, limit=5, within=None):
             scored = sorted(zip(_cosines(qv, [i["vec"] for i in with_vec]), with_vec),
                             key=lambda p: p[0], reverse=True)
             how = "by meaning"
-            top = scored[:max(limit, int(getattr(config, "RERANK_CANDIDATES", 24)))]
+            top = scored[:max(limit, safe.whole(getattr(config, "RERANK_CANDIDATES", 24), 24, lo=1, hi=1000))]
             better = embedder.rerank(query, [_doc_text(i["path"], i["heading"], i["text"]) for _s, i in top])
 
             if better is not None:
@@ -716,7 +723,7 @@ def prompt_block(query):
         return ""                     # words alone aren't sure enough to bring something in unasked
 
     try:
-        found, how = search(query, limit=int(getattr(config, "KNOWLEDGE_AUTO_PASSAGES", 2)))
+        found, how = search(query, limit=safe.whole(getattr(config, "KNOWLEDGE_AUTO_PASSAGES", 2), 2, lo=0, hi=20))
     except Exception as e:
         logbook.warn("knowledge", "auto search failed: %s", e)
         return ""
@@ -778,7 +785,7 @@ def _register():
             return "The knowledge base is off."
 
         try:
-            limit = max(1, min(10, int(limit or 5)))
+            limit = safe.whole(limit or 5, 5, lo=1, hi=10)
         except (TypeError, ValueError):
             limit = 5
 

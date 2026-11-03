@@ -33,6 +33,7 @@ from datetime import datetime
 
 import config
 from core import logbook
+from core import safe
 
 DB_FILE = os.path.join(config.BASE_DIR, "agent", "notebook.db")
 
@@ -70,9 +71,11 @@ CREATE TABLE IF NOT EXISTS play (
 """
 
 
-def _run(fn, default=None):
+def _run(fn, default=None, strict=False):
     """One connection per call, under one lock: background jobs and turns
-    both write here, and none of it is hot enough to pool."""
+    both write here, and none of it is hot enough to pool. strict: raise
+    instead of handing back the default, for the callers that would read
+    "database is locked" as "never done" and redo or overwrite things."""
     with _lock:
         try:
             os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
@@ -89,6 +92,9 @@ def _run(fn, default=None):
                 conn.close()
         except sqlite3.Error as e:
             logbook.warn("notebook", "db error: %s", e)
+
+            if strict:
+                raise
 
             return default
 
@@ -111,8 +117,11 @@ def _now():
 # meta - small bits of bookkeeping (when the dream pass last ran, where the
 # last episode ended, which fact pairs have already been checked)
 # ---------------------------------------------------------------------------
-def get(key, default=None):
-    row = _run(lambda c: c.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone())
+def get(key, default=None, strict=False):
+    """strict: a db error raises rather than looking like a missing key -
+    for bookkeeping, where "missing" means start over."""
+    row = _run(lambda c: c.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone(),
+               strict=strict)
 
     if not row:
         return default
@@ -241,7 +250,7 @@ def add_lesson(text, from_ids=(), origin="dream"):
 def _cap(keep=None):
     """Over max_lessons, the least-used oldest one is retired, not deleted -
     never the one that was just added."""
-    limit = int(getattr(config, "SELF_MAX_LESSONS", 40))
+    limit = safe.whole(getattr(config, "SELF_MAX_LESSONS", 40), 40, lo=1, hi=10000)
     active = [l for l in lessons() if l["id"] != keep]
     limit -= 1 if keep else 0
 
@@ -263,7 +272,7 @@ def restore_lesson(lesson_id):
 def relevant_lessons(query, limit=None):
     """Lesson texts for this turn. All of them while there are few; the
     closest to what was said once there are more than fit."""
-    limit = int(getattr(config, "SELF_LESSONS_IN_PROMPT", 4) if limit is None else limit)
+    limit = safe.whole(getattr(config, "SELF_LESSONS_IN_PROMPT", 4) if limit is None else limit, 4, lo=0, hi=100)
 
     return _pick(query, [l["text"] for l in lessons()], limit)
 
@@ -307,7 +316,7 @@ def latest_episode():
 def relevant_episodes(query, limit=None, skip_latest=True):
     """Older conversations that bear on this turn, newest first. The
     latest is left out by default - it travels anyway, as "last time"."""
-    limit = int(getattr(config, "SELF_EPISODES_IN_PROMPT", 2) if limit is None else limit)
+    limit = safe.whole(getattr(config, "SELF_EPISODES_IN_PROMPT", 2) if limit is None else limit, 2, lo=0, hi=100)
     skip = latest_episode()["id"] if skip_latest and latest_episode() else None
 
     # Stricter than the tool's search: these ride in every prompt, so an
@@ -398,7 +407,8 @@ def play_to_write(quiet_minutes):
     quiet_minutes counts as finished too - the app may have been closed
     mid-game, and the notes shouldn't wait for the next time she plays."""
     def go(c):
-        cutoff = datetime.fromtimestamp(datetime.now().timestamp() - quiet_minutes * 60)
+        cutoff = datetime.fromtimestamp(datetime.now().timestamp()
+                                         - safe.number(quiet_minutes, 20, lo=0, hi=60 * 24 * 365) * 60)
         c.execute("UPDATE play SET ended=last WHERE ended IS NULL AND last < ?",
                   (cutoff.isoformat(timespec="seconds"),))
         rows = c.execute("SELECT id, game, title, started, ended, turns, record FROM play "

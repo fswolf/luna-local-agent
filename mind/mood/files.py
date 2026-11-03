@@ -29,10 +29,30 @@ _FALLBACK = {
 _moods = {"data": None, "mtime": None, "error": ""}
 
 
+def _numbers(name, values):
+    """A list of edges as numbers, or a ValueError naming the bad one. A
+    string here used to fail later, inside every turn, as a TypeError."""
+    out = []
+    for v in values:
+        try:
+            n = float(v)
+        except (TypeError, ValueError):
+            n = float("nan")
+        if n != n or n in (float("inf"), float("-inf")):
+            raise ValueError(f"{name}.edges has {v!r} - every edge must be a number")
+        out.append(n)
+    return out
+
+
 def _check(data):
     """The file's shape, or a ValueError saying what's wrong with it."""
+    if not isinstance(data, dict):
+        raise ValueError("it should hold a {...} block")
     energy, warmth = data.get("energy") or {}, data.get("warmth") or {}
-    e_edges, w_edges = list(energy.get("edges") or []), list(warmth.get("edges") or [])
+    if not isinstance(energy, dict) or not isinstance(warmth, dict):
+        raise ValueError("energy and warmth must each be a {...} block")
+    e_edges = _numbers("energy", list(energy.get("edges") or []))
+    w_edges = _numbers("warmth", list(warmth.get("edges") or []))
     grid = data.get("grid") or []
 
     if len(grid) != len(w_edges) + 1:
@@ -76,7 +96,7 @@ def moods():
         with open(MOODS_FILE, encoding="utf-8") as handle:
             _moods["data"] = _check(json.load(handle))
         _moods["error"] = ""
-    except (OSError, ValueError) as e:
+    except (OSError, ValueError, TypeError, AttributeError) as e:
         if _moods["data"] is None:     # keep the last good copy if there is one
             _moods["data"] = _FALLBACK
         _moods["error"] = f"agent/moods.json: {e}"

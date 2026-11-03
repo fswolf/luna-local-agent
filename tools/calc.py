@@ -105,6 +105,14 @@ def _fmt(x):
 def math_answer(expression):
     tidy = _tidy(expression)
     value = _eval(ast.parse(tidy, mode="eval"))
+
+    # (-8) ** (1/3) is a complex number in Python, and 1e308 * 10 is inf:
+    # neither is an answer to read out.
+    if isinstance(value, complex):
+        raise ValueError("the answer isn't a real number")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("that number is too big to work out")
+
     return f"{expression.strip()} = {_fmt(value)}"
 
 
@@ -130,6 +138,15 @@ def _temps(text):
 
 
 def convert_answer(amount, target):
+    # pint evaluates what it's given, powers included, with Python's own
+    # integers: "9**9**9 m to km" worked out a number with hundreds of
+    # millions of digits while holding the interpreter, and the whole app
+    # froze. Units never need a power written out, so none get through;
+    # km^2 is "square km", which pint reads without one.
+    if re.search(r"\*\*|\^", f"{amount} {target}"):
+        return (f"Couldn't read {amount!r} to {target!r}: write a squared or cubed unit "
+                "as words (square km, cubic m), not with ^ or **.")
+
     try:
         ureg = _units()
     except ImportError:
@@ -150,7 +167,12 @@ def convert_answer(amount, target):
     if not isinstance(quantity.magnitude, (int, float)):
         return f"Couldn't read {amount!r} as one amount. Ask the user to say it another way."
 
-    return f"{amount.strip()} = {_fmt(float(result.magnitude))} {result.units:~P}"
+    magnitude = float(result.magnitude)
+
+    if not math.isfinite(magnitude):
+        return f"Couldn't convert {amount!r}: the number is too big. Ask the user to say it another way."
+
+    return f"{amount.strip()} = {_fmt(magnitude)} {result.units:~P}"
 
 
 @tool(

@@ -2,7 +2,7 @@
 
 Part of the config package (it was one config.py); see config/__init__.py.
 """
-from .base import setting
+from .base import flag, setting
 
 # -------------------------
 # Tool calling
@@ -26,7 +26,7 @@ MAX_TOOL_ROUNDS = int(_tools_cfg.get("max_rounds", 4))
 # voice. Speech alone doesn't wake anyone - it is exactly the thing a
 # sleeping brain is best at folding into a dream.
 _alarm_cfg = setting("alarms", {})
-ALARMS_ENABLED = bool(_alarm_cfg.get("enabled", True))
+ALARMS_ENABLED = flag(_alarm_cfg.get("enabled", True))
 # Independent of tts.volume on purpose: the level you picked for a
 # conversation at midnight is not the level that gets you up at seven.
 ALARM_VOLUME = float(_alarm_cfg.get("volume", 1.0))
@@ -45,12 +45,12 @@ REMINDER_CHECK_INTERVAL_SECONDS = _reminders_cfg.get("check_interval_minutes", 1
 
 _shell_cfg = setting("shell", {})
 # run_command: she runs a shell command, and every one asks first.
-SHELL_ENABLED = bool(_shell_cfg.get("enabled", True))
+SHELL_ENABLED = flag(_shell_cfg.get("enabled", True))
 SHELL_TIMEOUT = float(_shell_cfg.get("timeout", 60))
 SHELL_MAX_OUTPUT = int(_shell_cfg.get("max_output_chars", 6000))
 # sudo in her commands: off, or a password box on your screen for each one
 # (tools/askpass.sh). The password goes to sudo, never to her.
-SHELL_SUDO = bool(_shell_cfg.get("sudo", False))
+SHELL_SUDO = flag(_shell_cfg.get("sudo", False))
 # Remote sources whose commands run without the popup - for automation
 # from Discord. Empty by default: opting in is yours, in core config.
 SHELL_AUTO_APPROVE_SOURCES = [str(s).strip().lower() for s in
@@ -60,7 +60,7 @@ _web_search_cfg = setting("web_search", {})
 WEB_SEARCH_ENABLED = _web_search_cfg.get("enabled", True)
 WEB_SEARCH_MAX_RESULTS = _web_search_cfg.get("max_results", 5)
 # Opening a page she found, rather than summarizing the search blurb.
-PAGE_FETCH_ENABLED = bool(_web_search_cfg.get("fetch_pages", True))
+PAGE_FETCH_ENABLED = flag(_web_search_cfg.get("fetch_pages", True))
 # How much of a page reaches the model. Roughly a thousand tokens per
 # 4000 characters, so this is the main cost control.
 PAGE_MAX_CHARS = int(_web_search_cfg.get("page_max_chars", 6000))
@@ -68,7 +68,7 @@ PAGE_TIMEOUT = float(_web_search_cfg.get("page_timeout", 20))
 # read_page and research refuse this machine and the local network
 # (your router, llama-server, the monitor) unless this is on. A page
 # can ask her to "read" http://192.168.1.1/ as easily as you can.
-PAGE_ALLOW_LOCAL = bool(_web_search_cfg.get("allow_local", False))
+PAGE_ALLOW_LOCAL = flag(_web_search_cfg.get("allow_local", False))
 # research: how many pages it reads, and how much of them in total.
 RESEARCH_PAGES = max(1, int(_web_search_cfg.get("research_pages", 3)))
 RESEARCH_MAX_CHARS = int(_web_search_cfg.get("research_max_chars", 9000))

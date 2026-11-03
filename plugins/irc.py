@@ -63,6 +63,7 @@ from datetime import datetime
 from core import chatroom
 import config
 from core import logbook
+from core import safe
 from core import timeutil
 
 NAME = "irc"
@@ -152,6 +153,20 @@ def _credentials():
             str(parsed.get("sasl_password", "")).strip())
 
 
+def _credentials_problem():
+    """Why the credentials file can't be used, or "" (missing is fine).
+    A broken file should say so, not look like "no key"."""
+    try:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as handle:
+            parsed = json.load(handle)
+    except FileNotFoundError:
+        return ""
+    except (ValueError, OSError) as e:
+        return f"{CREDENTIALS_FILE} couldn't be read: {e}"
+
+    return "" if isinstance(parsed, dict) else f"{CREDENTIALS_FILE} should be one {{...}} object"
+
+
 def nick():
     configured = str(settings().get("nick", "")).strip()
 
@@ -179,7 +194,9 @@ def why_unavailable():
     if not str(block.get("channel", "")).strip():
         return 'no channel set - "irc": {"channel": "#gameranger"} under plugins'
 
-    return ""
+    # A file that's there was meant to sign her in; broken, she'd join
+    # without it and nobody would know why the nick isn't hers.
+    return _credentials_problem()
 
 
 # ---------------------------------------------------------------------------
@@ -424,11 +441,11 @@ def _authenticate(connection, reader, want_nick, user, password):
     return problem
 
 
-def _connect_once(block):
+def _connect_once(block, stop):
     global _sock, _connected, _last_error, _nick_in_use
 
     server = str(block["server"]).strip()
-    port = int(block["port"])
+    port = safe.whole(block.get("port"), 6697, 1, 65535)
     channel = str(block["channel"]).strip()
     want = nick()
 
@@ -472,7 +489,7 @@ def _connect_once(block):
         last_traffic = time.time()
         pinged = False
 
-        while not _stop.is_set():
+        while not stop.is_set():
             line = read_line()
 
             if line is None:
@@ -536,8 +553,11 @@ def _connect_once(block):
 
             _handle(prefix, command, params, channel, want)
     finally:
-        _connected = False
-        _sock = None
+        # Only if it's still ours: after a quick off and on, a newer
+        # connection may already be the one in use.
+        if _sock is connection:
+            _connected = False
+            _sock = None
 
         try:
             connection.close()
@@ -545,28 +565,29 @@ def _connect_once(block):
             pass
 
 
-def _listen_loop():
+def _listen_loop(stop):
+    """stop is this start's own: a loop left over from before a quick
+    off and on can't see the new one's cleared flag and carry on as a
+    second listener (every message answered twice)."""
     global _last_error
 
     block = settings()
     delay = 5
 
-    while not _stop.is_set():
+    while not stop.is_set():
         try:
-            _connect_once(block)
+            _connect_once(block, stop)
             delay = 5
         except Exception as e:
             _last_error = f"{type(e).__name__}: {e}"[:140]
             logbook.warn(NAME, "connection failed: %s", _last_error)
 
-        if _stop.is_set():
-            break
-
         # Backoff with jitter. Reconnecting hard in a loop against
         # somebody else's IRC server is how a host gets K-lined, and a
         # dropped connection is usually the network rather than
         # anything trying faster would fix.
-        time.sleep(delay + random.uniform(0, 2))
+        if stop.wait(delay + random.uniform(0, 2)):
+            break
         delay = min(delay * 2, 300)
 
 
@@ -574,7 +595,7 @@ def _listen_loop():
 # The plugin interface
 # ---------------------------------------------------------------------------
 def start(model):
-    global _room, _thread, _running
+    global _room, _thread, _running, _stop
 
     with _lock:
         if _running:
@@ -589,7 +610,7 @@ def start(model):
         channel = str(block["channel"]).strip()
         post = bool(block.get("post_replies", True))
         speaks = bool(block.get("speak", False))
-        max_lines = int(block.get("max_reply_lines", 3))
+        max_lines = safe.whole(block.get("max_reply_lines"), 3, 1, 20)
         me = nick()
 
         # With both off she would sit in the channel thinking about
@@ -617,8 +638,8 @@ def start(model):
         )
         _room.start(model)
 
-        _stop.clear()
-        _thread = threading.Thread(target=_listen_loop, daemon=True)
+        _stop = threading.Event()
+        _thread = threading.Thread(target=_listen_loop, args=(_stop,), daemon=True)
         _thread.start()
         _running = True
 
@@ -647,10 +668,13 @@ def stop():
         if _room is not None:
             _room.stop()
 
-        # Leave properly. A QUIT is the difference between "left" and
-        # a ghost sitting in the userlist until the server times it out.
-        _raw("QUIT :bye")
         _running = False
+
+    # Leave properly. A QUIT is the difference between "left" and
+    # a ghost sitting in the userlist until the server times it out.
+    # Sent off to one side: the throttle and a stuck socket could
+    # otherwise hold /irc off for half a minute.
+    threading.Thread(target=_raw, args=("QUIT :bye",), daemon=True, name="irc-quit").start()
 
     return True, "Left IRC."
 

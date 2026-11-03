@@ -40,6 +40,9 @@ def _run(command, stdin=None):
             command,
             capture_output=True, text=True, timeout=TIMEOUT,
             input=stdin,
+            # a clipboard holding non-UTF-8 bytes raised UnicodeDecodeError
+            # here, past the "never raises" promise
+            errors="replace",
         )
     except FileNotFoundError:
         return False, f"{command[0]} isn't installed"

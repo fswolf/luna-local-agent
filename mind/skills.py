@@ -34,6 +34,7 @@ from datetime import datetime
 
 import config
 from core import logbook
+from core import safe
 
 DB_FILE = os.path.join(config.BASE_DIR, "agent", "skills.db")
 
@@ -182,7 +183,7 @@ def add(name, when, steps, tools=()):
 
 def _cap(keep=None):
     """Over max_skills, the least-used oldest is retired, never deleted."""
-    limit = int(getattr(config, "SELF_MAX_SKILLS", 60))
+    limit = safe.whole(getattr(config, "SELF_MAX_SKILLS", 60), 60, lo=1, hi=10000)
     active = [s for s in skills() if s["id"] != keep]
     limit -= 1 if keep else 0
 
@@ -232,7 +233,7 @@ def relevant(query, limit=None):
     if not enabled() or not str(query or "").strip():
         return []
 
-    limit = int(getattr(config, "SELF_SKILLS_IN_PROMPT", 2) if limit is None else limit)
+    limit = safe.whole(getattr(config, "SELF_SKILLS_IN_PROMPT", 2) if limit is None else limit, 2, lo=0, hi=100)
     pool = skills()
 
     if not pool or limit <= 0:

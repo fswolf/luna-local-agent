@@ -5,6 +5,15 @@ from pynput import keyboard
 from voice.ptt import toggle
 
 
+def _escape():
+    """Esc read globally. While the window is up it's the window's (close a
+    pane, answer no, quit from the conversation); os._exit from here left
+    the terminal in raw mode. Before the window exists it still quits."""
+    if ui.view.app is not None:
+        return
+    os._exit(0)
+
+
 def _handle_home(model):
     # The same HOME as every other input path (voice/ptt.py): start, finish a
     # manual recording, or stop - and hands-free in open mode.
@@ -28,12 +37,7 @@ def start_keyboard(model):
             if key == keyboard.Key.home:
                 _handle_home(model)
             elif key == keyboard.Key.esc:
-                # os._exit terminates the whole process immediately,
-                # regardless of which thread calls it. This callback
-                # runs in a background hotkey thread, so plain exit()/
-                # sys.exit() would only kill this thread and leave the
-                # main thread hanging on input().
-                os._exit(0)
+                _escape()
         except Exception as e:
             ui.set_status(f"Keyboard error: {e}")
 

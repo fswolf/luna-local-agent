@@ -5,6 +5,15 @@ from pynput import keyboard
 from voice.ptt import toggle
 
 
+def _escape():
+    """Esc read globally. While the window is up it's the window's (close a
+    pane, answer no, quit from the conversation); os._exit from here left
+    the terminal in raw mode. Before the window exists it still quits."""
+    if ui.view.app is not None:
+        return
+    os._exit(0)
+
+
 def on_press(key, model):
     try:
         if key == keyboard.Key.home:
@@ -13,7 +22,7 @@ def on_press(key, model):
             toggle(model)
 
         elif key == keyboard.Key.esc:
-            os._exit(0)
+            _escape()
 
     except Exception as e:
         ui.set_status(f"Keyboard error: {e}")

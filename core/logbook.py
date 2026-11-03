@@ -52,7 +52,11 @@ def start():
     """Open the log. Safe to call twice; never raises."""
     global _log, _broken
 
-    if _log is not None or not LOG_ENABLED:
+    if _log is not None:
+        return _log
+
+    if not LOG_ENABLED:
+        _catch_everything_else(None)   # no file, but still nothing over the screen
         return _log
 
     try:
@@ -77,13 +81,85 @@ def start():
         logger.propagate = False
 
         _log = logger
+        _catch_everything_else(handler)
         _log.info("=" * 60)
         _log.info("started | python %s | pid %s", sys.version.split()[0], os.getpid())
     except Exception as e:
         _broken = str(e)
         _log = None
+        _catch_everything_else(None)
 
     return _log
+
+
+def _catch_everything_else(handler):
+    """Route what isn't ours into the same file: a crashed thread's
+    traceback, other libraries' log lines (asyncio, mcp, urllib3), and
+    Python warnings. Left alone, all three write to stderr, which is the
+    screen - or, while the screen is up, a file nobody reads."""
+    import threading
+
+    root = logging.getLogger()
+    if handler is not None and handler not in root.handlers:
+        root.addHandler(handler)
+    elif handler is None and not root.handlers:
+        root.addHandler(logging.NullHandler())   # no log file: dropped, not printed
+    if root.level == logging.NOTSET or root.level < logging.WARNING:
+        root.setLevel(logging.WARNING)
+    logging.captureWarnings(True)               # main.py's ignore filters still apply first
+
+    def thread_died(args):
+        if args.exc_type is SystemExit:
+            return
+        name = getattr(args.thread, "name", "?")
+        _crash(f"thread {name}", args.exc_type, args.exc_value, args.exc_traceback)
+
+    threading.excepthook = thread_died
+
+    def unraisable(args):
+        try:
+            _write(logging.WARNING, "python", "ignored error in %s: %r",
+                   getattr(args.object, "__qualname__", args.object), args.exc_value)
+        except Exception:
+            pass
+
+    sys.unraisablehook = unraisable
+
+
+# One line in the conversation per distinct error, at most once a
+# minute: enough to know something broke, never a screen full of it.
+_said = {}
+SAY_EVERY = 60.0
+
+
+def _crash(where, kind, value, tb):
+    try:
+        _write(logging.ERROR, where, "uncaught %s: %s", getattr(kind, "__name__", kind), value)
+        if _log is not None:
+            for line in "".join(traceback.format_exception(kind, value, tb)).rstrip().splitlines():
+                _log.error("[%s]     %s", where, line)
+    except Exception:
+        pass
+    tell(f"{where} failed: {getattr(kind, '__name__', kind)}: {value}")
+
+
+def tell(text):
+    """Show an error in the conversation once, however often it repeats."""
+    import time
+
+    try:
+        key = str(text)[:200]
+        now = time.monotonic()
+        if now - _said.get(key, -1e9) < SAY_EVERY:
+            return
+        _said[key] = now
+        if len(_said) > 200:
+            _said.clear()
+        import ui
+
+        ui.add_message("system", f"{str(text)[:300]} (details: /log)")
+    except Exception:
+        pass
 
 
 def _write(level, where, message, *args):

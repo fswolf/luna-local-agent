@@ -35,7 +35,10 @@ def _chat_completion(payload, narrator=None):
         return _streamed_message(payload, narrator)
 
     try:
-        response = requests.post(LM_URL, headers=LLM_HEADERS, json=payload)
+        # A timeout, as the streamed path has: this runs holding the turn
+        # lock, so a server that stalls would otherwise freeze every turn,
+        # chat message, job and reminder behind it for good.
+        response = requests.post(LM_URL, headers=LLM_HEADERS, json=payload, timeout=(10, 600))
     except requests.exceptions.RequestException as e:
         lmstudio.mark_failed(e)
         logbook.error("llm", "request failed: %s", e)
@@ -50,8 +53,8 @@ def _chat_completion(payload, narrator=None):
             f"{response.text[:300]}"
         )
 
-    if "choices" not in data:
-        detail = data.get("error", data)
+    if not isinstance(data, dict) or "choices" not in data:
+        detail = data.get("error", data) if isinstance(data, dict) else data
         logbook.error("llm", "response had no choices: %s", str(detail)[:500])
         raise RuntimeError(f"{config.llm_backend_label()} error: {detail}")
 
@@ -135,15 +138,20 @@ def _note_tokens(tokens, delta):
         try:
             text = str(entry.get("token", ""))
             lp = float(entry.get("logprob"))
-        except (TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError):
             continue
 
         alts = []
 
         if lp < -0.105:  # p < 0.9
-            alts = [[str(a.get("token", "")), round(float(a.get("logprob")), 3)]
-                    for a in entry.get("top_logprobs") or []
-                    if a.get("token") != text and a.get("logprob") is not None][:2]
+            # Inside a try like the token itself: one odd value from the
+            # server is a missing near-miss, not a failed turn.
+            try:
+                alts = [[str(a.get("token", "")), round(float(a.get("logprob")), 3)]
+                        for a in entry.get("top_logprobs") or []
+                        if a.get("token") != text and a.get("logprob") is not None][:2]
+            except (AttributeError, TypeError, ValueError, OverflowError):
+                alts = []
 
         tokens.append([text, part, round(lp, 3), alts])
 
@@ -516,7 +524,26 @@ def _stream_deltas(payload):
 
             raise RuntimeError(_explain_refusal(response.status_code, body, payload))
 
-        for raw in response.iter_lines():
+        lines = response.iter_lines()
+
+        while True:
+            # The server can drop mid-reply (crashed, model unloaded, a
+            # stall past the read timeout). That surfaced as requests' own
+            # "Connection broken: InvalidChunkLength(...)" and the header
+            # still said online.
+            try:
+                raw = next(lines)
+            except StopIteration:
+                return
+            except requests.exceptions.RequestException as e:
+                lmstudio.mark_failed(e)
+                logbook.error("llm", "stream dropped mid-reply: %s", e)
+
+                raise RuntimeError(
+                    f"{config.llm_backend_label()} stopped answering mid-reply ({e}). "
+                    "Check that the model is still loaded, then say it again."
+                ) from e
+
             line = (
                 raw.decode("utf-8", errors="replace")
                 if isinstance(raw, bytes) else raw
@@ -533,6 +560,9 @@ def _stream_deltas(payload):
             try:
                 chunk = json.loads(body)
             except json.JSONDecodeError:
+                continue
+
+            if not isinstance(chunk, dict):
                 continue
 
             choices = chunk.get("choices") or []
@@ -594,7 +624,7 @@ def _streamed_message(payload, narrator):
 
             try:
                 p = round(math.exp(delta["_logprobs"]["content"][-1]["logprob"]), 3)
-            except (KeyError, IndexError, TypeError, ValueError):
+            except (KeyError, IndexError, TypeError, ValueError, OverflowError):
                 pass
 
             livefeed.emit("tok", p="t" if piece else "a",

@@ -61,7 +61,8 @@ schedule later every day. Daily times are rebuilt from the wall clock
 rather than by adding 24 hours, which is the difference between "every
 morning at 8" staying at 8 and quietly becoming 7 for the winter. And if
 the app was closed for a week, the daily reminder is due tomorrow, not
-seven times at once.
+seven times at once. Repeats are at least a minute apart: "every 10
+seconds" is turned down with a message rather than set.
 
 ---
 
@@ -101,7 +102,8 @@ when it fires:
   setting you chose for a conversation at midnight.
 * **Talking over it dismisses it**, same as barge-in anywhere else.
 
-`/snooze` puts it back nine minutes; `/snooze 20` for twenty. `/alarm
+`/snooze` puts it back nine minutes; `/snooze 20` for twenty (up to a
+day, 1440). `/alarm
 off` stops it properly. A snoozed alarm is scheduled as a one-off, so
 snoozing a weekday alarm doesn't disturb tomorrow's.
 

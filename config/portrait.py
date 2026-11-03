@@ -4,7 +4,7 @@ Part of the config package (it was one config.py); see config/__init__.py.
 """
 import os
 
-from .base import BASE_DIR, setting
+from .base import BASE_DIR, flag, setting
 
 # The portrait window (portrait/, served by the live monitor at
 # /portrait/): a VRM model that blinks, looks around, twitches its ears
@@ -32,7 +32,7 @@ FRAMES = ("bust", "full")
 # Touching her portrait (portrait/touch.json): she reacts there at once,
 # and with touch_talk on she also answers out loud in one short line
 # (life/touches.py), at most once every touch_talk_cooldown seconds.
-PORTRAIT_TOUCH_TALK = bool(_portrait_cfg.get("touch_talk", True))
+PORTRAIT_TOUCH_TALK = flag(_portrait_cfg.get("touch_talk", True))
 PORTRAIT_TOUCH_TALK_COOLDOWN = float(_portrait_cfg.get("touch_talk_cooldown", 12))
 PORTRAIT_FRAME = str(_portrait_cfg.get("frame", "bust")).lower()
 # What's behind her: "" her usual dark gradient, "none" see-through, a colour
@@ -55,7 +55,7 @@ if PORTRAIT_FRAME not in FRAMES + ("face",):
 # tint), intensity, glitch (how often it tears), base (the projector glow).
 #   "hologram": { "enabled": true, "tint": "#c37bff", "mix": 0.8 }
 PORTRAIT_HOLOGRAM = dict(_portrait_cfg.get("hologram", {}) or {})
-PORTRAIT_HOLOGRAM_ENABLED = bool(PORTRAIT_HOLOGRAM.get("enabled", False))
+PORTRAIT_HOLOGRAM_ENABLED = flag(PORTRAIT_HOLOGRAM.get("enabled", False))
 # Light strips (portrait/viewer/lights.js): the LED paint on a robot model
 # glows and reacts. Needs a lights/ folder beside the model (portrait/lights.py
 # makes it). Off unless "enabled": true. color: "" follows her mood, "own"
@@ -63,11 +63,11 @@ PORTRAIT_HOLOGRAM_ENABLED = bool(PORTRAIT_HOLOGRAM.get("enabled", False))
 # (never on a tame stream either way). style: neon or plain.
 #   "lights": { "enabled": true, "color": "", "brightness": 1.0 }
 PORTRAIT_LIGHTS = dict(_portrait_cfg.get("lights", {}) or {})
-PORTRAIT_LIGHTS_ENABLED = bool(PORTRAIT_LIGHTS.get("enabled", False))
+PORTRAIT_LIGHTS_ENABLED = flag(PORTRAIT_LIGHTS.get("enabled", False))
 PORTRAIT_LIGHTS_COLOR = str(PORTRAIT_LIGHTS.get("color", "") or "").strip()
 PORTRAIT_LIGHTS_BRIGHTNESS = max(0.0, min(2.0, float(PORTRAIT_LIGHTS.get("brightness", 1.0))))
-PORTRAIT_LIGHTS_VOICE = bool(PORTRAIT_LIGHTS.get("voice", True))
-PORTRAIT_LIGHTS_PRIVATE = bool(PORTRAIT_LIGHTS.get("private", True))
+PORTRAIT_LIGHTS_VOICE = flag(PORTRAIT_LIGHTS.get("voice", True))
+PORTRAIT_LIGHTS_PRIVATE = flag(PORTRAIT_LIGHTS.get("private", True))
 PORTRAIT_LIGHTS_STYLE = "plain" if str(PORTRAIT_LIGHTS.get("style", "neon")).lower() == "plain" else "neon"
 # Gestures on a 3D model (life/gestures.py, portrait/viewer/gestures.js). How her
 # replies set them off: "keywords" (the default: actions she writes
@@ -77,7 +77,7 @@ PORTRAIT_LIGHTS_STYLE = "plain" if str(PORTRAIT_LIGHTS.get("style", "neon")).low
 # about her body changes how a small model talks. chat_gestures: viewers' !hug, hi, lol. meaning_margin: how far
 # a gesture must beat an ordinary reply in meaning mode.
 PORTRAIT_GESTURES = str(_portrait_cfg.get("gestures", "keywords"))
-PORTRAIT_CHAT_GESTURES = bool(_portrait_cfg.get("chat_gestures", True))
+PORTRAIT_CHAT_GESTURES = flag(_portrait_cfg.get("chat_gestures", True))
 PORTRAIT_MEANING_MARGIN = float(_portrait_cfg.get("meaning_margin", 0.04))
 # How the conversation changes her clothes on a model whose clothes come
 # off (life/clothes.py): "gestures" (the default: follows the setting
@@ -89,14 +89,14 @@ PORTRAIT_GESTURES_OFFERED = int(_portrait_cfg.get("gestures_offered", 8))
 # Little sounds with her gestures (portrait/sounds/, yours - not in git): a
 # gesture file names one, sound: 'touch-self'. No file there, no sound.
 # sound_volume 0-1.
-PORTRAIT_SOUNDS = bool(_portrait_cfg.get("sounds", True))
+PORTRAIT_SOUNDS = flag(_portrait_cfg.get("sounds", True))
 # Her morning coffee (life/coffee.py): once a day, between from and to (hours,
 # 24h clock), the first time you're around she picks up her mug, takes a
 # sip every few minutes, and puts it down after `minutes`. Each sip wakes
 # her up a little (energy, 0 for none).
 #   "coffee": { "enabled": true, "from": 5, "to": 11, "minutes": 40, "sip_minutes": 4, "wake": 0.03 }
 _coffee_cfg = dict(_portrait_cfg.get("coffee", {}) or {})
-PORTRAIT_COFFEE = bool(_coffee_cfg.get("enabled", True))
+PORTRAIT_COFFEE = flag(_coffee_cfg.get("enabled", True))
 PORTRAIT_COFFEE_FROM = int(_coffee_cfg.get("from", 5))
 PORTRAIT_COFFEE_TO = int(_coffee_cfg.get("to", 11))
 PORTRAIT_COFFEE_MINUTES = float(_coffee_cfg.get("minutes", 40))
@@ -107,7 +107,7 @@ PORTRAIT_COFFEE_WAKE = float(_coffee_cfg.get("wake", 0.03))
 # (or after `minutes`).
 #   "reading": { "enabled": true, "after": 10, "minutes": 60 }
 _reading_cfg = dict(_portrait_cfg.get("reading", {}) or {})
-PORTRAIT_READING = bool(_reading_cfg.get("enabled", True))
+PORTRAIT_READING = flag(_reading_cfg.get("enabled", True))
 PORTRAIT_READING_AFTER = max(1.0, float(_reading_cfg.get("after", 10)))
 PORTRAIT_READING_MINUTES = max(1.0, float(_reading_cfg.get("minutes", 60)))
 PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume", 0.8))))
@@ -120,7 +120,7 @@ PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume"
 # the brightness lift for dark pictures (per model, 1 = off).
 #   "fan": { "cast": true, "framing": "full", "fps": 15 }
 PORTRAIT_FAN = dict(_portrait_cfg.get("fan", {}) or {})
-PORTRAIT_FAN_CAST = bool(PORTRAIT_FAN.get("cast", False))
+PORTRAIT_FAN_CAST = flag(PORTRAIT_FAN.get("cast", False))
 PORTRAIT_LIVE2D = dict(_portrait_cfg.get("live2d", {}) or {})
 if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
     # Its three expressions, so moods show on her face out of the box.
@@ -129,13 +129,13 @@ if not PORTRAIT_LIVE2D and PORTRAIT_MODEL == _SIGEWINNE:
 # MCP servers whose tools she can use (core/mcpclient.py). Read at startup.
 #   "mcp": { "enabled": true, "servers": { "obs": {"command": "...", "args": [...]} } }
 _mcp_cfg = setting("mcp", {})
-MCP_ENABLED = bool(_mcp_cfg.get("enabled", True))
+MCP_ENABLED = flag(_mcp_cfg.get("enabled", True))
 MCP_SERVERS = dict(_mcp_cfg.get("servers", {}) or {})
 
 # The live monitor (web/livefeed.py): a page served by the assistant on
 # 127.0.0.1, showing each turn as it happens. Read at startup.
 #   "monitor": { "enabled": true, "port": 8792 }
 _monitor_cfg = setting("monitor", {})
-MONITOR_ENABLED = bool(_monitor_cfg.get("enabled", True))
+MONITOR_ENABLED = flag(_monitor_cfg.get("enabled", True))
 MONITOR_PORT = int(_monitor_cfg.get("port", 8792))
 

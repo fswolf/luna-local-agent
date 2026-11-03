@@ -16,6 +16,16 @@ from core.timewords import (
 # scanner and whoever is typing - can't read each other's setting.
 _MORNING = contextvars.ContextVar("morning", default=False)
 
+# The shortest repeat allowed. Each firing is a model call, a message and
+# speech, so "every second" is not a reminder, it is the screen filling up
+# with the same line until the app is closed.
+MIN_REPEAT_SECONDS = 60
+
+# What a stored repeat's "unit" may be. Anything else (a hand-edited file,
+# an older version) is read as minutes rather than crashing timedelta.
+_STEP_UNITS = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400,
+               "weeks": 604800, "months": 30 * 86400, "years": 365 * 86400}
+
 
 # ---------------------------------------------------------------------------
 # Parsing
@@ -212,13 +222,19 @@ def _add_months(moment, count):
 
 
 def _delta(amount, unit, reference):
-    if unit == "months":
-        return _add_months(reference, amount)
+    """reference moved on by amount units, or None when that lands past
+    the year 9999 (or isn't a number at all): "in 99999999 days" is a
+    phrase the caller should refuse, not an OverflowError."""
+    try:
+        if unit == "months":
+            return _add_months(reference, amount)
 
-    if unit == "years":
-        return _add_months(reference, amount * 12)
+        if unit == "years":
+            return _add_months(reference, amount * 12)
 
-    return reference + timedelta(**{unit: amount})
+        return reference + timedelta(**{unit: amount})
+    except (OverflowError, ValueError, TypeError):
+        return None
 
 
 # --- single points in time -------------------------------------------------
@@ -544,8 +560,9 @@ def _resolve_repeat(text, reference):
                 amount = (amount or 1) * 2
 
             if amount and amount > 0:
-                return _delta(amount, unit, reference), \
-                    {"amount": amount, "unit": unit}
+                due = _delta(amount, unit, reference)
+
+                return (due, {"amount": amount, "unit": unit}) if due else None
 
     grouped = _day_set_repeat(body, reference)
 
@@ -634,8 +651,36 @@ def parse_when(phrase, reference=None, morning=False):
             return repeated
 
         return _resolve_once(text, reference), None
+    except (OverflowError, ValueError):
+        # Past the year 9999, or a number datetime won't take. The same
+        # answer as a phrase that isn't a time: ask, don't crash.
+        return None, None
     finally:
         _MORNING.reset(token)
+
+
+def repeat_seconds(repeat):
+    """Roughly how far apart an interval repeat fires, in seconds, or
+    None for the wall-clock kinds (daily, weekly on a day, a day set)."""
+    if not repeat or not repeat.get("unit"):
+        return None
+
+    try:
+        amount = float(repeat.get("amount", 1))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+    if amount != amount:        # NaN
+        return None
+
+    return amount * _STEP_UNITS.get(repeat["unit"], 60)
+
+
+def too_frequent(repeat):
+    """True for an interval repeat closer together than MIN_REPEAT_SECONDS."""
+    seconds = repeat_seconds(repeat)
+
+    return seconds is not None and seconds < MIN_REPEAT_SECONDS
 
 
 def next_occurrence(repeat, reference=None, after=None):
@@ -656,40 +701,73 @@ def next_occurrence(repeat, reference=None, after=None):
     reference = reference or now()
     after = after or now()
 
-    result = _step(repeat, reference)
+    try:
+        result = _step(repeat, reference)
 
-    # Guard against a pathological repeat (a zero interval would spin).
-    for _ in range(4096):
-        if result > after:
-            break
+        # A long backlog of a short interval ("every minute", closed for a
+        # week) is skipped in one go: stepping it one at a time ran out of
+        # steps while still in the past, and each leftover fired again.
+        seconds = repeat_seconds(repeat)
 
-        stepped = _step(repeat, result)
+        if seconds and repeat.get("unit") not in ("months", "years") and result <= after:
+            step = timedelta(seconds=max(seconds, MIN_REPEAT_SECONDS))
+            behind = (after - result) // step + 1
+            result += step * behind
 
-        if stepped <= result:
-            return after + timedelta(minutes=1)
+        # Guard against a pathological repeat (a zero interval would spin).
+        for _ in range(4096):
+            if result > after:
+                break
 
-        result = stepped
+            stepped = _step(repeat, result)
+
+            if stepped <= result:
+                break
+
+            result = stepped
+    except (OverflowError, ValueError, TypeError, KeyError):
+        # Past the year 9999, or a stored repeat that makes no sense.
+        return None
+
+    # Never a time already gone: that would be due again the moment it
+    # was set, and delivered again, and again.
+    if result <= after:
+        return after + timedelta(minutes=1)
 
     return result
 
 
 def _step(repeat, reference):
+    # Stored repeats can be hand-edited, so each field is read defensively:
+    # a weekday of 7 or "x", an amount of "abc" or 1e30, an unknown unit.
     if repeat.get("days"):
-        hour, minute = _hm(repeat.get("at", "09:00")) or (9, 0)
+        hour, minute = _hm(str(repeat.get("at", "09:00"))) or (9, 0)
+        days = [int(d) % 7 for d in repeat["days"] if str(d).lstrip("-").isdigit()] or [0]
 
-        return next_in_days(reference, repeat["days"], hour, minute,
-                            force_next=True)
+        return next_in_days(reference, days, hour, minute, force_next=True)
 
     if repeat.get("weekday") is not None:
-        hour, minute = _hm(repeat.get("at", "09:00")) or (9, 0)
+        hour, minute = _hm(str(repeat.get("at", "09:00"))) or (9, 0)
 
-        return next_weekday(reference, repeat["weekday"], hour, minute,
+        return next_weekday(reference, int(repeat["weekday"]) % 7, hour, minute,
                             force_next=True)
 
     if repeat.get("unit"):
-        return _delta(float(repeat["amount"]), repeat["unit"], reference)
+        unit = repeat["unit"] if repeat["unit"] in _STEP_UNITS else "minutes"
+        amount = float(repeat.get("amount", 1))
 
-    hour, minute = _hm(repeat.get("at", "09:00")) or (9, 0)
+        if unit not in ("months", "years"):
+            # Never closer than a minute, whatever the file says.
+            amount = max(amount, MIN_REPEAT_SECONDS / _STEP_UNITS[unit])
+
+        due = _delta(amount, unit, reference)
+
+        if due is None:
+            raise OverflowError("the next time is out of range")
+
+        return due
+
+    hour, minute = _hm(str(repeat.get("at", "09:00"))) or (9, 0)
     due = _at_wall_clock(reference, hour, minute)
 
     while due <= reference:

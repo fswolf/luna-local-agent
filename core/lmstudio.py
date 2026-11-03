@@ -64,7 +64,7 @@ def probe(timeout=5):
         ids = [m.get("id", "") for m in data.get("data") or []]
         loaded = ids[0] if ids else ""
     except Exception as e:
-        _set(False, str(e))
+        _set(False, _short(e))
 
         return ""
 
@@ -117,9 +117,25 @@ def _set(reachable, why="", loaded=None):
             pass
 
 
+def _short(error):
+    """What the Model row says when the server is down. requests' own
+    text is a paragraph ("HTTPConnectionPool(host=...): Max retries
+    exceeded with url ... NewConnectionError(...)") that buries the one
+    fact worth reading in a header."""
+    if isinstance(error, requests.exceptions.ConnectionError) and not isinstance(
+            error, requests.exceptions.Timeout):
+        return f"nothing answering at {MODELS_URL.rsplit('/v1', 1)[0]}"
+    if isinstance(error, requests.exceptions.Timeout):
+        return "timed out"
+    if isinstance(error, requests.exceptions.HTTPError) and error.response is not None:
+        return f"HTTP {error.response.status_code}"
+    text = str(error) or type(error).__name__
+    return text if len(text) <= 120 else text[:117] + "..."
+
+
 def mark_failed(why):
     """Called when a request fails mid-conversation."""
-    _set(False, str(why)[:120])
+    _set(False, _short(why) if isinstance(why, BaseException) else str(why)[:120])
 
 
 def mark_worked():
@@ -146,7 +162,10 @@ def watch(interval=20):
     """
     def loop():
         while True:
-            probe(timeout=4)
+            try:
+                probe(timeout=4)
+            except Exception:
+                pass    # probe() reports its own failures; this only keeps the loop alive
             threading.Event().wait(interval)
 
     threading.Thread(target=loop, daemon=True).start()

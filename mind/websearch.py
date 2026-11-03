@@ -1,6 +1,7 @@
 import re
 
 import config
+from core import logbook
 
 _TRIGGER_PATTERN = re.compile(r"\bweb[\s\-_]*search\b", re.IGNORECASE)
 
@@ -33,17 +34,20 @@ def search(query: str, max_results: int = None) -> list:
     """
     max_results = max_results or config.WEB_SEARCH_MAX_RESULTS
 
+    # print() here painted over the screen; the log has it, and the one
+    # thing you can fix yourself is said once in the conversation.
     try:
         from ddgs import DDGS
     except ImportError:
-        print("[websearch] `ddgs` isn't installed - run: pip install ddgs")
+        logbook.warn("websearch", "ddgs isn't installed")
+        logbook.tell("Web search needs the ddgs package: pip install ddgs")
         return []
 
     try:
         with DDGS() as ddgs:
             return list(ddgs.text(query, max_results=max_results))
     except Exception as e:
-        print(f"[websearch] search failed: {e}")
+        logbook.warn("websearch", "search failed: %s", e)
         return []
 
 

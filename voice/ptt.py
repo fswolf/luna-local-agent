@@ -14,8 +14,8 @@ import threading
 import time
 
 import config
-from core import interrupts
-from voice import speech
+from core import interrupts, logbook, safe
+from voice import playback, speech
 import ui
 from voice import wakeword
 
@@ -122,42 +122,89 @@ def _hands_free_loop(model):
     # question doesn't need saying it again. Without one, every turn
     # starts on speech, which is what open mode always did.
     follow_up_until = 0.0
+    failures = 0
 
-    while _hands_free:
-        if wakeword.available() and time.monotonic() > follow_up_until:
-            if not speech.wait_for_wake_word(lambda: not _hands_free):
-                break
+    try:
+        while _hands_free:
+            mic_failed = False
+
+            if wakeword.available() and time.monotonic() > follow_up_until:
+                heard = speech.wait_for_wake_word(lambda: not _hands_free)
+
+                if heard is None:           # the mic didn't open, or died
+                    mic_failed = True
+                elif not heard or not _hands_free:
+                    break
+                else:
+                    _pause(safe.seconds(wakeword.cooldown_seconds(), 1.0, hi=60))
+
+            if not mic_failed:
+                playback.clear_mic_error()
+                try:
+                    # Once the wake word has armed it, a silent turn should
+                    # time out rather than wait forever - it was probably the
+                    # television. Without a wake word, waiting is the point.
+                    with interrupts.using(kind="voice") as stop:
+                        spoke = assistant_task(
+                            model, "auto" if wakeword.available() else "open"
+                        )
+                except Exception as e:
+                    ui.add_message("system", f"Listening stopped: {e}")
+                    break
+
+                # The turn swallows its own errors, so ask the mic layer
+                # whether it was the microphone that failed. A turn she
+                # answered heard you, whatever barge-in's own mic did.
+                mic_failed = not spoke and bool(playback.mic_error())
 
             if not _hands_free:
                 break
 
-            time.sleep(wakeword.cooldown_seconds())
+            # A dead mic used to go round this loop every half second for
+            # ever, a message and a traceback each time. Back off, and
+            # after a few in a row stop and say so once.
+            if mic_failed:
+                failures += 1
+                if failures >= MIC_FAILURES_TO_STOP:
+                    ui.add_message(
+                        "system",
+                        f"Hands-free stopped: the microphone isn't available "
+                        f"({playback.mic_error() or 'it would not open'}). "
+                        "Press HOME to try again.",
+                    )
+                    break
+                _pause(min(30.0, 2.0 ** failures))
+                continue
 
-        try:
-            # Once the wake word has armed it, a silent turn should
-            # time out rather than wait forever - it was probably the
-            # television. Without a wake word, waiting is the point.
-            with interrupts.using(kind="voice") as stop:
-                spoke = assistant_task(
-                    model, "auto" if wakeword.available() else "open"
-                )
-        except Exception as e:
-            ui.add_message("system", f"Listening stopped: {e}")
-            break
+            failures = 0
 
-        if not _hands_free:
-            break
+            # Only hold the door open if she actually answered something.
+            follow_up_until = (
+                time.monotonic() + safe.seconds(config.WAKE_WORD_FOLLOW_UP_SECONDS, 0)
+                if spoke else 0.0
+            )
 
-        # Only hold the door open if she actually answered something.
-        follow_up_until = (
-            time.monotonic() + config.WAKE_WORD_FOLLOW_UP_SECONDS
-            if spoke else 0.0
-        )
+            if not stop.barged_in:
+                _pause(safe.seconds(config.STT_SETTLE_SECONDS, 0.6, hi=60))
+    except Exception:
+        # A thread that dies here would leave open mode "on" with nothing
+        # listening; log it and switch hands-free off properly instead.
+        logbook.exception("ptt", "hands-free loop failed")
+        logbook.tell("Hands-free listening stopped after an error. Press HOME to start it again.")
+    finally:
+        stop_hands_free()
 
-        if not stop.barged_in:
-            time.sleep(config.STT_SETTLE_SECONDS)
 
-    stop_hands_free()
+# Mic failures in a row before hands-free gives up rather than retrying.
+MIC_FAILURES_TO_STOP = 3
+
+
+def _pause(seconds):
+    """Sleep, but wake early when hands-free is switched off."""
+    until = time.monotonic() + seconds
+
+    while _hands_free and time.monotonic() < until:
+        time.sleep(min(0.2, max(0.0, until - time.monotonic())))
 
 
 def start_hands_free(model):

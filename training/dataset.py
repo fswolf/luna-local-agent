@@ -106,19 +106,45 @@ def keep(source="good", reply=None, kind="habit"):
 
 
 def _read():
-    """Every row. Caller holds _lock."""
+    """Every row. Caller holds _lock.
+
+    A line that isn't an example (cut short by a crash mid-write, a typo
+    from editing it by hand) comes back as its own text: it's skipped by
+    everything that reads examples, said once in the log, and written back
+    as it was by _rewrite, so one bad line neither hides every other
+    example nor gets thrown away before you can look at it."""
+    rows, bad = [], 0
     try:
         with open(FILE, encoding="utf-8") as f:
-            return [json.loads(line) for line in f if line.strip()]
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    row = None
+                if isinstance(row, dict):
+                    rows.append(row)
+                else:
+                    rows.append(line.rstrip("\n"))
+                    bad += 1
     except FileNotFoundError:
         return []
+    if bad:
+        try:
+            from core import logbook
+
+            logbook.warn("dataset", "%d line(s) of %s aren't examples: skipped, and kept as they are", bad, FILE)
+        except Exception:
+            pass
+    return rows
 
 
 def examples(kind=None):
     """Every example, oldest first (optionally one kind)."""
     with _lock:
         rows = _read()
-    return [r for r in rows if kind is None or r.get("kind") == kind]
+    return [r for r in rows if isinstance(r, dict) and (kind is None or r.get("kind") == kind)]
 
 
 def _rewrite(rows):
@@ -127,7 +153,7 @@ def _rewrite(rows):
     tmp = FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            f.write((r if isinstance(r, str) else json.dumps(r, ensure_ascii=False)) + "\n")
     os.replace(tmp, FILE)
 
 
@@ -139,11 +165,11 @@ def update(example_id, **changes):
     with _lock:
         rows = _read()
         for r in rows:
-            if r.get("id") == example_id:
+            if isinstance(r, dict) and r.get("id") == example_id:
                 if "reply" in allowed:
                     allowed["reply"] = str(allowed["reply"]).strip()
-                    if allowed["reply"] != r["reply"]:
-                        r["original"] = r.get("original") or r["reply"]
+                    if allowed["reply"] != r.get("reply"):
+                        r["original"] = r.get("original") or r.get("reply")
                 r.update(allowed)
                 _rewrite(rows)
                 return True
@@ -154,7 +180,7 @@ def remove(example_id):
     """Delete an example for good. False if there's no such id."""
     with _lock:
         rows = _read()
-        kept = [r for r in rows if r.get("id") != example_id]
+        kept = [r for r in rows if not (isinstance(r, dict) and r.get("id") == example_id)]
         if len(kept) == len(rows):
             return False
         _rewrite(kept)

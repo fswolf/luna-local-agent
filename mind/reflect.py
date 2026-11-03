@@ -36,11 +36,47 @@ import requests
 import config
 from core import logbook
 from core import interrupts
+from core import safe
 from mind import notebook
 
 START = (getattr(config, "STARTED", None) or datetime.now()).replace(microsecond=0)
 _activity = {"last": time.monotonic(), "turns": 0}
 _running = threading.Lock()   # one job batch at a time
+
+
+# ---------------------------------------------------------------------------
+# Backoff for the background jobs
+#
+# The idle loop runs every two minutes. A job whose model call failed (the
+# server down, a 400) used to be retried on every one of them; now it rests
+# for an hour. /reflect ignores this - asking is asking.
+# ---------------------------------------------------------------------------
+BACKOFF_SECONDS = 3600
+_failed = {}            # job name -> time.monotonic() of its last failure
+
+
+def _job_failed(name):
+    _failed[name] = time.monotonic()
+
+
+def _job_ok(name):
+    _failed.pop(name, None)
+
+
+def _resting(name):
+    at = _failed.get(name)
+    return at is not None and time.monotonic() - at < BACKOFF_SECONDS
+
+
+# A game she can't put a feeling into words for (an empty reply, a
+# thinking model that spent its whole budget) is asked about this many
+# times per run of the app, not every two minutes for ever.
+FEELING_TRIES = 3
+_feeling_tries = {}
+
+
+def _idle_minutes():
+    return safe.whole(getattr(config, "SELF_IDLE_MINUTES", 30), 30, lo=1, hi=7 * 24 * 60)
 
 
 def touch():
@@ -194,8 +230,9 @@ def summarize_episodes(model, report=None, backlog=3):
     if not getattr(config, "SELF_EPISODES", True):
         return []
 
-    gap = timedelta(minutes=int(getattr(config, "SELF_IDLE_MINUTES", 30)))
-    since = notebook.get("episode_end", "")
+    gap = timedelta(minutes=_idle_minutes())
+    # strict: a locked db must not read as "never summarised" and redo them
+    since = notebook.get("episode_end", "", strict=True)
     now = datetime.now()
     entries = sorted((e for e in _transcript() if str(e.get("at", "")) > since),
                      key=lambda e: str(e.get("at", "")))
@@ -233,7 +270,10 @@ def summarize_episodes(model, report=None, backlog=3):
             summary = _ask(_model(model), prompt, think=0, max_tokens=300)
         except Exception as e:
             logbook.warn("reflect", "episode summary failed: %s", e)
-            break  # try again next time, from the same place
+            _job_failed("episodes")
+            break  # try again later, from the same place
+
+        _job_ok("episodes")
 
         summary = _short(summary, 900)
 
@@ -295,7 +335,9 @@ def feel_about_games(model, report=None, limit=2):
     if not getattr(config, "SELF_EPISODES", True):
         return []
     written = []
-    for game, title, notes in notebook.played_without_feeling()[:limit]:
+    games = [g for g in notebook.played_without_feeling()
+             if _feeling_tries.get(g[0], 0) < FEELING_TRIES]
+    for game, title, notes in games[:limit]:
         prompt = (
             f"These are your own notes on playing {title}:\n\n{notes}\n\n"
             f"Write one line: \"Feeling:\" and one short first-person sentence on how you feel about "
@@ -308,7 +350,12 @@ def feel_about_games(model, report=None, limit=2):
             feeling = feeling or re.split(r"(?<=[.!?])\s", rest, maxsplit=1)[0]
         except Exception as e:
             logbook.warn("reflect", "game feeling failed: %s", e)
+            _job_failed("games")
             break
+        _job_ok("games")
+        if not feeling:
+            _feeling_tries[game] = _feeling_tries.get(game, 0) + 1
+            logbook.info("reflect", "no feeling about %s (try %d)", title, _feeling_tries[game])
         if feeling:
             notebook.set_game_feeling(game, title, feeling)
             written.append(feeling)
@@ -357,7 +404,10 @@ def summarize_play(model, report=None):
             reply = _ask(_model(model), prompt, think=0, max_tokens=360)
         except Exception as e:
             logbook.warn("reflect", "play summary failed: %s", e)
-            break  # the same session again next time
+            _job_failed("play")
+            break  # the same session again later
+
+        _job_ok("play")
 
         notes, feeling, verdict = _play_notes(reply)
         summary = _short(" ".join(x for x in (notes, feeling) if x), 900)
@@ -445,7 +495,7 @@ def dream(model, report=None):
 
     from mind import thoughtlog
 
-    since = notebook.get("dream_at") or (datetime.now() - timedelta(days=7)).isoformat()
+    since = notebook.get("dream_at", strict=True) or (datetime.now() - timedelta(days=7)).isoformat()
     rows = [r for r in thoughtlog.rows(limit=400) if r["timestamp"] > since]
     picked = _worth_a_look(rows)
     notebook.put("dream_at", datetime.now().isoformat(timespec="seconds"))
@@ -604,9 +654,11 @@ def tidy_facts(model, report=None, limit=6):
         return []
 
     facts = sorted(factstore.rows(limit=1000), key=lambda r: r[0])  # oldest first
-    done = list(notebook.get("tidy_done", []))
+    # strict: on a db error, stop here - an empty list read back by mistake
+    # would be saved over the real one at the end
+    done = list(notebook.get("tidy_done", [], strict=True) or [])
     seen = set(done)
-    since_id = int(notebook.get("tidy_seen", 0) or 0)
+    since_id = safe.whole(notebook.get("tidy_seen", 0, strict=True), 0, lo=0)
     touched = set()  # changed this pass - its other pairs wait for next time
     changes = []
     asked = 0
@@ -731,7 +783,7 @@ def _dream_due():
     try:
         if failed and datetime.now() - datetime.fromisoformat(failed) < timedelta(hours=1):
             return False  # the server was down - don't retry every two minutes
-    except ValueError:
+    except (ValueError, TypeError):
         pass
 
     last = notebook.get("dream_at")
@@ -739,11 +791,12 @@ def _dream_due():
     if not last:
         return True
 
-    try:
-        hours = float(getattr(config, "SELF_REFLECT_HOURS", 20))
+    # Clamped: a hand-edited 1e999 made timedelta() overflow every two minutes
+    hours = safe.number(getattr(config, "SELF_REFLECT_HOURS", 20), 20, lo=0, hi=24 * 365)
 
+    try:
         return datetime.now() - datetime.fromisoformat(last) >= timedelta(hours=hours)
-    except ValueError:
+    except (ValueError, TypeError):
         return True
 
 
@@ -779,7 +832,7 @@ def greet(model):
     except ValueError:
         return
 
-    if away < timedelta(minutes=int(getattr(config, "SELF_IDLE_MINUTES", 30))) \
+    if away < timedelta(minutes=_idle_minutes()) \
             or away > timedelta(days=30):
         return
 
@@ -944,9 +997,12 @@ def _loop(model, show):
 
         try:
             with _running:
-                summarize_episodes(model)
-                summarize_play(model)
-                feel_about_games(model)
+                if not _resting("episodes"):
+                    summarize_episodes(model)
+                if not _resting("play"):
+                    summarize_play(model)
+                if not _resting("games"):
+                    feel_about_games(model)
 
                 if idle_seconds() >= 600 and _dream_due():
                     dream(model, report=_shout(show))

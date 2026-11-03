@@ -5,7 +5,7 @@ Part of the config package (it was one config.py); see config/__init__.py.
 """
 import os
 
-from .base import setting
+from .base import flag, setting
 from .abilities import _desktop_cfg
 
 # Email (tools/mail.py). The login is in ~/.config/ai-voice/email.json,
@@ -13,12 +13,12 @@ from .abilities import _desktop_cfg
 # until you say so, and even then every message asks.
 #   "email": { "enabled": true, "send": false, "max": 20 }
 _email_cfg = setting("email", {})
-EMAIL_ENABLED = bool(_email_cfg.get("enabled", True))
-EMAIL_SEND = bool(_email_cfg.get("send", False))
+EMAIL_ENABLED = flag(_email_cfg.get("enabled", True))
+EMAIL_SEND = flag(_email_cfg.get("send", False))
 EMAIL_MAX = int(_email_cfg.get("max", 20))   # most messages one check or search returns
 
 _files_cfg = setting("files", {})
-FILES_ENABLED = bool(_files_cfg.get("enabled", True))
+FILES_ENABLED = flag(_files_cfg.get("enabled", True))
 FILES_APPROVAL_TIMEOUT = float(_files_cfg.get("approval_timeout", 120))
 # The Permissions group in the tools pane. read: allow | ask | off,
 # write: ask | allow | off. "allow" for write is the saved form of the
@@ -43,5 +43,5 @@ FILES_JOB_WRITE_DIRS = [os.path.expanduser(str(p)) for p in
 # you last copied - a password, an API key - can land in the model's
 # context and from there in history on disk. On by default, but it is
 # the one here worth knowing is a switch.
-DESKTOP_CLIPBOARD = bool(_desktop_cfg.get("clipboard", True))
+DESKTOP_CLIPBOARD = flag(_desktop_cfg.get("clipboard", True))
 

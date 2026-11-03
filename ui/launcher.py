@@ -82,8 +82,9 @@ def launch(index=None):
 
             add_message("system", f"Couldn't open {address}: {e}")
         return
-    if view.on_submit:
-        view.on_submit(command)
+    from .app import submit
+
+    submit(command)
 
 
 def fragments():

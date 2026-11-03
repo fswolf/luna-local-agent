@@ -138,6 +138,9 @@ def _new(side=None):
 
 
 def _load():
+    """True if the saved game came back. A save that's there but can't be
+    read is moved aside (game.json.bad) rather than written over by the
+    new game, and _g["error"] says so."""
     try:
         with open(GAME_FILE, encoding="utf-8") as f:
             data = json.load(f)
@@ -148,7 +151,15 @@ def _load():
                   said=list(data.get("said", []))[-60:], result=data.get("result") or None,
                   started=data.get("started", ""), reacted=True, fails=0, stalled=False)
         return True
-    except (OSError, ValueError, KeyError, TypeError):
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+        logbook.warn(NAME, "couldn't read %s: %s", GAME_FILE, e)
+        try:
+            os.replace(GAME_FILE, GAME_FILE + ".bad")
+            _g["error"] = f"the saved game couldn't be read ({e}); it's kept as {GAME_FILE}.bad"
+        except OSError:
+            _g["error"] = f"the saved game couldn't be read ({e})"
         return False
 
 
@@ -457,18 +468,20 @@ def _step():
     allowed = ["chess_board"] if react else ["chess_board", "chess_move"]
 
     # Thinking from here, so a take-back can't slip in during the pause
-    # and leave her answering a position that's gone.
-    _g["thinking"] = not react
-    _emit()
-    if not react:
-        _loop.wait(float(s["think_seconds"] or 0))
-    prompt = (REACT_PROMPT if react else STEP_PROMPT).format(game=describe(), result=_ended())
+    # and leave her answering a position that's gone. Inside the try, so
+    # a pause that fails can't leave "thinking" on (and undo refused) for good.
     _turn.update(active=True, moved=False)
     exchanges = []
     try:
+        _g["thinking"] = not react
+        _emit()
+        if not react:
+            _loop.wait(_game.seconds(s["think_seconds"], DEFAULTS["think_seconds"], hi=60))
+        prompt = (REACT_PROMPT if react else STEP_PROMPT).format(game=describe(), result=_ended())
         answer = assistant.respond_to_job(prompt, _g["model"], "chess", allowed, speak=bool(s["speak"]),
                                           max_rounds=1 if react else 4, exchanges=exchanges,
-                                          time_limit=float(s["turn_seconds"] or 0) or None) or ""
+                                          time_limit=_game.turn_limit(s["turn_seconds"],
+                                                                      DEFAULTS["turn_seconds"])) or ""
     finally:
         _turn["active"] = False
         _g["thinking"] = False
@@ -504,7 +517,15 @@ def _due():
 
 # No waiting for quiet: she moves as soon as you have. The session ends
 # when a game does (_step), not when she stops between moves.
-_loop = _game.Loop(NAME, _g, _step, playing=_due, ends_session=False)
+def _stall():
+    """The loop gave up after failed turns: wait for /chess nudge."""
+    with _lock:
+        _g["stalled"] = True
+
+
+# Failed turns (the model not answering) count too: after a few, she's
+# stalled like a turn without a move, and /chess nudge tries again.
+_loop = _game.Loop(NAME, _g, _step, playing=_due, ends_session=False, pause=_stall, title="Chess")
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +657,7 @@ def start(model):
         return False, problem
     if _on:
         return True, "chess: already set up"
-    _g["model"] = model
+    _g.update(model=model, error="")
     with _lock:
         resumed = _load()
         if not resumed:
@@ -645,7 +666,8 @@ def start(model):
     _loop.start()
     _loop.wake()
     opened = _open_board() if settings()["open"] else f"The board: {board_url()}"
-    return True, ("chess: " + ("carrying on the saved game. " if resumed else "new game - you're "
+    bad = f" ({_g['error']})" if _g["error"] and not resumed else ""
+    return True, ("chess: " + ("carrying on the saved game. " if resumed else f"new game{bad} - you're "
                                f"{_color_name(not _g['luna'])}. ") + opened)
 
 

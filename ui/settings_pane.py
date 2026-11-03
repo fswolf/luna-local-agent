@@ -557,7 +557,7 @@ def reset():
 
     try:
         removed = config.reset_setting(path)
-    except OSError as e:
+    except (OSError, ValueError) as e:
         return _status(f"  couldn't write config.json: {e}")
 
     _status(f"  {path}: back to the default after a restart" if removed

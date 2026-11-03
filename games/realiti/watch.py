@@ -85,7 +85,9 @@ def main():
                 continue
             time.sleep(0.3)
             if os.path.exists(PATH) and os.path.getsize(PATH) < f.tell():
-                f.seek(0)     # trimmed or started over: from the top of what's left
+                # Trimmed or started over: carry on from the end. From the
+                # top re-printed the whole kept part, thousands of lines.
+                f.seek(0, 2)
 
 
 if __name__ == "__main__":

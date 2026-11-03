@@ -13,6 +13,11 @@ from . import tool
 # ---------------------------------------------------------------------------
 # Reminders
 # ---------------------------------------------------------------------------
+# Each firing is a model call, a message and speech, so "every second"
+# would fill the screen until the app was closed.
+_TOO_OFTEN = ("Error: repeats have to be at least a minute apart, so nothing was "
+              "scheduled. Tell the user, and ask how often they actually want it.")
+
 # One tool, one free-text field. This used to be two tools - one taking
 # minutes, one taking a clock time - because small models fill in a
 # polymorphic schema badly. That is still true, but the fix was the
@@ -50,6 +55,9 @@ def _set_reminder(text, when):
             f"Couldn't read {when!r} as a time, so nothing was scheduled. "
             "Ask the user when they want it - do not guess a time."
         )
+
+    if timeutil.too_frequent(repeat):
+        return _TOO_OFTEN
 
     return "Scheduled: " + reminders.describe(reminders.add(text, due, repeat))
 
@@ -92,6 +100,9 @@ def _set_alarm(text, when):
             "Ask the user when they want waking - do not guess a time."
         )
 
+    if timeutil.too_frequent(repeat):
+        return _TOO_OFTEN
+
     return "Alarm set: " + reminders.describe(
         reminders.add(text, due, repeat, kind="alarm")
     )
@@ -124,9 +135,14 @@ def _list_reminders():
     required=("number",),
 )
 def _cancel_reminder(number):
-    removed = reminders.cancel(int(number))
+    try:
+        number = int(number)
+    except (TypeError, ValueError, OverflowError):
+        return f"Error: {number!r} isn't a number from list_reminders."
+
+    removed = reminders.cancel(number)
 
     if removed is None:
         return "No reminder with that number."
 
-    return f"Cancelled: {removed['text']}"
+    return f"Cancelled: {removed.get('text', '?')}"

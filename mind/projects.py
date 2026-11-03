@@ -34,6 +34,7 @@ from datetime import datetime
 
 import config
 from core import logbook
+from core import safe
 
 DB_FILE = os.path.join(config.BASE_DIR, "agent", "projects.db")
 
@@ -259,7 +260,7 @@ def prompt_block(query=""):
     if not active and not paused:
         return ""
 
-    limit = int(getattr(config, "SELF_PROJECTS_IN_PROMPT", 3))
+    limit = safe.whole(getattr(config, "SELF_PROJECTS_IN_PROMPT", 3), 3, lo=0, hi=100)
 
     if len(active) > limit:
         ranked = sorted(active, key=lambda p: (_relevance(query, p), p["updated"]), reverse=True)

@@ -464,7 +464,7 @@ def grab(device=None):
     data = jpeg.tobytes()
 
     if float(frame.mean()) < 8:
-        logbook.info("camera", "frame from %d is nearly black", device)
+        logbook.info("camera", "frame from %s is nearly black", device)   # %s: a /dev path is a string
 
     last_error = ""
     return data, f"camera {device}, {w}x{h}, {len(data) // 1024}KB"

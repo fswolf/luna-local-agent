@@ -8,6 +8,7 @@ import threading
 import time
 import config
 from core import logbook
+from core import safe
 from mind.mood.core import S, _extra, _grudging, _intensity, _lock, _settle, _warm_enough
 from mind.mood.files import moods
 from mind.mood import appraise, drift, show, walkaway
@@ -29,6 +30,15 @@ HOSTILE_HIT = 0.27                 # warmth, on top of the exchange's own -0.08
 
 
 def _apply_exchange(said, answer, model):
+    """On its own thread, once per turn: anything that goes wrong here goes
+    to the log. Uncaught, it printed a traceback over the screen every turn."""
+    try:
+        _apply(said, answer, model)
+    except Exception:
+        logbook.exception("mood", "reading the exchange failed")
+
+
+def _apply(said, answer, model):
 
     rating, energy, warmth, feeling, flirt = appraise._appraise(said, answer, model)
 
@@ -81,7 +91,9 @@ def _layers(rating, warmth, flirt):
         with _lock:
             cool = S.warmth < moods()["warmth"]["edges"][0]
             if cool or _grudging():
-                minutes = float(_extra("grudge").get("minutes", 20))
+                # moods.json is hand-edited: "20m" or 1e999 here must not
+                # become an endless grudge or a crash
+                minutes = safe.number(_extra("grudge").get("minutes"), 20, lo=0, hi=24 * 60)
                 started = not _grudging()
                 S.grudge_until = time.time() + minutes * 60
                 _settle()
@@ -132,7 +144,7 @@ def _compliment(rating, feeling):
     spec = moods().get("compliment") or {}
     name = show._emote(spec.get("emote"))
 
-    if not name or rating < int(spec.get("rating", 2)):
+    if not name or rating < safe.number(spec.get("rating"), 2):
         return
 
     if feeling and ((moods().get("feelings") or {}).get(feeling) or {}).get("emote"):
@@ -153,7 +165,7 @@ def _feel(feeling):
     nudge = list(spec.get("nudge") or [0, 0]) + [0, 0]
 
     if nudge[0] or nudge[1]:
-        drift._nudge(float(nudge[0]), float(nudge[1]))
+        drift._nudge(safe.number(nudge[0], 0), safe.number(nudge[1], 0))
 
     if not config.MOOD_ENABLED:
         return
@@ -166,11 +178,11 @@ def _feel(feeling):
     try:
         from web import livefeed
 
-        face = {f: round(float(v) * k, 3) for f, v in (spec.get("face") or {}).items()} \
+        face = {f: round(safe.number(v, 0) * k, 3) for f, v in (spec.get("face") or {}).items()} \
             if getattr(config, "MOOD_FACE", True) else {}
         gesture = spec.get("gesture") if getattr(config, "MOOD_GESTURES", True) else None
         livefeed.emit("feeling", name=feeling, face=face, gesture=gesture or "",
-                      emote=show._emote(spec.get("emote")), seconds=float(spec.get("seconds", 6)))
+                      emote=show._emote(spec.get("emote")), seconds=safe.number(spec.get("seconds"), 6, 0, 3600))
     except Exception:
         pass
 
