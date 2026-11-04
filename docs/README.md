@@ -70,7 +70,7 @@ Everything the README only touches on, one subject per page.
 
 - Local speech recognition with Silero voice detection
 - Local language model with tool calling
-- Local text-to-speech via a shared Kokoro server
+- Local text-to-speech via a shared Kokoro server, or ElevenLabs voices if you'd rather ([install](install.md#or-elevenlabs))
 - Streaming replies: she talks while she's still thinking
 - Barge-in: interrupt her mid-sentence
 - Optional wake word, so open mode needs no keypress

@@ -53,8 +53,19 @@ TTS_PLAYER = str(_tts_cfg.get("player", "auto")).lower()
 TTS_STRIP_TILDE = bool(_tts_cfg.get("strip_tilde", True))
 VOICE = _tts_env("VOICE", setting("voice", "af_bella"))
 
+# Where her voice comes from: "kokoro" is the speech server at tts.url
+# (kokoro-reader, or anything speaking the same three endpoints);
+# "elevenlabs" is ElevenLabs' cloud voices (voice/elevenlabs.py), with its
+# own block below and the key in ~/.config/ai-voice/elevenlabs.json.
+TTS_PROVIDER = str(_tts_cfg.get("provider", "kokoro") or "kokoro").strip().lower()
+_eleven_cfg = _tts_cfg.get("elevenlabs") if isinstance(_tts_cfg.get("elevenlabs"), dict) else {}
+ELEVENLABS_VOICE_ID = str(_eleven_cfg.get("voice_id", "") or "")
+ELEVENLABS_MODEL = str(_eleven_cfg.get("model", "eleven_flash_v2_5") or "eleven_flash_v2_5")
+ELEVENLABS_STABILITY = _eleven_cfg.get("stability")      # None: the voice's own setting
+ELEVENLABS_SIMILARITY = _eleven_cfg.get("similarity_boost")
+
 # Shown on the UI's TTS line.
-TTS_ADDRESS = urlparse(TTS_URL).netloc or TTS_URL
+TTS_ADDRESS = "ElevenLabs" if TTS_PROVIDER == "elevenlabs" else (urlparse(TTS_URL).netloc or TTS_URL)
 
 # Old names, kept so nothing outside this file has to change at once.
 KOKORO_URL, KOKORO_SPEED = TTS_URL, TTS_SPEED

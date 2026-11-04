@@ -12,7 +12,7 @@ and what happens if you leave it out. Details and downloads are in
 | **Embedding model** (Qwen3-Embedding-0.6B) | Matching by meaning: recalling facts, searching your notes, picking which tools go along each turn, meaning-mode gestures | GPU by default, or CPU | about 0.7 GB | she matches by shared words instead; tool routing sends every tool that's on |
 | **Reranker** (Qwen3-Reranker-0.6B) | A closer second read of the best matches, so recall picks what answers you, not just what's on topic | GPU by default, or CPU | under 1 GB | recall uses the embedding's order as it is |
 | **Whisper** (speech to text) | Her hearing | CPU, inside Luna | system RAM, none on the GPU | you type instead of talk |
-| **Kokoro** (text to speech) | Her voice, a separate server (kokoro-reader) | GPU with PyTorch for NVIDIA or AMD, otherwise CPU | small, under about 1 GB | she answers on screen only |
+| **Kokoro** (text to speech) | Her voice, a separate server (kokoro-reader). Or ElevenLabs' cloud voices instead ([Install](install.md#or-elevenlabs)) | GPU with PyTorch for NVIDIA or AMD, otherwise CPU | small, under about 1 GB | she answers on screen only |
 
 ## Turning parts off, or moving them
 

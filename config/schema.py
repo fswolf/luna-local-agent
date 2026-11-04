@@ -64,6 +64,12 @@ SCHEMA = {
 
     # --- Speaking -----------------------------------------------------------
     "tts.url": ("text", "Address of the speech server (kokoro-reader) that turns her words into sound"),
+    "tts.provider": ("choice", "Where her voice comes from: kokoro (the speech server at tts.url, at home) or elevenlabs (ElevenLabs' cloud voices; what she says is sent to them)",
+                     ("kokoro", "elevenlabs")),
+    "tts.elevenlabs.voice_id": ("text", "The ElevenLabs voice she uses (/voice lists yours and /voice <name> picks one)"),
+    "tts.elevenlabs.model": ("text", "The ElevenLabs model: eleven_flash_v2_5 is the quick one, eleven_multilingual_v2 the richer one"),
+    "tts.elevenlabs.stability": ("float", "ElevenLabs stability, 0 to 1: higher is steadier, lower more varied. Empty uses the voice's own"),
+    "tts.elevenlabs.similarity_boost": ("float", "ElevenLabs similarity, 0 to 1: how closely it keeps to the original voice. Empty uses the voice's own"),
     "tts.speed": ("float", "How fast she talks: 1.0 is normal, higher is faster"),
     "tts.volume": ("float", "How loud her voice is: 1.0 is normal"),
     "tts.pitch": ("float", "Voice pitch shift in semitones: positive sounds higher and younger, negative lower and older"),

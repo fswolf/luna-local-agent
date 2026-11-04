@@ -229,11 +229,38 @@ def _pronounce(text):
 
 
 def _synthesize(text):
-    """POST one chunk to /tts and decode the WAV it returns."""
-    text = _pronounce(text)
+    """POST one chunk to /tts and decode the WAV it returns (or, with
+    tts.provider elevenlabs, ask ElevenLabs for it)."""
     # Clamped here as well as on the server: a speed of 0 or less sent one
     # server into a loop that never ends, and inf isn't valid JSON at all.
     speed = safe.number(safe.number(config.TTS_SPEED, 1.0) * _mood_speed(), 1.0, lo=0.25, hi=4.0)
+
+    from voice import elevenlabs
+
+    if elevenlabs.enabled():
+        # Not set up (no key, no voice): her voice isn't there, the same as
+        # a speech server that isn't running, and the header says so.
+        missing = elevenlabs.why_not()
+        if missing:
+            _set_reachable(False, missing)
+            raise RuntimeError(missing)
+
+        # No _pronounce: its [word](/phonemes/) marks are Kokoro's, and
+        # ElevenLabs would read the brackets out.
+        try:
+            samples, rate = elevenlabs.synthesize(text, speed)
+        except ConnectionError as e:
+            _set_reachable(False, str(e))
+            logbook.error("tts", "%s", e)
+            raise RuntimeError(str(e)) from e
+        except RuntimeError as e:
+            _set_reachable(True)
+            logbook.error("tts", "%s", e)
+            raise
+        _set_reachable(True)
+        return _finish(samples, rate)
+
+    text = _pronounce(text)
     try:
         response = requests.post(
             f"{TTS_URL}/tts",
@@ -262,7 +289,11 @@ def _synthesize(text):
             f"(HTTP {response.status_code}){': ' + detail if detail else ''}"
         )
 
-    samples, rate = _decode(response.content)
+    return _finish(*_decode(response.content))
+
+
+def _finish(samples, rate):
+    """Pitch and volume, the same whichever engine made the sound."""
     samples = _shift_pitch(samples, safe.number(config.TTS_PITCH, 0.0) + _mood_pitch())
 
     return np.clip(samples * safe.number(config.TTS_VOLUME, 1.0, lo=0.0, hi=10.0), -1.0, 1.0), rate

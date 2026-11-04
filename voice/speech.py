@@ -113,6 +113,13 @@ def load_models():
 
     models_ready = True
 
+    from voice import elevenlabs
+
+    if elevenlabs.enabled():
+        ok, why = elevenlabs.health()
+        _set_reachable(ok, why)
+        return tts.tts_ok
+
     try:
         response = requests.get(f"{TTS_URL}/health", timeout=5)
         response.raise_for_status()

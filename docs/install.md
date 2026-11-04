@@ -463,6 +463,52 @@ open at all.
 
 Point `tts.url` at the new port and nothing else changes.
 
+## Or ElevenLabs
+
+Her voice can come from [ElevenLabs](https://elevenlabs.io) instead,
+with no speech server at home at all. This is the one part of her that
+then leaves your machine: **every sentence she says is sent to
+ElevenLabs** to be spoken, and it costs whatever your ElevenLabs plan
+charges per character. Everything else stays local.
+
+1. Put your API key outside the repo, in
+   `~/.config/ai-voice/elevenlabs.json`:
+
+   ```json
+   {"api_key": "your key"}
+   ```
+
+   (or set `ELEVENLABS_API_KEY` in the environment).
+2. Switch her over, then restart:
+
+   ```
+   /set tts.provider elevenlabs
+   ```
+
+3. `/voice` lists the voices on your account, your own clones
+   included, and `/voice <name>` picks one.
+
+The settings, all in the `tts` block of `config.json`:
+
+```json
+"tts": {
+    "provider": "elevenlabs",
+    "elevenlabs": {
+        "voice_id": "",                  // set by /voice <name>
+        "model": "eleven_flash_v2_5",    // the quick one; eleven_multilingual_v2 is richer and slower
+        "stability": null,               // 0 to 1; null keeps the voice's own setting
+        "similarity_boost": null         // 0 to 1; null keeps the voice's own setting
+    }
+}
+```
+
+Her mood still nudges her speed (ElevenLabs takes 0.7 to 1.2, so
+`tts.speed` and the mood are kept inside that), and `tts.pitch` and
+`tts.volume` work the same as with Kokoro. Her pronunciation table
+(`pronounce` in agent.json) is Kokoro's and isn't used here. The
+launcher doesn't start the local voice server while she's on
+ElevenLabs. `/set tts.provider kokoro` puts her back.
+
 ---
 
 # Run the Assistant
