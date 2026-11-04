@@ -97,6 +97,11 @@ def tts_url():
     return str(url or "http://127.0.0.1:8899").rstrip("/")
 
 
+def eleven():
+    """Her voice comes from ElevenLabs: no speech server to start or check."""
+    return str((settings().get("tts") or {}).get("provider") or "").strip().lower() == "elevenlabs"
+
+
 def _here(url):
     from urllib.parse import urlparse
 
@@ -307,7 +312,11 @@ def check(py):
 
     v = state().get("voice", {})
     url = tts_url()
-    if v.get("mode") == "managed" and _here(url):
+    if eleven():
+        key = os.environ.get("ELEVENLABS_API_KEY") or os.path.exists(os.path.expanduser("~/.config/ai-voice/elevenlabs.json"))
+        line(bool(key), "her voice comes from ElevenLabs",
+             "put {\"api_key\": \"...\"} in ~/.config/ai-voice/elevenlabs.json")
+    elif v.get("mode") == "managed" and _here(url):
         ready = os.path.exists(v.get("python", "")) and os.path.exists(v.get("server", ""))
         line(ready, "her voice server is installed - ./start.sh starts it" if ready else
              "her voice server isn't where the installer left it", "run the installer again: ./installer/install.sh")
@@ -357,13 +366,14 @@ def main():
     voice = None
     v = s.get("voice", {})
     url = tts_url()
-    if v.get("mode") == "managed" and _here(url):   # a voice on another machine needs nothing started here
+    if v.get("mode") == "managed" and _here(url) and not eleven():   # a voice on another machine needs nothing started here
         voice = start_voice(v)
 
     warnings = []
     if not model_up():
         warnings.append("No model server - open LM Studio's Local Server, or run llama/start.sh.")
-    if not (v.get("mode") == "managed" and _here(url)) and v.get("mode") != "none" and not up(url + "/health"):
+    if not eleven() and not (v.get("mode") == "managed" and _here(url)) and v.get("mode") != "none" \
+            and not up(url + "/health"):
         warnings.append(f"No voice server at {url} - she'll start text-only.")
     if warnings:
         print("Starting anyway:\n  " + "\n  ".join(warnings), file=sys.stderr)

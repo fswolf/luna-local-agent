@@ -121,7 +121,10 @@ def _load_speech():
         # millisecond after starting the thread that finds out - so a
         # perfectly healthy server reported itself offline, with an
         # empty reason, because nothing had looked yet.
-        if not speech.tts_ok:
+        if not speech.tts_ok and config.TTS_PROVIDER == "elevenlabs":
+            ui.add_message("system", f"Her ElevenLabs voice isn't ready: {speech.tts_error or 'no answer'}. "
+                                     "She'll stay silent until it is.")
+        elif not speech.tts_ok:
             ui.add_message(
                 "system",
                 f"No TTS server answering at {TTS_URL} - start one "
@@ -142,7 +145,8 @@ threading.Thread(target=_load_speech, daemon=True).start()
 ui.init(
     agent_name=AGENT_NAME,
     model=MODEL,
-    voice=VOICE,
+    # ElevenLabs voices are ids; the name comes once /voice has looked it up
+    voice=("ElevenLabs" if config.TTS_PROVIDER == "elevenlabs" else VOICE),
     voice_server=speech.server_label(),
 )
 

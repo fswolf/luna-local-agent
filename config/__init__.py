@@ -129,6 +129,11 @@ SETTINGS = {
     # nothing here needs to know what a blend is.
     "voice":                      ("VOICE",                        True),
     "tts.url":                    ("TTS_URL",                      False),
+    "tts.provider":               ("TTS_PROVIDER",                 False),
+    "tts.elevenlabs.voice_id":    ("ELEVENLABS_VOICE_ID",          True),
+    "tts.elevenlabs.model":       ("ELEVENLABS_MODEL",             True),
+    "tts.elevenlabs.stability":   ("ELEVENLABS_STABILITY",         True),
+    "tts.elevenlabs.similarity_boost": ("ELEVENLABS_SIMILARITY",   True),
 
     "ui.mouse":                   ("UI_MOUSE",                     True),
 

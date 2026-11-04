@@ -95,6 +95,11 @@ def handle(text):
     if text.startswith("/voice"):
         wanted = text[6:].strip()
 
+        from voice import elevenlabs
+
+        if elevenlabs.enabled():
+            return _eleven_voice(wanted)
+
         def show():
             """Ask the server what it has. It is the only thing that
             knows - a blend named in the server's blends.json is real to
@@ -216,3 +221,43 @@ def handle(text):
         return True
 
     return False
+
+
+def _eleven_voice(wanted):
+    """/voice with tts.provider elevenlabs: the account's voices, or pick
+    one by name. Off the UI thread both ways - it's a request to their
+    servers."""
+    from voice import elevenlabs
+
+    def work():
+        try:
+            listed = elevenlabs.voices()
+        except Exception as e:
+            ui.add_message("system", f"Couldn't list your ElevenLabs voices: {e}")
+            return
+
+        if not wanted:
+            current = elevenlabs.voice_id()
+            lines = [f"ElevenLabs voice: {next((n for n, v, _ in listed if v == current), current or 'none picked')}", ""]
+            for name, vid, kind in listed:
+                mark = "*" if vid == current else " "
+                lines.append(f"  {mark} {name:<24} {kind:<12} {vid}")
+            lines += ["", "  /voice <name>            switch, and save it"]
+            ui.add_message("system", "\n".join(lines))
+            return
+
+        found = elevenlabs.find(wanted, listed)
+        if not found:
+            ui.add_message("system", f"No ElevenLabs voice called {wanted!r} (or more than one starts with it) - /voice lists them.")
+            return
+        name, vid = found
+        try:
+            config.save_setting("tts.elevenlabs.voice_id", vid)
+        except Exception as e:
+            ui.add_message("system", f"Couldn't save that: {e}")
+            return
+        ui.set_voice(name)
+        ui.add_message("system", f"ElevenLabs voice: {name}. Applies to the next thing she says.")
+
+    threading.Thread(target=work, daemon=True, name="voice-list").start()
+    return True

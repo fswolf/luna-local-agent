@@ -37,6 +37,7 @@ def _pane():
 # Sliders for the numbers people drag rather than type: (min, max, step).
 RANGES = {
     "tts.speed": (0.5, 2, 0.05), "tts.volume": (0, 2, 0.05), "tts.pitch": (-6, 6, 0.5),
+    "tts.elevenlabs.stability": (0, 1, 0.05), "tts.elevenlabs.similarity_boost": (0, 1, 0.05),
     "stt.sensitivity": (0.2, 3, 0.05), "stt.silence_seconds": (0.4, 4, 0.1),
     "alarms.volume": (0, 2, 0.05), "portrait.sound_volume": (0, 1, 0.05),
     "portrait.match_light": (0, 1, 0.05),
