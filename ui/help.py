@@ -53,6 +53,7 @@ _HELP_SECTIONS = [
         ("/mic", "levels from the last recording - is she hearing you?"),
         ("/barge", "talk-over-her diagnostics, with the thresholds"),
         ("/wake", "wake word status and live scores (openwakeword)"),
+        ("/hear", "whether her model gets the recording of what you said (stt.send_audio)"),
     ]),
     ("Her voice", [
         ("/voice", "list what the TTS server offers, current first"),

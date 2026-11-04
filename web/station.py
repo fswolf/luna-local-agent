@@ -378,7 +378,7 @@ def _model():
     return getattr(sys.modules.get("__main__"), "MODEL", None)
 
 
-def _respond(turn, text, speaker):
+def _respond(turn, text, speaker, recording=None):
     """Her answer to what was said (or typed) at a station, spoken back there."""
     from core import assistant, interrupts
     import ui
@@ -395,14 +395,14 @@ def _respond(turn, text, speaker):
         if turn.stopped:
             stop.stop(speaking=True, generating=True)
         assistant.respond(text, _model(), source="station", speaker=speaker,
-                          sink=turn.sentence, approver=turn.approver)
+                          sink=turn.sentence, approver=turn.approver, recording=recording)
 
 
 def _run(turn, audio=None, text=None):
     """One station turn: a recording (transcribed, voice checked) or typed text."""
     from core import assistant
     from senses import people
-    from voice import speech
+    from voice import hearing, speech
 
     path = None
     voice = threading.Thread(target=turn.speaker, daemon=True, name="station-voice")
@@ -429,7 +429,7 @@ def _run(turn, audio=None, text=None):
             return
         speaker = people.decide(heard.get("name"), voice_checked=heard.get("score") is not None,
                                 at_desk=False)      # another room: the desk camera can't tell
-        _respond(turn, said, speaker)
+        _respond(turn, said, speaker, hearing.clip(path))
     except Exception as e:
         turn.error = str(e)[:300]
         logbook.exception("station", "station turn failed")

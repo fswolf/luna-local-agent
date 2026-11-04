@@ -141,7 +141,7 @@ def answer(name, wav):
     """Transcribe, answer and speak one request. Returns (heard, reply, reply WAV or None)."""
     from core import assistant
     from senses import people
-    from voice import speech
+    from voice import hearing, speech
     from web import station
     import ui
 
@@ -163,7 +163,8 @@ def answer(name, wav):
         ui.add_message("user", f"[{who}{name}] {text}")
         said = []
         assistant.respond(text, getattr(sys.modules.get("__main__"), "MODEL", None),
-                          source="station", speaker=speaker, sink=said.append, approver=_no_screen)
+                          source="station", speaker=speaker, sink=said.append, approver=_no_screen,
+                          recording=hearing.clip(path))
         reply = " ".join(s.strip() for s in said if s and s.strip())
         if not reply:
             return text, "", None

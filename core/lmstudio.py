@@ -204,39 +204,69 @@ def context_length(timeout=3):
     return 0
 
 
-_vision = {"at": 0.0, "answer": None}
+_senses = {"at": 0.0, "vision": None, "audio": None, "deaf_until": 0.0}
 
 
-def accepts_images(max_age=30):
-    """True / False if the server says whether the loaded model can see,
-    None if it won't say. llama-server reports it in /props (it's False
-    when started without --mmproj); LM Studio marks vision models
-    "type": "vlm". Cached, so the tool list can ask every turn."""
+def _modalities(max_age=30):
+    """What the loaded model takes besides text, as the server tells it:
+    {"vision": True/False/None, "audio": True/False/None}, None where the
+    server doesn't say. llama-server reports both in /props (False when it
+    was started without the model's --mmproj); LM Studio marks vision
+    models "type": "vlm" and says nothing about audio. Cached, so the tool
+    list can ask every turn."""
     now = time.monotonic()
 
-    if now - _vision["at"] < max_age:
-        return _vision["answer"]
+    if now - _senses["at"] < max_age:
+        return _senses
 
-    answer = None
+    vision = audio = None
 
     try:
         if LLM_BACKEND == "llama":
             props = requests.get(PROPS_URL, headers=LLM_HEADERS, timeout=1).json()
-            modalities = props.get("modalities")
+            modalities = props.get("modalities") if isinstance(props, dict) else None
 
             if isinstance(modalities, dict):
-                answer = bool(modalities.get("vision"))
+                vision = bool(modalities.get("vision"))
+                audio = bool(modalities.get("audio"))
         else:
             for entry in requests.get(NATIVE_MODELS_URL, headers=LLM_HEADERS, timeout=1).json().get("data") or []:
                 if entry.get("state") == "loaded" and entry.get("type") in ("llm", "vlm"):
-                    answer = entry.get("type") == "vlm"
+                    vision = entry.get("type") == "vlm"
                     break
     except Exception:
         pass
 
-    _vision.update(at=now, answer=answer)
+    _senses.update(at=now, vision=vision, audio=audio)
 
-    return answer
+    return _senses
+
+
+def accepts_images(max_age=30):
+    """True / False if the server says whether the loaded model can see,
+    None if it won't say."""
+    return _modalities(max_age)["vision"]
+
+
+def accepts_audio(max_age=30):
+    """True / False if the server says whether the loaded model can hear
+    (an omni model with its mmproj on llama-server), None if it won't say.
+    False for a while after the server refused a recording (refused_audio)."""
+    if time.monotonic() < _senses["deaf_until"]:
+        return False
+    return _modalities(max_age)["audio"]
+
+
+def audio_refused():
+    """Is hearing off for now because the server refused a recording?"""
+    return time.monotonic() < _senses["deaf_until"]
+
+
+def refused_audio():
+    """The server turned a recording away after all: count the model as
+    deaf for ten minutes, so the next turns go as words without asking.
+    Only hearing: what it says about vision is untouched."""
+    _senses["deaf_until"] = time.monotonic() + 600
 
 
 # A screenshot travels as base64, hundreds of KB of it, but the model
@@ -245,6 +275,19 @@ def accepts_images(max_age=30):
 # the window, and the error hint blamed the context for it.
 _IMAGE = re.compile(r"data:image/[A-Za-z0-9.+-]+;base64,[A-Za-z0-9+/=]*")
 _IMAGE_TOKENS = 1500
+# A recording (voice/hearing.py) is the same story: 16-bit mono at
+# SAMPLE_RATE, and omni models spend about 25 tokens a second on it.
+_AUDIO = re.compile(r'"input_audio": \{"data": "([A-Za-z0-9+/=]*)"')
+_AUDIO_TOKENS_PER_SECOND = 25
+
+
+def _rate():
+    try:
+        import config
+
+        return max(1, int(config.SAMPLE_RATE))
+    except Exception:
+        return 16000
 
 
 def estimate_tokens(payload):
@@ -255,8 +298,10 @@ def estimate_tokens(payload):
 
         text = json.dumps(payload)
         images = len(_IMAGE.findall(text))
+        heard = sum(len(b) * 3 / 4 / (2 * _rate()) for b in _AUDIO.findall(text))
+        text = _AUDIO.sub("", _IMAGE.sub("", text))
 
-        return int(len(_IMAGE.sub("", text)) / 3.5) + images * _IMAGE_TOKENS
+        return int(len(text) / 3.5) + images * _IMAGE_TOKENS + int(heard * _AUDIO_TOKENS_PER_SECOND)
     except Exception:
         return 0
 

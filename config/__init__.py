@@ -109,6 +109,8 @@ SETTINGS = {
     "stt.manual_max_seconds":     ("STT_MANUAL_MAX_SECONDS",       True),
     "stt.no_speech_timeout":      ("STT_NO_SPEECH_TIMEOUT",        True),
     "stt.settle_seconds":         ("STT_SETTLE_SECONDS",           True),
+    "stt.send_audio":             ("STT_SEND_AUDIO",               True),
+    "stt.audio_max_seconds":      ("STT_AUDIO_MAX_SECONDS",        True),
     "stt.barge_in":               ("STT_BARGE_IN",                 True),
     "stt.barge_in_seconds":       ("STT_BARGE_IN_SECONDS",         True),
     "stt.barge_in_margin":        ("STT_BARGE_IN_MARGIN",          True),

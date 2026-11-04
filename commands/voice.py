@@ -1,4 +1,4 @@
-"""Hearing, speaking and seeing: /look, /mic, /voice, /barge, /wake.
+"""Hearing, speaking and seeing: /look, /mic, /voice, /barge, /hear, /wake.
 
 Part of the commands package; see commands/__init__.py.
 """
@@ -194,6 +194,16 @@ def handle(text):
                 levels["barge_probability"],
             ),
         )
+        return True
+
+    if text == "/hear":
+        from voice import hearing
+
+        why = hearing.why_not()
+        limit = float(config.STT_AUDIO_MAX_SECONDS or 0)
+        ui.add_message("system", f"Recordings: {why}" if why else
+                       "Recordings: sent with your words - her model hears how you said it"
+                       + (f" (up to {limit:g} s; longer goes as words only)" if limit > 0 else ""))
         return True
 
     if text == "/wake":

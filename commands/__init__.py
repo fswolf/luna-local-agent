@@ -3,7 +3,7 @@
     app        /clear /keys /mode /scroll /mouse /log /help
     reminders  /reminders /cancel /alarms /alarm /snooze /when /repair
     settings   /settings /preset /set /tools /tooltest /context /allow /mcp /plugins
-    voice      /look /mic /voice /barge /wake
+    voice      /look /mic /voice /barge /hear /wake
     life       /mood /coffee /read /situation
     portrait   /monitor /holo /outfit /lights /portrait ...
     memory     /facts /thoughts /memory /reflect /lessons /skills /projects /knowledge /episodes

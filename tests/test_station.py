@@ -173,7 +173,7 @@ class Stations(unittest.TestCase):
         _code, cookie = self._pair()
         import numpy as np
 
-        def respond(text, model, source, speaker, sink, approver):
+        def respond(text, model, source, speaker, sink, approver, recording=None):
             self.assertEqual((text, source), ("what's the weather", "station"))
             sink("It's sunny.")
             self.assertTrue(approver("write", "write notes.txt", ["hello"], False))
@@ -230,7 +230,7 @@ class Stations(unittest.TestCase):
         _c, hall = self._pair("hall")
         release = __import__("threading").Event()
 
-        def respond(text, model, source, speaker, sink, approver):
+        def respond(text, model, source, speaker, sink, approver, recording=None):
             release.wait(5)
 
         with mock.patch("voice.speech.transcribe", return_value="hi"), \
@@ -256,7 +256,7 @@ class Stations(unittest.TestCase):
 
         seen = {}
 
-        def respond(text, model, source, speaker, sink, approver):
+        def respond(text, model, source, speaker, sink, approver, recording=None):
             seen.update(text=text, source=source, speaker=speaker)
             sink("Sunny all day.")
 
@@ -287,7 +287,7 @@ class Stations(unittest.TestCase):
 
         stopped = threading.Event()
 
-        def respond(text, model, source, speaker, sink, approver):
+        def respond(text, model, source, speaker, sink, approver, recording=None):
             stop = interrupts.current()        # the station turn's own Stop
             sink("First.")
             for _ in range(200):               # "generating" until told to stop

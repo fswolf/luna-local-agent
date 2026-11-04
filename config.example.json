@@ -19,7 +19,9 @@
         "barge_in": true,
         "barge_in_seconds": 0.35,
         "barge_in_margin": 2.5,
-        "barge_in_boost": 0.25
+        "barge_in_boost": 0.25,
+        "send_audio": false,
+        "audio_max_seconds": 30
     },
     "tts": {
         "url": "http://127.0.0.1:8899",
