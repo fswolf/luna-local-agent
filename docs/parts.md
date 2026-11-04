@@ -8,7 +8,7 @@ and what happens if you leave it out. Details and downloads are in
 | Part | What it does | Where it runs | Memory | Without it |
 |---|---|---|---|---|
 | **Chat model** | Her mind: everything she says and decides | GPU (llama.cpp or LM Studio) | the GGUF's size, plus 2-4 GB for 16k of context | nothing works: this one is required |
-| **Vision adapter** (mmproj) | Her eyes: screenshots, the webcam, the pictures in her games (Vibe City) | GPU, inside the chat server | about 0.6-1 GB of VRAM | text only: no `look_at_screen`, no webcam looks, no game pictures. Everything else is the same |
+| **Vision adapter** (mmproj) | Her eyes: screenshots, the webcam, the pictures in her games (Vibe City). On an omni model the same file also lets her hear the recording of what you said, if you turn that on ([Controls](controls.md#hearing-how-you-said-it-optional)) | GPU, inside the chat server | about 0.6-1 GB of VRAM | text only: no `look_at_screen`, no webcam looks, no game pictures. Everything else is the same |
 | **Embedding model** (Qwen3-Embedding-0.6B) | Matching by meaning: recalling facts, searching your notes, picking which tools go along each turn, meaning-mode gestures | GPU by default, or CPU | about 0.7 GB | she matches by shared words instead; tool routing sends every tool that's on |
 | **Reranker** (Qwen3-Reranker-0.6B) | A closer second read of the best matches, so recall picks what answers you, not just what's on topic | GPU by default, or CPU | under 1 GB | recall uses the embedding's order as it is |
 | **Whisper** (speech to text) | Her hearing | CPU, inside Luna | system RAM, none on the GPU | you type instead of talk |

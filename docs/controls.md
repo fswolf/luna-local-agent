@@ -49,6 +49,7 @@ Slash commands:
 | `/mic` | What the voice detector measured on the last recording |
 | `/barge` | Whether talking over her will work, and the levels |
 | `/wake` | Wake word status and live scores |
+| `/hear` | Whether her model gets the recording of what you said |
 | `/reminders` | List what's scheduled, with countdowns |
 | `/cancel N` | Cancel reminder N |
 | `/when ...` | Test how a time phrase is read, without scheduling it |
@@ -270,6 +271,57 @@ A barge-in stops the *audio* only: the reply keeps generating and stays
 on screen. Without echo cancellation to lean on this will misfire
 occasionally, and when it does it should cost you the sound, never the
 answer. Pressing HOME is the one that stops both.
+
+---
+
+# Hearing How You Said It (Optional)
+
+Normally she gets your words and nothing else: Whisper writes down what
+you said, and a sigh, a laugh or a sarcastic tone are gone by the time
+the model sees it. An omni model can take the sound itself. Turn this on
+and the recording goes to the model along with Whisper's words, the same
+way a screenshot goes along when she looks at your screen.
+
+```json
+"stt": {
+    "send_audio": true,
+    "audio_max_seconds": 30
+}
+```
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `send_audio` | `false` | Send the recording with the words |
+| `audio_max_seconds` | `30` | Longer recordings go as words only |
+
+What it needs:
+
+- **llama.cpp.** LM Studio doesn't take audio, so with LM Studio she
+  gets words only.
+- **An omni model with its mmproj file.** Models llama.cpp can hear with
+  include Qwen3-Omni 30B-A3B, Qwen2.5-Omni 3B and 7B, and Gemma 4 E2B
+  and E4B. The mmproj goes in `MMPROJ=` or next to the model, the same
+  as for vision.
+
+What stays the same:
+
+- Whisper still runs on every recording. Commands, history, memory and
+  the transcript are all built from the words, so none of them change.
+- Her voice still comes from Kokoro or ElevenLabs. llama.cpp takes audio
+  in but doesn't make it.
+- With a model that can't hear, nothing is sent. llama-server says
+  whether the loaded model takes audio, so this switch can stay on when
+  you load a text-only model.
+
+The recording is only part of the request for that one reply. It isn't
+kept in history or in the transcript. Audio costs tokens, about 25 a
+second on the Qwen omni models, so a long ramble makes the reply start
+later; that's what `audio_max_seconds` is for. Recordings from relay
+stations and satellites go along too.
+
+`/hear` says whether recordings are being sent, and why not if they
+aren't. If the server refuses one anyway, that reply is sent again as
+words and recordings stay off for ten minutes before it checks again.
 
 ---
 

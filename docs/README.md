@@ -73,6 +73,7 @@ Everything the README only touches on, one subject per page.
 - Local text-to-speech via a shared Kokoro server, or ElevenLabs voices if you'd rather ([install](install.md#or-elevenlabs))
 - Streaming replies: she talks while she's still thinking
 - Barge-in: interrupt her mid-sentence
+- Optional: with an omni model on llama.cpp, she hears the recording as well as the words, so tone comes through ([controls](controls.md#hearing-how-you-said-it-optional))
 - Optional wake word, so open mode needs no keypress
 - Optional vision: she can read what's on your screen, and see through your webcam when you switch it on
 - [Presence](vision.md#presence-noticing-youre-there): she notices you at the desk, says hi when you come back, looks at you, and goes quiet in an empty room

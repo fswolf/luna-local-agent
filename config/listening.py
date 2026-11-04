@@ -63,6 +63,17 @@ STT_MANUAL_MAX_SECONDS = float(_stt_cfg.get("manual_max_seconds", 300))
 STT_SETTLE_SECONDS = float(_stt_cfg.get("settle_seconds", 0.6))
 
 # -------------------------
+# Hearing the recording
+# -------------------------
+# Send the recording of what you said along with Whisper's words, so a
+# model that takes audio (an omni model on llama-server) hears how it
+# was said as well as what. Off by default; with a model that can't
+# hear, nothing is sent either way. voice/hearing.py has the rest.
+STT_SEND_AUDIO = flag(_stt_cfg.get("send_audio", False))
+# Longer recordings go as words only: audio is a lot of tokens.
+STT_AUDIO_MAX_SECONDS = float(_stt_cfg.get("audio_max_seconds", 30))
+
+# -------------------------
 # Barge-in
 # -------------------------
 # Listen while Luna is speaking, and cut her off when you start

@@ -21,6 +21,7 @@ import tools
 from core import transcript
 from core import turnctx
 from mind import websearch
+from voice import hearing
 
 from . import session
 from .prompts import _calibration_note, _previous_user_text, build_generation_params, build_memory_prompt, build_self_prompt, build_system_prompt, build_tools_prompt
@@ -139,6 +140,18 @@ def prompt_budget(text="hello"):
     return parts, total, lmstudio.context_length()
 
 
+def _heard(send, payload, *args):
+    """Send the turn; if the server turned the recording away, once more
+    as words only (hearing.drop says so in the log)."""
+    try:
+        return send(payload, *args)
+    except RuntimeError as e:
+        if not hearing.drop(payload, e):
+            raise
+        _log_tool_call("hearing", "the server wouldn't take the recording, sent the words only")
+        return send(payload, *args)
+
+
 def ask(text, model, on_text=None, on_sentence=None,
         context=None, tools_allowed=None, remember=True, source=None):
     """One turn, inside a turnctx turn (see _ask for the turn itself)."""
@@ -240,7 +253,12 @@ def _ask(text, model, on_text=None, on_sentence=None,
         search_block = websearch.format_results(query, results)
         user_content = f"{search_block}\n\n{text}"
 
-    messages.append(_timestamped("user", user_content, now))
+    # Said out loud with stt.send_audio on and a model that can hear: the
+    # recording goes with the words (voice/hearing.py). Words only otherwise.
+    # Taken off the turn as it's used: a second ask inside the same turn
+    # (some other question entirely) mustn't get this recording too.
+    recording, turn.recording = turn.recording, None
+    messages.append(_timestamped("user", hearing.content(user_content, recording), now))
 
     # Use whatever is loaded now rather than what was loaded at startup.
     # Unloading a model to free VRAM and loading another is a normal
@@ -298,7 +316,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
                                        previous=_previous_user_text(replayed))
 
         try:
-            answer = _tool_rounds(payload, model, on_text, on_sentence)
+            answer = _heard(_tool_rounds, payload, model, on_text, on_sentence)
         except RuntimeError as e:
             if "image" in str(e).lower() or "vision" in str(e).lower():
                 if getattr(config, "LLM_BACKEND", "") == "llama":
@@ -334,9 +352,9 @@ def _ask(text, model, on_text=None, on_sentence=None,
                 logbook.warn("llm", "tool round failed, answering this turn without tools: %s", e)
                 _log_tool_call("tools", "that went wrong, answering without tools this once")
 
-            answer = _generate(payload, on_text, on_sentence)
+            answer = _heard(_generate, payload, on_text, on_sentence)
     else:
-        answer = _generate(payload, on_text, on_sentence)
+        answer = _heard(_generate, payload, on_text, on_sentence)
 
     answer = _strip_leading_timestamps(answer)
 
@@ -427,7 +445,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
         try:
             from training import dataset
 
-            dataset.note_turn(base_messages[0]["content"], replayed, base_messages[-1], answer,
+            dataset.note_turn(base_messages[0]["content"], replayed, hearing.words_only(base_messages[-1]), answer,
                               model=payload.get("model", ""),
                               used_tools=bool(_last_raw.get("exchanges")) or bool(turn.exchanges))
         except Exception:

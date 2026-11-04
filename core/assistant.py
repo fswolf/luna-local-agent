@@ -15,6 +15,7 @@ from core import interrupts
 from core import logbook
 from core import safe
 from senses import people
+from voice import hearing
 from voice import speech
 from core import turnctx
 import ui
@@ -106,7 +107,7 @@ def _say_away(said):
     ui.set_status("Idle")
 
 
-def respond(text, model, source="typed", speaker=None, sink=None, approver=None):
+def respond(text, model, source="typed", speaker=None, sink=None, approver=None, recording=None):
     """Send a turn to the model and speak the reply as it arrives.
 
     Nothing here waits for the whole answer. Text appears on screen as
@@ -127,6 +128,9 @@ def respond(text, model, source="typed", speaker=None, sink=None, approver=None)
     sink: where the reply's sentences go instead of the PC's speakers (a
     relay station plays them on its own speaker). approver: who answers her
     permission questions for this turn (a station asks on its own screen).
+
+    recording: what was said, as WAV bytes (hearing.clip), sent with the
+    words when stt.send_audio is on and her model can hear; None otherwise.
 
     source: "typed", "voice" or "station". Runs as the caller's Stop (interrupts)
     if it opened one - ptt does, at the key press - else its own, opened
@@ -154,7 +158,7 @@ def respond(text, model, source="typed", speaker=None, sink=None, approver=None)
                         _say_away(said)
                     return said
 
-                return _respond(text, model, source, stop, speaker, sink, approver)
+                return _respond(text, model, source, stop, speaker, sink, approver, recording)
             finally:
                 _hold(None)
 
@@ -370,7 +374,7 @@ def respond_remote(text, model, source, who, tools_allowed=None,
             ui.set_status("Idle")
 
 
-def _respond(text, model, source, stop, speaker=None, sink=None, approver=None):
+def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, recording=None):
     # a relay station speaks the reply itself: no Player on the PC's speakers
     player = speech.Player() if sink is None else None
     say = sink or player.say
@@ -388,7 +392,7 @@ def _respond(text, model, source, stop, speaker=None, sink=None, approver=None):
         # Your own turn, typed or spoken: ask() leaves source None for
         # those (it's what turns on the second-look checks), so how it
         # reached her is set on the turn itself.
-        with turnctx.begin(source=source, speaker=speaker, approver=approver):
+        with turnctx.begin(source=source, speaker=speaker, approver=approver, recording=recording):
             # a stranger or a session guest gets the short list (people.tools_for)
             answer = ask(
                 text, model, on_text=ui.extend_message, on_sentence=on_sentence,
@@ -493,7 +497,7 @@ def _spoken_turn(model, mode, stop):
                                 voice_score=heard.get("score"), at_desk=True)
         logbook.info("turn", "heard%s: %s", f" ({speaker})" if speaker else "", text[:200])
         ui.add_message("user", f"[{speaker}] {text}" if speaker else text)
-        respond(text, model, source="voice", speaker=speaker)
+        respond(text, model, source="voice", speaker=speaker, recording=hearing.clip(filename))
         ui.set_status("Idle")
 
         return True

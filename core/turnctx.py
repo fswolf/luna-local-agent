@@ -45,6 +45,7 @@ class Turn:
     routing: SimpleNamespace = field(default_factory=SimpleNamespace)  # tools/routing.py
     exchanges: list = field(default_factory=list)  # {name, arguments, result} per tool call, in order
     speaker: Optional[str] = None      # someone other than the owner talking (senses/people.py); None: the owner
+    recording: Optional[bytes] = None  # what was said, as WAV, for a model that can hear (voice/hearing.py)
 
 
 _current = contextvars.ContextVar("luna_turn", default=None)

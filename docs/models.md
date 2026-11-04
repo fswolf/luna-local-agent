@@ -83,6 +83,8 @@ uses whatever is loaded. With several loaded, set `llm.model` in
 `llama/server.local.env` (your own overrides, read after
 `llama/server.env`). If the model can see, put its mmproj file in
 `MMPROJ=`, or leave it empty and it's looked for next to the model.
+An omni model's mmproj (Qwen3-Omni, Qwen2.5-Omni, Gemma 4 E2B/E4B) gives
+her hearing too, for `stt.send_audio` ([Controls](controls.md#hearing-how-you-said-it-optional)).
 
 **Then check tool calling:** type `/tooltest`. It sends a set of plain
 requests ("remind me in 5 minutes...", "what time is it?") two ways each

@@ -91,6 +91,8 @@ SCHEMA = {
     "stt.manual_max_seconds": ("float", "Longest recording in manual mode, in seconds, where nothing else stops it"),
     "stt.no_speech_timeout": ("float", "Seconds to wait for you to start talking before giving up (auto mode only)"),
     "stt.settle_seconds": ("float", "Pause in seconds after she speaks before the mic re-arms in open mode"),
+    "stt.send_audio": ("bool", "Send the recording of what you said with the words, for a model that can hear (an omni model)"),
+    "stt.audio_max_seconds": ("float", "Recordings longer than this go as words only"),
     "stt.barge_in": ("bool", "Let you interrupt her by talking while she speaks (needs the silero detector)"),
     "stt.barge_in_seconds": ("float", "Seconds you must keep talking before she stops for you"),
     "stt.barge_in_margin": ("float", "How much louder than her own voice at the mic you must be to interrupt: raise on speakers"),

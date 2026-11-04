@@ -49,7 +49,7 @@ Powered by:
 
 What she does:
 
-- **Talks:** push-to-talk in three modes including hands free, replies that start a sentence in, and barge-in (talk over her and she stops)
+- **Talks:** push-to-talk in three modes including hands free, replies that start a sentence in, and barge-in (talk over her and she stops). With an omni model on llama.cpp she can hear your tone, not only your words ([optional](docs/controls.md#hearing-how-you-said-it-optional))
 - **Sees:** your screen, and your webcam when you switch it on
 - **Notices you:** with the webcam watching, she says hi when you come back, looks at you instead of the screen, and keeps quiet in an empty room ([details](docs/vision.md#presence-noticing-youre-there))
 - **Knows who's talking:** tells the people in your house apart by voice or face, uses their name and pronouns, and keeps each person's memories to themselves ([below](#she-knows-who-shes-talking-to))
