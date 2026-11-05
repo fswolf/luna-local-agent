@@ -424,6 +424,10 @@ def _after(path, value):
             from web import livefeed
 
             livefeed.emit("match_light", value=value)
+        elif path in ("portrait.sounds", "portrait.sound_volume"):
+            from web import livefeed
+
+            livefeed.sounds_changed()
         elif path == "portrait.model":
             from web import livefeed
 

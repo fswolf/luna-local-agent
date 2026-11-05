@@ -302,6 +302,12 @@ function handle(ev) {
     case 'background':  // /settings: what's behind her, picked by you
       window.lunaBackground?.(ev.value);
       break;
+    case 'sounds':      // /portrait sounds, /settings: gesture sounds on/off and their volume
+      cfg.sounds = ev.on !== false;
+      if (typeof ev.volume === 'number') cfg.sound_volume = ev.volume;
+      if (!cfg.sounds) stopSound(0.3);
+      else if (sound.el) sound.el.volume = Math.max(0, Math.min(1, cfg.sound_volume ?? 0.8));
+      break;
     case 'match_light': // /settings: how much her lights take on the room's colours
       if (!params.has('matchlight')) ambient.set(ev.value);
       break;

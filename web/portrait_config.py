@@ -133,6 +133,13 @@ def lights_config():
             "style": str(getattr(config, "PORTRAIT_LIGHTS_STYLE", "neon"))}
 
 
+def sounds_changed():
+    """portrait.sounds / sound_volume changed: an open portrait follows now
+    (turned off, a clip that's playing fades out)."""
+    livefeed.emit("sounds", on=bool(getattr(config, "PORTRAIT_SOUNDS", True)),
+                  volume=float(getattr(config, "PORTRAIT_SOUND_VOLUME", 0.8)))
+
+
 def lights_changed():
     """Tell an open portrait the light strip settings changed."""
     livefeed.emit("lights", lights=lights_config())
