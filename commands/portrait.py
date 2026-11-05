@@ -103,6 +103,24 @@ def handle(text):
                        f"Chat gestures {'on' if config.PORTRAIT_CHAT_GESTURES else 'off'}.")
         return True
 
+    if text == "/portrait sounds" or text.startswith("/portrait sounds "):
+        want = text[len("/portrait sounds"):].strip().lower()
+        try:
+            if want in ("on", "off"):
+                config.save_setting("portrait.sounds", "true" if want == "on" else "false")
+            elif want:
+                level = float(want.rstrip("%"))
+                level = level / 100 if want.endswith("%") or level > 1 else level
+                config.save_setting("portrait.sound_volume", str(max(0.0, min(1.0, level))))
+                config.save_setting("portrait.sounds", "true")
+        except ValueError:
+            ui.add_message("system", "/portrait sounds on, off, or a volume: 0.5 or 50%.")
+            return True
+        livefeed.sounds_changed()
+        ui.add_message("system", f"Gesture sounds: {'on' if config.PORTRAIT_SOUNDS else 'off'}, volume "
+                       f"{round(float(config.PORTRAIT_SOUND_VOLUME) * 100)}% (saved; an open portrait follows now).")
+        return True
+
     if text == "/portrait clothes" or text.startswith("/portrait clothes "):
         from life import clothes
 

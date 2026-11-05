@@ -57,6 +57,7 @@ from web.portrait_config import (  # noqa: F401  re-exported: livefeed.X keeps w
     gesture_mode_changed,
     lights_changed,
     lights_config,
+    sounds_changed,
     portrait_clips,
     portrait_url,
 )

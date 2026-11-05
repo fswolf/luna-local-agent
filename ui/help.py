@@ -120,6 +120,7 @@ _HELP_SECTIONS = [
         ("/portrait obs", "the see-through URL for an OBS browser source"),
         ("/portrait wave", "act it out: wave hug jump bounce shrug stretch look_hand tuck_hair (3D models)"),
         ("/portrait gestures", "how her replies set them off: tags, meaning, keywords, off"),
+        ("/portrait sounds", "the sounds some gestures make: on, off, or a volume like 50%"),
         ("/portrait clothes", "how the conversation changes her clothes: gestures, tags, keywords, off"),
         ("/portrait frame", "bust (head and shoulders) or full (all of her); click her to touch"),
         "/set thoughts.enabled false stops recording it.",

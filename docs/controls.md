@@ -73,6 +73,7 @@ Slash commands:
 | `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>` |
 | `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder, what's in her hands, clothes that are off) |
 | `/outfit` | Her clothes on a human model: `dressed`, `underwear`, `off <piece>`, `on <piece>`; alone, what she's wearing |
+| `/portrait sounds` | The sounds some gestures make: `on`, `off`, or a volume like `50%` |
 | `/portrait clothes <mode>` | How the conversation changes her clothes: `gestures` (follow the gesture setting), `tags`, `keywords`, `off` |
 | `/voice` | List voices, or switch: blends too |
 | `/context` | What every turn sends, in tokens, against the model's context length |

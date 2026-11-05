@@ -706,8 +706,11 @@ sound: { name: 'moan', from: 'random', len: 11 },    // a random stretch, 11 s
   gesture's length. It fades out at the end, or when another gesture
   starts.
 - No file, no sound: nothing breaks.
-- `portrait.sounds false` turns them off; `portrait.sound_volume` (0-1,
-  default 0.8).
+- `/portrait sounds off` turns them off, `/portrait sounds on` back on, and
+  `/portrait sounds 50%` sets the volume. The same switches are
+  `portrait.sounds` and `portrait.sound_volume` (0-1, default 0.8) in the
+  settings page. An open portrait follows straight away; a clip that's
+  playing fades out.
 - Keep a `CREDITS.md` there for packs that ask for credit.
 
 **Pronunciation.** Kokoro spells out words it doesn't know ("N-Y-A").
