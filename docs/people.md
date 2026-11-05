@@ -129,15 +129,23 @@ On someone else's turn:
 - **Facts** she learns go into their file (`agent/people/shannon.json`),
   not into your memory.
 - **Her prompt** shows only their facts, never yours, and none of your
-  preferences.
+  preferences. Your other memories stay out of it too: her notes on your
+  past conversations, the summary of your older talk, your projects, her
+  recipes for your machine, passages from your knowledge folder, the
+  window you have open and your next reminder. Her
+  lessons about her own behaviour and how she feels about her games are
+  hers, so those come along.
 - **Corrections** like "forget that" or "actually it's…" change only
   their facts.
 
 On your turns, nothing changes: your facts, your memory backend, as
 before. Someone else's facts never show up in your turns either.
 
-She still shares one conversation history with everyone. She's in one
-room, after all.
+She still shares the conversation as it's happening with everyone (the
+recent turns, labelled with who said them). She's in one room, after all.
+Someone you've registered also gets the same tools you do, so they could
+still ask her to look something up; a stranger or a session guest gets
+only a few safe ones.
 
 ## Privacy
 

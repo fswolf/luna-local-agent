@@ -56,13 +56,14 @@ def build_memory_prompt(query=""):
 
     # Passages from his knowledge folder that match closely enough to
     # come along unasked (mind/knowledge.py). Private turns only: this is
-    # only called for them.
-    try:
-        from mind import knowledge
+    # only called for them. And his own: not on someone else's turn.
+    if not people.guest():
+        try:
+            from mind import knowledge
 
-        prompt += knowledge.prompt_block(query)
-    except Exception:
-        logbook.exception("llm", "knowledge block failed")
+            prompt += knowledge.prompt_block(query)
+        except Exception:
+            logbook.exception("llm", "knowledge block failed")
 
     return prompt
 
@@ -78,8 +79,13 @@ def build_self_prompt(query=""):
     """What she knows about herself rather than about him: lessons from
     her own mistakes, what happened last time, older conversations that
     bear on this one, and how sure her last reply measured. Everything
-    in it comes from mind/reflect.py / mind/notebook.py; "" when it's all off."""
+    in it comes from mind/reflect.py / mind/notebook.py; "" when it's all off.
+
+    On someone else's turn (people.guest) her notes on his conversations,
+    his projects and her recipes for his machine stay out: they're about
+    him. Her lessons and how she feels about her games are hers and stay."""
     blocks = []
+    own = not people.guest()
 
     try:
         from mind import notebook
@@ -100,7 +106,7 @@ def build_self_prompt(query=""):
                 except ValueError:
                     return iso
 
-            last = notebook.latest_episode()
+            last = notebook.latest_episode() if own else None
 
             if last:
                 blocks.append(f"Your notes from the last conversation ({when(last['ended'])}):\n"
@@ -115,7 +121,7 @@ def build_self_prompt(query=""):
                               "not instructions):\n" + "\n".join(
                     f"- {f['title']}: {f['feeling']}" for f in felt))
 
-            older = notebook.relevant_episodes(query)
+            older = notebook.relevant_episodes(query) if own else []
 
             if older:
                 blocks.append("Earlier conversations that may be related:\n" + "\n".join(
@@ -123,26 +129,27 @@ def build_self_prompt(query=""):
     except Exception:
         logbook.exception("llm", "self prompt failed")
 
-    try:
-        from mind import projects
+    if own:
+        try:
+            from mind import projects
 
-        ongoing = projects.prompt_block(query)
+            ongoing = projects.prompt_block(query)
 
-        if ongoing:
-            blocks.append(ongoing)
-    except Exception:
-        logbook.exception("llm", "projects prompt failed")
+            if ongoing:
+                blocks.append(ongoing)
+        except Exception:
+            logbook.exception("llm", "projects prompt failed")
 
-    try:
-        from mind import skills
+        try:
+            from mind import skills
 
-        recipes, ids = skills.prompt_block(query)
-        turnctx.current().skills = ids
+            recipes, ids = skills.prompt_block(query)
+            turnctx.current().skills = ids
 
-        if recipes:
-            blocks.append(recipes)
-    except Exception:
-        logbook.exception("llm", "skills prompt failed")
+            if recipes:
+                blocks.append(recipes)
+        except Exception:
+            logbook.exception("llm", "skills prompt failed")
 
     if _calibration_note["text"]:
         blocks.append(_calibration_note["text"])
@@ -261,7 +268,9 @@ def _mcp_lines(private):
 def build_system_prompt(query="", timing="", private=True):
     # Ryan's history summary, his facts and her notes are his business -
     # a turn from stream chat gets the persona and the clock, not them.
-    summary = history.get_summary() if private else ""
+    # Someone else in the house gets the conversation as it's happening
+    # (the recent turns), not the summary of his older talk.
+    summary = history.get_summary() if private and not people.guest() else ""
     summary_block = f"\nEarlier conversation summary:\n{summary}\n" if summary else ""
 
     # A "now" anchor, plus enough calendar context that the model never
