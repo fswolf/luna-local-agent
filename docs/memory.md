@@ -19,7 +19,7 @@ deleting the wrong one.
 ```json
 "long_term_memory": {
     "enabled": true,
-    "backend": "json",
+    "backend": "sqlite",
     "max_facts": 30,
     "context_facts": 25
 }
@@ -36,11 +36,12 @@ in `agent/notebook.db`, and once a day a cleanup pass merges duplicate
 facts and retires the losing side of a contradiction. All of that is
 under [Learning from herself](learning.md#learning-from-herself).
 
-## The experimental permanent store
+## The permanent store (the default)
 
-`"backend": "sqlite"` swaps the capped list for a permanent table in
-`agent/facts.db`, plain SQLite, in-process, no server, nothing to
-install. What changes:
+`"backend": "sqlite"`, the default, keeps facts in a permanent table in
+`agent/facts.db`: plain SQLite, in-process, no server, nothing to
+install. `"backend": "json"` is the original capped list in
+`memory.json`. What the table does that the list doesn't:
 
 * **Nothing is ever dropped for space.** The JSON backend deletes the
   oldest fact once it passes `max_facts`; the table has no cap. Facts

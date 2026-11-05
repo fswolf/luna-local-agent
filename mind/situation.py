@@ -17,7 +17,8 @@ out rather than guessed. The whole block is cached for a few seconds,
 because a turn builds its prompt more than once.
 
 Never on a stream-chat turn: the focused window's title and what's
-playing are his business.
+playing are his business. On someone else's turn (a housemate, a guest)
+his window and his reminders stay out; the rest is the room's.
 
     "situation": {
         "enabled": true,
@@ -40,7 +41,12 @@ from core import logbook
 
 CACHE_SECONDS = 8
 
-_cache = {"at": 0.0, "text": ""}
+_cache = {"at": 0.0, "found": []}     # [(source name, line)]
+
+# Left out on someone else's turn (a housemate, a guest, a stranger): his
+# screen and his reminders are his business. The music, the machine and
+# what she's holding are the room's.
+OWNER_ONLY = ("window", "reminders")
 
 
 def enabled():
@@ -191,11 +197,16 @@ SOURCES = (("window", _window), ("music", _music), ("machine", _machine),
 
 
 # ---------------------------------------------------------------------------
-def lines(fresh=False):
-    """The block's lines, cached for a few seconds."""
-    if not fresh and time.monotonic() - _cache["at"] < CACHE_SECONDS:
-        return _cache["text"].splitlines()
+def lines(fresh=False, owner=True):
+    """The block's lines, cached for a few seconds. owner=False leaves out
+    the OWNER_ONLY ones."""
+    if fresh or time.monotonic() - _cache["at"] >= CACHE_SECONDS:
+        _cache.update(at=time.monotonic(), found=_read())
+    return [line for name, line in _cache["found"] if owner or name not in OWNER_ONLY]
 
+
+def _read():
+    """Every source that's switched on, read now: [(name, line)]."""
     out = []
 
     for name, source in SOURCES:
@@ -209,9 +220,8 @@ def lines(fresh=False):
             line = ""
 
         if line:
-            out.append(line[:700 if name == "hands" else 200])   # a book needs a few words
+            out.append((name, line[:700 if name == "hands" else 200]))   # a book needs a few words
 
-    _cache.update(at=time.monotonic(), text="\n".join(out))
     return out
 
 
@@ -220,7 +230,9 @@ def block():
     if not enabled():
         return ""
 
-    found = lines()
+    from senses import people
+
+    found = lines(owner=not people.guest())
 
     if not found:
         return ""
