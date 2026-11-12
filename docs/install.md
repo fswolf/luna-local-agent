@@ -185,9 +185,13 @@ is used as it is and left running. To never auto-start it, set
 `config.json`.
 
 `install.sh` clones llama.cpp into `llama/llama.cpp/` and builds only
-`llama-server` and `llama-bench`, for this card. If a build tool is
-missing it prints the exact `dnf install` line and stops. It doesn't
-run sudo itself. Vulkan and ROCm builds can sit side by side; `bin/`
+`llama-server` and `llama-bench`, for this card. If a build tool or the
+Vulkan headers are missing it prints the install line for your system
+(dnf, apt, pacman or zypper) and stops, before the build starts. It
+doesn't run sudo itself; the installer offers to install them first
+when you pick llama.cpp there. A ROCm build is for the cards `rocminfo`
+finds; `GPU_TARGETS=gfx1100 llama/install.sh rocm` names one by hand.
+Vulkan and ROCm builds can sit side by side; `bin/`
 points at whichever was built last. Run `llama/bin/llama-bench -m
 <model>` under each to see which is faster on your GPU.
 `install.sh update` pulls the latest llama.cpp and rebuilds.

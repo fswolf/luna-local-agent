@@ -360,6 +360,29 @@ def system_packages():
     return not missing
 
 
+def executables():
+    """Mark the repo's scripts runnable. A zip download, or a checkout made
+    without them, leaves llama/install.sh and the rest at 644."""
+    if WIN:
+        return
+    skip = {".git", ".venv", "venv", "node_modules", "llama.cpp", "__pycache__"}
+    for top, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in skip and top.count(os.sep) - ROOT.count(os.sep) < 3]
+        for f in files:
+            if not f.endswith(".sh"):
+                continue
+            path = os.path.join(top, f)
+            try:
+                with open(path, "rb") as fh:
+                    if fh.read(2) != b"#!":
+                        continue
+                mode = os.stat(path).st_mode
+                if not mode & 0o100:
+                    os.chmod(path, mode | 0o100 | (mode & 0o044) >> 2)   # chmod +x, as far as it's readable
+            except OSError:
+                pass
+
+
 # ---------------------------------------------------------------------------
 # 3. Luna's Python environment
 # ---------------------------------------------------------------------------
@@ -502,6 +525,38 @@ def voice(state, gpu_choice):
 # ---------------------------------------------------------------------------
 # 5. The brain
 # ---------------------------------------------------------------------------
+# what building llama.cpp needs, per package manager. ROCm itself is a
+# big install with its own instructions, so only Fedora's is offered.
+LLAMA_PACKAGES = {
+    "vulkan": {
+        "dnf": ["cmake", "gcc-c++", "git", "glslc", "vulkan-headers", "vulkan-loader-devel", "spirv-headers-devel"],
+        "apt-get": ["cmake", "g++", "git", "glslc", "libvulkan-dev", "spirv-headers"],
+        "pacman": ["cmake", "gcc", "git", "shaderc", "vulkan-headers", "vulkan-icd-loader", "spirv-headers"],
+        "zypper": ["cmake", "gcc-c++", "git", "shaderc", "vulkan-devel", "spirv-headers"],
+    },
+    "rocm": {
+        "dnf": ["cmake", "gcc-c++", "git", "rocm-hip-devel", "hipblas-devel", "rocblas-devel", "rocm-cmake"],
+    },
+}
+
+
+def build_packages(kind):
+    """Offer to install what the llama.cpp build needs, before it fails halfway."""
+    pm, install = package_manager()
+    wanted = LLAMA_PACKAGES.get(kind, {}).get(pm)
+    if not wanted:
+        return
+    missing = [p for p in wanted if not installed(pm, p)]
+    if not missing:
+        ok(f"build tools for {kind}")
+        return
+    print(f"  the {kind} build needs: {', '.join(missing)}")
+    if ARGS.no_system:
+        warn("--no-system: install those yourself")
+    elif ask(f"Run: {' '.join(install + missing)} ?"):
+        run(install + missing)
+
+
 def backend(state):
     step("Her brain (the model server)")
     choice = ARGS.backend
@@ -536,10 +591,11 @@ def backend(state):
                 print("    brew install cmake bash      (Homebrew: https://brew.sh)")
         else:
             kind = "rocm" if detect_gpu()[0] == "rocm" else "vulkan"
+            build_packages(kind)
         print(f"  building llama.cpp ({kind}) - this takes a few minutes")
         good = run(["bash", os.path.join(ROOT, "llama", "install.sh"), kind])
-        note("model server", good, "llama.cpp built - put a model in llama/models and run llama/start.sh"
-             if good else "llama.cpp build failed - see above")
+        note("model server", good, "llama.cpp built - put a model in llama/models; ./start.sh starts it with her"
+             if good else "llama.cpp build failed - see above, then run llama/install.sh again")
     else:
         note("model server", False, "skipped")
 
@@ -952,8 +1008,11 @@ def health(state):
 
     lm = http_ok("http://localhost:1234/v1/models")
     ll = http_ok("http://127.0.0.1:8080/health")
-    (ok if lm or ll else warn)("model server: " + ("llama.cpp :8080" if ll else "LM Studio :1234" if lm
-                                                   else "none running yet (start LM Studio's server or llama/start.sh)"))
+    built = os.path.exists(os.path.join(ROOT, "llama", "bin", "llama-server"))
+    idle = ("none running yet - ./start.sh starts llama.cpp with her" if built
+            else "none running yet - build llama.cpp with llama/install.sh first" if state.get("backend") == "llama"
+            else "none running yet - start LM Studio's server")
+    (ok if lm or ll else warn)("model server: " + ("llama.cpp :8080" if ll else "LM Studio :1234" if lm else idle))
     v = state.get("voice", {})
     if v.get("mode") == "managed":
         ok("voice: the launcher starts kokoro-reader with her")
@@ -1014,6 +1073,7 @@ def main():
     state["extras"] = extras
 
     system_packages()
+    executables()
     py = python_env(state, extras)
     if py:
         state["venv_python"] = py
