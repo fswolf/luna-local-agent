@@ -316,32 +316,32 @@ def handle(text):
             ui.add_message("system", "\n".join(lines))
         return True
 
-    if text == "/card" or text.startswith("/card "):
-        from mind import cards
+    if text == "/profile" or text.startswith("/profile "):
+        from mind import profiles
 
-        word = text[len("/card"):].strip()
+        word = text[len("/profile"):].strip()
         if word.lower() == "rebuild":
-            n = cards.rebuild_all()
-            ui.add_message("system", f"{n} card(s) will be rewritten on her next idle pass (or /reflect now).")
+            n = profiles.rebuild_all()
+            ui.add_message("system", f"{n} profile(s) will be rewritten on her next idle pass (or /reflect now).")
         elif word.lower().startswith("forget "):
-            gone = cards.forget(word[7:].strip())
-            ui.add_message("system", f"Card on {gone} dropped." if gone else "No card by that name.")
+            gone = profiles.forget(word[7:].strip())
+            ui.add_message("system", f"Profile of {gone} dropped." if gone else "No profile by that name.")
         elif word:
-            card = cards.get(word)
-            ui.add_message("system", f"{card['text']}\n(from {card['facts']} facts, {card['updated'][:16].replace('T', ' ')})"
-                           if card else f"No card on {word}. /card lists them.")
+            found = profiles.get(word)
+            ui.add_message("system", f"{found['text']}\n(from {found['facts']} facts, {found['updated'][:16].replace('T', ' ')})"
+                           if found else f"No profile of {word}. /profile lists them.")
         else:
-            have = cards.cards()
-            waiting = [cards.label(p) for p in cards.material() if p not in have]
-            lines = [f"{cards.label(p)} ({c['facts']} facts, {c['updated'][5:10]}): {c['text'][:110]}{'...' if len(c['text']) > 110 else ''}"
-                     for p, c in have.items()] or ["No cards yet."]
+            have = profiles.profiles()
+            waiting = [profiles.label(p) for p in profiles.material() if p not in have]
+            lines = [f"{profiles.label(p)} ({c['facts']} facts, {c['updated'][5:10]}): {c['text'][:110]}{'...' if len(c['text']) > 110 else ''}"
+                     for p, c in have.items()] or ["No profiles yet."]
             if waiting:
                 lines.append("Waiting for her next idle pass: " + ", ".join(waiting))
-            if not cards.enabled():
-                lines.append("Cards are off (self.card).")
-            lines.append("A card is a few sentences she writes from someone's facts (3 or more), and it's in her "
-                         "prompt whenever she talks to them. /card <name> (or me) reads one; /card rebuild, "
-                         "/card forget <name>.")
+            if not profiles.enabled():
+                lines.append("Profiles are off (self.profiles).")
+            lines.append("A profile is a few sentences she writes from someone's facts (3 or more), and it's in her "
+                         "prompt whenever she talks to them. /profile <name> (or me) reads one; /profile rebuild, "
+                         "/profile forget <name>.")
             ui.add_message("system", "\n".join(lines))
         return True
 

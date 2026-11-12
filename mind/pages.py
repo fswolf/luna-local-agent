@@ -112,7 +112,9 @@ def _facts():
 
     if longterm.backend() == "sqlite" and factstore.available():
         return [(r[1], r[2] or "") for r in factstore.rows(limit=2000)]      # (fact, subject), active only
-    return [(f, "") for f in longterm.relevant_facts("")]
+    # the owner's whole list: relevant_facts("") is capped at context_facts,
+    # and inside a guest's turn (reflect_now) it answers with their facts
+    return [(f, "") for f in longterm.memory.get("long_term_facts", [])]
 
 
 def _names(facts, skip):

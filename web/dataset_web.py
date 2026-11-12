@@ -22,13 +22,21 @@ KEY = secrets.token_urlsafe(24)       # this run's; the page re-reads it after a
 
 
 def _row(r):
+    from llm.prompts import split_live
+
     msgs = r.get("messages") or []
     said = next((m["content"] for m in reversed(msgs) if m.get("role") == "user"), "")
+    # With llm.stable_prompt the message she answered starts with the turn's
+    # note (the time, her mood, the memories picked for it): "said" is your
+    # words, and the note is shown with the prompt, folded away, where it
+    # belongs. The example itself keeps both - it's what she saw.
+    note, said = split_live(said)
+    system = next((m["content"] for m in msgs if m.get("role") == "system"), "")
     return {"id": r.get("id"), "when": r.get("when"), "kind": r.get("kind"), "source": r.get("source"),
             "model": r.get("model"), "approved": r.get("approved"), "said": said, "reply": r.get("reply"),
             "original": r.get("original"),
             "context": [m for m in msgs if m.get("role") != "system"][:-1],
-            "system": next((m["content"] for m in msgs if m.get("role") == "system"), "")}
+            "system": f"{system}\n\n{note}" if note else system}
 
 
 def handle(method, sub, body):

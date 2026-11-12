@@ -1,7 +1,7 @@
 """llm.stable_prompt: the system prompt stays the same from turn to turn, and
 what changes (the clock, the live lines, the memories picked for this
 message) rides in a note in front of the latest message - never stored in
-history. And the cards (mind/cards.py) that sit in the stable part.
+history. And the profiles (mind/profiles.py) that sit in the stable part.
 
     python -m unittest discover tests        (from the repo folder)
 """
@@ -19,7 +19,7 @@ from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 import config  # noqa: E402
 from core import turnctx  # noqa: E402
 from llm import prompts  # noqa: E402
-from mind import cards, notebook  # noqa: E402
+from mind import notebook, profiles  # noqa: E402
 
 
 class _Live(unittest.TestCase):
@@ -45,7 +45,7 @@ class _Live(unittest.TestCase):
             mock.patch.object(skills, "prompt_block", lambda q: ("", [])),
             mock.patch.object(knowledge, "prompt_block", lambda q: ""),
             mock.patch.object(prompts.history, "get_summary", lambda: "SUMMARY-OLD"),
-            mock.patch.object(prompts, "_card", lambda private: "CARD-RYAN\n" if private else ""),
+            mock.patch.object(prompts, "_profile", lambda private: "PROFILE-RYAN\n" if private else ""),
         ]
         for p in patches:
             p.start()
@@ -64,7 +64,7 @@ class StablePrompt(_Live):
         self.assertEqual(one, two)                                   # what the server reuses
         for changing in ("CLOCK-", "SITUATION-LINE", "FACT-", "LESSON-", "TIMING-NOTE"):
             self.assertNotIn(changing, one)
-        self.assertIn("CARD-RYAN", one)                              # the card is stable: it stays up top
+        self.assertIn("PROFILE-RYAN", one)                              # the profile is stable: it stays up top
         self.assertIn("SUMMARY-OLD", one)
         self.assertIn("FACT-coffee", live_one)
         self.assertIn("FACT-servers", live_two)
@@ -78,7 +78,7 @@ class StablePrompt(_Live):
     def test_off_is_the_old_prompt(self):
         whole, live = self.parts("coffee", on=False)
         self.assertEqual(live, "")
-        for part in ("CLOCK-", "SITUATION-LINE", "FACT-coffee", "LESSON-coffee", "TIMING-NOTE", "CARD-RYAN"):
+        for part in ("CLOCK-", "SITUATION-LINE", "FACT-coffee", "LESSON-coffee", "TIMING-NOTE", "PROFILE-RYAN"):
             self.assertIn(part, whole)
         self.assertLess(whole.index("Right now:"), whole.index("Personality:"))
 
@@ -86,7 +86,7 @@ class StablePrompt(_Live):
         with mock.patch.object(config, "LLM_STABLE_PROMPT", True, create=True):
             with turnctx.begin(source="typed"):
                 system, live = prompts.build_prompt_parts("coffee", "", private=False)
-        for private in ("CARD-RYAN", "SITUATION-LINE", "FACT-", "LESSON-", "SUMMARY-OLD"):
+        for private in ("PROFILE-RYAN", "SITUATION-LINE", "FACT-", "LESSON-", "SUMMARY-OLD"):
             self.assertNotIn(private, system + live)
         self.assertIn("CLOCK-", live)
 
@@ -100,6 +100,24 @@ class WithLive(unittest.TestCase):
         self.assertEqual(out[0]["text"], "NOTE\n(said out loud)\nhi")
         self.assertEqual(parts[0]["text"], "(said out loud)\nhi")          # the original isn't touched
         self.assertIs(out[1], parts[1])
+
+
+class SplitLive(unittest.TestCase):
+    def test_words_come_back_without_the_note(self):
+        live = f"{prompts.LIVE_OPEN}\nRight now:\nTuesday\n{prompts.LIVE_CLOSE}\n"
+        self.assertEqual(prompts.split_live(live + "hi there"), (live.rstrip("\n"), "hi there"))
+        self.assertEqual(prompts.split_live("hi there"), ("", "hi there"))
+        self.assertEqual(prompts.split_live(prompts.LIVE_OPEN + " no end"), ("", prompts.LIVE_OPEN + " no end"))
+
+    def test_the_examples_page_shows_your_words(self):
+        from web import dataset_web
+        live = f"{prompts.LIVE_OPEN}\nRight now:\nTuesday\n{prompts.LIVE_CLOSE}\n"
+        row = dataset_web._row({"messages": [{"role": "system", "content": "SYS"},
+                                             {"role": "user", "content": live + "how's the coffee"}],
+                                "reply": "Hot."})
+        self.assertEqual(row["said"], "how's the coffee")
+        self.assertTrue(row["system"].startswith("SYS"))
+        self.assertIn("Tuesday", row["system"])
 
 
 class ATurn(_Live):
@@ -148,7 +166,7 @@ class ATurn(_Live):
         self.assertIn("FACT-how's the coffee", payload["messages"][0]["content"])
 
 
-class Cards(unittest.TestCase):
+class Profiles(unittest.TestCase):
     MINE = ["Ryan runs Unraid", "Ryan builds Luna", "Ryan likes his coffee black", "Ryan streams on Mondays"]
     HERS = ["Shannon uses an iMac", "Shannon goes by NZ_Kitty", "Shannon plays Second Life"]
 
@@ -156,14 +174,14 @@ class Cards(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         from senses import people
         everyone = {"Shannon": {"name": "Shannon", "facts": list(self.HERS)},
-                    "Bob": {"name": "Bob", "facts": ["Bob is a plumber"]}}           # too little for a card
+                    "Bob": {"name": "Bob", "facts": ["Bob is a plumber"]}}           # too little for a profile
         self.patches = [mock.patch.object(notebook, "DB_FILE", os.path.join(self.tmp, "notebook.db")),
-                        mock.patch.object(cards, "_owner_facts", lambda: list(self.MINE)),
+                        mock.patch.object(profiles, "_owner_facts", lambda: list(self.MINE)),
                         mock.patch.object(people, "everyone", lambda: everyone),
                         mock.patch.object(people, "session_guest", lambda n: {"facts": []} if n == "Visitor" else None),
                         mock.patch("config.USER", "Ryan", create=True),
                         mock.patch("config.USER_NAME", "Ryan", create=True),
-                        mock.patch("config.SELF_CARD", True, create=True)]
+                        mock.patch("config.SELF_PROFILES", True, create=True)]
         for p in self.patches:
             p.start()
         self.asked = []
@@ -176,61 +194,75 @@ class Cards(unittest.TestCase):
     def ask(self, prompt):
         self.asked.append(prompt)
         who = prompt.split("saved about ")[1].split(":")[0]
-        return f"Here's the card: {who} is someone she knows well, card text."
+        return f"Here's the profile: {who} is someone she knows well, profile text."
 
     def test_who_gets_one_and_it_isnt_rewritten_for_nothing(self):
-        written = cards.write(self.ask)
+        written = profiles.write(self.ask)
         self.assertEqual(written, ["Ryan", "Shannon"])               # yours first; Bob has too little
-        self.assertEqual(cards.get("me")["text"], "Ryan is someone she knows well, card text.")
-        self.assertEqual(cards.write(self.ask), [])                  # nothing changed, nothing asked
+        self.assertEqual(profiles.get("me")["text"], "Ryan is someone she knows well, profile text.")
+        self.assertEqual(profiles.write(self.ask), [])                  # nothing changed, nothing asked
         self.assertEqual(len(self.asked), 2)
         self.MINE.append("Ryan bought a 7900 XT")
         try:
-            self.assertEqual(cards.write(self.ask), ["Ryan"])        # only the one whose facts moved
+            self.assertEqual(profiles.write(self.ask), ["Ryan"])        # only the one whose facts moved
         finally:
             self.MINE.pop()
 
-    def test_each_turn_gets_its_own_card_and_never_yours(self):
-        cards.write(self.ask)
+    def test_each_turn_gets_its_own_profile_and_never_yours(self):
+        profiles.write(self.ask)
         with turnctx.begin(source="typed"):
-            self.assertIn("Ryan is someone", cards.prompt_block())
+            self.assertIn("Ryan is someone", profiles.prompt_block())
         with turnctx.begin(source="voice", speaker="Shannon"):
-            block = cards.prompt_block()
+            block = profiles.prompt_block()
             self.assertIn("Shannon is someone", block)
             self.assertNotIn("Ryan is", block)
         for nobody in ("someone new", "Visitor"):
             with turnctx.begin(source="voice", speaker=nobody):
-                self.assertEqual(cards.prompt_block(), "")
+                self.assertEqual(profiles.prompt_block(), "")
 
     def test_a_failed_read_drops_nobody(self):
-        cards.write(self.ask)
+        profiles.write(self.ask)
 
         def broken():
             raise OSError("facts.db is locked")
-        with mock.patch.object(cards, "_owner_facts", broken):
-            cards.write(self.ask)
-        self.assertIsNotNone(cards.get("me"))
+        with mock.patch.object(profiles, "_owner_facts", broken):
+            profiles.write(self.ask)
+        self.assertIsNotNone(profiles.get("me"))
+
+    def test_your_facts_even_inside_a_guests_turn(self):
+        from mind import longterm
+        self.patches[1].stop()                                     # the real _owner_facts
+        try:
+            with mock.patch.object(longterm, "backend", lambda: "json"), \
+                    mock.patch.dict(longterm.memory, {"long_term_facts": ["MINE-1", "MINE-2"]}), \
+                    mock.patch("senses.people.facts", lambda name: ["THEIRS"]), \
+                    turnctx.begin(source="voice", speaker="Shannon"):
+                facts = profiles._owner_facts()
+        finally:
+            self.patches[1].start()
+        self.assertIn("MINE-1", facts)
+        self.assertNotIn("THEIRS", facts)
 
     def test_missing_until_written(self):
-        self.assertTrue(cards.missing())
-        cards.write(self.ask)
-        self.assertFalse(cards.missing())
-        cards.rebuild_all()
-        self.assertTrue(cards.missing())                            # marked for rewriting
-        cards.write(self.ask)
-        self.assertFalse(cards.missing())
-        with mock.patch("config.SELF_CARD", False, create=True):
-            cards.forget("me")
-            self.assertFalse(cards.missing())                       # off: nothing is missing
+        self.assertTrue(profiles.missing())
+        profiles.write(self.ask)
+        self.assertFalse(profiles.missing())
+        profiles.rebuild_all()
+        self.assertTrue(profiles.missing())                            # marked for rewriting
+        profiles.write(self.ask)
+        self.assertFalse(profiles.missing())
+        with mock.patch("config.SELF_PROFILES", False, create=True):
+            profiles.forget("me")
+            self.assertFalse(profiles.missing())                       # off: nothing is missing
 
     def test_off_and_forget(self):
-        cards.write(self.ask)
-        with mock.patch("config.SELF_CARD", False, create=True), turnctx.begin(source="typed"):
-            self.assertEqual(cards.prompt_block(), "")
-        self.assertEqual(cards.forget("shannon"), "Shannon")
-        self.assertIsNone(cards.get("Shannon"))
-        self.assertEqual(cards.rebuild_all(), 1)
-        self.assertEqual(cards.write(self.ask), ["Ryan", "Shannon"])
+        profiles.write(self.ask)
+        with mock.patch("config.SELF_PROFILES", False, create=True), turnctx.begin(source="typed"):
+            self.assertEqual(profiles.prompt_block(), "")
+        self.assertEqual(profiles.forget("shannon"), "Shannon")
+        self.assertIsNone(profiles.get("Shannon"))
+        self.assertEqual(profiles.rebuild_all(), 1)
+        self.assertEqual(profiles.write(self.ask), ["Ryan", "Shannon"])
 
 
 if __name__ == "__main__":
