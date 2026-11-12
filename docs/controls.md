@@ -66,7 +66,7 @@ Slash commands:
 | `/log` | Tail the debug log without leaving the app |
 | `/mood` | How she's feeling, and what moved it: `/mood reset` to clear |
 | `/pages` | Her joined-up notes per subject ([memory.md](memory.md#pages)): `/pages <subject>`, `rebuild`, `forget <subject>` |
-| `/card` | Her short card on you and each person she knows ([memory.md](memory.md#cards)): `/card <name>` (or `me`), `rebuild`, `forget <name>` |
+| `/profile` | Her short profile of you and each person she knows ([memory.md](memory.md#profiles)): `/profile <name>` (or `me`), `rebuild`, `forget <name>` |
 | `/offers` | What she's noticed on her own to offer you ([offers.md](offers.md)): `/offers now`, `on`, `off`, `unmute` |
 | `/good`, `/fix <reply>` | Keep her last reply, or your better version, as an example for her patches ([patches.md](patches.md)); `/examples` shows the count and the page |
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |

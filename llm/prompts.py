@@ -280,16 +280,16 @@ def stable_prompt():
     return v is not False
 
 
-def _card(private):
-    """The short card on whoever she's talking to (mind/cards.py), or ""."""
+def _profile(private):
+    """The short profile of whoever she's talking to (mind/profiles.py), or ""."""
     if not private:
         return ""
     try:
-        from mind import cards
+        from mind import profiles
 
-        return cards.prompt_block()
+        return profiles.prompt_block()
     except Exception:
-        logbook.exception("llm", "card block failed")
+        logbook.exception("llm", "profile block failed")
         return ""
 
 
@@ -316,7 +316,7 @@ def _pieces(query, timing, private):
 
     return {
         "user": people.user_line() if private else "",
-        "card": _card(private),
+        "profile": _profile(private),
         "now": timeutil.describe_now(),
         "situation": situation_block,
         "timing": timing,
@@ -357,7 +357,7 @@ def build_system_prompt(query="", timing="", private=True):
 def _whole(p):
     return f"""
 You are {AGENT_NAME}.
-{p['user']}{p['card']}
+{p['user']}{p['profile']}
 Right now:
 {p['now']}
 {p['situation']}
@@ -383,7 +383,7 @@ def build_prompt_parts(query="", timing="", private=True):
     """(system, live) for a turn.
 
     With llm.stable_prompt on (the default), system is what stays the same
-    from turn to turn - who she is, who she's talking to and her card on
+    from turn to turn - who she is, who she's talking to and her profile of
     them, her manner, the tools, the older-conversation summary - and live
     is everything picked or measured for this turn: the clock, the live
     situation lines, how long ago the last message was, her mood, the
@@ -399,7 +399,7 @@ def build_prompt_parts(query="", timing="", private=True):
 
     system = f"""
 You are {AGENT_NAME}.
-{p['user']}{p['card']}
+{p['user']}{p['profile']}
 The time right now, what's going on around you, your mood and what you remember
 that bears on this message come in a note in front of the latest message. Never
 calculate a date or a duration yourself - call get_datetime or time_until instead.
@@ -424,6 +424,18 @@ def turn_prompt(query, past, private=True):
     from .replay import _timing_note
 
     return build_prompt_parts(query, _timing_note(past, above=stable_prompt()), private=private)
+
+
+def split_live(text):
+    """(note, words) from a latest message that carries the turn's note, or
+    ("", text) when it doesn't. For showing what you said without the note
+    (the examples page); what she saw keeps both."""
+    text = str(text or "")
+    if text.startswith(LIVE_OPEN):
+        end = text.find(LIVE_CLOSE)
+        if end != -1:
+            return text[:end + len(LIVE_CLOSE)], text[end + len(LIVE_CLOSE):].lstrip("\n")
+    return "", text
 
 
 def with_live(live, content):

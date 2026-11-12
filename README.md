@@ -59,7 +59,7 @@ What she does:
 - **Files and commands:** writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane. A fresh install starts with the everyday tools on and the far-reaching ones (shell, network scans, email, desktop control) off until you switch them on
 - **Hard to steer:** a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
 - **Moods and feelings:** she runs warmer or flatter with the clock and the session, and laughs, blushes or gasps in the moment, all set in one file you can edit ([details](docs/moods.md), [the companion side](docs/companion.md))
-- **Long-term memory:** optional permanent SQLite store with its own browser editor
+- **Long-term memory:** a permanent SQLite store with its own browser editor, and a short profile of you (and each person she knows) she writes herself and keeps in mind ([details](docs/memory.md))
 - **Your knowledge base:** point her at your notes, manuals, PDFs and docs, and she answers from them and says which file ([details](docs/knowledge.md))
 - **Her reasoning, kept:** the model's scratchpad per turn, with a browser viewer for reading it back
 - **See inside her:** token-by-token confidence, automatic flags for guesses and slips, `introspect` and `self_status` tools she can use on herself, and a live monitor

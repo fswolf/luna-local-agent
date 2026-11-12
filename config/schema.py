@@ -381,7 +381,7 @@ SCHEMA = {
     "self.tidy_facts": ("bool", "Let her merge duplicate facts and retire contradicted ones"),
     "self.pages": ("bool", "Let her write a short joined-up page on each subject she knows a lot about, while idle"),
     "self.pages_in_prompt": ("int", "Most pages in one prompt (the ones your message is about)"),
-    "self.card": ("bool", "Let her keep a short card on you (and each person she knows) from their facts, written while idle, always in her prompt"),
+    "self.profiles": ("bool", "Let her keep a short profile of you (and each person she knows) from their facts, written while idle, always in her prompt"),
     "self.calibration": ("bool", "Let her say when she's unsure, measured from her word probabilities (llama-server)"),
     "self.hedge_below": ("float", "How sure, 0-1, a reply must be before she skips the unsure line"),
     "self.hedge_line": ("text", "What she says when unsure; empty keeps her quiet"),

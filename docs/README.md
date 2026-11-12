@@ -82,6 +82,7 @@ Everything the README only touches on, one subject per page.
 - Three push-to-talk modes, including hands free
 - Configurable AI personality, and moods that shift with the clock and the session
 - Long-term memory the model writes, corrects and forgets
+- A short [profile](memory.md#profiles) of you, and of each person she knows, always in her prompt
 - Permanent SQLite fact store that retires what stops being true, with a browser editor
 - Reminders in plain language, with repeats, retry and DST-safe schedules
 - Alarms that ring, nag and snooze until you're actually up

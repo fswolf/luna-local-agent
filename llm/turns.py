@@ -125,13 +125,13 @@ def prompt_budget(text="hello"):
     except Exception:
         situation_block = ""
 
-    from .prompts import _card
+    from .prompts import _profile
 
-    card_block = _card(True)
+    profile_block = _profile(True)
     whole = system + live
     parts = {
-        "persona + rules": lmstudio.estimate_tokens(whole) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block) - lmstudio.estimate_tokens(self_block) - lmstudio.estimate_tokens(situation_block) - lmstudio.estimate_tokens(card_block),
-        "card on who you're talking to": lmstudio.estimate_tokens(card_block),
+        "persona + rules": lmstudio.estimate_tokens(whole) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block) - lmstudio.estimate_tokens(self_block) - lmstudio.estimate_tokens(situation_block) - lmstudio.estimate_tokens(profile_block),
+        "profile of who you're talking to": lmstudio.estimate_tokens(profile_block),
         "situation (live)": lmstudio.estimate_tokens(situation_block),
         "memory (facts + preferences)": lmstudio.estimate_tokens(memory_block),
         "lessons, recipes, projects + past sessions": lmstudio.estimate_tokens(self_block),

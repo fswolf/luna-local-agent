@@ -16,8 +16,8 @@ with /reflect:
              or contradict each other, and merges or retires them.
              sqlite backend only; a retired fact stays in /facts retired.
   pages,     after the tidy: a short note per subject she knows a lot
-  cards      about (mind/pages.py), and a short card on you and on each
-             person she knows (mind/cards.py).
+  profiles   about (mind/pages.py), and a short profile of you and of each
+             person she knows (mind/profiles.py).
 
 Plus the startup part: the previous session is summarised before
 anything else, so the first thing she says can pick up where it left
@@ -761,23 +761,23 @@ def write_pages(model, report=None):
     return written
 
 
-def _cards_missing():
-    from mind import cards
+def _profiles_missing():
+    from mind import profiles
 
-    return cards.missing()
+    return profiles.missing()
 
 
-def write_cards(model, report=None):
-    """A short card on you, and on each person she knows (mind/cards.py), after
-    the facts are tidied. Returns who got one."""
-    from mind import cards
+def write_profiles(model, report=None):
+    """A short profile of you, and of each person she knows (mind/profiles.py),
+    after the facts are tidied. Returns who got one."""
+    from mind import profiles
 
-    if not cards.enabled():
+    if not profiles.enabled():
         return []
-    written = cards.write(lambda prompt: _ask(_model(model), prompt, think=0, max_tokens=220),
+    written = profiles.write(lambda prompt: _ask(_model(model), prompt, think=0, max_tokens=220),
                           yield_=_yield, report=report)
     if written:
-        logbook.info("reflect", "cards written: %s", ", ".join(written))
+        logbook.info("reflect", "profiles written: %s", ", ".join(written))
     return written
 
 
@@ -795,7 +795,7 @@ def run_all(model, report=None):
             dream(model, report)
             tidy_facts(model, report)
             write_pages(model, report)
-            write_cards(model, report)
+            write_profiles(model, report)
         except Interrupted:
             if report:
                 report("Paused - you started talking. The rest happens next time she's idle.")
@@ -1032,12 +1032,12 @@ def _loop(model, show):
                     dream(model, report=_shout(show))
                     tidy_facts(model, report=_shout(show))
                     write_pages(model, report=_shout(show))
-                    write_cards(model, report=_shout(show))
-                elif idle_seconds() >= 600 and not _resting("cards") and _cards_missing():
-                    if write_cards(model, report=_shout(show)):
-                        _job_ok("cards")
+                    write_profiles(model, report=_shout(show))
+                elif idle_seconds() >= 600 and not _resting("profiles") and _profiles_missing():
+                    if write_profiles(model, report=_shout(show)):
+                        _job_ok("profiles")
                     else:
-                        _job_failed("cards")        # the server's down, or she wrote nothing: an hour's rest
+                        _job_failed("profiles")        # the server's down, or she wrote nothing: an hour's rest
         except Interrupted:
             pass
         except Exception:
@@ -1048,7 +1048,7 @@ def start(model, show=None):
     """Called once at startup. show(line) puts a line on screen."""
     if not any(getattr(config, k, True) for k in
                ("SELF_EPISODES", "SELF_LESSONS", "SELF_TIDY_FACTS", "SELF_GREET", "SELF_PAGES",
-                "SELF_CARD")):
+                "SELF_PROFILES")):
         return
 
     threading.Thread(target=_loop, args=(model, show), daemon=True,

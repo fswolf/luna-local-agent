@@ -295,7 +295,7 @@ SETTINGS = {
     "self.projects_in_prompt":    ("SELF_PROJECTS_IN_PROMPT",      True),
     "self.pages":                 ("SELF_PAGES",                   True),
     "self.pages_in_prompt":       ("SELF_PAGES_IN_PROMPT",         True),
-    "self.card":                  ("SELF_CARD",                    True),
+    "self.profiles":              ("SELF_PROFILES",                True),
     "situation.enabled":          ("SITUATION_ENABLED",            True),
 
     "portrait.model":             ("PORTRAIT_MODEL",               True),

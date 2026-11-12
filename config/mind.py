@@ -106,8 +106,8 @@ SELF_PROJECTS_IN_PROMPT = int(_self_cfg.get("projects_in_prompt", 3))
 # Pages (mind/pages.py): a short joined-up note per subject she knows a lot about.
 SELF_PAGES = flag(_self_cfg.get("pages", True))
 SELF_PAGES_IN_PROMPT = int(_self_cfg.get("pages_in_prompt", 2))
-# Cards (mind/cards.py): a short summary of each person, from their facts.
-SELF_CARD = flag(_self_cfg.get("card", True))
+# Profiles (mind/profiles.py): a short summary of each person, from their facts.
+SELF_PROFILES = flag(_self_cfg.get("profiles", True))
 
 # The situation block (mind/situation.py): focused window, music, machine load,
 # running plugins, next reminder, what's in her hands - a few live lines in
