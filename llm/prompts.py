@@ -265,13 +265,40 @@ def _mcp_lines(private):
         return ""
 
 
-def build_system_prompt(query="", timing="", private=True):
+def stable_prompt():
+    """llm.stable_prompt: keep the system prompt the same from turn to turn
+    and carry what changes every turn in a note on the latest message.
+
+    llama-server keeps the start of the last prompt and skips re-reading
+    any part that hasn't changed. The old layout put the clock in the
+    third line and the memories picked for this message further down, so
+    something near the top changed every turn and the whole prompt - the
+    persona, the rules, the tool schemas and the history after them - was
+    read again from scratch. With this on, only the note and your message
+    are new. Off puts everything back in the system prompt, as before."""
+    v = config.current("llm.stable_prompt")
+    return v is not False
+
+
+def _card(private):
+    """The short card on whoever she's talking to (mind/cards.py), or ""."""
+    if not private:
+        return ""
+    try:
+        from mind import cards
+
+        return cards.prompt_block()
+    except Exception:
+        logbook.exception("llm", "card block failed")
+        return ""
+
+
+def _pieces(query, timing, private):
     # Ryan's history summary, his facts and her notes are his business -
     # a turn from stream chat gets the persona and the clock, not them.
     # Someone else in the house gets the conversation as it's happening
     # (the recent turns), not the summary of his older talk.
     summary = history.get_summary() if private and not people.guest() else ""
-    summary_block = f"\nEarlier conversation summary:\n{summary}\n" if summary else ""
 
     # A "now" anchor, plus enough calendar context that the model never
     # has to derive a date. It used to get a bare ISO timestamp and the
@@ -287,32 +314,129 @@ def build_system_prompt(query="", timing="", private=True):
         except Exception:
             logbook.exception("llm", "situation block failed")
 
-    return f"""
-You are {AGENT_NAME}.
-{people.user_line() if private else ""}
-Right now:
-{timeutil.describe_now()}
-{situation_block}
-Never calculate a date or a duration yourself - call get_datetime or
-time_until instead.
-{timing}
+    return {
+        "user": people.user_line() if private else "",
+        "card": _card(private),
+        "now": timeutil.describe_now(),
+        "situation": situation_block,
+        "timing": timing,
+        "feelings": f"{mood.line(private)}{heavy.line(private)}{offers.line(private)}{away.line(private)}",
+        # follows her mood (tags mode), so it's one of the parts that change
+        "gestures": gestures.prompt_line(private),
+        "tools": f"{build_tools_prompt(private)}{_plugin_lines(private)}{_mcp_lines(private)}",
+        "memory": build_memory_prompt(query) if private else "",
+        "self": build_self_prompt(query) if private else "",
+        "summary": f"\nEarlier conversation summary:\n{summary}\n" if summary else "",
+    }
 
-Personality:
-{PERSONALITY}
-{mood.line(private)}{heavy.line(private)}{offers.line(private)}{away.line(private)}
-Tone:
+
+def _persona():
+    return f"""Personality:
+{PERSONALITY}"""
+
+
+def _manner():
+    return f"""Tone:
 {TONE}
 
 Traits:
 {', '.join(TRAITS)}
 
 Rules:
-{', '.join(RULES)}
-{gestures.prompt_line(private)}{build_tools_prompt(private)}{_plugin_lines(private)}{_mcp_lines(private)}
-{build_memory_prompt(query) if private else ""}
-{build_self_prompt(query) if private else ""}
-{summary_block}
+{', '.join(RULES)}"""
+
+
+def build_system_prompt(query="", timing="", private=True):
+    """The whole prompt as one system message, the way it always was: what
+    changes every turn sits in it too. For callers that build a request of
+    their own (a touch, diagnose.py); a turn uses build_prompt_parts."""
+    p = _pieces(query, timing, private)
+    return _whole(p)
+
+
+def _whole(p):
+    return f"""
+You are {AGENT_NAME}.
+{p['user']}{p['card']}
+Right now:
+{p['now']}
+{p['situation']}
+Never calculate a date or a duration yourself - call get_datetime or
+time_until instead.
+{p['timing']}
+
+{_persona()}
+{p['feelings']}
+{_manner()}
+{p['gestures']}{p['tools']}
+{p['memory']}
+{p['self']}
+{p['summary']}
 """
+
+
+LIVE_OPEN = "[Notes for this turn, from the app - not part of the message. Don't read them out or answer them.]"
+LIVE_CLOSE = "[End of notes. The message:]"
+
+
+def build_prompt_parts(query="", timing="", private=True):
+    """(system, live) for a turn.
+
+    With llm.stable_prompt on (the default), system is what stays the same
+    from turn to turn - who she is, who she's talking to and her card on
+    them, her manner, the tools, the older-conversation summary - and live
+    is everything picked or measured for this turn: the clock, the live
+    situation lines, how long ago the last message was, her mood, the
+    facts, pages, lessons and notes that match this message. The caller
+    puts live in front of the latest message, and only there: it's never
+    stored in history, so it doesn't pile up turn after turn.
+
+    Off: (the whole prompt, "")."""
+    p = _pieces(query, timing, private)
+
+    if not stable_prompt():
+        return _whole(p), ""
+
+    system = f"""
+You are {AGENT_NAME}.
+{p['user']}{p['card']}
+The time right now, what's going on around you, your mood and what you remember
+that bears on this message come in a note in front of the latest message. Never
+calculate a date or a duration yourself - call get_datetime or time_until instead.
+
+{_persona()}
+{_manner()}
+{p['tools']}
+{p['summary']}
+"""
+    live = "\n".join(s.strip("\n") for s in (
+        "Right now:\n" + p["now"], p["situation"], p["timing"], p["feelings"], p["gestures"],
+        p["memory"], p["self"]) if s and s.strip())
+
+    return system, f"{LIVE_OPEN}\n{live}\n{LIVE_CLOSE}\n"
+
+
+def turn_prompt(query, past, private=True):
+    """(system, live) for a turn on top of the stored conversation `past`,
+    timing note included. Every request that stands in for a turn (ask, a
+    touch, diagnose.py's last layers) builds it here, so they all lay the
+    prompt out the same way - and share one cached start."""
+    from .replay import _timing_note
+
+    return build_prompt_parts(query, _timing_note(past, above=stable_prompt()), private=private)
+
+
+def with_live(live, content):
+    """The latest message's content with the turn's note in front of it.
+    content is the words, or a list of parts (words plus a recording):
+    the note goes in front of the words either way."""
+    if not live:
+        return content
+    if isinstance(content, list):
+        content = list(content)
+        content[0] = dict(content[0], text=f"{live}{content[0].get('text', '')}")
+        return content
+    return f"{live}{content}"
 
 
 def build_generation_params():

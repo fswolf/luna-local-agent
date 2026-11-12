@@ -256,6 +256,8 @@ SETTINGS = {
     "long_term_memory.context_facts": ("LONG_TERM_MEMORY_CONTEXT_FACTS", True),
     "long_term_memory.backend":   ("LONG_TERM_MEMORY_BACKEND",      True),
 
+    "llm.stable_prompt":          ("LLM_STABLE_PROMPT",            True),
+
     "thoughts.enabled":           ("THOUGHTS_ENABLED",             True),
     "thoughts.max_records":       ("THOUGHTS_MAX_RECORDS",         True),
     "thoughts.token_probs":       ("THOUGHTS_TOKEN_PROBS",         True),
@@ -293,6 +295,7 @@ SETTINGS = {
     "self.projects_in_prompt":    ("SELF_PROJECTS_IN_PROMPT",      True),
     "self.pages":                 ("SELF_PAGES",                   True),
     "self.pages_in_prompt":       ("SELF_PAGES_IN_PROMPT",         True),
+    "self.card":                  ("SELF_CARD",                    True),
     "situation.enabled":          ("SITUATION_ENABLED",            True),
 
     "portrait.model":             ("PORTRAIT_MODEL",               True),

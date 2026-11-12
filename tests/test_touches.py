@@ -87,7 +87,7 @@ class Answering(unittest.TestCase):
              mock.patch("core.history.add_message", side_effect=lambda r, c, **k: added.append((r, c))), \
              mock.patch("core.history.save"), mock.patch("core.transcript.add"), \
              mock.patch("mind.mood.note_exchange") as mood_heard, \
-             mock.patch("llm.build_system_prompt", return_value="SYSTEM"), \
+             mock.patch("llm.turn_prompt", return_value=("SYSTEM", "")), \
              mock.patch("voice.speech.Player") as player, \
              mock.patch("ui.add_message"), mock.patch("ui.begin_message"), mock.patch("ui.extend_message"), \
              mock.patch("ui.end_message"), mock.patch("ui.set_status"):

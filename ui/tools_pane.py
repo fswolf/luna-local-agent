@@ -42,6 +42,8 @@ _SELF_FEATURES = (
     ("lessons (dream pass)", "SELF_LESSONS", "self.lessons", "/reflect, /lessons"),
     ("episodic memory", "SELF_EPISODES", "self.episodes", "/episodes"),
     ("fact cleanup", "SELF_TIDY_FACTS", "self.tidy_facts", "sqlite memory"),
+    ("pages", "SELF_PAGES", "self.pages", "/pages"),
+    ("cards", "SELF_CARD", "self.card", "/card"),
     ("calibration", "SELF_CALIBRATION", "self.calibration", "says when unsure"),
     ("startup greeting", "SELF_GREET", "self.greet", "after a break"),
     ("skill recipes", "SELF_SKILLS", "self.skills", "/skills"),

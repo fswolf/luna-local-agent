@@ -1,6 +1,6 @@
 """What Luna does while nobody's talking to her.
 
-Three jobs, all run in the background when she's idle, and all at once
+Her chores, all run in the background when she's idle, and all at once
 with /reflect:
 
   episodes   each finished conversation becomes a few sentences in her
@@ -15,6 +15,9 @@ with /reflect:
   tidy       looks for remembered facts that say the same thing twice,
              or contradict each other, and merges or retires them.
              sqlite backend only; a retired fact stays in /facts retired.
+  pages,     after the tidy: a short note per subject she knows a lot
+  cards      about (mind/pages.py), and a short card on you and on each
+             person she knows (mind/cards.py).
 
 Plus the startup part: the previous session is summarised before
 anything else, so the first thing she says can pick up where it left
@@ -758,6 +761,26 @@ def write_pages(model, report=None):
     return written
 
 
+def _cards_missing():
+    from mind import cards
+
+    return cards.missing()
+
+
+def write_cards(model, report=None):
+    """A short card on you, and on each person she knows (mind/cards.py), after
+    the facts are tidied. Returns who got one."""
+    from mind import cards
+
+    if not cards.enabled():
+        return []
+    written = cards.write(lambda prompt: _ask(_model(model), prompt, think=0, max_tokens=220),
+                          yield_=_yield, report=report)
+    if written:
+        logbook.info("reflect", "cards written: %s", ", ".join(written))
+    return written
+
+
 # ---------------------------------------------------------------------------
 # All of it, and when
 # ---------------------------------------------------------------------------
@@ -772,6 +795,7 @@ def run_all(model, report=None):
             dream(model, report)
             tidy_facts(model, report)
             write_pages(model, report)
+            write_cards(model, report)
         except Interrupted:
             if report:
                 report("Paused - you started talking. The rest happens next time she's idle.")
@@ -1008,6 +1032,12 @@ def _loop(model, show):
                     dream(model, report=_shout(show))
                     tidy_facts(model, report=_shout(show))
                     write_pages(model, report=_shout(show))
+                    write_cards(model, report=_shout(show))
+                elif idle_seconds() >= 600 and not _resting("cards") and _cards_missing():
+                    if write_cards(model, report=_shout(show)):
+                        _job_ok("cards")
+                    else:
+                        _job_failed("cards")        # the server's down, or she wrote nothing: an hour's rest
         except Interrupted:
             pass
         except Exception:
@@ -1017,7 +1047,8 @@ def _loop(model, show):
 def start(model, show=None):
     """Called once at startup. show(line) puts a line on screen."""
     if not any(getattr(config, k, True) for k in
-               ("SELF_EPISODES", "SELF_LESSONS", "SELF_TIDY_FACTS", "SELF_GREET")):
+               ("SELF_EPISODES", "SELF_LESSONS", "SELF_TIDY_FACTS", "SELF_GREET", "SELF_PAGES",
+                "SELF_CARD")):
         return
 
     threading.Thread(target=_loop, args=(model, show), daemon=True,

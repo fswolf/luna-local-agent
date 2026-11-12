@@ -1,6 +1,6 @@
 # Learning from herself
 
-Eight things that make her a little better each day, and more aware of what's around her. None of them
+Ten things that make her a little better each day, and more aware of what's around her. None of them
 changes the model's weights. They change what she gets told about
 herself, and all of it is written down where you can read it, edit it,
 or switch it off.
@@ -11,6 +11,7 @@ or switch it off.
 | Episodic memory | a few sentences of her own notes on each conversation, and on each time she played a game | `/episodes` |
 | Fact cleanup | merges facts that say the same thing twice, retires the losing side of a contradiction | `/facts retired` |
 | Pages | a short joined-up note on each subject she knows a lot about (a person, your hardware), brought along when you talk about it ([memory.md](memory.md#pages)) | `/pages` |
+| Cards | a few sentences on you, and on each person she knows, written from their facts and always in her prompt when she talks to them ([memory.md](memory.md#cards)) | `/card` |
 | Calibration | says so out loud when her token probabilities say she didn't know | the thought log's **overconfident** flag |
 | Startup greeting | after a break, opens by picking up where you left off | the first thing she says |
 | Recipes (skill library) | saves the steps of a multi-step job that went right, and brings them back for similar jobs | `/skills` |

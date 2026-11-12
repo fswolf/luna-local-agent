@@ -286,6 +286,10 @@ def _layers():
     ]))
 
     user = {"role": "user", "content": text}
+    # the real prompt as a turn lays it out: with llm.stable_prompt on, what
+    # changes every turn rides in a note in front of the message
+    real, live = llm.build_prompt_parts(text)
+    live_user = {"role": "user", "content": llm.with_live(live, text)}
 
     layers = [
         ("bare instruction", [{"role": "system", "content": INSTRUCTION}, user], {}),
@@ -296,9 +300,9 @@ def _layers():
          [{"role": "system", "content": persona + llm.build_tools_prompt()
            + llm.build_memory_prompt(text)}, user], {}),
         ("+ the real system prompt",
-         [{"role": "system", "content": llm.build_system_prompt(text)}, user], {}),
+         [{"role": "system", "content": real}, live_user], {}),
         ("+ generation settings",
-         [{"role": "system", "content": llm.build_system_prompt(text)}, user],
+         [{"role": "system", "content": real}, live_user],
          llm.build_generation_params()),
     ]
 
@@ -309,10 +313,9 @@ def _layers():
     # diagnostic - it was already reporting on a history format ask()
     # had stopped using.
     past = history.get_messages_full()
-    messages = [{
-        "role": "system",
-        "content": llm.build_system_prompt(text, llm._timing_note(past)),
-    }]
+    system, live = llm.turn_prompt(text, past)
+    messages = [{"role": "system", "content": system}]
+    user = {"role": "user", "content": llm.with_live(live, text)}
 
     replayed = []
 

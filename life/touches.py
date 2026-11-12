@@ -162,7 +162,7 @@ def _answer(touches):
     from core import transcript
     from core import turnctx
     import ui
-    from llm import _replay, _timing_note, build_system_prompt
+    from llm import _replay, turn_prompt, with_live
 
     if not _quiet_now() or not assistant._turn.acquire(blocking=False):
         return
@@ -177,10 +177,12 @@ def _answer(touches):
             assistant._hold(stop)
             _state["last"] = time.monotonic()
             past = history.get_messages_full()
-            messages = [{"role": "system", "content": build_system_prompt(note, _timing_note(past))}]
+            # laid out like any turn, so it reuses the same cached start
+            system, live = turn_prompt(note, past)
+            messages = [{"role": "system", "content": system}]
             for m in past:
                 messages.extend(_replay(m))
-            messages.append({"role": "user", "content": note})
+            messages.append({"role": "user", "content": with_live(live, note)})
 
             ui.set_status("Touched...")
             reply = _request(messages, model)

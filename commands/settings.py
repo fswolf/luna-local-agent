@@ -220,9 +220,12 @@ def handle(text):
                 "with /set, or raise the context length in LM Studio."
             )
 
+        steady = ("\nThe clock, the live lines, her mood and the memories picked for your message ride in a "
+                  "note on your message (llm.stable_prompt), so llama-server reuses the rest from the last turn."
+                  if llm.stable_prompt() else "")
         ui.add_message(
             "system",
-            f"Roughly what every turn sends (tokens):\n{rows}\n{verdict}{warning}",
+            f"Roughly what every turn sends (tokens):\n{rows}\n{verdict}{warning}{steady}",
         )
         return True
 

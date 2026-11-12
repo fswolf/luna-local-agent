@@ -14,8 +14,9 @@ Everything other modules use is re-exported here, so `import llm` and
 `llm.ask(...)` work exactly as before.
 """
 from .session import tools_active
-from .prompts import (build_generation_params, build_memory_prompt, build_self_prompt,
-                      build_system_prompt, build_tools_prompt)
+from .prompts import (build_generation_params, build_memory_prompt, build_prompt_parts,
+                      build_self_prompt, build_system_prompt, build_tools_prompt, stable_prompt,
+                      turn_prompt, with_live)
 from .replay import _demonstration, _has_tool_example, _replay, _timing_note
 from .streaming import _last_raw, _note_tokens
 from .rounds import _tool_rounds
@@ -25,7 +26,7 @@ from .turns import _record_thoughts, ask, prompt_budget
 __all__ = [
     "ask", "prompt_budget", "tools_active",
     "build_system_prompt", "build_memory_prompt", "build_self_prompt", "build_tools_prompt",
-    "build_generation_params",
+    "build_generation_params", "build_prompt_parts", "stable_prompt", "turn_prompt", "with_live",
     # Internals other modules reach for (introspection, diagnose, reflect,
     # the Discord and job paths). Listed so it's clear they're on purpose.
     "_demonstration", "_has_tool_example", "_replay", "_timing_note", "_last_raw",

@@ -316,6 +316,35 @@ def handle(text):
             ui.add_message("system", "\n".join(lines))
         return True
 
+    if text == "/card" or text.startswith("/card "):
+        from mind import cards
+
+        word = text[len("/card"):].strip()
+        if word.lower() == "rebuild":
+            n = cards.rebuild_all()
+            ui.add_message("system", f"{n} card(s) will be rewritten on her next idle pass (or /reflect now).")
+        elif word.lower().startswith("forget "):
+            gone = cards.forget(word[7:].strip())
+            ui.add_message("system", f"Card on {gone} dropped." if gone else "No card by that name.")
+        elif word:
+            card = cards.get(word)
+            ui.add_message("system", f"{card['text']}\n(from {card['facts']} facts, {card['updated'][:16].replace('T', ' ')})"
+                           if card else f"No card on {word}. /card lists them.")
+        else:
+            have = cards.cards()
+            waiting = [cards.label(p) for p in cards.material() if p not in have]
+            lines = [f"{cards.label(p)} ({c['facts']} facts, {c['updated'][5:10]}): {c['text'][:110]}{'...' if len(c['text']) > 110 else ''}"
+                     for p, c in have.items()] or ["No cards yet."]
+            if waiting:
+                lines.append("Waiting for her next idle pass: " + ", ".join(waiting))
+            if not cards.enabled():
+                lines.append("Cards are off (self.card).")
+            lines.append("A card is a few sentences she writes from someone's facts (3 or more), and it's in her "
+                         "prompt whenever she talks to them. /card <name> (or me) reads one; /card rebuild, "
+                         "/card forget <name>.")
+            ui.add_message("system", "\n".join(lines))
+        return True
+
     if text == "/episodes" or text.startswith("/episodes "):
         from mind import notebook
 
