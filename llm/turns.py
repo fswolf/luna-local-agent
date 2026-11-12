@@ -24,8 +24,8 @@ from mind import websearch
 from voice import hearing
 
 from . import session
-from .prompts import _calibration_note, _previous_user_text, build_generation_params, build_memory_prompt, build_self_prompt, build_system_prompt, build_tools_prompt
-from .replay import _demonstration, _has_tool_example, _replay, _strip_leading_timestamps, _timestamped, _timing_note
+from .prompts import _calibration_note, _previous_user_text, build_generation_params, build_memory_prompt, build_self_prompt, build_tools_prompt, turn_prompt, with_live
+from .replay import _demonstration, _has_tool_example, _replay, _strip_leading_timestamps, _timestamped
 from .rounds import _generate, _log_tool_call, _tool_rounds, _why_empty
 from .second_look import _adaptive_on, _calibrate, _follow_through, _ground, _promised_action, _rethink, _vote
 from .streaming import _last_raw
@@ -105,7 +105,7 @@ def prompt_budget(text="hello"):
     has this got".
     """
     past = history.get_messages_full()
-    system = build_system_prompt(text, _timing_note(past))
+    system, live = turn_prompt(text, past)
     replayed = []
 
     for m in past:
@@ -125,8 +125,13 @@ def prompt_budget(text="hello"):
     except Exception:
         situation_block = ""
 
+    from .prompts import _card
+
+    card_block = _card(True)
+    whole = system + live
     parts = {
-        "persona + rules": lmstudio.estimate_tokens(system) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block) - lmstudio.estimate_tokens(self_block) - lmstudio.estimate_tokens(situation_block),
+        "persona + rules": lmstudio.estimate_tokens(whole) - lmstudio.estimate_tokens(memory_block) - lmstudio.estimate_tokens(tools_block) - lmstudio.estimate_tokens(self_block) - lmstudio.estimate_tokens(situation_block) - lmstudio.estimate_tokens(card_block),
+        "card on who you're talking to": lmstudio.estimate_tokens(card_block),
         "situation (live)": lmstudio.estimate_tokens(situation_block),
         "memory (facts + preferences)": lmstudio.estimate_tokens(memory_block),
         "lessons, recipes, projects + past sessions": lmstudio.estimate_tokens(self_block),
@@ -207,13 +212,13 @@ def _ask(text, model, on_text=None, on_sentence=None,
     turn.read_local = False
     turn.lessons = []
     turn.skills = []
-    messages = [{
-        "role": "system",
-        # A turn from stream chat never sees her notes on Ryan's
-        # conversations - "last time" is his business, not the room's.
-        "content": build_system_prompt(text, _timing_note(past),
-                                       private=context is None),
-    }]
+    # A turn from stream chat never sees her notes on Ryan's
+    # conversations - "last time" is his business, not the room's.
+    # live: what changes every turn, in front of the latest message so the
+    # system prompt stays the same and the server can reuse it
+    # (llm.stable_prompt); "" when that's off.
+    system, live = turn_prompt(text, past, private=context is None)
+    messages = [{"role": "system", "content": system}]
 
     if context is None:
         _calibration_note["text"] = ""  # read once, by the prompt just built
@@ -258,7 +263,11 @@ def _ask(text, model, on_text=None, on_sentence=None,
     # Taken off the turn as it's used: a second ask inside the same turn
     # (some other question entirely) mustn't get this recording too.
     recording, turn.recording = turn.recording, None
-    messages.append(_timestamped("user", hearing.content(user_content, recording), now))
+    # The turn's note goes in front of the words (and of the line saying a
+    # recording is attached). Only on this message, and only in the request:
+    # history.add_message below stores what was said, so the note never
+    # piles up turn after turn.
+    messages.append(_timestamped("user", with_live(live, hearing.content(user_content, recording)), now))
 
     # Use whatever is loaded now rather than what was loaded at startup.
     # Unloading a model to free VRAM and loading another is a normal
@@ -456,7 +465,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
         # rule or memory selection is a different hash - and a flag rate
         # that moves can be lined up against the prompt that moved it.
         prompt_hash = hashlib.sha1(
-            messages[0]["content"].encode("utf-8", "replace")
+            (messages[0]["content"] + live).encode("utf-8", "replace")
         ).hexdigest()[:12]
 
         if second:

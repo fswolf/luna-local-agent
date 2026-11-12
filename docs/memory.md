@@ -129,6 +129,67 @@ server, so it gets a memory cap and trains at night.
 `/set self.pages false` switches them off; `self.pages_in_prompt` sets
 how many can come along. Kept in `agent/notebook.db`.
 
+## Cards
+
+Facts only come along when your message touches them. A card is the
+other half: a few sentences she writes herself, while idle, from
+everything she has on you, so the gist of who you are is always in her
+prompt even when the message is about something else.
+
+```
+> /card me
+Ryan builds Luna himself and runs her on his Fedora desktop, with an
+Unraid server on the way for her model. He likes plain talk, hates tools
+that censor an idea, and streams as a VTuber.
+```
+
+- **Who gets one:** you, once you have 3 or more facts, and each person
+  she knows by voice or face (see [people](people.md)), from their own
+  facts.
+- **Whose card she sees:** on your turns, yours. On someone else's turn,
+  theirs, and never yours. A stranger, or someone she met this session,
+  gets none.
+- **When:** in the idle dream pass, after the facts are tidied, and only
+  when the facts under a card changed. A first card doesn't wait for the
+  dream pass, and neither does a `/card rebuild`: those are written once
+  she's been idle ten minutes. `/reflect` runs it now.
+- **Facts stay the truth.** A card is a summary she can always rewrite;
+  her prompt says a fact wins if it ever says otherwise.
+
+```
+/card                 the cards she has, and who's waiting for one
+/card <name>          read one (/card me for yours)
+/card rebuild         rewrite them on her next idle pass
+/card forget <name>   drop one (it comes back if the facts are still there)
+```
+
+`/set self.card false` switches them off. A card adds about 100 tokens
+to every prompt; if she does well with it, `long_term_memory.context_facts`
+can go down to win them back. Kept in `agent/notebook.db`, beside the pages.
+
+## How it reaches her prompt
+
+llama-server keeps the start of the last prompt and skips re-reading any
+part of it that hasn't changed. So her system prompt is kept the same
+from turn to turn: who she is, who she's talking to and her card on them,
+her manner, the tools and the older-conversation summary. Everything
+picked or measured for this turn goes in a note in front of your latest
+message instead: the time, the live lines (window, music, reminders), how
+long ago you last spoke, her mood, and the facts, pages, lessons and
+notes that match what you said.
+
+The note is only in the request. History stores what you said, so notes
+never pile up turn after turn. `/context` shows what each part costs.
+
+```
+/set llm.stable_prompt false     everything back in the system prompt, as before
+```
+
+Turns where a different set of tools travels (see
+[tools](tools.md)) still re-read the history, because most models' chat
+templates put the tool list near the top of the prompt. llama-server's log shows how much of each
+prompt it had to process, which is the way to see the difference.
+
 ## Conversation history
 
 Older turns are folded into a running summary once there are more than

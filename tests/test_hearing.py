@@ -174,7 +174,10 @@ class ATurnThatHears(unittest.TestCase):
         answer, bodies, deaf, vision = self.run_turn(refuse=True)
         self.assertEqual(answer, "Okay.")
         self.assertEqual(len(bodies), 2)
-        self.assertEqual(bodies[1]["messages"][-1]["content"], "I'm fine")
+        words = bodies[1]["messages"][-1]["content"]
+        self.assertIsInstance(words, str)                          # words only now
+        self.assertTrue(words.endswith("I'm fine"))
+        self.assertNotIn("recording is attached", words)
         self.assertFalse(deaf)                                     # the rest of the turns go as words
         self.assertEqual(vision, lmstudio._senses["vision"])       # what it says about vision is untouched
 

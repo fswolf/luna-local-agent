@@ -59,8 +59,9 @@ def _timestamped(role, content, timestamp):
     in that shape. In-context examples beat instructions, and there were
     fifteen examples against one instruction.
 
-    The timing information moves to _timing_note(), which states it once
-    in the system prompt where there is no pattern to copy.
+    The timing information moves to _timing_note(), which states it once,
+    in the system prompt or the note in front of the latest message
+    (llm.stable_prompt), where there is no pattern to copy.
     """
     return {"role": role, "content": content}
 
@@ -177,11 +178,13 @@ def _has_tool_example(messages):
     return any(m.get("tool_calls") for m in messages)
 
 
-def _timing_note(messages):
+def _timing_note(messages, above=False):
     """When the conversation below happened, said once.
 
     Replaces the per-message prefixes. Same information, stated as a
     fact rather than demonstrated fifteen times in the shape of a reply.
+    above: it's going in the note on the latest message (llm.stable_prompt),
+    after the conversation rather than before it.
     """
     stamps = []
 
@@ -206,7 +209,7 @@ def _timing_note(messages):
 
     note = [
         "",
-        "The conversation below carries no timestamps. For reference: "
+        f"The conversation {'above' if above else 'below'} carries no timestamps. For reference: "
         + opening,
     ]
 

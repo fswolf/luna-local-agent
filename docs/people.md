@@ -135,6 +135,9 @@ On someone else's turn:
   window you have open and your next reminder. Her
   lessons about her own behaviour and how she feels about her games are
   hers, so those come along.
+- **Their card:** once she has 3 or more facts on them, she writes a short
+  card on them while idle, and it's in her prompt on their turns, never
+  yours ([cards](memory.md#cards)).
 - **Corrections** like "forget that" or "actually it's…" change only
   their facts.
 

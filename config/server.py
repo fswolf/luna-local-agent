@@ -6,7 +6,7 @@ Part of the config package (it was one config.py); see config/__init__.py.
 import json
 import os
 
-from .base import BASE_DIR, LM_URL, setting
+from .base import BASE_DIR, LM_URL, flag, setting
 
 # -------------------------
 # Which model server
@@ -36,6 +36,10 @@ LLM_BACKEND_WANTED = str(_llm_cfg.get("backend", "auto")).lower()
 # on a server holding several - LM Studio with JIT loading, Ollama, vLLM -
 # and if that model isn't there she says so instead of using another.
 LLM_MODEL = str(_llm_cfg.get("model", "") or "").strip()
+# Keep the system prompt the same every turn and put what changes (the clock,
+# the live lines, the memories picked for your message) in a note on the
+# latest message, so llama-server can reuse the rest (llm/prompts.py).
+LLM_STABLE_PROMPT = flag(_llm_cfg.get("stable_prompt", True))
 
 
 def _root(url):
