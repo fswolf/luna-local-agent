@@ -310,6 +310,96 @@ class Stations(unittest.TestCase):
         self.assertTrue(view["stopped"])
         self.assertEqual(view["reply"], "First.")
 
+    def test_her_portrait_for_paired_devices_only(self):
+        self.assertEqual(self._open("/portrait/")[0], 401)
+        self.assertEqual(self._open("/portrait/config.json")[0], 401)
+        _code, cookie = self._pair()
+        status, headers, page = self._open("/portrait/", cookie=cookie)
+        self.assertEqual(status, 200)
+        self.assertIn(b"boot.js", page)
+        self.assertIn("'wasm-unsafe-eval'", headers["Content-Security-Policy"])
+        status, _h, body = self._open("/portrait/config.json", cookie=cookie)
+        self.assertEqual(status, 200)
+        self.assertIsInstance(json.loads(body), dict)
+        self.assertEqual(self._open("/portrait/../config/server.py", cookie=cookie)[0], 404)
+        self.assertEqual(self._open("/portrait", cookie=cookie)[1]["Location"], "/portrait/")
+        # read-only: no pose studio saves; taps and clothes reports are dropped quietly
+        self.assertEqual(self._open("/portrait/gestures/save", b"{}", cookie, "application/json")[0], 404)
+        with mock.patch("life.touches.note") as note, mock.patch("life.clothes.note") as worn:
+            self.assertEqual(self._open("/portrait/touch", b'{"zone": "head"}', cookie, "application/json")[0], 204)
+            self.assertEqual(self._open("/portrait/outfit", b'{"wearing": "none"}', cookie, "application/json")[0], 204)
+        note.assert_not_called()
+        worn.assert_not_called()
+        # a tablet never casts to the PC's hologram fan
+        with mock.patch.object(config, "PORTRAIT_FAN_CAST", True, create=True):
+            body = self._open("/portrait/config.json", cookie=cookie)[2]
+        self.assertFalse(json.loads(body)["fan"]["cast"])
+
+    def test_portrait_stream_leaves_out_your_words_and_her_thinking(self):
+        import http.client
+
+        from web import livefeed
+
+        snap = mock.patch.dict(livefeed._snapshot, clear=True)
+        snap.start()
+        self.addCleanup(snap.stop)
+        _code, cookie = self._pair()
+        c = http.client.HTTPSConnection("127.0.0.1", self.port, context=self.ctx, timeout=10)
+        c.request("GET", "/portrait/events", headers={"Cookie": cookie})
+        r = c.getresponse()
+        self.assertEqual(r.status, 200)
+        deadline = time.time() + 5
+        while not livefeed._filtered and time.time() < deadline:
+            time.sleep(0.05)
+        livefeed.emit("turn", text="my secret", source="voice", guest=False)
+        livefeed.emit("tok", p="t", s="thinking hard", c=None)
+        livefeed.emit("tok", p="a", s="<think>inline thoughts</think>", c=None)
+        livefeed.emit("tok", p="a", s="*hugs*", c=None)
+        livefeed.emit("context", used=100)
+        livefeed.emit("mood", warmth=0.5, energy=0.1)
+        got = []
+        while time.time() < deadline:
+            line = r.fp.readline().decode()
+            if line.startswith("data: "):
+                got.append(json.loads(line[6:]))
+                if got[-1]["t"] == "mood" and any(e["t"] == "tok" for e in got):
+                    break
+        r.close()           # the app leaving her portrait
+        c.close()
+        text = json.dumps(got)
+        self.assertNotIn("my secret", text)
+        self.assertNotIn("thinking hard", text)
+        self.assertNotIn("inline thoughts", text)
+        self.assertIn("*hugs*", text)
+        self.assertNotIn('"context"', text)
+        self.assertIn({"t": "turn", "source": "voice", "guest": False},
+                      [{k: e.get(k) for k in ("t", "source", "guest")} for e in got if e["t"] == "turn"])
+        deadline = time.time() + 5             # noticed within a second or so
+        while livefeed._filtered and time.time() < deadline:
+            time.sleep(0.2)
+        self.assertFalse(livefeed._filtered)
+
+    def test_playing_a_clip_moves_her_mouth(self):
+        _code, cookie = self._pair()
+        turn = station.Turn("kitchen", next(iter(station.devices())))
+        turn.clips.append(_wav(0.5))
+        station._turns[turn.id] = turn
+        with mock.patch("web.livefeed.watching", return_value=False), mock.patch("voice.tts._lip_sync") as lips:
+            self.assertEqual(self._open(f"/playing/{turn.id}/0", b"", cookie)[0], 200)
+            time.sleep(0.3)
+        lips.assert_not_called()           # nobody watching: the clip isn't even decoded
+        with mock.patch("web.livefeed.watching", return_value=True), mock.patch("voice.tts._lip_sync") as lips:
+            status, _h, _b = self._open(f"/playing/{turn.id}/0", b"", cookie)
+            self.assertEqual(status, 200)
+            deadline = time.time() + 5
+            while not lips.called and time.time() < deadline:
+                time.sleep(0.05)
+        self.assertTrue(lips.called)
+        samples, rate = lips.call_args[0]
+        self.assertEqual(rate, 16000)
+        self.assertEqual(len(samples), 8000)
+        self.assertEqual(self._open(f"/playing/{turn.id}/5", b"", cookie)[0], 404)
+
     def test_unpair(self):
         _code, cookie = self._pair()
         key = next(iter(station.devices()))

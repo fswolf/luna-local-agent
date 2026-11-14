@@ -6,6 +6,10 @@ Luna serves on your home network, you tap and talk, and she answers through
 its speaker. It's the same Luna as at the desk: same memory, mood, people
 and tools. Nothing to install on the device, no account, no internet needed.
 
+On Android there's also an app for it, [Luna Station](#the-luna-station-app-android),
+which turns a phone or tablet into a room device for her: her portrait on
+screen, a mic to talk and a speaker for her voice.
+
 <img width="300" alt="A phone as a relay station in the kitchen: one big Tap to talk button, what you said, and her answer underneath" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/relay-station.jpg" />
 
 ## Set it up
@@ -71,6 +75,53 @@ and **Deny**. Unanswered for two minutes means no.
 
 While a voice enrolment is running at the PC (`/people enroll voice`), the
 stations wait: read the enrolment lines at the PC.
+
+## Her portrait
+
+A paired device can show her portrait too, at `/portrait/` on the station
+address (`https://<pc>:8793/portrait/`), or in the app's Portrait view: the
+same page as on the PC, her
+model moving with her mood, gestures and voice. It's drawn on the device,
+so a small or old tablet may struggle with it; try it before you rely on
+it.
+
+- **Paired devices only,** like everything else on the station port.
+- **Read-only:** the pose studio can't save, and touching her or changing
+  her clothes from a station does nothing. Those stay at the PC.
+- **Only her part of the stream.** The PC's live view carries everything
+  (what you said, her thinking, her tools). The station's portrait gets
+  only what moves her: her stage, mood, gestures and feelings, clothes,
+  props, lights, and what she says out loud (it acts out her `*hugs*`).
+  Your words and her thinking never reach the device.
+- **It shows what the PC shows.** If she's changed clothes at the desk,
+  the portrait in the kitchen shows that too.
+- **Her mouth** moves with her voice on the device: the station page tells
+  Luna when each piece of her reply starts playing (`POST /playing/<turn>/<n>`),
+  and an app playing the clips itself does the same.
+
+## The Luna Station app (Android)
+
+[Luna Station](https://github.com/fswolf/luna-station-android) is the same
+station as a proper app, made to sit somewhere in the house: a tablet on a
+stand in the kitchen, say. Luna still does all the work on your PC; the app
+is her screen, mic and speaker, and only talks to your PC over the home
+network.
+
+- **Two views,** picked at the top: **Chat** (the conversation, typed or
+  spoken, like the page) and **Portrait** (her portrait full screen, one big
+  talk button, her words underneath). Both are one conversation, so
+  switching while she answers doesn't interrupt her.
+- **Pairing** is the same QR code from the settings page: the app scans it
+  (or you type the address and code), fetches Luna's certificate itself and
+  trusts only that. Nothing to install in Android's settings.
+- **Android 11 or newer,** Amazon Fire tablets on Fire OS 8 included, no
+  Google services needed. Installed from an APK (the repo's Releases, or
+  built yourself).
+- The pairing token is kept encrypted on the device; the conversation isn't
+  stored there.
+
+Early days: pairing, typing, talking and the Chat view are tested; the
+Portrait view against a real Luna is next. Its README has the details.
 
 ## Your computer
 

@@ -53,7 +53,7 @@ What she does:
 - **Sees:** your screen, and your webcam when you switch it on
 - **Notices you:** with the webcam watching, she says hi when you come back, looks at you instead of the screen, and keeps quiet in an empty room ([details](docs/vision.md#presence-noticing-youre-there))
 - **Knows who's talking:** tells the people in your house apart by voice or face, uses their name and pronouns, and keeps each person's memories to themselves ([below](#she-knows-who-shes-talking-to))
-- **Talk from another room:** an old phone or tablet becomes a relay station, paired by QR code, nothing to install. Dedicated voice devices (ESPHome satellites) are experimental ([details](docs/stations.md))
+- **Talk from another room:** an old phone or tablet becomes a relay station, paired by QR code, nothing to install, and it can show her portrait too. On Android, the [Luna Station app](https://github.com/fswolf/luna-station-android) makes it a room device: her portrait on screen, a mic and a speaker (early). Dedicated voice devices (ESPHome satellites) are experimental ([details](docs/stations.md))
 - **Reminders and real alarms:** she wakes you up, and nags until you're up
 - **Email:** checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
 - **Files and commands:** writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane. A fresh install starts with the everyday tools on and the far-reaching ones (shell, network scans, email, desktop control) off until you switch them on
@@ -252,7 +252,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Vision](docs/vision.md): looking at your screen, the webcam, noticing you're there
 - [People in the house](docs/people.md): she knows who's talking, by voice or face
 - [Who she's talking to](docs/who.md): how every turn is matched to a person, the face check, privacy
-- [Relay stations](docs/stations.md): talk to her from another room on an old phone or tablet
+- [Relay stations](docs/stations.md): talk to her from another room on an old phone or tablet, in the browser or the Android app
 - [Reminders and alarms](docs/reminders.md)
 - [Knowledge](docs/knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history

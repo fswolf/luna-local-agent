@@ -190,7 +190,8 @@ function handle(ev) {
 }
 
 function connect() {
-  const es = new EventSource('/events');
+  // relative: /portrait/events on the PC, a relay station's own cut-down stream on a tablet
+  const es = new EventSource('events');
   es.onmessage = m => { try { handle(JSON.parse(m.data)); } catch (_) {} };
   es.onopen = () => say('');
   es.onerror = () => { if (!params.get('demo')) say('waiting for Luna…', true); };

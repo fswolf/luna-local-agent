@@ -23,6 +23,11 @@ What keeps it safe:
     15 minutes), and keeps a token after that (stored hashed; removable)
   - her permission questions (writing a file, running a command) are
     asked on the station that asked, never answered for you
+
+Her portrait is here too, at /portrait/, for paired devices only: the same
+page the PC shows (web/portrait_serve.py), read-only (no pose studio
+saves, cards or touches from here), fed by a cut-down stream with only
+what the portrait acts on - never what you said or her thinking.
 """
 import datetime
 import hashlib
@@ -30,6 +35,7 @@ import io
 import ipaddress
 import json
 import os
+import queue
 import secrets
 import socket
 import ssl
@@ -54,6 +60,14 @@ MAX_AUDIO = 6 * 1024 * 1024        # about 3 minutes of 16 kHz mono
 MAX_TYPED = 2000                   # characters typed in the station's box
 ASK_SECONDS = 120                  # how long a permission question waits on the tablet
 TURN_KEEP = 300                    # finished turns are forgotten after this
+
+# The portrait (/portrait/): her model and its scripts are all files of our
+# own, but three.js and the Live2D core need eval, blob: and wasm. Nothing
+# from elsewhere.
+_PORTRAIT_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; "
+                 "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; "
+                 "connect-src 'self' data: blob:; worker-src 'self' blob:; font-src 'self' data:; "
+                 "frame-ancestors 'none'")
 
 _state = {"servers": [], "error": "", "ip": "", "codes": {}}
 _turns = {}                        # id -> Turn
@@ -452,6 +466,37 @@ def _tidy():
             del _turns[k]
 
 
+def _lips(wav):
+    """Her portrait's mouth for one station clip (the WAV bytes), or stopped
+    (None). The PC's own playback does this in voice/tts.py; a station's
+    clips play on the device, so the device says when. Only with a portrait
+    open; never in the way of the request."""
+    def go():
+        try:
+            from voice import tts
+            from web import livefeed
+
+            if not livefeed.watching():
+                return                      # no portrait open anywhere: nothing to decode for
+            if wav is None:
+                return tts._lip_stop()
+            import numpy as np
+
+            with wave.open(io.BytesIO(wav)) as w:
+                rate, width, frames = w.getframerate(), w.getsampwidth(), w.readframes(w.getnframes())
+                channels = w.getnchannels()
+            if width != 2:
+                return
+            samples = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+            if channels > 1:
+                samples = samples.reshape(-1, channels).mean(axis=1)
+            tts._lip_sync(samples, rate)
+        except Exception as e:
+            logbook.debug("station", "no lip sync for a clip: %s", e)
+
+    threading.Thread(target=go, daemon=True, name="station-lips").start()
+
+
 # ---------------------------------------------------------------------------
 # The two servers
 # ---------------------------------------------------------------------------
@@ -509,18 +554,19 @@ class _Base(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-    def _send(self, code, body, kind="text/html; charset=utf-8", headers=()):
+    def _send(self, code, body, kind="text/html; charset=utf-8", headers=(), cache=False, csp=None):
         if isinstance(body, str):
             body = body.encode()
         self.send_response(code)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        # her model is megabytes: kept an hour, not fetched on every open
+        self.send_header("Cache-Control", "private, max-age=3600" if cache else "no-store")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy",
+        self.send_header("Content-Security-Policy", csp or (
                          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; "
-                         "img-src 'self' data:; media-src 'self' blob:; frame-ancestors 'none'")
+                         "img-src 'self' data:; media-src 'self' blob:; frame-ancestors 'none'"))
         for k, v in headers:
             self.send_header(k, v)
         self.end_headers()
@@ -570,6 +616,76 @@ class _Station(_Base):
         turn = _turns.get(tid)
         return turn if turn and turn.device == device["key"] else None
 
+    def _portrait_stream(self):
+        """Her portrait's events, as the PC's /events sends them but cut down
+        to what the portrait acts on (portrait_serve.portrait_only). Ends when
+        the device goes, or is unpaired on the PC."""
+        from web import livefeed
+        from web.portrait_serve import PortraitCut
+
+        token = _token(self.headers.get("Cookie"))
+        self.close_connection = True
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        q = livefeed.subscribe(PortraitCut())
+        try:
+            quiet = 0
+            while True:
+                try:
+                    self.wfile.write(q.get(timeout=1))
+                    self.wfile.flush()
+                    quiet = 0
+                    continue
+                except queue.Empty:
+                    quiet += 1
+                if self._gone():
+                    break
+                if quiet >= 10:
+                    quiet = 0
+                    if not _by_token(token) or not running():
+                        break
+                    self.wfile.write(b": ping\n\n")   # a gone device shows up here, as a failed write
+                    self.wfile.flush()
+        except OSError:
+            pass
+        finally:
+            livefeed.unsubscribe(q)
+
+    def _gone(self):
+        """The device closed its end (the app left her portrait): known
+        within a second, so a portrait nobody watches stops costing
+        anything. Over TLS a closed connection reads as b"" (its
+        close_notify) or an error; a device just listening sends nothing."""
+        import select
+
+        try:
+            fd = self.connection.fileno()
+            if hasattr(select, "poll"):
+                p = select.poll()
+                p.register(fd, select.POLLIN)
+                ready = bool(p.poll(0))
+            else:
+                ready = bool(select.select([fd], [], [], 0)[0])
+        except (OSError, ValueError):
+            return True
+        if not ready:
+            return False
+        before = self.connection.gettimeout()
+        try:
+            self.connection.settimeout(0)
+            return self.connection.recv(1) == b""
+        except ssl.SSLWantReadError:
+            return False                    # part of a TLS record: not a goodbye yet
+        except (OSError, ValueError):
+            return True
+        finally:
+            try:
+                self.connection.settimeout(before)
+            except OSError:
+                pass
+
     def do_GET(self):
         if not self._allowed():
             return
@@ -597,7 +713,22 @@ class _Station(_Base):
             token = _token(self.headers.get("Cookie"))
             return self._send(200, _station_page(device["name"], token), headers=[_cookie(token)])
         if not device:
+            if url.path in ("/portrait", "/portrait/"):
+                return self._send(401, _message_page(
+                    "This device isn't paired yet.",
+                    "On the PC: settings page, Relay stations, Add a phone or tablet.", _RESUME))
             return self._json(401, {"error": "not paired"})
+        if url.path == "/portrait":
+            return self._send(301, "", headers=[("Location", "/portrait/" + ("?" + url.query if url.query else ""))])
+        if url.path == "/portrait/events":
+            return self._portrait_stream()
+        if url.path.startswith("/portrait/"):
+            from web.portrait_serve import portrait_file
+
+            code, kind, body, cache = portrait_file(url.path[len("/portrait/"):], url.query, station=True)
+            if code != 200:
+                return self._json(code, {"error": "not found"})
+            return self._send(200, body, kind, cache=cache, csp=_PORTRAIT_CSP)
         if url.path.startswith("/turn/"):
             turn = self._turn(url.path[6:], device)
             return self._json(200, turn.view()) if turn else self._json(404, {"error": "no such turn"})
@@ -668,11 +799,25 @@ class _Station(_Base):
                 _turns[turn.id] = turn
             threading.Thread(target=_run, args=(turn,) + args, daemon=True, name="station-turn").start()
             return self._json(200, {"turn": turn.id})
+        if url.path in ("/portrait/outfit", "/portrait/touch"):
+            # the portrait page reporting her clothes or a tap: those count at
+            # the PC only, so a station's are taken and dropped, quietly
+            return self._send(204, "")
         if url.path.startswith("/stop/"):
             turn = self._turn(url.path[6:], device)
             if not turn:
                 return self._json(404, {"error": "no such turn"})
             turn.stop()
+            _lips(None)
+            return self._json(200, {"ok": True})
+        if url.path.startswith("/playing/"):
+            # the device is starting clip n now: her portrait's mouth moves
+            # with it (here and on the PC), timed to when it really plays
+            tid, _, n = url.path[9:].partition("/")
+            turn = self._turn(tid, device)
+            if not turn or not n.isdigit() or int(n) >= len(turn.clips):
+                return self._json(404, {"error": "no such clip"})
+            _lips(turn.clips[int(n)])
             return self._json(200, {"ok": True})
         if url.path.startswith("/answer/"):
             turn = self._turn(url.path[8:], device)

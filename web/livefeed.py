@@ -24,12 +24,13 @@ the page registry). It re-exports the rest, so `livefeed.X` still works:
     web/portrait_config.py   what the portrait page is told when it loads
     web/gesture_files.py     reading gesture and prop files for the pages
     web/gaze.py              where her eyes follow on screen
+    web/portrait_serve.py    the portrait's files, and its part of the stream
+                             (the relay stations show her portrait too)
 """
 import importlib.util
 import json
 import os
 import queue
-import re
 import threading
 import time
 import zipfile
@@ -38,8 +39,9 @@ import config
 from web import holofan
 from core import logbook
 from web.gaze import _gaze_loop
-from web.gesture_files import gesture_file, prop_entry, props_list
-from web.portrait_config import portrait_config, portrait_models
+from web.gesture_files import gesture_file, prop_entry, props_list  # noqa: F401  props_list re-exported
+from web.portrait_config import portrait_config, portrait_models  # noqa: F401  re-exported
+from web.portrait_serve import SOUNDS, TYPES, portrait_file
 from web.gesture_files import (  # noqa: F401  re-exported: livefeed.X keeps working
     _BONE,
     _GNAME,
@@ -68,6 +70,7 @@ from web.gaze import (  # noqa: F401  re-exported: livefeed.X keeps working
 )
 
 _subs = set()
+_filtered = {}       # queue -> filter: a stream that gets only part of each event (a station's portrait)
 _lock = threading.Lock()
 
 # The last of each of these, replayed to a page that opens mid-session,
@@ -86,14 +89,45 @@ def url():
 
 
 def watching():
-    return bool(_subs)
+    return bool(_subs or _filtered)
+
+
+def subscribe(only):
+    """A queue of stream lines for a page outside this server - a relay
+    station's portrait (web/station.py) - with each event passed through
+    only(event) first: what it returns is sent, None leaves the event out.
+    Starts with the snapshot, like a page that opens here. unsubscribe()
+    when the page goes."""
+    q = queue.Queue(maxsize=5000)
+    for event in list(_snapshot.values()):
+        _put_filtered(q, only, event)
+    with _lock:
+        _filtered[q] = only
+    return q
+
+
+def unsubscribe(q):
+    with _lock:
+        _filtered.pop(q, None)
+
+
+def _put_filtered(q, only, event):
+    try:
+        cut = only(event)
+        if cut is not None:
+            q.put_nowait(_line(cut))
+    except queue.Full:
+        pass
+    except Exception as e:
+        # a filter that trips over one event loses that event, never the stream
+        logbook.debug("monitor", "a filtered stream skipped a %s event: %s", event.get("t"), e)
 
 
 def emit(kind, **data):
     """One event to every open page. Safe from any thread; never raises."""
     event = dict(data, t=kind, at=round(time.time(), 3))
 
-    if kind not in _SNAPSHOT_KINDS and not _subs:
+    if kind not in _SNAPSHOT_KINDS and not _subs and not _filtered:
         return
 
     # Made into its line once, here. An event that can't be (a value JSON has
@@ -115,7 +149,7 @@ def emit(kind, **data):
             # A new turn makes the old one's tail meaningless.
             _snapshot.pop("done", None)
 
-    if not _subs:
+    if not _subs and not _filtered:
         return
 
     with _lock:
@@ -124,6 +158,8 @@ def emit(kind, **data):
                 q.put_nowait(line)
             except queue.Full:
                 pass  # a page that stopped reading loses events, not the turn
+        for q, only in list(_filtered.items()):
+            _put_filtered(q, only, event)
 
 
 def _line(event):
@@ -179,7 +215,9 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/events":
+        elif self.path.split("?")[0] in ("/events", "/portrait/events"):
+            # the portrait opens events relative to its own page, so the same
+            # file finds this stream here and a station's cut-down one there
             self._stream()
         elif self._page("GET"):
             pass
@@ -483,98 +521,20 @@ class _Handler(BaseHTTPRequestHandler):
             return True
         return False
 
-    _TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
-              ".json": "application/json", ".vrm": "model/gltf-binary", ".glb": "model/gltf-binary",
-              ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp",
-              ".moc3": "application/octet-stream", ".vrma": "model/gltf-binary",
-              ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".wav": "audio/wav", ".m4a": "audio/mp4"}
-    _SOUNDS = (".mp3", ".ogg", ".wav", ".m4a")
+    _TYPES = TYPES          # kept for anything that still looks here
+    _SOUNDS = SOUNDS
 
     def _portrait(self, rel):
-        """The portrait page and its files - and nothing outside portrait/,
-        whatever the path says. The page and its libraries live in
-        portrait/viewer/ (vendor/ inside it); models/ and animations/ beside
-        it are served at the same level, so the page finds them as models/...,
-        gestures/..."""
-        from urllib.parse import unquote
-        rel = unquote(rel)   # a model folder with spaces or non-latin letters in its name
-        if rel == "config.json":
-            # ?model=... previews another model without switching to it
-            from urllib.parse import parse_qs, urlsplit
-            want = (parse_qs(urlsplit(self.path).query).get("model") or [""])[0]
-            return self._body(json.dumps(portrait_config(want if want in portrait_models() else None)).encode(),
-                              "application/json")
+        """The portrait page and its files (web/portrait_serve.py), which a
+        relay station serves too."""
+        from urllib.parse import urlsplit
 
-        if rel == "gestures/index.json":
-            # every gesture file the page should load (portrait/gestures/)
-            gdir = os.path.join(config.BASE_DIR, "portrait", "gestures")
-            try:
-                names = sorted(f[:-3] for f in os.listdir(gdir) if f.endswith(".js") and not f.startswith("_"))
-            except OSError:
-                names = []
-            return self._body(json.dumps(names).encode(), "application/json")
-
-        if rel == "props/index.json":
-            return self._body(json.dumps(props_list()).encode(), "application/json")
-
-        if rel == "props/props.json" and not os.path.isfile(
-                os.path.join(config.BASE_DIR, "portrait", "props", "props.json")):
-            return self._body(b"{}", "application/json")     # nothing placed yet: the defaults
-
-        if rel == "sounds/index.json":
-            # portrait/sounds/: {name: [files]} - a file by its name without the
-            # extension (touch-self.mp3 -> "touch-self"), a folder by its name
-            # (gasp/ -> every clip in it, one picked at random), and numbered files
-            # by their shared name (moan01.mp3, moan02.mp3 -> "moan")
-            sdir = os.path.join(config.BASE_DIR, "portrait", "sounds")
-            found = {}
-            for top, _dirs, files in os.walk(sdir):
-                for f in sorted(files):
-                    if os.path.splitext(f)[1].lower() not in self._SOUNDS:
-                        continue
-                    path = os.path.relpath(os.path.join(top, f), os.path.join(config.BASE_DIR, "portrait"))
-                    url = "/".join(path.split(os.sep))
-                    stem = os.path.splitext(f)[0].lower()
-                    found.setdefault(stem, []).append(url)
-                    base = re.sub(r"[_\- ]?\d+$", "", stem)      # moan-sexy01, moan-sexy02 -> also "moan-sexy"
-                    if base and base != stem:
-                        found.setdefault(base, []).append(url)
-                    if top != sdir:
-                        found.setdefault(os.path.relpath(top, sdir).replace(os.sep, "/").lower(), []).append(url)
-            return self._body(json.dumps(found).encode(), "application/json")
-
-        if rel == "cards/index.json":
-            from web import cards
-            return self._body(json.dumps(cards.cards()).encode(), "application/json")
-        if rel == "cards/yours.json":
-            from web import cards
-            return self._body(json.dumps(cards.own_gestures()).encode(), "application/json")
-        if rel.startswith("cards/thumb/") and rel.endswith(".png"):
-            from web import cards
-            try:
-                return self._body(cards.picture(rel[12:-4]), "image/png")
-            except (ValueError, OSError):
-                self.send_response(404)
-                self.end_headers()
-                return
-
-        if rel == "models.json":
-            return self._body(json.dumps(portrait_models()).encode(), "application/json")
-
-        root = os.path.realpath(os.path.join(config.BASE_DIR, "portrait"))
-        full = os.path.realpath(os.path.join(root, "viewer", rel or "index.html"))
-        if not os.path.isfile(full):
-            full = os.path.realpath(os.path.join(root, rel or "index.html"))
-        ext = os.path.splitext(full)[1].lower()
-
-        if not full.startswith(root + os.sep) or ext not in self._TYPES or not os.path.isfile(full):
-            self.send_response(404)
+        code, kind, body, cache = portrait_file(rel, urlsplit(self.path).query)
+        if code != 200:
+            self.send_response(code)
             self.end_headers()
             return
-
-        with open(full, "rb") as f:
-            self._body(f.read(), self._TYPES[ext], cache=ext in (".vrm", ".glb", ".png", ".jpg", ".webp", ".moc3")
-                       and "vendor" not in full)  # .vrma not cached: you're likely re-recording it
+        self._body(body, kind, cache=cache)
 
     def _body(self, body, kind, cache=False):
         self.send_response(200)

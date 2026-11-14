@@ -109,6 +109,7 @@ function queue(id, n) {
     const s = ctx.createBufferSource(); s.buffer = buf; s.connect(ctx.destination);
     s.onended = () => { if (source === s) source = null; res(); };
     source = s; s.start();
+    fetch(`/playing/${id}/${n}`, {method: 'POST'}).catch(() => {});   // her portrait's mouth, in time with this clip
   })).catch(() => {});
 }
 
