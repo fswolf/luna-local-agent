@@ -272,6 +272,15 @@ the reply as **overconfident** ("sounded sure at 38%, and didn't say
 so"). The dream pass reads those flags. Reminders, alarms and her
 startup greeting are never hedged.
 
+Your name, her name and your pet names don't count as specifics ("here,
+Daddy" is how she talks to you, not a fact), nor do plain words that only
+look like names because of a capital ("The", "That").
+
+The hedge line is kept in the history file, since it's what she said, but
+it's left out of the history she reads. Replayed reply after reply it
+became a pattern, and she started saying it herself in the middle of
+ordinary conversation.
+
 ## `self_status`
 
 A tool in the *Self* group, next to `introspect`. Ask her how she's

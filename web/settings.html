@@ -316,7 +316,7 @@ function render() {
 
 // Who she is: agent.json as text. Kept out of #list, so a re-render of
 // the settings never throws away what you're typing.
-const agent = {stamp: "", saved: "", loading: false};
+const agent = {stamp: "", saved: "", loading: false, typed: false};
 function agentState(text, kind) { const el = $("#agentstate"); el.textContent = text; el.className = kind || ""; }
 function agentDirty() {
   const dirty = $("#agenttext").value !== agent.saved;
@@ -338,7 +338,7 @@ async function agentLoad() {
   catch (e) { return agentState("no answer from Luna - is she running?", "bad"); }
   finally { agent.loading = false; }
   if (!out.ok) return agentState(out.message, "bad");
-  agent.stamp = out.stamp; agent.saved = out.text;
+  agent.stamp = out.stamp; agent.saved = out.text; agent.typed = false;
   $("#agenttext").value = out.text;
   agentState(out.text ? "" : "agent.json doesn't exist yet: Save makes it");
   agentDirty();
@@ -363,7 +363,7 @@ $("#agentload").addEventListener("click", () => {
   if (agentDirty() && !confirm("Throw away your changes to agent.json?")) return;
   agentLoad();
 });
-$("#agenttext").addEventListener("input", () => { if ($("#agentstate").className) agentState(""); agentDirty(); });
+$("#agenttext").addEventListener("input", () => { agent.typed = true; if ($("#agentstate").className) agentState(""); agentDirty(); });
 $("#agenttext").addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); agentSave(); }
   else if (e.key === "Escape") e.target.blur();                    // Tab indents, so Esc is the way out
@@ -384,6 +384,15 @@ if (closed.has("agent.json")) { $("#agentbox").classList.remove("closed"); agent
 // Back to this page from another (the page switcher): the browser may show
 // it from its cache, file and all. Fetch it fresh unless you were editing.
 window.addEventListener("pageshow", e => { if (e.persisted && !agentDirty()) { agent.stamp = ""; agentEnsure(); } });
+// Firefox puts a textarea back the way it was before a refresh, and can do it
+// after the file has already been filled in: once the page has finished
+// loading, put the file back unless you've typed, and load it if it never came.
+window.addEventListener("load", () => {
+  const box = $("#agenttext");
+  if (agent.stamp && !agent.typed && box.value !== agent.saved) box.value = agent.saved;
+  agentEnsure();
+  if (agent.stamp) agentDirty();
+});
 window.addEventListener("beforeunload", e => { if (agentDirty()) { e.preventDefault(); e.returnValue = ""; } });
 
 function update(entry) {

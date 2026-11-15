@@ -46,6 +46,26 @@ class WhenToHedge(unittest.TestCase):
         flirty = "*softens, eyes searching yours* Unless you'd rather I stay awake with you?"
         self.assertEqual(self._calibrated(flirty, "eyes searching yours"), flirty)
 
+    def test_banter_leaves_no_note_for_next_turn(self):
+        from llm.prompts import _calibration_note
+        _calibration_note["text"] = ""
+        self._calibrated("*softens* Unless you'd rather I stay awake with you?", "softens")
+        self.assertEqual(_calibration_note["text"], "")     # "only 57% sure, be upfront" taught her to say it
+        self._calibrated("It has 20 GB of VRAM.", "20 GB of")
+        self.assertIn("sure", _calibration_note["text"])
+        _calibration_note["text"] = ""
+
+    def test_what_isnt_a_specific(self):
+        with mock.patch("config.user_preferences", return_value={"nicknames": ["Daddy", "Senpai"]}):
+            for say, span in (("*smirks*  You idiot.", "You idiot"),             # two spaces after an action
+                              ("Always ready, Daddy~ Everything okay?", "ready, Daddy"),
+                              ('She paused. "Hold onto it," she said.', '"Hold onto it'),
+                              ("You're making me blush~ \U0001f43e That was sweet.", "That was"),
+                              ("**The** part I like.", "The"),
+                              ("**Tip**: Make it louder.", "Make it")):
+                self.assertFalse(second_look._unsure_of_a_specific(say, span), say)
+        self.assertTrue(second_look._unsure_of_a_specific("It's on port 8096 for Jellyfin.", "port 8096"))
+
     def test_the_span_is_kept_whole(self):
         runs = [[("We", "a", 0.0)] + [(w, "a", -3.0) for w in (" at", " 4", ".5", " GB")] + [(".", "a", 0.0)]]
         with mock.patch.object(thoughtlog, "SHAKY_RUN", 3):
@@ -81,3 +101,17 @@ class WhenToLookAgain(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NotInHerHistory(unittest.TestCase):
+    """The hedge line is added by code; replayed as her own words fifteen
+    times over, she started saying it herself."""
+
+    def test_replay_leaves_it_out(self):
+        from llm import replay
+        line = "I'm not totally sure about that one, though."
+        with mock.patch("config.SELF_HEDGE_LINE", line, create=True):
+            out = replay._replay({"role": "assistant", "content": f"It has 20 GB. {line}"})
+            self.assertEqual(out[-1]["content"], "It has 20 GB.")
+            mine = replay._replay({"role": "user", "content": f"you said {line}"})
+            self.assertIn(line, mine[-1]["content"])          # only her side

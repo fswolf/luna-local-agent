@@ -293,6 +293,16 @@ def _calibrate(answer, second, remember, on_text, on_sentence):
     if conf is None or conf >= config.SELF_HEDGE_BELOW:
         return answer
 
+    # Only when the doubt has a place - a run of coin-flip tokens holding a
+    # name, a number or a date - not when a playful reply simply had a lot
+    # of ways to be worded. Banter averages low (a roleplay model can sit
+    # under hedge_below on almost every reply), and its unsure runs are word
+    # choice ("leans in closer"); that isn't a guess. This gates the note
+    # for her next turn too: "you were only 57% sure, be upfront" after
+    # every flirty reply taught her to say she wasn't sure.
+    if not _unsure_of_a_specific(answer, shape.get("span", "")):
+        return answer
+
     shaky = f" - shakiest on {shape['shaky'].split(', ', 1)[-1]}" if shape["shaky"] else ""
     _calibration_note["text"] = (
         f"About your previous reply: your own token probabilities say you were "
@@ -300,12 +310,7 @@ def _calibrate(answer, second, remember, on_text, on_sentence):
         "weren't sure."
     )
 
-    # Said out loud only when the doubt has a place - a run of coin-flip
-    # tokens holding a name, a number or a date - not when a playful reply
-    # simply had a lot of ways to be worded. Banter averages low, and its
-    # unsure runs are word choice ("leans in closer"); that isn't a guess.
-    if (second and second["corrected"]) or thoughtlog._HEDGED.search(answer) \
-            or not config.SELF_HEDGE_LINE or not _unsure_of_a_specific(answer, shape.get("span", "")):
+    if (second and second["corrected"]) or thoughtlog._HEDGED.search(answer) or not config.SELF_HEDGE_LINE:
         return answer
 
     line = config.SELF_HEDGE_LINE.strip()
@@ -324,14 +329,51 @@ def _calibrate(answer, second, remember, on_text, on_sentence):
 _KEY_TERM = re.compile(r"\d+(?:[.,:]\d+)*|(?<![.!?]\s)(?<!^)\b[A-Z][a-zA-Z]{2,}\b")
 
 
+def _names_of_us():
+    """Her names and yours, pet names included: "here, Daddy" is how she
+    addresses you, not a fact she could have wrong."""
+    names = {config.AGENT_NAME, getattr(config, "USER_NAME", "")}
+
+    try:
+        prefs = config.user_preferences()
+        names.add(prefs.get("name", ""))
+        nick = prefs.get("nicknames") or []
+        names.update(nick if isinstance(nick, list) else [nick])
+    except Exception:
+        pass
+
+    try:
+        names.add(config.agent.get("nickname", ""))
+    except Exception:
+        pass
+
+    return {str(n).lower() for n in names if n}
+
+
 def _key_terms(text):
     """The parts of an answer that make it *this* answer: numbers, and
-    capitalised names that don't just start a sentence. Her *actions* and
-    line breaks end a sentence too, so "*leans in* Here's the thing" is a
-    sentence start, not a name."""
+    capitalised names that don't just start a sentence. Her *actions*,
+    line breaks, dashes and a trailing ~ end a sentence too, so "*leans in*
+    Here's the thing" is a sentence start, not a name. Her name and yours
+    (pet names too) aren't specifics."""
     text = re.sub(r"\*[^*\n]*\*", ". ", str(text or ""))
-    text = re.sub(r"\s*\n\s*", ". ", text).strip(" .")
-    return {m.group(0).lower().replace(",", "") for m in _KEY_TERM.finditer(text)}
+    text = re.sub(r"\s*\n\s*|\s*[~\u2014\u2013]\s*|\s+-\s+|\.{3}|\u2026|:\s+", ". ", text)   # "**Tip**: Make" too
+    text = re.sub(r"[.!?]['\")\]]+", ".", text)                 # end quote after the stop
+    # quotes, markdown and emoji aren't words: '. "Hold on' and 'blush~ 🐾 That' start sentences
+    text = re.sub(r"[\"\u201c\u201d\u2018\u2019*_()\[\]#>]|[^\w\s.,:;!?'-]", " ", text)
+    text = re.sub(r"\s+", " ", re.sub(r"([.!?])(\s*[.!?])+", r"\1", text)).strip(" .")
+    skip = _names_of_us() | _PLAIN
+    return {t for t in (m.group(0).lower().replace(",", "") for m in _KEY_TERM.finditer(text))
+            if t not in skip}
+
+
+# Capitalised mid-line for emphasis or in a story ("called The Archive"), they
+# still aren't a name or a number she could have wrong.
+_PLAIN = set("""the that this these those there then than they them their you your yours
+and but not now yes yeah okay what when where which who why how she her his him its
+our out all any one just still even maybe also because every everything nothing
+something someone everyone here very really well please thank thanks sorry hey hello
+""".split())
 
 
 def _agrees(a, b):

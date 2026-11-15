@@ -43,6 +43,25 @@ def _strip_leading_timestamps(text):
     return text.strip()
 
 
+def _unhedged(role, content):
+    """Her past replies without the hedge line (self.hedge_line).
+
+    The line is added by code after a reply, not written by her, and it's
+    kept on disk because it's what she said. But in the history she reads,
+    fifteen replies ending in the same sentence are a pattern, and a model
+    copies patterns: she started saying it herself, mid-reply, about
+    nothing ("I'm not totally sure about that one, though. I'm pretty sure
+    you already know..."). So it never reaches her, from past turns either."""
+    import config
+
+    line = str(getattr(config, "SELF_HEDGE_LINE", "") or "").strip()
+
+    if role != "assistant" or not line or not isinstance(content, str) or line not in content:
+        return content
+
+    return re.sub(r"[ \t]{2,}", " ", content.replace(line, "")).strip()
+
+
 def _timestamped(role, content, timestamp):
     """A history message, with no timestamp in it.
 
@@ -63,7 +82,7 @@ def _timestamped(role, content, timestamp):
     in the system prompt or the note in front of the latest message
     (llm.stable_prompt), where there is no pattern to copy.
     """
-    return {"role": role, "content": content}
+    return {"role": role, "content": _unhedged(role, content)}
 
 
 def _valid_json(raw):
@@ -117,7 +136,7 @@ def _replay(message):
         })
 
     if message.get("content"):
-        replayed.append({"role": message["role"], "content": message["content"]})
+        replayed.append({"role": message["role"], "content": _unhedged(message["role"], message["content"])})
 
     return replayed
 
