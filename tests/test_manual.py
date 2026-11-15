@@ -35,9 +35,14 @@ class Manual(unittest.TestCase):
     def test_question_words_alone_find_nothing(self):
         self.assertEqual(manual.search("how do I make you do that"), [])
 
-    def test_plurals_meet(self):
-        self.assertEqual(manual._stem("stations"), manual._stem("station"))
-        self.assertEqual(manual._stem("settings"), manual._stem("setting"))
+    def test_forms_of_a_word_meet(self):
+        for a, b in (("stations", "station"), ("settings", "setting"), ("voices", "voice"),
+                     ("devices", "device"), ("saving", "saved"), ("memories", "memory")):
+            self.assertEqual(manual._stem(a), manual._stem(b), (a, b))
+
+    def test_everyday_words_reach_the_docs_word(self):
+        self.assertIn(manual._stem("station"), manual._question("my phones"))
+        self.assertNotIn(manual._stem("portrait"), manual._question("which model should I use"))
 
     def test_nothing_found_says_so(self):
         out = manual._read_manual("zzqx flibbertigibbet")

@@ -195,9 +195,37 @@ the limit isn't the one that pays for it.
 "history": {
     "max_raw_messages": 15,
     "summarize_chunk": 8,
-    "summary_max_chars": 2500
+    "summary_max_chars": 2500,
+    "auto_scale": true,
+    "scale_cap": 60
 }
 ```
+
+On a model server with a 32k window or bigger, she keeps more than that.
+Every tool's description, her prompt, room for a full reply and a turn's
+tool results come off the top first; a quarter of what's left stays spare;
+a fifth of the rest goes to the summary and the remainder to messages, at
+about 150 tokens each. It never drops below your two settings and never
+goes past `scale_cap` messages. Roughly: 32k with every tool on keeps about
+34 messages and a 4,500-character summary; 48k and up reaches the cap of 60
+and 8,000 characters. `/context` shows what she's keeping right now, and
+`"auto_scale": false` keeps your settings exactly.
+
+Every number in that sum is a setting, for trying a different model: the
+settings page's History section shows them with the sum worked out live
+underneath (the window, each thing taken off, what's left and what she
+keeps), and **Measure again** asks the model server afresh after you load
+another model. `scale_prompt_reserve` and `scale_results_reserve` are the
+token reserves, `scale_use` the share of what's left that history may take,
+`scale_summary_share` the summary's part of that, `scale_message_tokens` how
+long a stored message is counted as, `scale_summary_cap` the summary's
+ceiling, and `scale_from` the smallest window it works on. A bigger model
+handles long history better, so `scale_cap` is the one most worth raising.
+
+Loading a model with a smaller window shrinks what she keeps at once: a
+prompt never carries more than the new limit plus one chunk waiting to be
+folded, and the folding takes up to four chunks at a time until it has
+caught up, so a smaller window never overflows while the summary catches up.
 
 Stored turns carry what they called, not just what they said:
 

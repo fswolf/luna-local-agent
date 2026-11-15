@@ -46,7 +46,16 @@ def _items():
     from mind import knowledge
 
     files = _files()
-    stamp = tuple((f, os.path.getmtime(f)) for f in files)
+    stamp = []
+
+    for f in files:
+        try:
+            stamp.append((f, os.path.getmtime(f)))
+        except OSError:          # gone between the listing and now (a git pull)
+            pass
+
+    stamp = tuple(stamp)
+    files = [f for f, _ in stamp]
 
     with _lock:
         if _cache["stamp"] == stamp:
@@ -92,11 +101,21 @@ _WORD = re.compile(r"[a-z0-9]+")
 
 
 def _stem(w):
-    """Light and blunt, enough that station/stations and setting/settings meet."""
-    for end in ("ings", "ing", "ies", "es", "ed", "s"):
-        if len(w) > len(end) + 2 and w.endswith(end):
-            return w[:-len(end)] + ("y" if end == "ies" else "")
-    return w
+    """Light and blunt, but the same for a word's forms: station/stations,
+    setting/settings, voice/voices, save/saving/saved all meet."""
+    if len(w) <= 3:
+        return w
+    if w.endswith("ies") and len(w) > 4:
+        w = w[:-3] + "y"
+    elif w.endswith(("sses", "xes", "zes", "ches", "shes")):
+        w = w[:-2]
+    elif w.endswith("s") and not w.endswith(("ss", "us", "is")):
+        w = w[:-1]
+    if w.endswith("ing") and len(w) > 5:
+        w = w[:-3]
+    elif w.endswith("ed") and not w.endswith("eed") and len(w) > 4:
+        w = w[:-2]
+    return w[:-1] if len(w) > 3 and w.endswith("e") else w
 
 
 def _terms(text):
@@ -105,12 +124,14 @@ def _terms(text):
 
 # Everyday words for things the docs call by their own names. One-way: they
 # only add the doc's word to the question, never take the person's away.
-_ALSO = {"phone": "station", "tablet": "station", "android": "station", "room": "station",
-         "kitchen": "station", "bedroom": "station", "remember": "memory", "forget": "memory",
-         "recall": "memory", "toy": "device", "vibrator": "device", "look": "card",
-         "outfit": "card", "avatar": "portrait", "model": "portrait", "feel": "mood",
-         "feeling": "mood", "speak": "voice", "talk": "voice", "sound": "voice",
-         "kokoro": "voice", "hear": "voice", "mic": "voice", "see": "vision", "webcam": "camera"}
+# ("model" and "look" stay out: "which model", "look it up" mean something else.)
+_ALSO = {_stem(k): _stem(v) for k, v in {
+    "phone": "station", "tablet": "station", "android": "station", "room": "station",
+    "kitchen": "station", "bedroom": "station", "remember": "memory", "forget": "memory",
+    "recall": "memory", "toy": "device", "vibrator": "device", "outfit": "card",
+    "clothes": "card", "avatar": "portrait", "feel": "mood", "feeling": "mood",
+    "speak": "voice", "talk": "voice", "sound": "voice", "kokoro": "voice", "hear": "voice",
+    "mic": "voice", "see": "vision", "webcam": "camera"}.items()}
 
 
 def _question(text):
@@ -118,7 +139,7 @@ def _question(text):
 
     for w in list(words):
         if w in _ALSO:
-            words[_stem(_ALSO[w])] += 1
+            words[_ALSO[w]] += 1
 
     return set(words)
 

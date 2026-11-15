@@ -179,6 +179,28 @@ def get_messages() -> list:
         ]
 
 
+def recent() -> list:
+    """The stored messages a prompt may carry: all of them normally, but
+    never more than limits() keeps plus one chunk waiting to be folded.
+    After a switch to a smaller window there can be far more stored than
+    fit; the extra wait for the summary instead of overflowing the prompt.
+    Starts on one of your messages, so no reply arrives without its question."""
+    keep = limits()[0] + int(config.SUMMARIZE_CHUNK)
+
+    with _lock:
+        messages = list(_data.get("messages", []))
+
+    if len(messages) <= keep:
+        return messages
+
+    messages = messages[-keep:]
+
+    while messages and messages[0].get("role") != "user":
+        messages.pop(0)
+
+    return messages
+
+
 def get_messages_full() -> list:
     """Same as get_messages(), but keeps the "timestamp" field on each
     message - use this for display purposes (e.g. showing timestamps
@@ -365,18 +387,25 @@ def _compress(model, summary):
     ))
 
 
-def _fold(model):
+def _fold(model, keep=None, chars=None):
     """Move the oldest turns into the summary. Runs on a worker."""
     global _summarizing, _retry_after
+
+    keep = config.MAX_RAW_MESSAGES if keep is None else keep
+    chars = config.SUMMARY_MAX_CHARS if chars is None else chars
 
     try:
         with _lock:
             messages = _data.get("messages", [])
 
-            if len(messages) <= config.MAX_RAW_MESSAGES:
+            if len(messages) <= keep:
                 return
 
-            chunk = list(messages[:config.SUMMARIZE_CHUNK])
+            # Normally one chunk. Far over (a smaller window after a model
+            # swap), up to four at once, so it catches up in a turn or two.
+            step = int(config.SUMMARIZE_CHUNK)
+            count = max(step, min(len(messages) - keep, step * 4))
+            chunk = list(messages[:count])
             existing = _data.get("summary", "")
 
         # The model call happens outside the lock - it's the slow part,
@@ -384,14 +413,14 @@ def _fold(model):
         piece = _summarize_chunk(model, chunk)
         merged = f"{existing}\n{piece}".strip() if existing else piece
 
-        if len(merged) > config.SUMMARY_MAX_CHARS:
+        if len(merged) > chars:
             try:
                 merged = _compress(model, merged)
             except Exception:
                 # Compression failing is survivable; an over-long
                 # summary is better than a lost one. Trim the oldest
                 # half so it can't grow without bound either way.
-                merged = merged[-config.SUMMARY_MAX_CHARS:]
+                merged = merged[-chars:]
 
         with _lock:
             messages = _data.get("messages", [])
@@ -400,11 +429,11 @@ def _fold(model):
             # chunk we summarized is still the oldest, so dropping that
             # many from the front is still correct - but only if they
             # haven't already been dropped by a previous fold.
-            if messages[:config.SUMMARIZE_CHUNK] != chunk:
+            if messages[:len(chunk)] != chunk:
                 return
 
             _data["summary"] = merged
-            _data["messages"] = messages[config.SUMMARIZE_CHUNK:]
+            _data["messages"] = messages[len(chunk):]
 
         save()
     except Exception as e:
@@ -417,6 +446,103 @@ def _fold(model):
         _summarizing = False
 
 
+# ---------------------------------------------------------------------------
+# How much history to keep: the settings, or more on a big window
+# ---------------------------------------------------------------------------
+_scaled = {"at": -1e9, "window": 0, "tools": 0}
+
+
+def _knob(name, default):
+    return getattr(config, name, default)
+
+
+def _measure(fresh=False):
+    """The server's window and what every tool's description costs, at
+    most every five minutes: one is an HTTP call, the other only changes
+    when tools or plugins are switched."""
+    if not fresh and time.monotonic() - _scaled["at"] < 300:
+        return _scaled["window"], _scaled["tools"]
+
+    window = tools_cost = 0
+
+    try:
+        from core import lmstudio
+
+        window = lmstudio.context_length()
+
+        import tools
+
+        tools_cost = lmstudio.estimate_tokens(tools.specs())   # all of them, as if routing were off
+    except Exception as e:
+        logbook.warn("history", "couldn't size history to the window: %s", e)
+
+    _scaled.update(at=time.monotonic(), window=window, tools=tools_cost)
+
+    return window, tools_cost
+
+
+def explain(fresh=False):
+    """Every number behind limits(), for the settings page and /context."""
+    keep = int(config.MAX_RAW_MESSAGES)
+    chars = int(config.SUMMARY_MAX_CHARS)
+    out = {"keep": keep, "chars": chars, "settings_keep": keep, "settings_chars": chars,
+           "scaled": False, "why": ""}
+
+    if not _knob("HISTORY_AUTO_SCALE", True):
+        out["why"] = "auto scaling is off: your history settings are used as they are"
+        return out
+
+    window, tools_cost = _measure(fresh)
+    reply = int((getattr(config, "GENERATION", {}) or {}).get("max_tokens", 4800) or 4800)
+    prompt = int(_knob("HISTORY_SCALE_PROMPT", 6000))
+    results = int(_knob("HISTORY_SCALE_RESULTS", 4000))
+    use = min(1.0, max(0.0, float(_knob("HISTORY_SCALE_USE", 0.75))))
+    left = window - tools_cost - prompt - reply - results
+    room = int(left * use)
+    out.update(window=window, tools=tools_cost, prompt=prompt, reply=reply, results=results,
+               left=left, use=use, room=room)
+
+    if not window:
+        out["why"] = "the model server didn't say how big its window is"
+        return out
+
+    if window < int(_knob("HISTORY_SCALE_FROM", 32768)):
+        out["why"] = f"the window ({window}) is under {_knob('HISTORY_SCALE_FROM', 32768)}"
+        return out
+
+    if room <= 0:
+        out["why"] = "the tools and reserves fill the window: nothing left over"
+        return out
+
+    share = min(1.0, max(0.0, float(_knob("HISTORY_SCALE_SUMMARY_SHARE", 0.2))))
+    per = max(1, int(_knob("HISTORY_SCALE_MESSAGE_TOKENS", 150)))
+    scaled_chars = min(int(_knob("HISTORY_SCALE_SUMMARY_CAP", 8000)), int(room * share * 3.5))
+    scaled_keep = int((room - scaled_chars / 3.5) / per)
+    cap = max(keep, int(_knob("HISTORY_SCALE_CAP", 60)))
+    out.update(keep=min(cap, max(keep, scaled_keep)), chars=max(chars, scaled_chars),
+               fits=scaled_keep, cap=cap)
+    out["scaled"] = out["keep"] > keep or out["chars"] > chars
+    out["why"] = ("at the cap" if scaled_keep >= cap else
+                  "sized to the window" if out["scaled"] else "your settings are already more than the room allows")
+
+    return out
+
+
+def limits():
+    """(messages kept word for word, summary length in characters).
+
+    The settings on a window under history.scale_from (32k), or when
+    auto_scale is off. Above it, the room left after every tool
+    description, her prompt, a full reply and a turn's tool results;
+    history.scale_use of that (three quarters), a fifth of it for the
+    summary, the rest for messages. Never less than the settings, never
+    more than scale_cap messages. explain() shows the working.
+    """
+    out = explain()
+
+    return out["keep"], out["chars"]
+
+
 def maybe_summarize(model):
     """Fold older turns away if there are too many.
 
@@ -426,8 +552,10 @@ def maybe_summarize(model):
     """
     global _summarizing
 
+    keep, chars = limits()   # may ask the server; never under the lock
+
     with _lock:
-        if _summarizing or len(_data.get("messages", [])) <= config.MAX_RAW_MESSAGES:
+        if _summarizing or len(_data.get("messages", [])) <= keep:
             return
 
         if time.monotonic() < _retry_after:
@@ -435,4 +563,4 @@ def maybe_summarize(model):
 
         _summarizing = True
 
-    threading.Thread(target=_fold, args=(model,), daemon=True).start()
+    threading.Thread(target=_fold, args=(model, keep, chars), daemon=True).start()

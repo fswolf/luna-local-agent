@@ -103,7 +103,7 @@ def prompt_budget(text="hello"):
     the moment a request starts failing and the question is "how big
     has this got".
     """
-    past = history.get_messages_full()
+    past = history.recent()
     system, live = turn_prompt(text, past)
     replayed = []
 
@@ -202,7 +202,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
     _last_raw["thinking"] = []
     _last_raw["tokens"] = []
 
-    past = [] if context is not None else history.get_messages_full()
+    past = [] if context is not None else history.recent()
     turn = turnctx.current()
     turn.private = context is None
     # A fresh turn starts clean. A stream-chat turn starts marked: its

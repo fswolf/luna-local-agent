@@ -335,6 +335,15 @@ SCHEMA = {
     "history.max_raw_messages": ("int", "Recent messages kept word for word; older ones are folded into a summary"),
     "history.summarize_chunk": ("int", "How many older messages are folded into the summary at a time"),
     "history.summary_max_chars": ("int", "Length in characters at which the running summary is compressed again"),
+    "history.auto_scale": ("bool", "With a 32k+ window, keep more history, sized to the room left after every tool"),
+    "history.scale_cap": ("int", "Most messages auto scaling may keep word for word"),
+    "history.scale_from": ("int", "Smallest context window, in tokens, that auto scaling works on"),
+    "history.scale_prompt_reserve": ("int", "Tokens set aside for her persona, rules, facts, lessons and profile"),
+    "history.scale_results_reserve": ("int", "Tokens set aside for one turn's tool results (a web page, a search)"),
+    "history.scale_use": ("float", "Share 0-1 of the room left that history may use; the rest stays spare"),
+    "history.scale_summary_share": ("float", "Share 0-1 of the history room that goes to the running summary"),
+    "history.scale_message_tokens": ("int", "Tokens one stored message is counted as"),
+    "history.scale_summary_cap": ("int", "Longest the summary may grow when scaled, in characters"),
     "history.transcript": ("bool", "Keep a full archive of every turn, for searching past conversations"),
     "history.transcript_max_mb": ("float", "Size in MB the archive of every turn may grow to"),
 
@@ -579,4 +588,8 @@ BASIC = (
     "camera.presence.enabled", "people.voice", "station.enabled",
     "vision.enabled", "knowledge.enabled", "reminders.enabled", "alarms.volume",
     "long_term_memory.enabled", "self.greet", "thoughts.enabled", "ui.mouse",
+    # history sized to the window: its own box on the settings page, for trying other models
+    "history.auto_scale", "history.scale_cap", "history.scale_use", "history.scale_summary_share",
+    "history.scale_message_tokens", "history.scale_prompt_reserve", "history.scale_results_reserve",
+    "history.scale_summary_cap", "history.scale_from",
 )

@@ -72,6 +72,10 @@ section>h2 .after{color:var(--warn);font-size:11.5px;font-weight:400;margin-left
 .stationbox ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .stationbox li{display:flex;justify-content:space-between;align-items:center;font-size:13px}
 .stationbox li span{color:var(--dim)}
+.scalebox table{border-collapse:collapse;font-size:13px}
+.scalebox td{padding:2px 14px 2px 0}.scalebox td.n{text-align:right;font-family:ui-monospace,monospace;color:var(--text)}
+.scalebox tr.sum td{border-top:1px solid var(--line);padding-top:5px}
+.scalebox .big{font-size:14px}.scalebox .big b{color:var(--accent)}
 .ctl input[type=color]{width:46px;height:32px;padding:2px;background:#0e0a16;border:1px solid var(--line);border-radius:6px;cursor:pointer}
 .ctl input[type=color]::-webkit-color-swatch-wrapper{padding:0}.ctl input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
 .ctl input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
@@ -255,6 +259,34 @@ function stationBox() {
     <div class="add"><input id="stname" placeholder="kitchen" maxlength="30"><button id="stpair">Add a phone or tablet</button></div>${qr}${list}</div>`;
 }
 
+// History sized to the window: the sum behind it, under the History settings
+function scaleBox() {
+  const s = data.scale || {};
+  if (s.error) return `<div class="stationbox scalebox"><div class="st bad"><b>${esc(s.error)}</b></div></div>`;
+  const n = v => Number(v || 0).toLocaleString();
+  const sum = s.window ? `<table>
+    <tr><td>Context window, from the model server</td><td class="n">${n(s.window)}</td></tr>
+    <tr><td>− every tool's description, as switched on now</td><td class="n">${n(s.tools)}</td></tr>
+    <tr><td>− her prompt: persona, rules, facts, lessons <span class="st">(scale_prompt_reserve)</span></td><td class="n">${n(s.prompt)}</td></tr>
+    <tr><td>− a full reply, thinking included <span class="st">(generation.max_tokens)</span></td><td class="n">${n(s.reply)}</td></tr>
+    <tr><td>− one turn's tool results <span class="st">(scale_results_reserve)</span></td><td class="n">${n(s.results)}</td></tr>
+    <tr class="sum"><td>left over</td><td class="n">${n(s.left)}</td></tr>
+    <tr><td>history may use ${Math.round((s.use || 0) * 100)}% of it <span class="st">(scale_use)</span></td><td class="n">${n(Math.max(0, s.room))}</td></tr>
+    </table>` : "";
+  const fits = s.fits !== undefined ? ` (room for ${n(s.fits)}, cap ${n(s.cap)})` : "";
+  return `<div class="stationbox scalebox">
+    <div class="st big">She keeps <b>${n(s.keep)} messages</b> word for word${fits} and a summary of up to <b>${n(s.chars)} characters</b>.</div>
+    <div class="st">${esc((s.why || "").charAt(0).toUpperCase() + (s.why || "").slice(1))}. Your own settings, never gone under: ${n(s.settings_keep)} messages, ${n(s.settings_chars)} characters.</div>
+    ${sum}<div class="add"><button id="scalefresh" title="Ask the model server again (after loading another model)">Measure again</button>
+    <span class="st">Estimates, at about 3.5 characters a token; llama-server's log has the real count of each prompt.</span></div></div>`;
+}
+
+async function scaleRefresh() {
+  try { data.scale = await (await fetch("api/scale", {cache: "no-store"})).json(); } catch (e) { return; }
+  const box = document.querySelector(".scalebox");
+  if (box) box.outerHTML = scaleBox();
+}
+
 function render() {
   if (!data) return;
   const q = query.toLowerCase();
@@ -270,7 +302,7 @@ function render() {
     const after = allRestart.has(g.key) ? '<span class="after" title="every setting here takes effect after a restart">↻ after a restart</span>' : "";
     sections.push(g);
     html += `<section class="${shut ? "closed" : ""}" data-group="${esc(g.key)}" id="s_${esc(g.key)}"><h2><div>${esc(g.title)}${changed && view !== "changed" ? `<em>${changed} set</em>` : ""}${after}</div> <span>${rows.length}</span></h2>
-             <div class="rows">${rows.map(row).join("")}</div>${g.key === "station" ? stationBox() : ""}</section>`;
+             <div class="rows">${rows.map(row).join("")}</div>${g.key === "station" ? stationBox() : ""}${g.key === "history" && !q && view !== "changed" ? scaleBox() : ""}</section>`;
   }
   $("#list").innerHTML = html || `<div class="empty">${query ? `Nothing matches "${esc(query)}".` : "Nothing set in config.json yet: everything is at its default."}</div>`;
   // presets are for browsing, not for a search or the list of your changes
@@ -382,6 +414,7 @@ async function save(path, value) {
   toast(out.ok ? `${path}: ${out.message}` : out.message, !out.ok);
   if (!out.ok) setTimeout(load, 900);
   else if (path.startsWith("station.")) setTimeout(load, 900);     // its state box follows
+  else if (/^(history\.|generation\.max_tokens|tools\.)/.test(path)) scaleRefresh();   // the sum follows
 }
 
 $("#list").addEventListener("change", e => {
@@ -401,6 +434,7 @@ $("#list").addEventListener("input", e => {
   if (e.target.type === "range") e.target.nextElementSibling.textContent = e.target.value;
 });
 $("#list").addEventListener("click", async e => {
+  if (e.target.id === "scalefresh") { await scaleRefresh(); return toast("measured again"); }
   if (e.target.id === "stpair") {
     const out = await send({action: "station_pair", name: ($("#stname").value || "station").trim()});
     if (!out.ok) return toast(out.message, true);

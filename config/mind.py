@@ -14,6 +14,20 @@ SUMMARY_MAX_CHARS = int(_history_cfg.get("summary_max_chars", 2500))
 # A full archive of every turn, which summarization never prunes. It is
 # what search_history reads; the prompt never sees it.
 TRANSCRIPT_ENABLED = flag(_history_cfg.get("transcript", True))
+# On a server with a 32k+ window, keep more history word for word, sized to
+# what's left after every tool, her prompt, a reply and a turn's tool results
+# (core/history.py limits()). Never below the two settings above; never past
+# scale_cap messages.
+HISTORY_AUTO_SCALE = flag(_history_cfg.get("auto_scale", True))
+HISTORY_SCALE_CAP = int(_history_cfg.get("scale_cap", 60))
+# The knobs behind it, for trying other models (settings page, History).
+HISTORY_SCALE_FROM = int(_history_cfg.get("scale_from", 32768))
+HISTORY_SCALE_PROMPT = int(_history_cfg.get("scale_prompt_reserve", 6000))
+HISTORY_SCALE_RESULTS = int(_history_cfg.get("scale_results_reserve", 4000))
+HISTORY_SCALE_USE = float(_history_cfg.get("scale_use", 0.75))
+HISTORY_SCALE_SUMMARY_SHARE = float(_history_cfg.get("scale_summary_share", 0.2))
+HISTORY_SCALE_MESSAGE_TOKENS = int(_history_cfg.get("scale_message_tokens", 150))
+HISTORY_SCALE_SUMMARY_CAP = int(_history_cfg.get("scale_summary_cap", 8000))
 TRANSCRIPT_MAX_MB = float(_history_cfg.get("transcript_max_mb", 20))
 
 _memory_cfg = setting("long_term_memory", {})

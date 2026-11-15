@@ -124,7 +124,17 @@ def listing():
                 "active": all(pane._value(path)[0] == v for path, v in p["values"].items())}
                for n, p in PRESETS.items()]
 
-    return {"groups": groups, "presets": presets, "station": _station_panel()}
+    return {"groups": groups, "presets": presets, "station": _station_panel(), "scale": _scale()}
+
+
+def _scale(fresh=False):
+    """How much history she keeps and why (core/history.py explain())."""
+    try:
+        from core import history
+
+        return history.explain(fresh)
+    except Exception as e:
+        return {"error": f"history sizing: {e}"}
 
 
 def _station_panel():
@@ -320,6 +330,9 @@ def handle(method, sub, body, key=None):
 
     if method == "GET" and sub == "/api":
         return 200, "application/json", json.dumps(listing())
+
+    if method == "GET" and sub == "/api/scale":
+        return 200, "application/json", json.dumps(_scale(fresh=True))
 
     if method == "GET" and sub == "/api/agent":
         return 200, "application/json", json.dumps(agent_text())

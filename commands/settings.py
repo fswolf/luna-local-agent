@@ -220,12 +220,17 @@ def handle(text):
                 "with /set, or raise the context length in LM Studio."
             )
 
+        from core import history
+
+        sized = history.explain()
+        kept = (f"\nHistory kept word for word: {sized['keep']} messages, summary up to {sized['chars']} "
+                f"characters ({sized['why'] or 'your history settings'}).")
         steady = ("\nThe clock, the live lines, her mood and the memories picked for your message ride in a "
                   "note on your message (llm.stable_prompt), so llama-server reuses the rest from the last turn."
                   if llm.stable_prompt() else "")
         ui.add_message(
             "system",
-            f"Roughly what every turn sends (tokens):\n{rows}\n{verdict}{warning}{steady}",
+            f"Roughly what every turn sends (tokens):\n{rows}\n{verdict}{warning}{kept}{steady}",
         )
         return True
 

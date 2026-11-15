@@ -265,7 +265,9 @@
         "summarize_chunk": 8,
         "summary_max_chars": 2500,
         "transcript": true,
-        "transcript_max_mb": 20
+        "transcript_max_mb": 20,
+        "auto_scale": true,
+        "scale_cap": 60
     },
     "long_term_memory": {
         "enabled": true,
