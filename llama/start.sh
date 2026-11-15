@@ -79,8 +79,10 @@ serving() { curl -fsS --max-time 1 "http://$HOST:$1/health" >/dev/null 2>&1; }
 # mmproj-*.gguf, so the model's own folder is the first place to look.
 MMPROJ="${MMPROJ:-}"
 MMPROJ_MATCH="${MMPROJ_MATCH:-}"
+VISION_WHY="no mmproj next to the model (see MMPROJ in server.env)"
 if [ "$MMPROJ" = off ]; then
     MMPROJ=""
+    VISION_WHY="MMPROJ=off in server.env"
 elif [ -z "$MMPROJ" ]; then
     mapfile -t mm < <(find "$(dirname "$MODEL")" -maxdepth 1 -iname "*mmproj*.gguf" 2>/dev/null | sort)
     if [ "${#mm[@]}" -eq 0 ] && [ -n "$MMPROJ_MATCH" ]; then
@@ -250,7 +252,7 @@ echo "  $MODEL"
 if [ -n "$MMPROJ" ]; then
     echo "  vision: $(basename "$MMPROJ")"
 else
-    echo "  vision: off - no mmproj next to the model (see MMPROJ in server.env)"
+    echo "  vision: off - $VISION_WHY"
 fi
 [ "${#patch_lines[@]}" -gt 0 ] && printf '%s\n' "${patch_lines[@]}"
 echo "  http://$HOST:$PORT  (Ctrl+C stops them all)"

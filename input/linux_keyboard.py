@@ -75,8 +75,8 @@ def _on_key_evdev(event, model):
 
 def _escape():
     """Esc read globally. While the window is up it's the window's: there
-    Esc closes a pane or answers a popup with no, and only quits from the
-    conversation - and evdev sees every Esc on the desktop, so quitting
+    Esc closes a pane or answers a popup with no, and does nothing in
+    the conversation - and evdev sees every Esc on the desktop, so quitting
     here killed her when you closed a pane. os._exit also left the
     terminal in raw mode with mouse reporting on. Before the window
     exists (still starting) it still quits, as it always did."""

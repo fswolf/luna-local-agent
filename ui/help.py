@@ -42,7 +42,8 @@ _HELP_SECTIONS = [
         ("(F2)", "mouse capture: wheel scroll vs selecting text"),
         ("(End)", "back to the newest line"),
         ("(Tab)", "cycle: conversation, launcher (open a page), tools, settings"),
-        ("(ESC)", "quit"),
+        ("(ESC)", "close a pane or popup, back to the conversation"),
+        ("(Ctrl+Q)", "quit"),
     ]),
     ("Voice modes", [
         ("/mode", None),  # gets the (now: ...) suffix

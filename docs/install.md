@@ -272,14 +272,16 @@ URLs above (`http://192.168.1.50:8080/...`), then on the model machine:
 and reranker servers, if those run elsewhere too.
 
 **Vision.** llama-server only takes images when it's started with the
-model's vision adapter, a separate `mmproj-*.gguf`. `start.sh` looks
-for one in the model's own folder, which is where LM Studio puts it,
-and prints `vision: <file>` or `vision: off` when it starts. Without
-one, every screenshot comes back "image input is not supported". A
-finetune that doesn't ship its own mmproj uses its base model's (a
-Qwen3.5-9B finetune takes the Qwen3.5-9B one): drop it beside the
-model, or set `MMPROJ` in `server.env` to its full path (`off` disables
-it). Luna asks the server whether the loaded model can see, and when
+model's vision adapter, a separate `mmproj-*.gguf`. It's off by
+default (`MMPROJ=off` in `server.env`), because it costs about 1 GB of
+VRAM as F16 and 2 GB as F32. To turn it on, set `MMPROJ=` empty and
+`start.sh` looks for one in the model's own folder, which is where LM
+Studio puts it, or set it to the file's full path. It prints
+`vision: <file>` or `vision: off` when it starts. Without one, every
+screenshot comes back "image input is not supported". A finetune that
+doesn't ship its own mmproj uses its base model's (a Qwen3.5-9B
+finetune takes the Qwen3.5-9B one). If there's a choice, take the F16
+file: it sees as well as the F32 at half the memory. Luna asks the server whether the loaded model can see, and when
 it can't, `look_at_screen` is left out of her tools and the tools pane
 says why, instead of a turn failing.
 
@@ -362,7 +364,7 @@ everything else, these lines in `llama/server.env` free the most:
 | `EMBED_NGL=0`, `RERANK_NGL=0` | about 1.5 GB of VRAM | nothing but a moment: both run on the CPU instead |
 | `RERANK=off` | under 1 GB | the reranker's sharper pick |
 | `EMBED=off` | about 0.7 GB | recall by meaning (back to matching words) |
-| `MMPROJ=off` | about 0.6 to 1 GB | screenshots, the webcam and Vibe City pictures |
+| `MMPROJ=off` (the default) | about 1 GB (F16) to 2 GB (F32) | screenshots, the webcam and Vibe City pictures |
 | `CTX=8192` | half the context memory | shorter conversations before old turns drop |
 | `PARALLEL=1` | slot overhead | jobs and chat wait for each other |
 | `CACHE_RAM=512` | up to 1.5 GB of system RAM | reusing old prompts, so some turns start slower |

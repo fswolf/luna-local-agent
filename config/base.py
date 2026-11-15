@@ -109,7 +109,11 @@ def setting(key, default=None):
     return value
 
 
-AGENT_NAME = agent.get("name") or settings.get("name") or "Luna"
+def _name(agent):
+    return agent.get("name") or settings.get("name") or "Luna"
+
+
+AGENT_NAME = _name(agent)
 
 # Persona, kept separate from the machine settings so llm.py doesn't have
 # to know which file anything came from.
@@ -122,7 +126,11 @@ RULES = agent.get("rules", [])
 # agent.json "pronounce": {"nya": "/njˈɑ/"}, phonemes in Kokoro's own set.
 # voice/speech.py sends them as Kokoro's [word](/phonemes/) override; the screen
 # never sees it.
-PRONOUNCE = agent.get("pronounce", {}) if isinstance(agent.get("pronounce"), dict) else {}
+def _pronounce(agent):
+    return agent.get("pronounce", {}) if isinstance(agent.get("pronounce"), dict) else {}
+
+
+PRONOUNCE = _pronounce(agent)
 
 # Who she's talking to, from agent.json's "user" block:
 #
@@ -153,7 +161,12 @@ def _who(block):
 USER_NAME, (USER_THEY, USER_THEM, USER_THEIR), _USER_GAVE_PRONOUNS = _who(agent.get("user"))
 USER = USER_NAME or "the user"          # the subject of a prompt line: "when {USER} asks"
 # Others in the house (senses/people.py): [{"name": "Shannon", "pronouns": "she/her"}]
-PEOPLE = [p for p in (agent.get("people") or []) if isinstance(p, dict) and p.get("name")]
+def _people(agent):
+    people = agent.get("people") or []
+    return [p for p in people if isinstance(p, dict) and p.get("name")] if isinstance(people, list) else []
+
+
+PEOPLE = _people(agent)
 
 
 def user_line():
@@ -165,6 +178,30 @@ def user_line():
     if not _USER_GAVE_PRONOUNS:
         return f"You're talking with {who}.\n"
     return f"You're talking with {who} ({USER_THEY}/{USER_THEM}/{USER_THEIR}).\n"
+
+
+def apply_agent(data):
+    """agent.json again, after it was edited while she runs (the settings
+    page): her name, persona, pronunciations, who you are and who else
+    lives here, from her next turn. Changes this module's values (what
+    user_line() reads) and the config namespace's (what everything else
+    reads as config.X), the same way the first-start setup applies yours."""
+    import config as namespace
+
+    # in place, never empty in between: other threads read it as config.agent
+    for key in [k for k in agent if k not in data]:
+        agent.pop(key, None)
+    agent.update(data)
+    name, (they, them, their), gave = _who(agent.get("user"))
+    values = {"AGENT_NAME": _name(agent), "PERSONALITY": agent.get("personality", ""),
+              "TONE": agent.get("tone", ""), "TRAITS": agent.get("traits", []), "RULES": agent.get("rules", []),
+              "PRONOUNCE": _pronounce(agent), "PEOPLE": _people(agent),
+              "USER_NAME": name, "USER_THEY": they, "USER_THEM": them, "USER_THEIR": their,
+              "_USER_GAVE_PRONOUNS": gave, "USER": name or "the user"}
+    for key, value in values.items():
+        globals()[key] = value
+        if not key.startswith("_"):
+            setattr(namespace, key, value)
 
 
 GENERATION = setting("generation", {})

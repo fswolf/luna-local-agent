@@ -7,7 +7,7 @@ from voice.ptt import toggle
 
 def _escape():
     """Esc read globally. While the window is up it's the window's (close a
-    pane, answer no, quit from the conversation); os._exit from here left
+    pane, answer no; nothing in the conversation); os._exit from here left
     the terminal in raw mode. Before the window exists it still quits."""
     if ui.view.app is not None:
         return

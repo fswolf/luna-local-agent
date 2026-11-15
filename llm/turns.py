@@ -8,7 +8,6 @@ import time
 from datetime import datetime
 
 import config
-from config import AGENT_NAME
 from core import history
 from life import gestures
 from web import livefeed
@@ -88,7 +87,7 @@ def _record_thoughts(user_text, answer, started, source=None, model="",
             results=[x.get("result", "") for x in _last_raw.get("exchanges") or []],
             known_tools=known,
             tokens=_last_raw.get("tokens") or [],
-            agent=AGENT_NAME,
+            agent=config.AGENT_NAME,
             model=model,
             prompt_hash=prompt_hash,
             extra_flags=extra_flags,

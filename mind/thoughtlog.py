@@ -626,12 +626,20 @@ _DATE_MATH = re.compile(
     re.IGNORECASE,
 )
 _DATE_TOOLS = {"get_datetime", "time_until"}
-_SCRATCH_OPENING = re.compile(
-    r"^\s*(okay|ok|alright|hmm|so),?\s+(the user|he|she|they|ryan|let me|i need to|i should"
-    + "".join("|" + re.escape(n) for n in [str(getattr(config, "USER_NAME", "") or "").lower()] if n)
-    + r")\b",
-    re.IGNORECASE,
-)
+_SCRATCH = (None, None)        # (your name it was made with, the pattern)
+
+
+def _scratch_opening():
+    """A reply that opens like her notes to herself ("Okay, the user wants...",
+    "So Ryan asked..."). Made again if your name in agent.json changed."""
+    global _SCRATCH
+    name = str(getattr(config, "USER_NAME", "") or "").lower()
+    if _SCRATCH[0] != name:
+        _SCRATCH = (name, re.compile(
+            r"^\s*(okay|ok|alright|hmm|so),?\s+(the user|he|she|they|ryan|let me|i need to|i should"
+            + ("|" + re.escape(name) if name else "") + r")\b",
+            re.IGNORECASE))
+    return _SCRATCH[1]
 _TOOL_ERROR = re.compile(
     r"^\s*(error|denied|failed|couldn't|could not|can't|cannot|unable|"
     r"that text (isn't|appears)|\S+ (doesn't exist|isn't a)|"
@@ -680,7 +688,7 @@ def review(reasoning, answer, called, results=(), known_tools=(),
         flags.append("did date math: worked out a date or duration itself "
                      f"instead of calling {' or '.join(sorted(date_tools))}")
 
-    if "leaked" in on and ("<think" in answer.lower() or _SCRATCH_OPENING.match(answer)):
+    if "leaked" in on and ("<think" in answer.lower() or _scratch_opening().match(answer)):
         flags.append("leaked: the answer reads like the scratchpad, not a reply")
 
     results = [str(r or "") for r in results or ()]

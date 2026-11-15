@@ -30,7 +30,7 @@ from core import interrupts
 from core import logbook
 from core import safe
 
-from config import AGENT_NAME, BASE_DIR
+from config import BASE_DIR
 
 TONE_RATE = 24000
 
@@ -241,7 +241,7 @@ def ring(model, alarm):
                 else:
                     line = NAGS[min(round_number - 1, len(NAGS) - 1)]
 
-                ui.add_message(AGENT_NAME.lower(), line)
+                ui.add_message(config.AGENT_NAME.lower(), line)
 
                 if not _dismissed.is_set() and not stop.speaking.is_set():
                     try:

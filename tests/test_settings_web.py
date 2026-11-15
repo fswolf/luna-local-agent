@@ -270,3 +270,169 @@ class LiveSettings(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WhoSheIs(unittest.TestCase):
+    """agent.json edited as text on the settings page: checked, backed up,
+    saved as typed, and in her prompt from the next turn. A temporary file;
+    yours is never touched."""
+
+    GOOD = '{\n    "name": "Mira",\n    "personality": "A calm dragon who hoards books.",\n    "traits": ["dry humour"]\n}\n'
+
+    def setUp(self):
+        from config import base
+
+        self.base = base
+        self.tmp = tempfile.mkdtemp()
+        self.file = os.path.join(self.tmp, "agent.json")
+        with open(self.file, "w") as f:
+            f.write('{"name": "Luna", "personality": "kind"}\n')
+        self.before = json.loads(json.dumps(config.agent))
+        self.patch = mock.patch.object(config, "AGENT_FILE", self.file)
+        self.patch.start()
+
+    def tearDown(self):
+        self.patch.stop()
+        self.base.apply_agent(self.before)          # her real persona back, everywhere
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _post(self, **data):
+        code, _kind, body = settings_web.handle("POST", "/api", json.dumps(dict(data, key=settings_web.KEY)).encode())
+        return code, json.loads(body)
+
+    def _read(self):
+        code, _kind, body = settings_web.handle("GET", "/api/agent", b"")
+        self.assertEqual(code, 200)
+        return json.loads(body)
+
+    def test_the_file_as_it_is(self):
+        got = self._read()
+        self.assertEqual(got["text"], '{"name": "Luna", "personality": "kind"}\n')
+        self.assertTrue(got["stamp"])
+
+    def test_a_save_is_kept_as_typed_backed_up_and_used_next_turn(self):
+        from llm import prompts
+
+        stamp = self._read()["stamp"]
+        code, out = self._post(action="agent_save", text=self.GOOD, stamp=stamp)
+        self.assertEqual(code, 200, out)
+        with open(self.file) as f:
+            self.assertEqual(f.read(), self.GOOD)             # your layout, not reformatted
+        backups = os.listdir(os.path.join(self.tmp, "backups"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(config.AGENT_NAME, "Mira")
+        self.assertEqual(config.agent["traits"], ["dry humour"])
+        system, _live = prompts.build_prompt_parts("hi", None, True)
+        self.assertIn("You are Mira.", system)
+        self.assertIn("hoards books", system)
+        self.assertIn("dry humour", system)
+        self.assertNotEqual(out["stamp"], stamp)              # the page's next save is against this one
+
+    def test_bad_json_says_where_and_changes_nothing(self):
+        before = self._read()
+        code, out = self._post(action="agent_save", text='{\n  "name": "Mira",\n  "personality": "x",\n}', stamp=before["stamp"])
+        self.assertEqual(code, 400)
+        self.assertRegex(out["message"], r"line [34], column")   # 3.13 points at the comma itself
+        self.assertEqual(self._read()["text"], before["text"])
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "backups")))
+
+    def test_valid_json_that_would_break_her(self):
+        stamp = self._read()["stamp"]
+        for text, words in (('{"name": "Mira"}', "personality"),
+                            ('{"personality": "  "}', "personality"),
+                            ('["a list"]', "{...}"),
+                            ('{"personality": "x", "traits": "one string"}', "traits"),
+                            ('{"personality": "x", "name": 5}', "name"),
+                            ('{"personality": "x", "user": "Ryan"}', "user")):
+            code, out = self._post(action="agent_save", text=text, stamp=stamp)
+            self.assertEqual(code, 400, text)
+            self.assertIn(words, out["message"], text)
+        self.assertEqual(config.AGENT_NAME, self.before.get("name") or config.AGENT_NAME)
+
+    def test_a_hand_edit_since_the_page_loaded_isnt_overwritten(self):
+        stamp = self._read()["stamp"]
+        with open(self.file, "w") as f:
+            f.write('{"name": "Luna", "personality": "edited by hand"}\n')
+        os.utime(self.file, ns=(int(stamp) + 10**9, int(stamp) + 10**9))
+        code, out = self._post(action="agent_save", text=self.GOOD, stamp=stamp)
+        self.assertEqual(code, 400)
+        self.assertIn("changed outside", out["message"])
+        with open(self.file) as f:
+            self.assertIn("edited by hand", f.read())
+
+    def test_saving_needs_the_key(self):
+        code, _kind, body = settings_web.handle("POST", "/api", json.dumps(
+            {"action": "agent_save", "text": self.GOOD}).encode())
+        self.assertEqual(code, 403)
+        with open(self.file) as f:
+            self.assertNotIn("Mira", f.read())
+
+    def test_the_page_has_the_editor(self):
+        _code, _kind, html = settings_web.handle("GET", "/", b"")
+        self.assertIn('id="agenttext"', html)
+
+
+class WhoSheIsAfterwards(unittest.TestCase):
+    """What follows a save: backups that don't pile up or overwrite each
+    other, the file's permissions, and the parts of her that read her name
+    or yours later than at start."""
+
+    def setUp(self):
+        from config import base
+
+        self.base = base
+        self.tmp = tempfile.mkdtemp()
+        self.file = os.path.join(self.tmp, "agent.json")
+        with open(self.file, "w") as f:
+            f.write('{"name": "Luna", "personality": "kind"}\n')
+        self.before = json.loads(json.dumps(config.agent))
+        self.patch = mock.patch.object(config, "AGENT_FILE", self.file)
+        self.patch.start()
+
+    def tearDown(self):
+        self.patch.stop()
+        self.base.apply_agent(self.before)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _save(self, name, user=""):
+        text = json.dumps({"name": name, "personality": "kind", "user": {"name": user}})
+        ok, message = settings_web.agent_save(text)
+        self.assertTrue(ok, message)
+
+    def test_backups_dont_overwrite_each_other_and_dont_pile_up(self):
+        with mock.patch.object(settings_web, "AGENT_BACKUPS", 3):
+            for n in range(5):                        # all inside the same second
+                self._save(f"Name{n}")
+        folder = os.path.join(self.tmp, "backups")
+        kept = os.listdir(folder)
+        self.assertEqual(len(kept), 3)
+        names = []
+        for f in kept:
+            with open(os.path.join(folder, f)) as fh:
+                names.append(json.load(fh)["name"])
+        names.sort()
+        self.assertEqual(names, ["Name1", "Name2", "Name3"])    # the newest three versions before Name4
+
+    def test_a_private_file_stays_private(self):
+        os.chmod(self.file, 0o600)
+        self._save("Mira")
+        self.assertEqual(os.stat(self.file).st_mode & 0o777, 0o600)
+
+    def test_too_long_is_refused(self):
+        ok, message = settings_web.agent_save('{"personality": "' + "x" * settings_web.AGENT_MAX + '"}')
+        self.assertFalse(ok)
+
+    def test_chat_rooms_answer_to_her_new_name(self):
+        from core import chatroom
+
+        room = chatroom.ChatRoom("t", "Ryan", {})
+        self.assertTrue(room._named().search("hey luna"))
+        self._save("Mira")
+        self.assertTrue(room._named().search("hey mira"))
+        self.assertFalse(room._named().search("hey luna"))
+
+    def test_her_scratch_check_knows_your_new_name(self):
+        from mind import thoughtlog
+
+        self._save("Luna", user="Sam")
+        self.assertTrue(thoughtlog._scratch_opening().match("Okay, Sam wants a timer"))

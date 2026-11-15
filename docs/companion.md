@@ -114,6 +114,16 @@ and stop words still work.
 The **mood line** is added on top of this every turn - agent.json is
 who she is, the mood is how she happens to be right now.
 
+**Editing it without hunting for the file:** the settings page
+(`/settings`) has **Who she is** at the top: agent.json as plain text,
+exactly as the file holds it. **Save** (or Ctrl+S) checks it first: a
+JSON mistake is pointed out by line and column, and a file with no
+`personality`, or `traits` and `rules` that aren't lists of text, isn't
+saved. The old file goes to `agent/backups/` and she uses the new one
+from her next turn, no restart. Her name in the terminal's header
+changes at the next start. If you edited the file by hand while the page
+was open, Save refuses rather than overwrite it: **Reload** first.
+
 ## One turn, companion side
 
 What happens around a reply, in order:

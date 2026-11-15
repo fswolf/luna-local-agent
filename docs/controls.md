@@ -9,7 +9,8 @@
 | Tab | Cycle conversation → pages → tools → settings; the input bar names the next stop |
 | F2 | Toggle mouse capture: see below |
 | End | Jump back to the newest message |
-| Esc | Quit (in Luna's window: an Esc pressed in another app doesn't quit her) |
+| Esc | Close a pane or popup and go back to the conversation; in the conversation it does nothing |
+| Ctrl+Q | Quit (Ctrl+C too) |
 
 **Pages** (Tab once) opens her pages in your browser: the portrait, the
 OBS address, the pose studio (the debug viewer, for making and trying

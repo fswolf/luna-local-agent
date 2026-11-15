@@ -7,7 +7,7 @@ print, then speak", and the copies drifted.
 """
 import threading
 
-from config import AGENT_NAME
+import config
 from llm import ask
 from voice.speech import record_audio, transcribe
 
@@ -95,10 +95,10 @@ def _gone(text=None, model=None):
 def _say_away(said):
     """Her leaving line at the desk, shown and spoken; after that, quiet."""
     if not said:
-        ui.set_status(f"{AGENT_NAME} isn't talking right now")
+        ui.set_status(f"{config.AGENT_NAME} isn't talking right now")
         return
 
-    ui.begin_message(AGENT_NAME.lower())
+    ui.begin_message(config.AGENT_NAME.lower())
     ui.extend_message(said)
     ui.end_message()
     player = speech.Player()
@@ -210,7 +210,7 @@ def respond_to_chat(prompt, model, source, who, said,
         # answer on stream - the one thing that wasn't on screen.
         ui.add_message(f"chat:{source}", f"{who}: {said}")
         ui.set_status("Chat..." if speak else "Chat (silent)...")
-        ui.begin_message(AGENT_NAME.lower())
+        ui.begin_message(config.AGENT_NAME.lower())
 
         def on_sentence(sentence):
             if not stop.speaking.is_set():
@@ -267,7 +267,7 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
 
         ui.add_message("system", f"Job: {job}")
         ui.set_status(f"Job {job}...")
-        ui.begin_message(AGENT_NAME.lower())
+        ui.begin_message(config.AGENT_NAME.lower())
 
         def on_sentence(sentence):
             if not stop.speaking.is_set():
@@ -344,7 +344,7 @@ def respond_remote(text, model, source, who, tools_allowed=None,
         # your message under her name.
         ui.add_message("user", f"[{source}] {text}")
         ui.set_status(f"{source.title()}...")
-        ui.begin_message(AGENT_NAME.lower())
+        ui.begin_message(config.AGENT_NAME.lower())
 
         def on_sentence(sentence):
             if not stop.speaking.is_set():
@@ -380,7 +380,7 @@ def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, 
     say = sink or player.say
 
     ui.set_status("Thinking...")
-    ui.begin_message(AGENT_NAME.lower())
+    ui.begin_message(config.AGENT_NAME.lower())
 
     def on_sentence(sentence):
         # HOME during generation means "don't bother speaking this" -

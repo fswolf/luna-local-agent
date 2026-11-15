@@ -4,7 +4,7 @@ Two files, two jobs.
 
 | File | Holds | You edit it when |
 |------|-------|------------------|
-| `agent/agent.json` | Who she is (name, personality, tone, traits, rules) and who you are | You want her to behave differently |
+| `agent/agent.json` | Who she is (name, personality, tone, traits, rules) and who you are | You want her to behave differently (or edit it under **Who she is** on the settings page) |
 | `config.json` | How the machine runs: voice, models, thresholds, timeouts, theme | You want it to work differently |
 
 They used to be one file, which meant tuning a VAD threshold and

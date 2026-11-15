@@ -81,8 +81,9 @@ uses whatever is loaded. With several loaded, set `llm.model` in
 
 **llama.cpp:** put the GGUF's full path in `MODEL=` in
 `llama/server.local.env` (your own overrides, read after
-`llama/server.env`). If the model can see, put its mmproj file in
-`MMPROJ=`, or leave it empty and it's looked for next to the model.
+`llama/server.env`). Vision is off by default (`MMPROJ=off`); if the
+model can see and you want her eyes, put its mmproj file in `MMPROJ=`,
+or leave it empty and it's looked for next to the model.
 An omni model's mmproj (Qwen3-Omni, Qwen2.5-Omni, Gemma 4 E2B/E4B) gives
 her hearing too, for `stt.send_audio` ([Controls](controls.md#hearing-how-you-said-it-optional)).
 

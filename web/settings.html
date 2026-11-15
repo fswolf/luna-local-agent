@@ -33,6 +33,17 @@ section{scroll-margin-top:80px;margin-bottom:14px;background:var(--panel);border
 section>h2{margin:0;font-size:14px;padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;user-select:none}
 section>h2 span{color:var(--dim);font-weight:400}
 section.closed .rows{display:none}
+#agentbox .rows{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+#agentbox p{margin:0;color:var(--dim);font-size:12.5px}
+#agentbox code{font-family:ui-monospace,monospace;font-size:12px}
+#agenttext{width:100%;min-height:340px;resize:vertical;background:#0e0a16;border:1px solid var(--line);border-radius:8px;color:var(--text);
+  font-family:ui-monospace,"Cascadia Mono",monospace;font-size:13px;line-height:1.5;padding:10px 12px;tab-size:4;white-space:pre-wrap;overflow:auto}
+#agenttext:focus{outline:none;border-color:var(--accent)}
+#agentbox .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#agentbox button{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:5px 14px;cursor:pointer;font:inherit}
+#agentbox button:hover:not(:disabled){background:var(--accent);color:#14081c}
+#agentbox button:disabled{opacity:.45;cursor:default}
+#agentstate{font-size:13px;color:var(--dim)}#agentstate.bad{color:var(--bad)}#agentstate.good{color:var(--ok)}
 .row{display:grid;grid-template-columns:minmax(150px,230px) 1fr auto;grid-template-areas:"name ctl reset" "help help help";gap:6px 16px;padding:10px 14px;border-top:1px solid var(--line);align-items:center}
 .row .name{grid-area:name}.row .ctl{grid-area:ctl}.row .reset{grid-area:reset}
 .row .name{font-family:ui-monospace,"Cascadia Mono",monospace;font-size:13px;word-break:break-all}
@@ -104,6 +115,12 @@ section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;m
 <div id="presetbox"><div class="presets" id="presets"></div>
 <div class="ptitle">Model size <span>sets how much fits in each prompt; pick the one closest to your model and its context window</span></div>
 <div class="presets" id="sizes"></div></div>
+<section id="agentbox" class="closed" data-group="agent"><h2><div>Who she is <em style="color:var(--dim)">agent/agent.json</em></div> <span>edit</span></h2>
+<div class="rows">
+<p>Her name, personality, tone, traits and rules, and who you are, as the file holds them. Save checks it first and keeps the old one in <code>agent/backups/</code>; she uses it from her next turn. Ctrl+S saves; Tab indents, Esc leaves the box.</p>
+<textarea id="agenttext" spellcheck="false" autocomplete="off" aria-label="agent.json"></textarea>
+<div class="bar"><button id="agentsave" disabled>Save</button><button id="agentload" title="Throw away your edits and load the file again">Reload</button><span id="agentstate"></span></div>
+</div></section>
 <div class="count" id="count"></div>
 <div id="list"></div>
 </main>
@@ -257,11 +274,73 @@ function render() {
   $("#list").innerHTML = html || `<div class="empty">${query ? `Nothing matches "${esc(query)}".` : "Nothing set in config.json yet: everything is at its default."}</div>`;
   // presets are for browsing, not for a search or the list of your changes
   $("#presetbox").hidden = !!query || view === "changed";
+  $("#agentbox").hidden = !!query || view === "changed";
   $("#count").textContent = query ? `${shown} setting${shown === 1 ? "" : "s"} match` : view === "changed" ? `${shown} set in config.json` : "";
   const jump = $("#jump");
   jump.hidden = view !== "all" || !!query;      // the long list is the one worth jumping around
   jump.innerHTML = `<option value="">Jump to…</option>` + sections.map(g => `<option value="${esc(g.key)}">${esc(g.title)}</option>`).join("");
 }
+
+// Who she is: agent.json as text. Kept out of #list, so a re-render of
+// the settings never throws away what you're typing.
+const agent = {stamp: "", saved: ""};
+function agentState(text, kind) { const el = $("#agentstate"); el.textContent = text; el.className = kind || ""; }
+function agentDirty() {
+  const dirty = $("#agenttext").value !== agent.saved;
+  $("#agentsave").disabled = !dirty;
+  if (dirty && !$("#agentstate").className) agentState("unsaved changes");
+  else if (!dirty && $("#agentstate").textContent === "unsaved changes") agentState("");
+  return dirty;
+}
+async function agentLoad() {
+  let out;
+  try { out = await (await fetch("api/agent", {cache: "no-store"})).json(); }
+  catch (e) { return agentState("no answer from Luna - is she running?", "bad"); }
+  if (!out.ok) return agentState(out.message, "bad");
+  agent.stamp = out.stamp; agent.saved = out.text;
+  $("#agenttext").value = out.text;
+  agentState(out.text ? "" : "agent.json doesn't exist yet: Save makes it");
+  agentDirty();
+}
+async function agentSave() {
+  if (!agentDirty()) return;
+  const box = $("#agenttext");
+  if (box.value.length > 50000) return agentState("that's too long to save from here (over 50,000 characters)", "bad");
+  const out = await send({action: "agent_save", text: box.value, stamp: agent.stamp});
+  if (out.ok) {
+    agent.stamp = out.stamp; agent.saved = out.text;
+    if (box.value !== out.text) {                 // only a final newline added: keep your place
+      const [a, b, top] = [box.selectionStart, box.selectionEnd, box.scrollTop];
+      box.value = out.text; box.setSelectionRange(a, b); box.scrollTop = top;
+    }
+  }
+  agentState(out.message, out.ok ? "good" : "bad");
+  agentDirty();
+}
+$("#agentsave").addEventListener("click", agentSave);
+$("#agentload").addEventListener("click", () => {
+  if (agentDirty() && !confirm("Throw away your changes to agent.json?")) return;
+  agentLoad();
+});
+$("#agenttext").addEventListener("input", () => { if ($("#agentstate").className) agentState(""); agentDirty(); });
+$("#agenttext").addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); agentSave(); }
+  else if (e.key === "Escape") e.target.blur();                    // Tab indents, so Esc is the way out
+  else if (e.key === "Tab" && !e.shiftKey) {                     // indent instead of leaving the box
+    e.preventDefault();
+    const t = e.target, a = t.selectionStart;
+    t.setRangeText("    ", a, t.selectionEnd, "end"); agentDirty();
+  }
+});
+$("#agentbox > h2").addEventListener("click", e => {
+  const box = $("#agentbox");
+  box.classList.toggle("closed");
+  box.classList.contains("closed") ? closed.delete("agent.json") : closed.add("agent.json");   // remembered open, unlike the rest
+  try { localStorage.setItem("luna.settings.closed", JSON.stringify([...closed])); } catch (err) {}
+  if (!box.classList.contains("closed") && !agent.stamp && !$("#agenttext").value) agentLoad();
+});
+if (closed.has("agent.json")) { $("#agentbox").classList.remove("closed"); agentLoad(); }
+window.addEventListener("beforeunload", e => { if (agentDirty()) { e.preventDefault(); e.returnValue = ""; } });
 
 function update(entry) {
   for (const g of data.groups) {

@@ -250,8 +250,9 @@ def _build_keys():
 
     @keys.add("escape", eager=True)
     def _(event):
-        # Esc answers a permission popup with no, closes an open pane
-        # if it's open, quits otherwise - same as sfav's notes popup.
+        # Esc answers a permission popup with no, cancels an edit,
+        # clears the filter, closes an open pane - back to the
+        # conversation, where it does nothing. Ctrl+Q / Ctrl+C quit.
 
         if approving():
             _answer_approval(False)
@@ -268,9 +269,6 @@ def _build_keys():
         if view.pane is not None:
             view.pane = None
             _refresh()
-            return
-
-        event.app.exit()
 
     @keys.add("c-c")
     @keys.add("c-q")

@@ -15,11 +15,17 @@ setting also needs this session's key, which is only in the page itself:
 another site open in your browser can send a request here, but can't
 read the page to learn the key. Passwords and tokens are never sent to
 the page, only whether one is set.
+
+"Who she is" at the top edits agent/agent.json itself, as text: her name,
+personality, tone, traits, rules, who you are. No form, so a key added
+later shows up without the page knowing about it. Save checks it first,
+keeps the old file in agent/backups/, and she uses it from her next turn.
 """
 import json
 import os
 import re
 import secrets
+import time
 
 import config
 from core import logbook
@@ -191,6 +197,118 @@ def preset(name):
 
 
 # ---------------------------------------------------------------------------
+# Who she is: agent/agent.json, as text
+# ---------------------------------------------------------------------------
+AGENT_MAX = 50_000                     # characters: the page's requests stop at 64 KB; hers is a few hundred
+AGENT_BACKUPS = 20                     # the newest are kept in agent/backups/
+_TEXT_KEYS = ("name", "personality", "tone")
+_LIST_KEYS = ("traits", "rules")
+
+
+def _stamp(path):
+    try:
+        return str(os.stat(path).st_mtime_ns)
+    except OSError:
+        return ""
+
+
+def agent_text():
+    """agent.json exactly as it is on disk, and a stamp of the version, so a
+    save can tell when the file was changed by hand in the meantime."""
+    path = config.AGENT_FILE
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        text = ""
+    except OSError as e:
+        return {"ok": False, "message": f"couldn't read agent.json: {e}", "text": "", "stamp": ""}
+    return {"ok": True, "text": text, "stamp": _stamp(path), "file": os.path.relpath(path, config.BASE_DIR)}
+
+
+def check_agent(text):
+    """The parsed file, or ValueError saying what's wrong and where. Valid
+    JSON isn't enough: a file without her personality would leave her
+    blank, and a list of traits written as one string would be spelled
+    out letter by letter in her prompt."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"line {e.lineno}, column {e.colno}: {e.msg}") from None
+    if not isinstance(data, dict):
+        raise ValueError("it should be one {...} block")
+    personality = data.get("personality")
+    if not isinstance(personality, str) or not personality.strip():
+        raise ValueError('"personality" is missing or empty: that is who she is')
+    for key in _TEXT_KEYS:
+        if key in data and not isinstance(data[key], str):
+            raise ValueError(f'"{key}" should be text, in quotes')
+    for key in _LIST_KEYS:
+        if key in data and not (isinstance(data[key], list) and all(isinstance(x, str) for x in data[key])):
+            raise ValueError(f'"{key}" should be a list of text: ["...", "..."]')
+    for key, kind, word in (("user", dict, "a {...} block"), ("pronounce", dict, "a {...} block"),
+                            ("people", list, "a list [...]")):
+        if key in data and not isinstance(data[key], kind):
+            raise ValueError(f'"{key}" should be {word}')
+    return data
+
+
+def _backup(path):
+    """The file as it was, into agent/backups/ (gitignored), under a name no
+    other save takes even in the same second; only the newest few are kept."""
+    import shutil
+
+    folder = os.path.join(os.path.dirname(path), "backups")
+    os.makedirs(folder, exist_ok=True)
+    base = f"agent.{time.strftime('%Y%m%d-%H%M%S')}"
+    dest, n = os.path.join(folder, base + ".json"), 1
+    while os.path.exists(dest):
+        n += 1
+        dest = os.path.join(folder, f"{base}-{n}.json")
+    shutil.copy2(path, dest)
+    mine = sorted((f for f in os.listdir(folder) if f.startswith("agent.") and f.endswith(".json")),
+                  key=lambda f: os.path.getmtime(os.path.join(folder, f)))
+    for old in mine[:-AGENT_BACKUPS]:
+        try:
+            os.remove(os.path.join(folder, old))
+        except OSError:
+            pass
+
+
+def agent_save(text, stamp=""):
+    """Check, back up, save and apply. Returns (ok, message)."""
+    if not isinstance(text, str):
+        return False, "nothing to save"
+    if len(text) > AGENT_MAX:
+        return False, "that's far too long for agent.json"
+    try:
+        data = check_agent(text)
+    except ValueError as e:
+        return False, f"not saved - {e}"
+
+    path = config.AGENT_FILE
+    if stamp and _stamp(path) and stamp != _stamp(path):
+        return False, "agent.json was changed outside this page since you opened it - Reload to see it first"
+
+    try:
+        mode = None
+        if os.path.exists(path):
+            mode = os.stat(path).st_mode & 0o777
+            _backup(path)
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            f.write(text if text.endswith("\n") else text + "\n")
+        if mode is not None:
+            os.chmod(path + ".tmp", mode)         # a file you made private stays private
+        os.replace(path + ".tmp", path)
+    except OSError as e:
+        return False, f"couldn't save agent.json: {e}"
+
+    config.apply_agent(data)
+    logbook.info("settings", "web: agent.json saved (old one in agent/backups/)")
+    return True, f"saved - {config.AGENT_NAME} uses it from her next turn"
+
+
+# ---------------------------------------------------------------------------
 # The page (livefeed.add_page)
 # ---------------------------------------------------------------------------
 def handle(method, sub, body, key=None):
@@ -202,6 +320,9 @@ def handle(method, sub, body, key=None):
 
     if method == "GET" and sub == "/api":
         return 200, "application/json", json.dumps(listing())
+
+    if method == "GET" and sub == "/api/agent":
+        return 200, "application/json", json.dumps(agent_text())
 
     if method == "POST" and sub == "/api":
         try:
@@ -220,6 +341,13 @@ def handle(method, sub, body, key=None):
             ok, message, item = preset(str(data.get("name", "")))
         elif action in ("station_pair", "station_forget"):
             return 200, "application/json", json.dumps(_station_action(action, data))
+        elif action == "agent_save":
+            ok, message = agent_save(data.get("text"), str(data.get("stamp") or ""))
+            out = {"ok": ok, "message": message}
+            if ok:
+                out.update(agent_text())
+                out["message"] = message
+            return (200 if ok else 400), "application/json", json.dumps(out)
         else:
             ok, message, item = False, "unknown action", None
 

@@ -43,7 +43,7 @@ from core import interrupts
 from core import logbook
 from core import safe
 
-from config import AGENT_NAME
+import config
 
 # The widest a chat turn may ever reach, whatever a plugin or a config
 # file asks for. Everything absent from this acts on his machine or his
@@ -146,9 +146,7 @@ class ChatRoom:
 
         # Matched as a whole word. A substring match answers to "lunar"
         # and "lunatic", which on a stream about games is not rare.
-        self._named = re.compile(
-            rf"(?<![a-z0-9]){re.escape(AGENT_NAME.lower())}(?![a-z0-9])"
-        )
+        self._name_re = (None, None)        # (the name it was made for, the pattern)
 
         self._queue = queue.Queue()
         self._recent = deque(maxlen=50)
@@ -161,7 +159,16 @@ class ChatRoom:
         self._last_reply_at = 0.0
         self._last_user_reply = {}
 
+    def _named(self):
+        """Her name as a whole word, made again if she was renamed (the
+        settings page's Who she is) since this room started."""
+        name = config.AGENT_NAME.lower()
+        if self._name_re[0] != name:
+            self._name_re = (name, re.compile(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])"))
+        return self._name_re[1]
+
     # -- what the plugin calls ------------------------------------------
+
     def saw(self, who, message):
         """One message from the room. Safe to call from any thread."""
         who = str(who or "").strip()
@@ -179,7 +186,7 @@ class ChatRoom:
         self._recent.append((who, message))
         _show(who, message, self.name)
 
-        if not self._named.search(message.lower()):
+        if not self._named().search(message.lower()):
             return
 
         if len(message) > self.max_chars:
@@ -368,7 +375,7 @@ class ChatRoom:
 
         return [
             f"  {self.seen} messages seen, {self.answered} answered",
-            f"  answers to: {AGENT_NAME} (anywhere in the message)",
+            f"  answers to: {config.AGENT_NAME} (anywhere in the message)",
             f"  voice: {'speaks the answer' if self.speak else 'silent - text only'}",
             f"  tools allowed: {', '.join(self.tools) or 'none'}",
             f"  cooldown: {self.cooldown:g}s, {self.user_cooldown:g}s per viewer",

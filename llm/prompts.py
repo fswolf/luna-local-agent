@@ -6,7 +6,7 @@ Part of the llm package (it was one llm.py); see llm/__init__.py.
 from datetime import datetime
 
 import config
-from config import AGENT_NAME, PERSONALITY, TONE, TRAITS, RULES, GENERATION
+from config import GENERATION
 from config import memory
 from core import history
 from life import gestures
@@ -332,18 +332,18 @@ def _pieces(query, timing, private):
 
 def _persona():
     return f"""Personality:
-{PERSONALITY}"""
+{config.PERSONALITY}"""
 
 
 def _manner():
     return f"""Tone:
-{TONE}
+{config.TONE}
 
 Traits:
-{', '.join(TRAITS)}
+{', '.join(config.TRAITS)}
 
 Rules:
-{', '.join(RULES)}"""
+{', '.join(config.RULES)}"""
 
 
 def build_system_prompt(query="", timing="", private=True):
@@ -356,7 +356,7 @@ def build_system_prompt(query="", timing="", private=True):
 
 def _whole(p):
     return f"""
-You are {AGENT_NAME}.
+You are {config.AGENT_NAME}.
 {p['user']}{p['profile']}
 Right now:
 {p['now']}
@@ -398,7 +398,7 @@ def build_prompt_parts(query="", timing="", private=True):
         return _whole(p), ""
 
     system = f"""
-You are {AGENT_NAME}.
+You are {config.AGENT_NAME}.
 {p['user']}{p['profile']}
 The time right now, what's going on around you, your mood and what you remember
 that bears on this message come in a note in front of the latest message. Never
