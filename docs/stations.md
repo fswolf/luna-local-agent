@@ -1,18 +1,19 @@
 # Relay stations: talk to her from another room
 
-An old phone or tablet becomes a way to talk to Luna from the kitchen, the
-bedroom, anywhere in the house. It runs nothing of its own: it opens a page
-Luna serves on your home network, you tap and talk, and she answers through
-its speaker. It's the same Luna as at the desk: same memory, mood, people
-and tools. Nothing to install on the device, no account, no internet needed.
+A phone or tablet becomes a way to talk to Luna from the kitchen, the
+bedroom, anywhere in the house. It runs nothing of its own: Luna does all
+the work on your PC, and the device is her screen, mic and speaker. It's the
+same Luna as at the desk: same memory, mood, people and tools. No account,
+no internet needed.
 
-On Android there's also an app for it, [Luna Station](#the-luna-station-app-android),
-which turns a phone or tablet into a room device for her: her portrait on
-screen, a mic to talk and a speaker for her voice.
+On Android, use the [Luna Station app](#the-luna-station-app-android). It's
+the sturdy way to do it: a room device with her portrait full screen and a
+big talk button, or the conversation. Any other phone or tablet, an iPhone or
+iPad included, works [in its browser](#in-the-browser-instead).
 
-<img width="300" alt="A phone as a relay station in the kitchen: one big Tap to talk button, what you said, and her answer underneath" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/relay-station.jpg" />
+<img width="280" alt="The Luna Station app in Portrait view: Luna reading a book called The Moonlit Library in a cosy room at night, a big microphone button below her" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-portrait.jpg" /> <img width="280" alt="The Luna Station app in Chat view: the end of her reply, a Speaking status line, the text box and the Stop button" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-chat.jpg" />
 
-## Set it up
+## Turn stations on
 
 1. Install the extra once (it makes the certificates and the QR codes):
 
@@ -24,29 +25,60 @@ screen, a mic to talk and a speaker for her voice.
    **enabled** on. She starts listening on your home network: port 8793 for
    the stations and 8794 for the setup page (`station.port` changes them).
 3. Type a name for the device (kitchen, bedroom) and press **Add a phone or
-   tablet**. A QR code appears.
-4. On the phone or tablet, scan it with the camera. The setup page walks
-   you through two steps:
-   - **Trust Luna's certificate** (once per device). Phones only allow the
-     microphone on secure pages, so Luna made her own certificate on your
-     PC. Download it and follow the steps for Android or iPhone/iPad shown
-     there.
-   - **Open Luna.** The device is paired and the page opens. Bookmark it or
-     add it to the home screen; from then on it opens straight to her.
+   tablet**. A QR code appears. It works once, for 15 minutes.
 
-The pairing code works once, for 15 minutes. Paired devices are listed
-under Relay stations, each with **Unpair**.
+Paired devices are listed under Relay stations, each with **Unpair**. A
+paired device stays paired until you unpair it.
 
-A paired device stays paired until you unpair it. Its cookie is renewed
-every time it opens Luna, and the page keeps its own copy of the device's
-token, so a browser that throws cookies away when it closes (Firefox can)
-reconnects by itself. Opening the old pairing link again on a paired
-device just goes straight in.
+## The Luna Station app (Android)
+
+[Luna Station](https://github.com/fswolf/luna-station-android) is the same
+station as a proper app, made to sit somewhere in the house: a tablet on a
+stand in the kitchen, say. Luna still does all the work on your PC; the app
+is her screen, mic and speaker, and only talks to your PC over the home
+network.
+
+- **Two views,** picked at the top: **Chat** (the conversation, typed or
+  spoken, like the page) and **Portrait** (her portrait full screen, one big
+  talk button, her words underneath). Both are one conversation, so
+  switching while she answers doesn't interrupt her.
+- **Pairing:** install the APK, open the app and scan the QR code from the
+  settings page (or type the address and code). The app fetches Luna's
+  certificate itself and trusts only that, so there's nothing to set up in
+  Android's settings.
+- **Android 11 or newer,** Amazon Fire tablets on Fire OS 8 included, no
+  Google services needed. Installed from an APK (the repo's Releases, or
+  built yourself).
+- The pairing token is kept encrypted on the device; the conversation isn't
+  stored there.
+
+Tested against a real Luna: pairing, typing, talking, and both views. Its
+README has the details.
+
+## In the browser instead
+
+For a device without the app (an iPhone, an iPad, an older Android), the
+station is a page Luna serves, so there's nothing to install. It works, but
+the app is sturdier where you can use it.
+
+Scan the QR code with the device's camera. The setup page walks you
+through two steps:
+
+- **Trust Luna's certificate** (once per device). Phones only allow the
+  microphone on secure pages, so Luna made her own certificate on your PC.
+  Download it and follow the steps for Android or iPhone/iPad shown there.
+- **Open Luna.** The device is paired and the page opens. Bookmark it or add
+  it to the home screen; from then on it opens straight to her.
+
+The page's cookie is renewed every time it opens Luna, and the page keeps
+its own copy of the device's token, so a browser that throws cookies away
+when it closes (Firefox can) reconnects by itself. Opening the old pairing
+link again on a paired device just goes straight in.
 
 ## Talking
 
-The page is a conversation, like a messaging app: your words on the right,
-hers on the left, the newest at the bottom.
+The app's Chat view and the page work the same way, like a messaging app:
+your words on the right, hers on the left, the newest at the bottom.
 
 - **Talk:** tap 🎙 and speak. She stops listening after a short pause (or
   tap 🎙 again). What she heard appears as your message.
@@ -58,8 +90,8 @@ hers on the left, the newest at the bottom.
 - Scroll back to read: the view stays where you put it while she writes,
   and ↓ takes you back to the newest. Your own message always jumps to the
   bottom.
-- The last 40 messages are kept on the device, so the conversation is still
-  there next time you open the page.
+- The page keeps the last 40 messages on the device, so the conversation
+  is still there next time you open it. The app keeps none.
 
 The PC shows each turn too, marked with the room: `[kitchen] ...`.
 
@@ -98,30 +130,6 @@ it.
 - **Her mouth** moves with her voice on the device: the station page tells
   Luna when each piece of her reply starts playing (`POST /playing/<turn>/<n>`),
   and an app playing the clips itself does the same.
-
-## The Luna Station app (Android)
-
-[Luna Station](https://github.com/fswolf/luna-station-android) is the same
-station as a proper app, made to sit somewhere in the house: a tablet on a
-stand in the kitchen, say. Luna still does all the work on your PC; the app
-is her screen, mic and speaker, and only talks to your PC over the home
-network.
-
-- **Two views,** picked at the top: **Chat** (the conversation, typed or
-  spoken, like the page) and **Portrait** (her portrait full screen, one big
-  talk button, her words underneath). Both are one conversation, so
-  switching while she answers doesn't interrupt her.
-- **Pairing** is the same QR code from the settings page: the app scans it
-  (or you type the address and code), fetches Luna's certificate itself and
-  trusts only that. Nothing to install in Android's settings.
-- **Android 11 or newer,** Amazon Fire tablets on Fire OS 8 included, no
-  Google services needed. Installed from an APK (the repo's Releases, or
-  built yourself).
-- The pairing token is kept encrypted on the device; the conversation isn't
-  stored there.
-
-Early days: pairing, typing, talking and the Chat view are tested; the
-Portrait view against a real Luna is next. Its README has the details.
 
 ## Your computer
 

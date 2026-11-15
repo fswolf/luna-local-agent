@@ -14,7 +14,14 @@ from senses import vision
 
 from .streaming import _Narrator, _THINK_BLOCK, _calls_from_text, _chat_completion, _content, _last_raw, _visible
 
-def _force_prose(payload, on_text=None, on_sentence=None):
+_SAY_WHAT_YOU_DID = "(Tell me what you just did, in one short sentence. Do not call any more tools.)"
+# After a tool came back with something to pass on (an answer from a
+# bigger model, a search result): what she did isn't the point, what it said is.
+_ANSWER_WITH_IT = ("(You have what your tools returned. Answer me now, in your own words, "
+                   "using it. Do not call any more tools.)")
+
+
+def _force_prose(payload, on_text=None, on_sentence=None, nudge=_SAY_WHAT_YOU_DID):
     """Ask again with no tools offered.
 
     After a tool result some models keep trying to call something, or
@@ -27,11 +34,7 @@ def _force_prose(payload, on_text=None, on_sentence=None):
     payload = dict(payload)
     payload.pop("tools", None)
     payload.pop("tool_choice", None)
-    payload["messages"] = payload["messages"] + [{
-        "role": "user",
-        "content": "(Tell me what you just did, in one short sentence. "
-                   "Do not call any more tools.)",
-    }]
+    payload["messages"] = payload["messages"] + [{"role": "user", "content": nudge}]
 
     if on_text or on_sentence:
         narrator = _Narrator(on_text, on_sentence)
@@ -101,12 +104,25 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             said.append(text)
 
         if not calls:
-            if said:
-                return " ".join(said).strip()
+            if text or not said:
+                if said:
+                    return " ".join(said).strip()
+                # Nothing usable and nothing to call: the model has finished
+                # but said nothing. One more attempt with tools removed,
+                # asked for the answer if a tool already brought one back.
+                nudge = _ANSWER_WITH_IT if _last_raw["exchanges"] else _SAY_WHAT_YOU_DID
+                return _force_prose(payload, on_text, on_sentence, nudge=nudge) or ""
 
-            # Nothing usable and nothing to call: the model has finished
-            # but said nothing. One more attempt with tools removed.
-            return _force_prose(payload, on_text, on_sentence) or ""
+            # The round after a tool came back empty. Only the preamble
+            # from before the call ("let me ask Claude") was said, so
+            # returning that would end the turn without the result ever
+            # being passed on. Ask once more, tools removed, for the answer.
+            logbook.warn("llm", "the round after %s said nothing - asking once more for the answer",
+                         ", ".join(sorted(_last_raw["called"])) or "a tool")
+            more = _force_prose(payload, on_text, on_sentence, nudge=_ANSWER_WITH_IT)
+            if more:
+                said.append(more)
+            return " ".join(said).strip()
 
         # The thinking that led here gets told what it decided. Only if
         # this run actually thought - a run with no scratchpad added no

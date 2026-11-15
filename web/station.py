@@ -932,14 +932,16 @@ def _satellites():
 
 
 def qr_svg(text):
-    """The address as a QR code (SVG), or None without the segno package."""
+    """The address as a QR code (SVG), or None without the segno package.
+    A viewBox and no fixed size, so the page's box scales it instead of
+    cropping it (it's drawn 222 px wide, the box is 180)."""
     try:
         import segno
     except ImportError:
         return None
     out = io.BytesIO()
     segno.make(text, error="m").save(out, kind="svg", scale=6, border=2, dark="#120d1c", light="#ffffff",
-                                    xmldecl=False, svgns=True)
+                                    xmldecl=False, svgns=True, omitsize=True)
     return out.getvalue().decode()
 
 

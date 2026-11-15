@@ -661,15 +661,23 @@ def _mount_class(name):
     return _mount_classes[name]
 
 
+_SWITCHER_ORDER = ("examples", "settings", "help")
+
+
 def with_switcher(html, here):
     """A small pill bottom-right linking the pages this server serves."""
-    links = [("", "live"), ("portrait/", "portrait"), ("thoughts/", "thoughts"), ("memory/", "memory")]
+    links = [("portrait/", "portrait"), ("", "live"), ("thoughts/", "thoughts"), ("memory/", "memory")]
+    extra = []
     for name, (label, _handler, visible) in list(PAGES.items()):
         try:
             if visible():
-                links.append((name + "/", label))
+                extra.append((name + "/", label))
         except Exception:
             pass
+    # examples, settings, help in that order; a plugin's page (chess) after them
+    first = {name: i for i, name in enumerate(_SWITCHER_ORDER)}
+    extra.sort(key=lambda link: first.get(link[1], len(first)))
+    links += extra
     items = "".join(
         f'<a href="/{href}"{" class=on" if (href.rstrip("/") or "live") == here else ""}>{label}</a>'
         for href, label in links)

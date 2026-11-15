@@ -420,6 +420,10 @@ class Stations(unittest.TestCase):
         self.assertTrue(panel["running"])
         self.assertEqual(panel["port"], self.port)
         self.assertIn("<svg", station.qr_svg("http://example/") or "<svg")
+        svg = station.qr_svg("http://example/")
+        if svg:                    # scales to its box, never cropped by it
+            self.assertIn("viewBox", svg)
+            self.assertNotIn('width="', svg.split(">", 1)[0])
 
 
 class HomeNetworkOnly(unittest.TestCase):

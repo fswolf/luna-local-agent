@@ -21,7 +21,7 @@ Everything the README only touches on, one subject per page.
 - [Vision](vision.md): looking at your screen, the webcam, noticing you're there
 - [People in the house](people.md): who's talking, by voice or face, and their own memories
 - [Who she's talking to](who.md): how every turn is matched to a person, and what changes for a guest
-- [Relay stations](stations.md): talk to her from another room on an old phone or tablet, in the browser or the [Android app](https://github.com/fswolf/luna-station-android)
+- [Relay stations](stations.md): talk to her from another room on a phone or tablet, with the [Android app](https://github.com/fswolf/luna-station-android) or in the browser
 - [Reminders and alarms](reminders.md)
 - [Offers](offers.md): things she notices on her own (a full disk, a date coming up) and offers to help with
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
