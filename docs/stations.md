@@ -11,7 +11,7 @@ the sturdy way to do it: a room device with her portrait full screen and a
 big talk button, or the conversation. Any other phone or tablet, an iPhone or
 iPad included, works [in its browser](#in-the-browser-instead).
 
-<img width="280" alt="The Luna Station app in Portrait view: Luna reading a book called The Moonlit Library in a cosy room at night, a big microphone button below her" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-portrait.jpg" /> <img width="280" alt="The Luna Station app in Chat view: the end of her reply, a Speaking status line, the text box and the Stop button" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-chat.jpg" />
+<img width="280" alt="The Luna Station app on an Android phone in Portrait view: Luna in a cosy room at night, the start of her reply under her, and a big microphone button" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-portrait.jpg" /> <img width="280" alt="The Luna Station app on an Android phone in Chat view: a question about dinosaurs, her answer, a Speaking status line, the text box and the Stop button" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-chat.jpg" />
 
 ## Turn stations on
 
