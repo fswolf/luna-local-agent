@@ -141,6 +141,7 @@ async function load() {
   const r = await fetch("api", {cache: "no-store"});
   data = await r.json();
   presets(); render();
+  agentEnsure();          // Luna answered: if the box is open and still empty, fill it now
 }
 
 const post = body => fetch("api", {method: "POST", headers: {"Content-Type": "application/json"},
@@ -283,7 +284,7 @@ function render() {
 
 // Who she is: agent.json as text. Kept out of #list, so a re-render of
 // the settings never throws away what you're typing.
-const agent = {stamp: "", saved: ""};
+const agent = {stamp: "", saved: "", loading: false};
 function agentState(text, kind) { const el = $("#agentstate"); el.textContent = text; el.className = kind || ""; }
 function agentDirty() {
   const dirty = $("#agenttext").value !== agent.saved;
@@ -292,10 +293,18 @@ function agentDirty() {
   else if (!dirty && $("#agentstate").textContent === "unsaved changes") agentState("");
   return dirty;
 }
+// The box open and the file not loaded yet (a fetch that failed while she was
+// starting, a page the browser brought back from its cache): load it.
+function agentEnsure() {
+  if (!$("#agentbox").classList.contains("closed") && !agent.stamp) agentLoad();
+}
 async function agentLoad() {
+  if (agent.loading) return;                       // one fetch at a time
+  agent.loading = true;
   let out;
   try { out = await (await fetch("api/agent", {cache: "no-store"})).json(); }
   catch (e) { return agentState("no answer from Luna - is she running?", "bad"); }
+  finally { agent.loading = false; }
   if (!out.ok) return agentState(out.message, "bad");
   agent.stamp = out.stamp; agent.saved = out.text;
   $("#agenttext").value = out.text;
@@ -337,9 +346,12 @@ $("#agentbox > h2").addEventListener("click", e => {
   box.classList.toggle("closed");
   box.classList.contains("closed") ? closed.delete("agent.json") : closed.add("agent.json");   // remembered open, unlike the rest
   try { localStorage.setItem("luna.settings.closed", JSON.stringify([...closed])); } catch (err) {}
-  if (!box.classList.contains("closed") && !agent.stamp && !$("#agenttext").value) agentLoad();
+  agentEnsure();
 });
-if (closed.has("agent.json")) { $("#agentbox").classList.remove("closed"); agentLoad(); }
+if (closed.has("agent.json")) { $("#agentbox").classList.remove("closed"); agentEnsure(); }
+// Back to this page from another (the page switcher): the browser may show
+// it from its cache, file and all. Fetch it fresh unless you were editing.
+window.addEventListener("pageshow", e => { if (e.persisted && !agentDirty()) { agent.stamp = ""; agentEnsure(); } });
 window.addEventListener("beforeunload", e => { if (agentDirty()) { e.preventDefault(); e.returnValue = ""; } });
 
 function update(entry) {

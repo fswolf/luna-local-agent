@@ -141,8 +141,7 @@ On someone else's turn:
 - **Corrections** like "forget that" or "actually it's…" change only
   their facts.
 
-On your turns, nothing changes: your facts, your memory backend, as
-before. Someone else's facts never show up in your turns either.
+On your turns, nothing changes: your facts, as before. Someone else's facts never show up in your turns either.
 
 She still shares the conversation as it's happening with everyone (the
 recent turns, labelled with who said them). She's in one room, after all.

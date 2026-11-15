@@ -1,9 +1,8 @@
 # Memory
 
 Facts are written deliberately by the model, not scraped from every
-turn, and they live in `agent/memory.json` where you can edit them by
-hand. A malformed file no longer takes the app down on startup: it says
-what's wrong, leaves the file alone and starts empty.
+turn, and they live in `agent/facts.db`, with a page to edit them by
+hand.
 
 ```
 > "Remember I stream on Tuesdays."      -> remember_fact
@@ -19,16 +18,14 @@ deleting the wrong one.
 ```json
 "long_term_memory": {
     "enabled": true,
-    "backend": "sqlite",
-    "max_facts": 30,
     "context_facts": 25
 }
 ```
 
 Under `context_facts` every fact goes into every prompt, which is fine at
-thirty. Over it, only the ones sharing vocabulary with what you just said
-travel, plus the newest few regardless: a wall of unrelated trivia is
-exactly what makes a small model start answering questions nobody asked.
+thirty. Over it, only the ones that match what you just said travel,
+plus the newest few regardless: a wall of unrelated trivia is exactly
+what makes a small model start answering questions nobody asked.
 
 Facts are one of three kinds of memory now. Her notes on each
 conversation (*episodes*) and her lessons about her own behaviour live
@@ -36,20 +33,18 @@ in `agent/notebook.db`, and once a day a cleanup pass merges duplicate
 facts and retires the losing side of a contradiction. All of that is
 under [Learning from herself](learning.md#learning-from-herself).
 
-## The permanent store (the default)
+## The fact store
 
-`"backend": "sqlite"`, the default, keeps facts in a permanent table in
-`agent/facts.db`: plain SQLite, in-process, no server, nothing to
-install. `"backend": "json"` is the original capped list in
-`memory.json`. What the table does that the list doesn't:
+`agent/facts.db` is plain SQLite: in-process, no server, nothing to
+install.
 
-* **Nothing is ever dropped for space.** The JSON backend deletes the
-  oldest fact once it passes `max_facts`; the table has no cap. Facts
-  that stop being true are *retired*: kept with their dates, hidden
-  from context, visible under `/facts retired`, so a wrong retirement
-  is recoverable and "what was my last graphics card" is answerable.
-* **Search is FTS5**: stemmed and term-weighted instead of raw word
-  overlap, and milliseconds at thousands of facts.
+* **Nothing is ever dropped for space.** There's no cap. Facts that stop
+  being true are *retired*: kept with their dates, hidden from context,
+  visible under `/facts retired`, so a wrong retirement is recoverable
+  and "what was my last graphics card" is answerable.
+* **Search is FTS5**: stemmed and term-weighted, and milliseconds at
+  thousands of facts. A Python whose sqlite was built without FTS5 still
+  works: facts are matched by shared words instead, and the log says so.
 * **Contradictions get handled.** The extractor can answer `REPLACE` as
   well as `NEW`, so "I got a 7900 XTX" retires the 6950 XT fact instead
   of sitting next to it forever. When both could be true at once it
@@ -57,9 +52,19 @@ install. `"backend": "json"` is the original capped list in
   losing a fact.
 * **`recall_facts` takes a query.** She can look something up instead of
   reading the whole table into context.
+* **A damaged file doesn't stop her.** If facts.db can't be read as a
+  database, it's kept as `facts.db.bad-<time>`, a fresh one starts, and
+  she tells you where the old one went.
 
-`/facts` shows what's stored and which backend is live, and
-`memory-manager/` is the editor:
+Older installs could keep a capped list in `agent/memory.json` instead
+(the json backend). If yours did, its facts are read into facts.db the
+first time she starts after updating, once only, so a fact you have her
+forget never comes back from the old file; the file is never written
+again. An install already on facts.db had that list read in when it
+switched, and it's left alone. Your preferences in memory.json are still
+read until you move them into agent.json.
+
+`/facts` shows what's stored, and `memory-manager/` is the editor:
 
 <img width="1067" alt="The memory manager" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
 
@@ -68,27 +73,15 @@ install. `"backend": "json"` is the original capped list in
 ```
 
 opens a local page (127.0.0.1:8792/memory/, and only 127.0.0.1) to view,
-search, add, edit, retire, restore and delete facts, plus edit the
-`user_preferences` block of `memory.json`, whichever backend is
-active. Below the facts is **her notebook**: how she feels about each
-game she's played, her notes on past conversations and game sessions
-(game ones marked), and the lessons she's learned, each with a forget,
-retire or edit button. Facts are about you; the notebook is about her
-(see [learning](learning.md)). On sqlite it's safe to use while she's running; on json the
-page warns you that a running assistant can overwrite your edits when
-it next saves. The switch is
-live in both directions and loses nothing:
-
-```
-/set long_term_memory.backend sqlite    json facts are absorbed into the table
-/set long_term_memory.backend json      newest max_facts are written back to
-                                        memory.json; the rest wait in the db
-```
-
-The db is always the superset and the JSON file is always the limited
-view, which is what makes the setting safe to flip the day it misbehaves.
-If this python's sqlite lacks FTS5 the setting quietly stays on json and
-the log says why.
+search, add, edit, retire, restore and delete facts. It's safe to use
+while she's running: an edit is in her next prompt. Your preferences
+(what she calls you, nicknames, what to avoid) aren't here: they're
+`user_preferences` in agent.json, under **Who she is** on the settings
+page ([Companion](companion.md#who-she-is-agentjson)). Below the facts is
+**her notebook**: how she feels about each game she's played, her notes
+on past conversations and game sessions (game ones marked), and the
+lessons she's learned, each with a forget, retire or edit button. Facts
+are about you; the notebook is about her (see [learning](learning.md)).
 
 ## Pages
 

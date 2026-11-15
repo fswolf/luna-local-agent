@@ -269,8 +269,6 @@
     },
     "long_term_memory": {
         "enabled": true,
-        "backend": "sqlite",
-        "max_facts": 30,
         "context_facts": 25
     },
     "logging": {

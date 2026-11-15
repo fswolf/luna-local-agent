@@ -103,10 +103,9 @@ class Pane(unittest.TestCase):
         self.assertIs(config.MOOD_EMOTES, False)
 
     def test_space_steps_a_choice(self):
-        self._select("long_term_memory.backend")
-        with mock.patch.object(config, "LONG_TERM_MEMORY_BACKEND", "json", create=True):
-            settings_pane.flip()
-        self.assertIn(self._file()["long_term_memory"]["backend"], ("json", "sqlite"))
+        self._select("stt.vad")
+        settings_pane.flip()
+        self.assertIn(self._file()["stt"]["vad"], ("silero", "energy", "auto"))
 
     def test_a_setting_outside_the_table_saves_for_a_restart(self):
         self._select("plugins.twitch.lewd")

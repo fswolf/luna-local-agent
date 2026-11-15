@@ -160,59 +160,58 @@ class MoodsFile(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# memory.json
+# facts.db through longterm.py, and an old install's memory.json
 # ---------------------------------------------------------------------------
-class MemoryFile(Temp):
+class Facts(Temp):
     def setUp(self):
         super().setUp()
-        self.file = os.path.join(self.dir, "memory.json")
-        self.patch(longterm, "MEMORY_FILE", self.file)
-        p = mock.patch.dict(longterm.memory, {"long_term_facts": []}, clear=True)
-        p.start()
-        self.addCleanup(p.stop)
-        p = mock.patch.dict(longterm._disk, {"mtime": None, "blocked": ""})
-        p.start()
-        self.addCleanup(p.stop)
-        self.patch(longterm, "backend", lambda: "json")
+        from tests.facts_tmp import use_temp_facts
+        use_temp_facts(self, self.dir, old=["Ryan lives in Lacombe", "Ryan uses Fedora"])
         self.patch(longterm, "_guest", lambda: None)
         self.patch(longterm, "_announce", lambda: None)
         self.told = self.patch(logbook, "tell")
 
-    def write(self, text):
-        with open(self.file, "w") as f:
-            f.write(text)
-        os.utime(self.file, (time.time() + 5, time.time() + 5))     # a different mtime
-
-    def read(self):
-        with open(self.file) as f:
-            return json.load(f)
-
-    def test_unreadable_file_is_kept_before_it_is_written_over(self):
-        self.write('{"long_term_facts": ["Ryan lives in Lacombe", ')    # half a file
+    def test_an_old_memory_json_is_read_in_once(self):
         self.assertTrue(longterm.add_fact("Ryan has a cat named Mew"))
-        kept = [n for n in os.listdir(self.dir) if n.startswith("memory.json.bad-")]
-        self.assertEqual(len(kept), 1)
-        with open(os.path.join(self.dir, kept[0])) as f:
-            self.assertIn("Lacombe", f.read())
-        self.assertEqual(self.read()["long_term_facts"], ["Ryan has a cat named Mew"])
-        self.told.assert_called()
+        self.assertEqual(longterm.get_facts(),
+                         ["Ryan lives in Lacombe", "Ryan uses Fedora", "Ryan has a cat named Mew"])
+        longterm.forget_fact("Fedora")
+        longterm._imported[0] = False                   # a restart, the old file still there
+        self.assertNotIn("Ryan uses Fedora", longterm.get_facts())     # forgotten stays forgotten
 
-    def test_edits_made_elsewhere_are_kept(self):
-        """The memory manager's edits used to be undone by the next save."""
-        longterm.add_fact("Ryan streams as a VTuber")
-        self.write(json.dumps({"long_term_facts": ["Ryan streams as a VTuber", "Ryan uses Fedora"],
-                               "user_preferences": {"tone": "short"}}))
+    def test_an_install_already_on_sqlite_keeps_its_forgotten_facts_forgotten(self):
+        # facts.db in use for months (the old list read in back then, one
+        # fact forgotten since), memory.json still lying around
+        self.patch(longterm, "_imported", [True])
+        factstore.add("Ryan lives in Lacombe")
+        longterm._imported[0] = False
+        self.assertNotIn("Ryan uses Fedora", longterm.get_facts())
+        self.assertTrue(factstore.meta("memory_json_imported"))
+
+    def test_an_install_still_on_json_brings_its_facts(self):
+        self.patch(longterm, "_imported", [True])
+        factstore.add("Ryan lives in Lacombe")
+        longterm._imported[0] = False
+        with mock.patch.object(config, "setting", return_value={"backend": "json"}):
+            self.assertIn("Ryan uses Fedora", longterm.get_facts())
+
+    def test_nothing_writes_a_memory_json(self):
         longterm.add_fact("Ryan has a cat named Mew")
-        saved = self.read()
-        self.assertEqual(saved["long_term_facts"],
-                         ["Ryan streams as a VTuber", "Ryan uses Fedora", "Ryan has a cat named Mew"])
-        self.assertEqual(saved["user_preferences"], {"tone": "short"})
+        longterm.update_fact("cat", "Ryan has two cats")
+        self.assertEqual(sorted(os.listdir(self.dir)), sorted(n for n in os.listdir(self.dir)
+                                                             if n.startswith("facts.db")))
 
-    def test_failed_write_leaves_the_old_file(self):
-        longterm.add_fact("Ryan streams as a VTuber")
-        with mock.patch.object(longterm.json, "dump", side_effect=OSError("disk full")):
-            longterm.add_fact("Ryan has a cat named Mew")
-        self.assertEqual(self.read()["long_term_facts"], ["Ryan streams as a VTuber"])
+    def test_without_fts5_facts_are_matched_by_words(self):
+        factstore._db.close() if factstore._db else None
+        self.patch(factstore, "_db", None)
+        self.patch(factstore, "_FTS", "CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5nope(fact);")
+        self.patch(config, "LONG_TERM_MEMORY_CONTEXT_FACTS", 2)
+        self.patch("mind.embedmem.select", return_value=None)   # no embedding server: its "down" would stick
+        for fact in ("Ryan builds Luna", "Ryan owns a 7900 XT graphics card", "Ryan likes tea", "Ryan streams"):
+            self.assertTrue(longterm.add_fact(fact))
+        self.assertFalse(factstore._fts)
+        self.assertIsNone(factstore.search("graphics card"))
+        self.assertIn("Ryan owns a 7900 XT graphics card", longterm.relevant_facts("my graphics card"))
 
     def test_extraction_thread_never_raises(self):
         class Inline:
@@ -245,11 +244,25 @@ class FactsDb(Temp):
         if factstore._db is not None:
             factstore._db.close()
 
-    def test_corrupt_file_means_unavailable_not_a_crash(self):
+    def test_a_corrupt_file_is_kept_and_a_fresh_one_starts(self):
         with open(factstore.DB_FILE, "wb") as f:
             f.write(b"this is not a database" * 100)
-        self.assertFalse(factstore.available())
+        self.assertTrue(factstore.available())
+        kept = [n for n in os.listdir(self.dir) if n.startswith("facts.db.bad-")]
+        self.assertEqual(len(kept), 1)
+        with open(os.path.join(self.dir, kept[0]), "rb") as f:
+            self.assertIn(b"not a database", f.read())
+        self.assertTrue(factstore.add("Ryan has a 7900 XT"))
+        logbook.tell.assert_called()
+
+    def test_a_corrupt_file_that_cant_be_moved_is_left_alone(self):
+        with open(factstore.DB_FILE, "wb") as f:
+            f.write(b"this is not a database" * 100)
+        with mock.patch.object(factstore.os, "replace", side_effect=OSError("read-only")):
+            self.assertFalse(factstore.available())
         self.assertTrue(factstore.why_unavailable())
+        with open(factstore.DB_FILE, "rb") as f:
+            self.assertIn(b"not a database", f.read())
 
     def test_failed_replace_rolls_back(self):
         if not factstore.available():
@@ -278,8 +291,7 @@ class Bookkeeping(Temp):
         self.patch(reflect, "_yield", lambda: None)
         with mock.patch.object(notebook, "get", side_effect=sqlite3.OperationalError("locked")), \
                 mock.patch.object(notebook, "put") as put, \
-                mock.patch("mind.longterm.backend", return_value="sqlite"), \
-                mock.patch("mind.factstore.available", return_value=True), \
+                mock.patch("mind.longterm.ready", return_value=True), \
                 mock.patch("mind.factstore.rows", return_value=[]):
             with self.assertRaises(sqlite3.Error):
                 reflect.tidy_facts("model")

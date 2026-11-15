@@ -250,17 +250,17 @@ with the embedding server, by shared words without it) and asks her
 about each close pair: same thing, contradiction, or different facts?
 Duplicates get merged into one. In a contradiction the losing fact is
 **retired**, not deleted: `/facts retired` and the memory manager still
-have it. Each pair is only asked about once. This needs the sqlite
-memory backend.
+have it. Each pair is only asked about once.
 
 ## Calibration
 
 On llama-server her token probabilities measure how sure she actually
 was. When a reply measured under `self.hedge_below` (60%) *and* had a
-run of coin-flip tokens in it (a name, a date, a number she was guessing
-at), didn't call a tool, and didn't already hedge, two things happen.
-The run matters: playful banter averages low because there are lots of
-ways to word it, and that isn't a guess.
+run of coin-flip tokens on a specific (a name, a date, a number she was
+guessing at), didn't call a tool, and didn't already hedge, two things
+happen. The specific matters: playful banter averages low, and its unsure
+runs are word choice ("leans in closer"), because there are lots of ways
+to word it. That isn't a guess, so it isn't hedged.
 
 - she adds `self.hedge_line` out loud ("I'm not totally sure about that
   one, though.");

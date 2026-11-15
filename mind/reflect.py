@@ -14,7 +14,7 @@ with /reflect:
              on. Once every self.reflect_every_hours, while idle.
   tidy       looks for remembered facts that say the same thing twice,
              or contradict each other, and merges or retires them.
-             sqlite backend only; a retired fact stays in /facts retired.
+             A retired fact stays in /facts retired.
   pages,     after the tidy: a short note per subject she knows a lot
   profiles   about (mind/pages.py), and a short profile of you and of each
              person she knows (mind/profiles.py).
@@ -650,9 +650,9 @@ def tidy_facts(model, report=None, limit=6):
     from mind import factstore
     from mind import longterm
 
-    if longterm.backend() != "sqlite" or not factstore.available():
+    if not longterm.ready():
         if report:
-            report("Fact cleanup needs the sqlite memory backend - skipped.")
+            report("Fact cleanup skipped: facts.db can't be opened.")
 
         return []
 

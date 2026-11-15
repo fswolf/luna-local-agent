@@ -138,7 +138,12 @@ _TOOL_MARKUP = re.compile(r"<tool_call>|<function=", re.IGNORECASE)
 def _rethink(payload, base_messages, answer, on_text, on_sentence):
     """A deeper second look at a shaky reply. Returns None when the
     first reply was sure enough, otherwise a dict with both passes'
-    thinking and tokens, the outcome, and what (if anything) was said."""
+    thinking and tokens, the outcome, and what (if anything) was said.
+
+    Shaky means unsure on average (under rethink_below), or a run of
+    coin-flip tokens on a specific - a number or a name. An unsure run in
+    banter is word choice; another look can't make "leans in closer" more
+    right, so it costs a generation for nothing (_vote the same)."""
     from mind import thoughtlog
 
     first = {"thinking": _last_raw.get("thinking") or [],
@@ -147,10 +152,12 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
     shape = thoughtlog.confidence(first["tokens"])
     conf = shape["conf"]
 
-    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shape["shaky"]):
+    shaky = _unsure_of_a_specific(answer, shape.get("span", ""))
+
+    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shaky):
         return None
 
-    reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shape["shaky"]
+    reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shaky
               else f"only {conf:.0%} sure")
 
     try:
@@ -247,6 +254,15 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
             "corrected": corrected, "conf": conf, "conf2": conf2, "outcome": outcome}
 
 
+def _unsure_of_a_specific(answer, span):
+    """Does the unsure run hold one of the reply's specifics - a number, or
+    a name (a capitalised word that doesn't just start a sentence)? Those
+    are read off the whole reply, where a sentence start can be told apart;
+    the run alone can start mid-sentence."""
+    span = " ".join(str(span or "").lower().replace(",", "").split())
+    return bool(span) and any(term in span for term in _key_terms(answer))
+
+
 def _calibrate(answer, second, remember, on_text, on_sentence):
     """Make what she says match how sure she measured.
 
@@ -285,10 +301,11 @@ def _calibrate(answer, second, remember, on_text, on_sentence):
     )
 
     # Said out loud only when the doubt has a place - a run of coin-flip
-    # tokens (a name, a number, a date) - not when a playful reply simply
-    # had a lot of ways to be worded. Banter averages low; it isn't a guess.
+    # tokens holding a name, a number or a date - not when a playful reply
+    # simply had a lot of ways to be worded. Banter averages low, and its
+    # unsure runs are word choice ("leans in closer"); that isn't a guess.
     if (second and second["corrected"]) or thoughtlog._HEDGED.search(answer) \
-            or not config.SELF_HEDGE_LINE or not shape["shaky"]:
+            or not config.SELF_HEDGE_LINE or not _unsure_of_a_specific(answer, shape.get("span", "")):
         return answer
 
     line = config.SELF_HEDGE_LINE.strip()
@@ -309,8 +326,12 @@ _KEY_TERM = re.compile(r"\d+(?:[.,:]\d+)*|(?<![.!?]\s)(?<!^)\b[A-Z][a-zA-Z]{2,}\
 
 def _key_terms(text):
     """The parts of an answer that make it *this* answer: numbers, and
-    capitalised names that don't just start a sentence."""
-    return {m.group(0).lower().replace(",", "") for m in _KEY_TERM.finditer(str(text or "").strip())}
+    capitalised names that don't just start a sentence. Her *actions* and
+    line breaks end a sentence too, so "*leans in* Here's the thing" is a
+    sentence start, not a name."""
+    text = re.sub(r"\*[^*\n]*\*", ". ", str(text or ""))
+    text = re.sub(r"\s*\n\s*", ". ", text).strip(" .")
+    return {m.group(0).lower().replace(",", "") for m in _KEY_TERM.finditer(text)}
 
 
 def _agrees(a, b):
@@ -351,10 +372,12 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
     shape = thoughtlog.confidence(first["tokens"])
     conf = shape["conf"]
 
-    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shape["shaky"]):
+    shaky = _unsure_of_a_specific(answer, shape.get("span", ""))
+
+    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shaky):
         return None
 
-    reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shape["shaky"]
+    reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shaky
               else f"only {conf:.0%} sure")
     n = max(1, min(4, int(getattr(config, "ADAPTIVE_VOTES", 2))))
 

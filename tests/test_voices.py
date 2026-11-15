@@ -143,8 +143,7 @@ class WhoIsTalking(_Folder):
 
 class GuestMemories(_Folder):
     def test_a_guests_facts_are_their_own(self):
-        with mock.patch.object(longterm, "factstore") as store, \
-                mock.patch.object(longterm, "backend", return_value="sqlite"):
+        with mock.patch.object(longterm, "factstore") as store:
             with turnctx.begin(speaker="Shannon"):
                 self.assertTrue(longterm.add_fact("Shannon is allergic to cats."))
                 self.assertFalse(longterm.add_fact("Shannon is allergic to cats."))
@@ -164,9 +163,10 @@ class GuestMemories(_Folder):
 
     def test_the_owner_never_sees_a_guests_facts(self):
         people.add_fact("Shannon", "Shannon works nights.")
-        with mock.patch.object(longterm, "backend", return_value="json"), \
-                mock.patch.dict(longterm.memory, {"long_term_facts": ["Ryan builds Luna."]}):
-            self.assertEqual(longterm.get_facts(), ["Ryan builds Luna."])
+        from tests.facts_tmp import use_temp_facts
+        use_temp_facts(self, self.tmp)
+        longterm.add_fact("Ryan builds Luna.")
+        self.assertEqual(longterm.get_facts(), ["Ryan builds Luna."])
 
 
 if __name__ == "__main__":

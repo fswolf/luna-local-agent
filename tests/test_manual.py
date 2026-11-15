@@ -26,6 +26,19 @@ class Manual(unittest.TestCase):
         top = manual.search("wake word", 1)[0][1]
         self.assertIn("wake word", (top["heading"] + top["text"]).lower())
 
+    def test_station_question_finds_the_stations_page(self):
+        for q in ("how do I set up a station", "how do I connect my phone",
+                  "can I talk to you from the kitchen", "how do I pair my tablet"):
+            top = manual.search(q, 1)[0][1]
+            self.assertTrue(top["path"].endswith("stations.md"), q)
+
+    def test_question_words_alone_find_nothing(self):
+        self.assertEqual(manual.search("how do I make you do that"), [])
+
+    def test_plurals_meet(self):
+        self.assertEqual(manual._stem("stations"), manual._stem("station"))
+        self.assertEqual(manual._stem("settings"), manual._stem("setting"))
+
     def test_nothing_found_says_so(self):
         out = manual._read_manual("zzqx flibbertigibbet")
         self.assertIn("not sure", out)

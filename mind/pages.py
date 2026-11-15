@@ -110,11 +110,11 @@ def rebuild_all():
 def _facts():
     from mind import factstore, longterm
 
-    if longterm.backend() == "sqlite" and factstore.available():
-        return [(r[1], r[2] or "") for r in factstore.rows(limit=2000)]      # (fact, subject), active only
-    # the owner's whole list: relevant_facts("") is capped at context_facts,
-    # and inside a guest's turn (reflect_now) it answers with their facts
-    return [(f, "") for f in longterm.memory.get("long_term_facts", [])]
+    # the owner's own rows, not relevant_facts(""): that one is capped at
+    # context_facts, and inside a guest's turn (reflect_now) answers with theirs
+    if not longterm.ready():
+        return []
+    return [(r[1], r[2] or "") for r in factstore.rows(limit=2000)]      # (fact, subject), active only
 
 
 def _names(facts, skip):

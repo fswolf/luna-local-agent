@@ -7,7 +7,7 @@ from datetime import datetime
 
 import config
 from config import GENERATION
-from config import memory
+# from config import memory    # preferences come from config.preference_lines() now (agent.json)
 from core import history
 from life import gestures
 from core import logbook
@@ -32,11 +32,9 @@ def build_memory_prompt(query=""):
     """
     prompt = ""
 
-    if "user_preferences" in memory and not people.guest():   # the owner's, not a guest's
-        prompt += "\nUser Preferences:\n"
-
-        for key, value in memory["user_preferences"].items():
-            prompt += f"{key}: {value}\n"
+    lines = config.preference_lines() if not people.guest() else []   # the owner's, not a guest's
+    if lines:
+        prompt += "\nUser Preferences:\n" + "".join(f"{line}\n" for line in lines)
 
     facts = longterm.relevant_facts(query)
 

@@ -217,9 +217,10 @@ the thought log already measures:
 1. **Every turn thinks on a modest budget** (`first_budget`, 1024
    tokens), which also makes easy questions answer sooner.
 2. **If the reply came out shaky**, meaning under `rethink_below` (75%)
-   sure on average or with a run of coin-flip tokens, the same question
-   is asked again, silently, with the thinking budget lifted
-   (`deep_budget`, -1 = unlimited).
+   sure on average or with a run of coin-flip tokens on a specific (a
+   number, a name), the same question is asked again, silently, with the
+   thinking budget lifted (`deep_budget`, -1 = unlimited). An unsure run
+   in banter ("leans in closer") is just word choice, so it doesn't count.
 3. **The second answer replaces the first only if it's different and
    genuinely sure**: above the same 75%, at least `min_gain` surer than
    the first, and with no shaky stretch of its own. Then she says *"Hang

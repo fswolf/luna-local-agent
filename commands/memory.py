@@ -36,55 +36,44 @@ def handle(text):
     if text.startswith("/facts"):
 
         argument = text[6:].strip().lower()
-        which = longterm.backend()
 
-        if which == "sqlite":
-            from mind import factstore
+        if not longterm.ready():
+            ui.add_message("system", "Memory: agent/facts.db can't be opened - the log says why.")
+            return True
 
-            active, retired = factstore.counts()
+        from mind import factstore
 
-            if argument == "retired":
-                listing = factstore.rows(retired=True, limit=30)
-                shown = "\n".join(
-                    f"  ~ {fact}  (retired {when[:10]})"
-                    for _i, fact, _s, _c, when in listing
-                ) or "  (none)"
-                ui.add_message(
-                    "system",
-                    f"{retired} retired fact(s) - superseded, kept for "
-                    f"history:\n{shown}",
-                )
-                return True
+        active, retired = factstore.counts()
 
-            limit = 500 if argument == "all" else 20
-            listing = factstore.rows(retired=False, limit=limit)
+        if argument == "retired":
+            listing = factstore.rows(retired=True, limit=30)
             shown = "\n".join(
-                f"  - {fact}" + (f"  [{subject}]" if subject else "")
-                for _i, fact, subject, _c, _w in reversed(listing)
-            ) or "  (none yet)"
-            more = (
-                f"\n  ... /facts all shows the rest of the {active}."
-                if argument != "all" and active > limit else ""
-            )
+                f"  ~ {fact}  (retired {when[:10]})"
+                for _i, fact, _s, _c, when in listing
+            ) or "  (none)"
             ui.add_message(
                 "system",
-                f"Memory backend: sqlite (experimental) - {active} active, "
-                f"{retired} retired. Newest {min(active, limit)}:\n{shown}{more}"
-                "\n/facts retired shows what's been superseded. "
-                "/set long_term_memory.backend json falls back to the old "
-                "handling - nothing is lost either way.",
+                f"{retired} retired fact(s) - superseded, kept for "
+                f"history:\n{shown}",
             )
-        else:
-            facts = longterm.get_facts()
-            shown = "\n".join(f"  - {f}" for f in facts) or "  (none yet)"
-            ui.add_message(
-                "system",
-                f"Memory backend: json (capped at "
-                f"{config.LONG_TERM_MEMORY_MAX_FACTS}) - {len(facts)} "
-                f"fact(s):\n{shown}\n"
-                "/set long_term_memory.backend sqlite switches to the "
-                "experimental permanent store.",
-            )
+            return True
+
+        limit = 500 if argument == "all" else 20
+        listing = factstore.rows(retired=False, limit=limit)
+        shown = "\n".join(
+            f"  - {fact}" + (f"  [{subject}]" if subject else "")
+            for _i, fact, subject, _c, _w in reversed(listing)
+        ) or "  (none yet)"
+        more = (
+            f"\n  ... /facts all shows the rest of the {active}."
+            if argument != "all" and active > limit else ""
+        )
+        ui.add_message(
+            "system",
+            f"Memory: {active} active, {retired} retired. "
+            f"Newest {min(active, limit)}:\n{shown}{more}"
+            "\n/facts retired shows what's been superseded.",
+        )
         return True
 
     if text in ("/thoughts", "/memory"):

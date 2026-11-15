@@ -29,7 +29,7 @@ check the time, then schedule something.
 | `find_device` / `scan_network` | A machine's IP on your network, by name or MAC, remembered by MAC ([Sysadmin](sysadmin.md#finding-machines-on-your-network)) |
 | `check_email` / `read_email` / `search_email` | Your inbox, read-only: nothing gets marked read ([Email](email.md)) |
 | `search_docs` | Your own notes, manuals and PDFs, by meaning, with the file it came from ([Knowledge](knowledge.md)) |
-| `read_manual` | Her own manual (these docs): what she can do and the exact command or setting for it, so "how do I get you to play chess?" gets `/chess on` |
+| `read_manual` | Her own manual (these docs): what she can do and the exact command or setting for it, so "how do I get you to play chess?" gets `/chess on`. Everyday words find the right page too: "can I talk to you from my phone?" finds [Stations](stations.md) |
 | `make_texture` | New textures for her 3D model through ComfyUI, from a template ([Textures](textures.md)) |
 | `send_email` | Send or reply as you: **off until you switch it on, then you approve every one** |
 | `read_page` | Open a link and read it, not just the search snippet |

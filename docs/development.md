@@ -135,13 +135,13 @@ ai-voice/
 ├── agent/
 │   ├── agent.json
 │   ├── mood.json     # how she's feeling, so a restart doesn't wipe it
-│   ├── facts.db      # the sqlite memory backend (gitignored)
+│   ├── facts.db      # her facts about you (gitignored)
 │   ├── thoughts.db   # the reasoning log (gitignored)
 │   ├── notebook.db   # lessons and conversation notes (gitignored)
 │   ├── embeddings.db # cached embeddings (gitignored)
 │   ├── cron.json     # scheduled jobs (gitignored)
 │   ├── minecraft.json # places she pinned, per world (gitignored)
-│   └── memory.json
+│   └── memory.json   # older installs only: its facts are read into facts.db once (gitignored)
 │
 ├── assets/
 │   ├── alarm.wav

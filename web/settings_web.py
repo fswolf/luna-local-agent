@@ -247,7 +247,7 @@ def check_agent(text):
         if key in data and not (isinstance(data[key], list) and all(isinstance(x, str) for x in data[key])):
             raise ValueError(f'"{key}" should be a list of text: ["...", "..."]')
     for key, kind, word in (("user", dict, "a {...} block"), ("pronounce", dict, "a {...} block"),
-                            ("people", list, "a list [...]")):
+                            ("people", list, "a list [...]"), ("user_preferences", dict, "a {...} block")):
         if key in data and not isinstance(data[key], kind):
             raise ValueError(f'"{key}" should be {word}')
     return data

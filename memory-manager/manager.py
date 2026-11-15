@@ -3,28 +3,18 @@
     python memory-manager/manager.py
 
 opens a small page on http://127.0.0.1:8790 - view, search, add, edit,
-retire, restore and delete facts, and edit the user_preferences block
-of memory.json, whichever backend is in charge. Below that, her own
+retire, restore and delete facts (agent/facts.db). (Your preferences used
+to be edited here too; they live in agent.json now, under Who she is on
+the settings page.) Below that, her own
 notebook (agent/notebook.db): how she feels about the games she's
 played, her notes on past conversations and game sessions, and the
 lessons she's learned - facts are about you, the notebook is about her. It's a separate
 process on purpose: memory is the one thing you occasionally want to
 inspect while suspecting the assistant of being wrong about it.
 
-It reads config.json fresh on every refresh, so flipping
-long_term_memory.backend in the running assistant shows up here on the
-next reload without restarting anything.
-
-Playing nicely with a running assistant:
-
-  * sqlite - completely safe. SQLite coordinates the two processes
-    itself (WAL), and the assistant reads rows per query rather than
-    caching them, so an edit here is in her next prompt.
-  * json - edits here rewrite memory.json, but a running assistant
-    holds its copy in RAM and writes it back whenever it saves,
-    clobbering yours. The page says so when that backend is live.
-    Preferences are json-file edits either way, so the same warning
-    applies to them.
+Safe to use while she runs: SQLite coordinates the two processes itself
+(WAL), and the assistant reads rows per query rather than caching them,
+so an edit here is in her next prompt.
 
 Localhost only. It's your memory; nothing here should ever be
 reachable from another machine.
@@ -39,12 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
-CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
-MEMORY_FILE = os.path.join(BASE_DIR, "agent", "memory.json")
-
 PORT = 8790
-
-_json_lock = threading.Lock()
 
 
 def _factstore():
@@ -53,71 +38,20 @@ def _factstore():
     return factstore
 
 
-def backend():
-    """What config.json says right now, downgraded to json if this
-    python's sqlite can't actually serve it."""
-    try:
-        with open(CONFIG_FILE, encoding="utf-8") as f:
-            wanted = str(
-                json.load(f).get("long_term_memory", {}).get("backend", "json")
-            ).lower()
-    except Exception:
-        wanted = "json"
+def _ready():
+    """facts.db open (an old memory.json's facts read in, the first time)."""
+    from mind import longterm
 
-    if wanted.startswith("sql") and _factstore().available():
-        return "sqlite"
-
-    return "json"
-
-
-# ---------------------------------------------------------------------------
-# The json backend, read fresh per operation - this process doesn't own
-# the file, so holding a copy would only widen the window for clobbering
-# whatever the assistant wrote in between.
-# ---------------------------------------------------------------------------
-def _load_memory(strict=False):
-    """memory.json as a dict. A missing file is an empty memory. One that
-    can't be read (a typo, or caught half-written) is an error when about
-    to save (strict): saving what we have would be saving {} over every
-    fact and preference in it. For showing the page it's an empty one."""
-    try:
-        with open(MEMORY_FILE, encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        data = {}
-    except (OSError, ValueError) as e:
-        if strict:
-            raise ValueError(f"agent/memory.json can't be read ({e}) - nothing was saved, "
-                             "so nothing in it is lost. Fix the file, then try again.") from None
-        data = {}
-
-    if not isinstance(data, dict) or not isinstance(data.get("long_term_facts", []), list):
-        if strict:
-            raise ValueError("agent/memory.json isn't in the shape it should be - nothing was saved. "
-                             "Fix the file, then try again.")
-        data = {}
-
-    data.setdefault("long_term_facts", [])
-
-    return data
-
-
-def _save_memory(data):
-    """Written whole to a file beside it, then swapped in: the assistant
-    reading it at that moment sees the old file or the new one, never half."""
-    tmp = MEMORY_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-    os.replace(tmp, MEMORY_FILE)
+    return longterm.ready()
 
 
 # ---------------------------------------------------------------------------
 # One state blob for the page
 # ---------------------------------------------------------------------------
 def state():
-    which = backend()
+    active, retired, warning = [], [], ""
 
-    if which == "sqlite":
+    if _ready():
         store = _factstore()
         active = [
             {"id": i, "fact": fact, "subject": subject, "created": created[:10]}
@@ -129,32 +63,12 @@ def state():
             for i, fact, subject, created, when
             in store.rows(retired=True, limit=100000)
         ]
-        warning = ""
     else:
-        facts = _load_memory()["long_term_facts"]
-        active = [
-            {"id": i, "fact": fact, "subject": "", "created": ""}
-            for i, fact in enumerate(facts)
-        ]
-        retired = []
-        warning = (
-            "json backend: if the assistant is running, it can overwrite "
-            "edits made here the next time it saves. The sqlite backend "
-            "doesn't have this problem."
-        )
-
-    try:
-        _load_memory(strict=True)
-    except ValueError as e:
-        warning = str(e)    # shown empty, and saying why, rather than looking like no memories
+        warning = "agent/facts.db can't be opened - the assistant's log says why."
 
     return {
-        "backend": which,
         "active": active,
         "retired": retired,
-        "prefs": json.dumps(
-            _load_memory().get("user_preferences", {}), indent=2
-        ),
         "warning": warning,
         "notebook": notebook_state(),
     }
@@ -192,7 +106,6 @@ def notebook_state():
 # Edits
 # ---------------------------------------------------------------------------
 def apply(action, body):
-    which = backend()
     fact = str(body.get("fact", "")).strip()
     subject = str(body.get("subject", "")).strip()
 
@@ -216,70 +129,30 @@ def apply(action, body):
             raise ValueError(f"unknown action {action!r}")
         return
 
-    if action == "prefs":
-        prefs = json.loads(body.get("text", "{}"))  # invalid json -> error
+    if not _ready():
+        raise ValueError("agent/facts.db can't be opened - nothing was changed")
 
-        if not isinstance(prefs, dict):
-            raise ValueError("preferences must be a JSON object")
+    store = _factstore()
+    fact_id = int(body.get("id", -1))
 
-        with _json_lock:
-            data = _load_memory(strict=True)
-            data["user_preferences"] = prefs
-            _save_memory(data)
+    if action == "add":
+        if not fact:
+            raise ValueError("empty fact")
 
-        return
+        store.add(fact, subject)
+    elif action == "edit":
+        if not fact:
+            raise ValueError("empty fact")
 
-    if which == "sqlite":
-        store = _factstore()
-        fact_id = int(body.get("id", -1))
-
-        if action == "add":
-            if not fact:
-                raise ValueError("empty fact")
-
-            store.add(fact, subject)
-        elif action == "edit":
-            if not fact:
-                raise ValueError("empty fact")
-
-            store.set_row(fact_id, fact, subject)
-        elif action == "retire":
-            store.retire_row(fact_id)
-        elif action == "restore":
-            store.restore_row(fact_id)
-        elif action == "delete":
-            store.delete_row(fact_id)
-        else:
-            raise ValueError(f"unknown action {action!r}")
-
-        return
-
-    # json backend: the id is the list index
-    with _json_lock:
-        data = _load_memory(strict=True)
-        facts = data["long_term_facts"]
-        index = int(body.get("id", -1))
-
-        if action == "add":
-            if not fact:
-                raise ValueError("empty fact")
-
-            if fact not in facts:
-                facts.append(fact)
-        elif action == "edit":
-            if not fact or not 0 <= index < len(facts):
-                raise ValueError("bad edit")
-
-            facts[index] = fact
-        elif action == "delete":
-            if not 0 <= index < len(facts):
-                raise ValueError("bad index")
-
-            facts.pop(index)
-        else:
-            raise ValueError(f"{action!r} needs the sqlite backend")
-
-        _save_memory(data)
+        store.set_row(fact_id, fact, subject)
+    elif action == "retire":
+        store.retire_row(fact_id)
+    elif action == "restore":
+        store.restore_row(fact_id)
+    elif action == "delete":
+        store.delete_row(fact_id)
+    else:
+        raise ValueError(f"unknown action {action!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -483,9 +356,10 @@ PAGE = r"""<!DOCTYPE html>
 <h2 id="retired-h">Retired</h2>
 <div id="retired"></div>
 
-<h2>Preferences (memory.json)</h2>
-<textarea id="prefs" spellcheck="false"></textarea>
-<div style="margin-top:8px"><button onclick="savePrefs()">save preferences</button></div>
+<h2>Preferences</h2>
+<div class="meta-note">What she calls you, nicknames and what to avoid are in agent.json now, as <code>user_preferences</code>: the settings page, <a href="/settings/">Who she is</a>.</div>
+<!-- <textarea id="prefs" spellcheck="false"></textarea>
+<div style="margin-top:8px"><button onclick="savePrefs()">save preferences</button></div> -->
 
 <div id="nb">
 <h1 style="margin-top:40px">Her notebook</h1>
@@ -507,7 +381,7 @@ PAGE = r"""<!DOCTYPE html>
 <div id="status"></div>
 
 <script>
-let S = {active: [], retired: [], backend: "json"};
+let S = {active: [], retired: []};
 
 function flash(msg, bad) {
   const el = document.getElementById("status");
@@ -531,13 +405,11 @@ async function refresh(keepPrefs) {
   const r = await fetch("api/state");
   S = await r.json();
   document.getElementById("meta").textContent =
-    `backend: ${S.backend} - ${S.active.length} active` +
-    (S.backend === "sqlite" ? `, ${S.retired.length} retired` : "") +
-    ` - refresh the page after switching backends in the assistant`;
+    `${S.active.length} active, ${S.retired.length} retired`;
   const warn = document.getElementById("warning");
   warn.style.display = S.warning ? "block" : "none";
   warn.textContent = S.warning;
-  if (!keepPrefs) document.getElementById("prefs").value = S.prefs;
+  // if (!keepPrefs) document.getElementById("prefs").value = S.prefs;    // moved to agent.json
   render();
   renderNotebook();
 }
@@ -658,8 +530,7 @@ function factRow(f, retired) {
 
   if (!retired) {
     btn("edit", "", () => editRow(row, f));
-    if (S.backend === "sqlite")
-      btn("retire", "", async () => { await api("retire", {id: f.id}); refresh(true); });
+    btn("retire", "", async () => { await api("retire", {id: f.id}); refresh(true); });
   } else {
     btn("restore", "", async () => { await api("restore", {id: f.id}); refresh(true); });
   }
@@ -677,20 +548,17 @@ function editRow(row, f) {
   const text = document.createElement("input");
   text.className = "inline"; text.value = f.fact;
   row.appendChild(text);
-  let subject = null;
-  if (S.backend === "sqlite") {
-    subject = document.createElement("input");
-    subject.className = "inline subject-input";
-    subject.value = f.subject || ""; subject.placeholder = "subject";
-    row.appendChild(subject);
-  }
+  const subject = document.createElement("input");
+  subject.className = "inline subject-input";
+  subject.value = f.subject || ""; subject.placeholder = "subject";
+  row.appendChild(subject);
   const buttons = document.createElement("div");
   buttons.className = "row-buttons";
   const save = document.createElement("button");
   save.textContent = "save";
   save.onclick = async () => {
     await api("edit", {id: f.id, fact: text.value,
-                       subject: subject ? subject.value : ""});
+                       subject: subject.value});
     flash("saved"); refresh(true);
   };
   const cancel = document.createElement("button");
@@ -714,17 +582,11 @@ function render() {
   shown.forEach(f => active.appendChild(factRow(f, false)));
 
   const retiredWrap = document.getElementById("retired");
-  const heading = document.getElementById("retired-h");
-  const show = S.backend === "sqlite";
-  heading.style.display = show ? "" : "none";
-  retiredWrap.style.display = show ? "" : "none";
-  if (show) {
-    retiredWrap.replaceChildren();
-    const rows = S.retired.filter(match);
-    if (!rows.length)
-      retiredWrap.innerHTML = '<div class="empty">nothing retired</div>';
-    rows.forEach(f => retiredWrap.appendChild(factRow(f, true)));
-  }
+  retiredWrap.replaceChildren();
+  const rows = S.retired.filter(match);
+  if (!rows.length)
+    retiredWrap.innerHTML = '<div class="empty">nothing retired</div>';
+  rows.forEach(f => retiredWrap.appendChild(factRow(f, true)));
 }
 
 async function addFact() {
@@ -738,10 +600,10 @@ async function addFact() {
 document.getElementById("newfact").onkeydown =
   e => { if (e.key === "Enter") addFact(); };
 
-async function savePrefs() {
-  await api("prefs", {text: document.getElementById("prefs").value});
-  flash("preferences saved");
-}
+// async function savePrefs() {    // preferences moved to agent.json
+//   await api("prefs", {text: document.getElementById("prefs").value});
+//   flash("preferences saved");
+// }
 
 refresh();
 </script>
@@ -753,7 +615,6 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     url = f"http://127.0.0.1:{PORT}"
     print(f"memory manager: {url}  (Ctrl+C stops it)")
-    print(f"backend right now: {backend()}")
 
     threading.Timer(0.4, lambda: webbrowser.open(url)).start()
 

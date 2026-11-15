@@ -340,9 +340,6 @@ SCHEMA = {
 
     # --- Long-term memory ---------------------------------------------------
     "long_term_memory.enabled": ("bool", "Let her remember facts about you between sessions"),
-    "long_term_memory.backend": ("choice", "Where facts are kept: json (capped list) or sqlite (uncapped, searchable)",
-                                 ("json", "sqlite")),
-    "long_term_memory.max_facts": ("int", "Most facts kept (json storage)"),
     "long_term_memory.context_facts": ("int", "Most facts put in one prompt; past this, only the relevant ones"),
 
     # --- Thought log --------------------------------------------------------

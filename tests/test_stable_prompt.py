@@ -230,12 +230,14 @@ class Profiles(unittest.TestCase):
         self.assertIsNotNone(profiles.get("me"))
 
     def test_your_facts_even_inside_a_guests_turn(self):
-        from mind import longterm
+        from mind import factstore
+        from tests.facts_tmp import use_temp_facts
+        use_temp_facts(self, self.tmp)
+        factstore.add("MINE-1")
+        factstore.add("MINE-2")
         self.patches[1].stop()                                     # the real _owner_facts
         try:
-            with mock.patch.object(longterm, "backend", lambda: "json"), \
-                    mock.patch.dict(longterm.memory, {"long_term_facts": ["MINE-1", "MINE-2"]}), \
-                    mock.patch("senses.people.facts", lambda name: ["THEIRS"]), \
+            with mock.patch("senses.people.facts", lambda name: ["THEIRS"]), \
                     turnctx.begin(source="voice", speaker="Shannon"):
                 facts = profiles._owner_facts()
         finally:

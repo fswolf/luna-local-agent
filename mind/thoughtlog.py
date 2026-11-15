@@ -322,12 +322,13 @@ def confidence(runs):
     string of near coin flips is one she didn't know, however sure it
     sounds. conf is the mean probability of the answer's tokens; low
     how many fell under LOW; shaky the worst run of low ones, quoted,
-    when there's a run long enough to mean something.
+    when there's a run long enough to mean something; span that run's
+    text, whole.
     """
     answer = [t for run in runs for t in run if t[1] == "a"]
 
     if not answer:
-        return {"conf": None, "low": 0, "n": sum(len(r) for r in runs), "shaky": ""}
+        return {"conf": None, "low": 0, "n": sum(len(r) for r in runs), "shaky": "", "span": ""}
 
     probs = [math.exp(t[2]) for t in answer]
     low = [p < LOW for p in probs]
@@ -342,7 +343,7 @@ def confidence(runs):
 
             start = None
 
-    shaky = ""
+    shaky = span = ""
 
     if worst >= SHAKY_RUN:
         a, b = best
@@ -356,6 +357,7 @@ def confidence(runs):
         "low": sum(low),
         "n": sum(len(r) for r in runs),
         "shaky": shaky,
+        "span": span,
     }
 
 def repair_from_transcript():

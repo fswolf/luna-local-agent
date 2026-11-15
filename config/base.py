@@ -169,6 +169,36 @@ def _people(agent):
 PEOPLE = _people(agent)
 
 
+def user_preferences():
+    """What you like, from agent.json's "user_preferences" block: what to
+    call you, nicknames, things to avoid. A dict, read at each use, so an
+    edit on the settings page counts from her next turn.
+
+    Older installs kept this block in memory.json. That copy is still read
+    when agent.json has none, so nobody loses theirs on update; moving it
+    into agent.json is all it takes to retire it."""
+    prefs = agent.get("user_preferences")
+    if isinstance(prefs, dict):
+        return prefs
+    old = memory.get("user_preferences")      # legacy: memory.json
+    return old if isinstance(old, dict) else {}
+
+
+def preference_lines():
+    """user_preferences as prompt lines: "favorite color: Purple",
+    "nicknames: Daddy, Senpai" (a list as words, not ['Daddy', 'Senpai'])."""
+    lines = []
+    for key, value in user_preferences().items():
+        if isinstance(value, (list, tuple)):
+            value = ", ".join(str(v) for v in value if str(v).strip())
+        elif isinstance(value, dict):
+            value = ", ".join(f"{k}: {v}" for k, v in value.items())
+        value = " ".join(str(value).split())
+        if value:
+            lines.append(f"{str(key).replace('_', ' ')}: {value}")
+    return lines
+
+
 def user_line():
     """The system prompt's line on who she's talking to, or '' when
     agent.json says nothing about them."""

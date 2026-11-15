@@ -17,18 +17,14 @@ TRANSCRIPT_ENABLED = flag(_history_cfg.get("transcript", True))
 TRANSCRIPT_MAX_MB = float(_history_cfg.get("transcript_max_mb", 20))
 
 _memory_cfg = setting("long_term_memory", {})
+# Facts live in agent/facts.db (mind/factstore.py): uncapped, searched,
+# tidied while she's idle, and able to retire a fact that stops being true
+# instead of keeping both. (The old "backend" and "max_facts" keys were for
+# the json list it replaced; they're ignored if still in a config.json.)
 LONG_TERM_MEMORY_ENABLED = _memory_cfg.get("enabled", True)
-LONG_TERM_MEMORY_MAX_FACTS = _memory_cfg.get("max_facts", 40)
 # How many facts may go into one system prompt. Under this, all of them
 # do; over it, the ones relevant to what was just said.
 LONG_TERM_MEMORY_CONTEXT_FACTS = _memory_cfg.get("context_facts", 25)
-# "sqlite" (the default) is the permanent table in mind/factstore.py:
-# uncapped, searched with FTS5, tidied while she's idle, and able to retire
-# a fact that stops being true instead of keeping both versions. "json" is
-# the original capped list in memory.json. Live: /set
-# long_term_memory.backend json to switch; switching adds what the other
-# store has, so a fact forgotten in one can come back from the other.
-LONG_TERM_MEMORY_BACKEND = str(_memory_cfg.get("backend", "sqlite"))
 
 # The reasoning log - see mind/thoughtlog.py. Every turn from the keyboard
 # or the mic keeps the model's scratchpad (<think> blocks, or the

@@ -1089,7 +1089,10 @@ function applyMood(target, dt) {
 // ---------------------------------------------------------------------------
 // The loop
 // ---------------------------------------------------------------------------
-const clock = new THREE.Clock();
+// THREE.Clock is deprecated in newer three.js; THREE.Timer replaces it. Everything here
+// reads clock.elapsedTime, so a tiny stand-in keeps that, filled each frame.
+const timer = new THREE.Timer();
+const clock = { elapsedTime: 0 };
 const headRot = { x: 0, y: 0, z: 0 };
 
 function bone(name) { return vrm.humanoid.getNormalizedBoneNode(name); }
@@ -1107,9 +1110,10 @@ function inTPose() {
 
 function animate() {
   requestAnimationFrame(animate);
-  const raw = clock.getDelta();
+  timer.update();
+  const raw = timer.getDelta();
   const dt = Math.min(raw, 0.05);
-  const now = clock.elapsedTime;
+  const now = clock.elapsedTime = timer.getElapsed();
 
   if (vrm) {
     const L = look.update(now);

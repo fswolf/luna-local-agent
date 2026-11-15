@@ -110,18 +110,16 @@ def rebuild_all():
 def _owner_facts():
     from mind import factstore, longterm
 
-    if longterm.backend() == "sqlite" and factstore.available():
+    # straight from the owner's rows, not get_facts(): that one answers
+    # with a guest's facts when it runs inside their turn (reflect_now)
+    facts = []
+    if longterm.ready():
         facts = [r[1] for r in factstore.rows(limit=MAX_FACTS)]          # newest first, active only
         facts.reverse()
-    else:
-        # straight from the owner's list, not get_facts(): that one answers
-        # with a guest's facts when it runs inside their turn (reflect_now)
-        facts = list(longterm.memory.get("long_term_facts", []))[-MAX_FACTS:]
     try:
-        from config import memory
+        import config
 
-        prefs = memory.get("user_preferences") or {}
-        facts += [f"Prefers {k}: {v}" for k, v in prefs.items()]
+        facts += [f"Prefers {line}" for line in config.preference_lines()]   # agent.json's user_preferences
     except Exception:
         pass
     return facts

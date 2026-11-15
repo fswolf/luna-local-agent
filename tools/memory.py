@@ -34,7 +34,7 @@ def _remember_fact(fact):
 
     return "Not saved - too long, too short, or already known."
 
-# `about` arrived with the sqlite backend. Without it this tool was a
+# `about` arrived with the fact table. Without it this tool was a
 # SELECT * - fine at thirty facts, a context bomb at three thousand.
 # It stays optional so "what do you know about me" still works, but a
 # bare call now returns the newest slice rather than everything.

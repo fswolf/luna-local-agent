@@ -260,37 +260,33 @@ class MemoryManager(unittest.TestCase):
         self.mm = _load("luna_memory_manager_test", "memory-manager", "manager.py")
         self.dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.dir)
-        self.file = os.path.join(self.dir, "memory.json")
-        for p in (mock.patch.object(self.mm, "MEMORY_FILE", self.file),
-                  mock.patch.object(self.mm, "backend", return_value="json")):
-            p.start()
-            self.addCleanup(p.stop)
+        from tests.facts_tmp import use_temp_facts
+        use_temp_facts(self, self.dir)
 
-    def test_unreadable_file_is_never_overwritten(self):
-        broken = '{"long_term_facts": ["likes tea"], "user_preferences": {"a": 1},'   # cut short
-        with open(self.file, "w") as f:
-            f.write(broken)
-        for action, body in (("add", {"fact": "new"}), ("prefs", {"text": "{}"}), ("delete", {"id": 0})):
+    def test_edits_go_to_facts_db(self):
+        self.mm.apply("add", {"fact": "likes tea", "subject": "food"})
+        [row] = self.mm.state()["active"]
+        self.assertEqual((row["fact"], row["subject"]), ("likes tea", "food"))
+        self.mm.apply("edit", {"id": row["id"], "fact": "likes green tea", "subject": "food"})
+        self.mm.apply("retire", {"id": row["id"]})
+        state = self.mm.state()
+        self.assertEqual(state["active"], [])
+        self.assertEqual(state["retired"][0]["fact"], "likes green tea")
+        self.mm.apply("delete", {"id": row["id"]})
+        self.assertEqual(self.mm.state()["retired"], [])
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "memory.json")))
+
+    def test_bad_requests(self):
+        for action, body in (("add", {"fact": " "}), ("prefs", {"text": "{}"}), ("nonsense", {})):
             with self.assertRaises(ValueError):
                 self.mm.apply(action, body)
-        with open(self.file) as f:
-            self.assertEqual(f.read(), broken)
-        self.assertIn("can't be read", self.mm.state()["warning"])
 
-    def test_saves_whole(self):
-        with open(self.file, "w") as f:
-            json.dump({"long_term_facts": ["likes tea"], "other": True}, f)
-        self.mm.apply("add", {"fact": "has a cat"})
-        with open(self.file) as f:
-            data = json.load(f)
-        self.assertEqual(data["long_term_facts"], ["likes tea", "has a cat"])
-        self.assertTrue(data["other"])
-        self.assertFalse(os.path.exists(self.file + ".tmp"))
-
-    def test_missing_file_starts_empty(self):
-        self.mm.apply("add", {"fact": "first"})
-        with open(self.file) as f:
-            self.assertEqual(json.load(f)["long_term_facts"], ["first"])
+    def test_unopenable_db_says_so_and_changes_nothing(self):
+        from mind import longterm
+        with mock.patch.object(longterm, "ready", return_value=False):
+            self.assertIn("can't be opened", self.mm.state()["warning"])
+            with self.assertRaises(ValueError):
+                self.mm.apply("add", {"fact": "new"})
 
     def test_length(self):
         self.assertEqual(self.mm._length({"Content-Length": "-3"}), 0)

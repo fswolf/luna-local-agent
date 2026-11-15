@@ -1,9 +1,5 @@
-import json
-import os
 import re
-import shutil
 import threading
-import time
 import requests
 
 import config
@@ -11,167 +7,68 @@ from mind import factstore
 from core import logbook
 
 # The tunables are read as config.X at each use rather than imported by
-# value, so /set changes actually reach them.
-from config import memory, LM_URL, LLM_HEADERS, BASE_DIR
+# value, so /set changes actually reach them. memory: an older install's
+# agent/memory.json, as config loaded it at startup.
+from config import memory, LM_URL, LLM_HEADERS
 
-MEMORY_FILE = os.path.join(BASE_DIR, "agent", "memory.json")
+# Facts live in agent/facts.db (mind/factstore.py). Older installs could
+# keep a capped list in agent/memory.json instead. If this one did, its
+# facts are read into facts.db once ever (facts.db remembers it did, so a
+# fact you forget never comes back from the old file), and the file is
+# never written again. Preferences in it are still read by
+# config.user_preferences() until they're moved to agent.json.
 
 _lock = threading.Lock()
-
-memory.setdefault("long_term_facts", [])
-
-
-# ---------------------------------------------------------------------------
-# memory.json on disk
-#
-# Two processes write it (this one and the memory manager), and a crash or
-# a full disk mid-write used to leave half a file. That half file loaded as
-# {} at the next start, and the first fact learned then overwrote it: every
-# fact gone. So: it's written to a temp file and swapped in; a copy that
-# can't be read is kept aside as memory.json.bad-<time> before anything is
-# written over it; and edits made elsewhere are picked up before changing it.
-# ---------------------------------------------------------------------------
-_disk = {"mtime": None, "blocked": ""}
+_imported = [False]
 
 
-def _mtime():
-    try:
-        return os.path.getmtime(MEMORY_FILE)
-    except OSError:
-        return None
+def _was_on_json():
+    """Was this install keeping its facts in memory.json? Its config.json
+    said so, or facts.db has never held a fact. One already on sqlite had
+    the old list read in when it switched, and reading it again now would
+    bring back every fact forgotten since."""
+    wanted = str((config.setting("long_term_memory", {}) or {}).get("backend", "")).lower()
 
-
-def _keep_bad_copy(error):
-    """The file on disk can't be read: copy it aside and say so. If even
-    that fails, block saving, so the only copy is never overwritten."""
-    keep = f"{MEMORY_FILE}.bad-{time.strftime('%Y%m%d-%H%M%S')}"
-
-    try:
-        shutil.copy2(MEMORY_FILE, keep)
-    except OSError as e:
-        _disk["blocked"] = f"memory.json can't be read ({error}) and couldn't be backed up ({e})"
-        logbook.error("longterm", "%s - not saving over it", _disk["blocked"])
-        logbook.tell(f"Memory isn't being saved: {_disk['blocked']}. Fix or move agent/memory.json and restart.")
-        return
-
-    logbook.error("longterm", "memory.json unreadable (%s) - kept as %s", error, keep)
-    logbook.tell(f"agent/memory.json couldn't be read ({error}). It was kept as "
-                 f"{os.path.basename(keep)}; new facts go into a fresh memory.json.")
-
-
-def _sync():
-    """Pick up the file if something else changed it since we last read or
-    wrote it (the memory manager). Caller holds _lock."""
-    stamp = _mtime()
-
-    if stamp is None or stamp == _disk["mtime"]:
-        return
-
-    _disk["mtime"] = stamp      # looked at: a bad file is reported once, not every save
-
-    try:
-        with open(MEMORY_FILE, encoding="utf-8") as f:
-            data = json.load(f)
-
-        if not isinstance(data, dict):
-            raise ValueError(f"it holds a {type(data).__name__}, not a {{...}} block")
-    except (OSError, ValueError) as e:
-        _keep_bad_copy(e)
-        return
-
-    if not isinstance(data.get("long_term_facts", []), list):
-        data["long_term_facts"] = []
-
-    # In place: llm/prompts.py holds the same dict.
-    memory.clear()
-    memory.update(data)
-    memory.setdefault("long_term_facts", [])
-
-
-def _write():
-    """memory as it is now, atomically. Caller holds _lock."""
-    if _disk["blocked"]:
-        logbook.warn("longterm", "not saving: %s", _disk["blocked"])
-        return False
-
-    try:
-        os.makedirs(os.path.dirname(MEMORY_FILE), exist_ok=True)
-        temp = MEMORY_FILE + ".tmp"
-
-        with open(temp, "w", encoding="utf-8") as f:
-            json.dump(memory, f, indent=4)
-            f.flush()
-            os.fsync(f.fileno())
-
-        os.replace(temp, MEMORY_FILE)
-        _disk["mtime"] = _mtime()
+    if wanted.startswith("json"):
         return True
-    except (OSError, TypeError, ValueError) as e:
-        logbook.error("longterm", "saving memory.json failed: %s", e)
-        logbook.tell(f"Couldn't save memory: {e}")
+
+    active, retired = factstore.counts()
+
+    return active + retired == 0
+
+
+def ready():
+    """facts.db is open to use. The first time ever, an old memory.json's
+    facts come in, if this install was still keeping them there."""
+    if not factstore.available():
         return False
 
+    if _imported[0]:
+        return True
 
-# A memory.json that didn't load at startup is backed up now, before
-# anything can be written over it.
-if not memory.get("long_term_facts") and _mtime() is not None:
+    # Held through the import: a second caller waits for the facts rather
+    # than seeing an empty memory while they're still coming in.
     with _lock:
-        _sync()
+        if _imported[0]:
+            return True
 
+        old = memory.get("long_term_facts")
 
-# ---------------------------------------------------------------------------
-# Which backend is in charge
-#
-# long_term_memory.backend chooses: "json" is the original capped list
-# in memory.json, "sqlite" is the permanent searchable table in
-# mind/factstore.py. The sqlite side is experimental, so the switch is live
-# (/set long_term_memory.backend json, no restart) and changing it
-# loses nothing in either direction:
-#
-#   json -> sqlite   the JSON facts are absorbed into the table
-#                    (idempotently - flipping twice doesn't duplicate)
-#   sqlite -> json   the newest max_facts facts are written back to
-#                    memory.json; the rest STAY in the table, waiting
-#
-# So the db is always the superset and json is always the limited view,
-# which is what makes the setting safe to flip on a bad day.
-# ---------------------------------------------------------------------------
-_active_backend = [None]
+        try:
+            if isinstance(old, list) and old and not factstore.meta("memory_json_imported"):
+                moved = factstore.import_facts(old) if _was_on_json() else 0
+                factstore.set_meta("memory_json_imported", moved)
 
+                if moved:
+                    logbook.info("longterm", "read %d fact(s) from the old memory.json into facts.db", moved)
+        except Exception:
+            # facts.db itself works; the import is tried again next start
+            logbook.exception("longterm", "reading the old memory.json facts failed")
 
-def backend():
-    """"json" or "sqlite", after running any changeover."""
-    wanted = str(getattr(config, "LONG_TERM_MEMORY_BACKEND", "json")).lower()
-    wanted = "sqlite" if wanted.startswith("sql") else "json"
+        _imported[0] = True
 
-    if wanted == "sqlite" and not factstore.available():
-        wanted = "json"  # no FTS5 in this python - said once in the log
+    return True
 
-    with _lock:
-        previous = _active_backend[0]
-
-        if previous == wanted:
-            return wanted
-
-        _active_backend[0] = wanted
-
-    # Changeover, outside the lock - both sides take their own locks.
-    if wanted == "sqlite":
-        moved = factstore.import_facts(memory.get("long_term_facts", []))
-
-        if moved or previous is not None:
-            logbook.info("longterm", "backend: sqlite (+%d from json)", moved)
-    elif previous == "sqlite":
-        memory["long_term_facts"] = factstore.export_facts(
-            config.LONG_TERM_MEMORY_MAX_FACTS
-        )
-        save()
-        logbook.info("longterm", "backend: json (newest %d exported)",
-                     len(memory["long_term_facts"]))
-
-    _announce()
-
-    return wanted
 
 # A real "fact" is one short, plain sentence describing something
 # durable about the user - not a full assistant reply. Caps length and
@@ -184,19 +81,17 @@ _VOICE_TELLS = ("mrrp", "nya~", "senpai", "purring", "\U0001F63E".lower())
 
 
 def status():
-    """One short line for the Memory row: backend and what's in it."""
+    """One short line for the Memory row: what's in it."""
     if not config.LONG_TERM_MEMORY_ENABLED:
         return "off"
 
-    if backend() == "sqlite":
-        active, retired = factstore.counts()
-        line = f"sqlite · {active} fact{'s' if active != 1 else ''}"
+    if not ready():
+        return "facts.db can't be opened"
 
-        return f"{line}, {retired} retired" if retired else line
+    active, retired = factstore.counts()
+    line = f"sqlite · {active} fact{'s' if active != 1 else ''}"
 
-    count = len(memory.get("long_term_facts", []))
-
-    return f"json · {count}/{config.LONG_TERM_MEMORY_MAX_FACTS} facts"
+    return f"{line}, {retired} retired" if retired else line
 
 
 def _announce():
@@ -229,10 +124,7 @@ def get_facts() -> list:
 
         return people.facts(guest)
 
-    if backend() == "sqlite":
-        return factstore.active_facts()
-
-    return list(memory.get("long_term_facts", []))
+    return factstore.active_facts() if ready() else []
 
 
 # ---------------------------------------------------------------------------
@@ -292,8 +184,11 @@ def relevant_facts(query, limit=None):
         if chosen is not None:
             return chosen
 
-    if backend() == "sqlite":
-        return factstore.search(query, limit)
+    if ready():
+        found = factstore.search(query, limit)
+
+        if found is not None:          # None: no FTS5 here, the word ranking below does it
+            return found
 
     return _by_words(facts, query, limit)
 
@@ -336,7 +231,7 @@ def _by_words(facts, query, limit):
 # Editing what's remembered
 #
 # Adding was the only thing possible before, which meant a fact she
-# misheard was permanent short of hand-editing memory.json. Both of
+# misheard was permanent short of hand-editing her memory. Both of
 # these take a phrase rather than an index, for the same reason
 # set_reminder takes one: the model is good at repeating what was said
 # and bad at bookkeeping.
@@ -397,7 +292,7 @@ def find_fact(phrase):
 def forget_fact(phrase):
     """Remove one fact. Returns (removed_text, candidates).
 
-    Both backends really delete here. "Forget that" is the one case
+    This really deletes, rather than retiring. "Forget that" is the one case
     where keeping a retired copy would be the opposite of what was
     asked."""
     index, found = find_fact(phrase)
@@ -412,24 +307,12 @@ def forget_fact(phrase):
 
         return (found, []) if people.set_fact(guest, found, None) else (None, [])
 
-    if backend() == "sqlite":
-        removed = factstore.remove(found)
-        _announce()
-        return (found, []) if removed else (None, [])
+    if not ready():
+        return None, []
 
-    with _lock:
-        _sync()
-        facts = memory.setdefault("long_term_facts", [])
-
-        if found not in facts:      # changed on disk since it was found
-            return None, []
-
-        removed = facts.pop(facts.index(found))
-
-    save()
+    removed = factstore.remove(found)
     _announce()
-
-    return removed, []
+    return (found, []) if removed else (None, [])
 
 
 def update_fact(phrase, replacement):
@@ -451,32 +334,12 @@ def update_fact(phrase, replacement):
 
         return ((found, replacement), []) if people.set_fact(guest, found, replacement) else (None, [])
 
-    if backend() == "sqlite":
-        # A correction, not a change in the world - rewritten in place
-        # rather than superseded, so no history row.
-        if factstore.update(found, replacement):
-            return (found, replacement), []
+    # A correction, not a change in the world - rewritten in place
+    # rather than superseded, so no history row.
+    if ready() and factstore.update(found, replacement):
+        return (found, replacement), []
 
-        return None, []
-
-    with _lock:
-        _sync()
-        facts = memory.setdefault("long_term_facts", [])
-
-        if found not in facts:      # changed on disk since it was found
-            return None, []
-
-        old = found
-        facts[facts.index(found)] = replacement
-
-    save()
-
-    return (old, replacement), []
-
-
-def save():
-    with _lock:
-        return _write()
+    return None, []
 
 
 def _looks_like_valid_fact(fact: str) -> bool:
@@ -503,25 +366,10 @@ def add_fact(fact: str, subject: str = "") -> bool:
         from senses import people
 
         return people.add_fact(guest, fact)
-    if backend() == "sqlite":
-        # No cap here - permanence is the point of this backend.
-        stored = factstore.add(fact, subject)
-        _announce()
-        return stored
-    stored = False
-    with _lock:
-        _sync()
-        facts = memory.setdefault("long_term_facts", [])
-        if fact not in facts:  # simple exact-match de-dupe
-            facts.append(fact)
-            stored = True
-        # Cap the list so it can't grow forever - drop the oldest
-        # entries first once we're over the limit. (Read off config
-        # live, so /set long_term_memory.max_facts actually applies.)
-        overflow = len(facts) - config.LONG_TERM_MEMORY_MAX_FACTS
-        if overflow > 0:
-            del facts[:overflow]
-    save()
+    if not ready():
+        return False
+    # No cap - permanence is the point.
+    stored = factstore.add(fact, subject)
     _announce()
     return stored
 
@@ -560,7 +408,10 @@ def _extract_fact_sqlite(model, user_text, answer):
     mangled reply is the coexistence bug we already had, never a lost
     fact and never a wrongly retired one.
     """
-    known = factstore.search(f"{user_text} {answer}", limit=12)
+    query = f"{user_text} {answer}"
+    known = factstore.search(query, limit=12)
+    if known is None:                   # no FTS5: the same word ranking the conversation uses
+        known = _by_words(factstore.active_facts(), query, 12)
     known_block = ""
 
     if known:
@@ -663,10 +514,12 @@ def _extract_fact_sqlite(model, user_text, answer):
 
 
 def _extract_fact(model, user_text, answer):
-    if backend() == "sqlite" and not _guest():
-        _extract_fact_sqlite(model, user_text, answer)
-
+    if not _guest():
+        if ready():
+            _extract_fact_sqlite(model, user_text, answer)
         return
+
+    # A guest's facts (senses/people.py): the simpler new-fact-or-nothing ask.
 
     existing = get_facts()
     existing_block = ""

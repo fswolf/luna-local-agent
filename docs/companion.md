@@ -96,7 +96,8 @@ and stop words still work.
     "tone": "Intimate and playful, like talking to someone you're into ...",
     "traits": ["Flirts constantly; calls the user pet names", "..."],
     "rules": ["Clarity over comfort", "...", "Use nya/meow/mrrp or a trailing ~ at most once every few replies"],
-    "pronounce": {"nya": "/njˈɑ/", "mew": "/mjˈu/", "meow": "/miˈW/", "mrrp": "/mˈɜɹp/"}
+    "pronounce": {"nya": "/njˈɑ/", "mew": "/mjˈu/", "meow": "/miˈW/", "mrrp": "/mˈɜɹp/"},
+    "user_preferences": {"favorite_color": "Purple", "nicknames": ["Senpai"], "avoid": ["excessive disclaimers"]}
 }
 ```
 
@@ -110,6 +111,7 @@ and stop words still work.
 | `traits` | Habits, one per line |
 | `rules` | Hard lines for how she talks. Small models are bad at counting across replies, so "at most once every few replies" style rules are followed loosely |
 | `pronounce` | Words her voice says wrong, with the phonemes to use instead (see [Sounds and pronunciation](#sounds-and-pronunciation)). Only her voice uses this; the screen shows the word as written |
+| `user_preferences` | What you like: what to call you, nicknames, things to avoid, anything else. Any keys you want; each becomes a line in her prompt on your own turns ("nicknames: Senpai"), never a guest's, and feeds the profile she writes about you. Older installs kept this in `memory.json`; that copy is still read until you move it here |
 
 The **mood line** is added on top of this every turn - agent.json is
 who she is, the mood is how she happens to be right now.

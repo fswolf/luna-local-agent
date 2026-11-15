@@ -252,9 +252,7 @@ SETTINGS = {
     "history.transcript":         ("TRANSCRIPT_ENABLED",           True),
 
     "long_term_memory.enabled":   ("LONG_TERM_MEMORY_ENABLED",     True),
-    "long_term_memory.max_facts": ("LONG_TERM_MEMORY_MAX_FACTS",   True),
     "long_term_memory.context_facts": ("LONG_TERM_MEMORY_CONTEXT_FACTS", True),
-    "long_term_memory.backend":   ("LONG_TERM_MEMORY_BACKEND",      True),
 
     "llm.stable_prompt":          ("LLM_STABLE_PROMPT",            True),
 
