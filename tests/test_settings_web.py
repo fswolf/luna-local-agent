@@ -268,6 +268,61 @@ class LiveSettings(unittest.TestCase):
         self.assertEqual([f for f in found if f not in startup_only], [])
 
 
+class Browse(unittest.TestCase):
+    """Browse... by a path setting: a folder browser served by Luna."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.dir, "pokemon"))
+        os.makedirs(os.path.join(self.dir, ".hidden"))
+        for name in ("tetris.gb", "zelda.GBC", "notes.txt"):
+            open(os.path.join(self.dir, name), "w").close()
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_a_file_picker_lists_folders_and_its_files(self):
+        out = settings_web.browse("plugins.gameboy.rom", self.dir)
+        self.assertTrue(out["ok"])
+        self.assertEqual([d["name"] for d in out["dirs"]], ["pokemon"])          # no hidden ones
+        self.assertEqual([f["name"] for f in out["files"]], ["tetris.gb", "zelda.GBC"])
+        self.assertEqual(out["files"][0]["path"], os.path.join(self.dir, "tetris.gb"))
+
+    def test_a_folder_picker_lists_only_folders(self):
+        out = settings_web.browse("plugins.gameboy.saves", self.dir)
+        self.assertEqual(out["files"], [])
+        self.assertEqual(out["parent"], os.path.dirname(self.dir))
+
+    def test_starts_from_the_nearest_folder_that_exists(self):
+        out = settings_web.browse("plugins.gameboy.rom", os.path.join(self.dir, "gone", "x.gb"))
+        self.assertEqual(out["path"], self.dir)
+
+    def test_only_settings_with_a_button(self):
+        self.assertFalse(settings_web.browse("voice", self.dir)["ok"])
+        self.assertEqual(settings_web.entry("plugins.gameboy.roms").get("pick"), "folder")
+        self.assertNotIn("pick", settings_web.entry("voice"))
+
+    def test_every_picker_is_a_real_path_setting(self):
+        for path, (kind, _ext) in settings_web.PICKERS.items():
+            self.assertIn(path, SCHEMA)
+            self.assertIn(SCHEMA[path][0], ("text", "list"), path)
+            self.assertIn(kind, ("file", "folder"), path)
+
+    def test_any_file_when_no_kinds_are_named(self):
+        out = settings_web.browse("plugins.zork.interpreter", self.dir)
+        self.assertEqual(len(out["files"]), 3)
+
+    def test_needs_the_key(self):
+        body = json.dumps({"action": "browse", "setting": "plugins.gameboy.rom", "at": self.dir}).encode()
+        status, _ctype, _out = settings_web.handle("POST", "/api", body)
+        self.assertEqual(status, 403)
+        body = json.dumps({"action": "browse", "setting": "plugins.gameboy.rom", "at": self.dir,
+                           "key": settings_web.KEY}).encode()
+        status, _ctype, out = settings_web.handle("POST", "/api", body)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(json.loads(out)["files"]), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
 

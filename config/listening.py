@@ -101,7 +101,7 @@ STT_BARGE_IN_BOOST = float(_stt_cfg.get("barge_in_boost", 0.25))
 # Wake word
 # -------------------------
 # Replaces HOME in open mode: say her name and she listens. Optional
-# "wake_word" block in agent.json:
+# "wake_word" block in config.json:
 #
 #   "wake_word": {
 #       "enabled": true,

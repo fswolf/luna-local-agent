@@ -328,9 +328,33 @@ def _pieces(query, timing, private):
     }
 
 
+def who_she_is():
+    """"You are Luna." - with agent.json's "nickname" when there is one, so
+    she knows the second name she answers to (it was only ever read by the
+    hedge's list of names, and she didn't know her own nickname)."""
+    nick = " ".join(str(config.agent.get("nickname") or "").split())
+
+    if nick and nick.lower() != str(config.AGENT_NAME).lower():
+        return f"You are {config.AGENT_NAME}, nicknamed {nick}."
+
+    return f"You are {config.AGENT_NAME}."
+
+
 def _persona():
     return f"""Personality:
 {config.PERSONALITY}"""
+
+
+def as_lines(value):
+    """agent.json's traits or rules for the prompt: a list one item a line
+    ("- Flirts constantly"), so each reads as its own; written as one
+    paragraph instead, it goes in as it is. (Joined with commas, a list ran
+    into one sentence, and a paragraph came apart into its letters.)"""
+    if isinstance(value, (list, tuple)):
+        items = (" ".join(str(item).split()) for item in value)
+        return "\n".join(f"- {item}" for item in items if item)
+
+    return str(value or "").strip()
 
 
 def _manner():
@@ -338,10 +362,10 @@ def _manner():
 {config.TONE}
 
 Traits:
-{', '.join(config.TRAITS)}
+{as_lines(config.TRAITS)}
 
 Rules:
-{', '.join(config.RULES)}"""
+{as_lines(config.RULES)}"""
 
 
 def build_system_prompt(query="", timing="", private=True):
@@ -354,7 +378,7 @@ def build_system_prompt(query="", timing="", private=True):
 
 def _whole(p):
     return f"""
-You are {config.AGENT_NAME}.
+{who_she_is()}
 {p['user']}{p['profile']}
 Right now:
 {p['now']}
@@ -396,13 +420,14 @@ def build_prompt_parts(query="", timing="", private=True):
         return _whole(p), ""
 
     system = f"""
-You are {config.AGENT_NAME}.
+{who_she_is()}
 {p['user']}{p['profile']}
 The time right now, what's going on around you, your mood and what you remember
 that bears on this message come in a note in front of the latest message. Never
 calculate a date or a duration yourself - call get_datetime or time_until instead.
 
 {_persona()}
+
 {_manner()}
 {p['tools']}
 {p['summary']}

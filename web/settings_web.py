@@ -13,7 +13,8 @@ Served by livefeed, so it inherits its guard: localhost only, and a
 request whose Host or Origin isn't this server is refused. Changing a
 setting also needs this session's key, which is only in the page itself:
 another site open in your browser can send a request here, but can't
-read the page to learn the key. Passwords and tokens are never sent to
+read the page to learn the key. The Browse button by a path setting (PICKERS)
+lists folders on this PC, so it needs the key too, and only lists names. Passwords and tokens are never sent to
 the page, only whether one is set.
 
 "Who she is" at the top edits agent/agent.json itself, as text: her name,
@@ -69,6 +70,78 @@ def _range(kind, line, path=""):
     return None
 
 
+# Settings that are a path on this PC get a Browse button on the page, which
+# opens a small file browser served from here (browse()): a native file
+# dialog in a browser only ever gives the page a file's name, never where it
+# is. A file one lists only folders and the kinds of file named (every file
+# when none are); a folder one only folders. On a list setting the pick is
+# added to the list ("Add..."). Add a setting here to give it the button.
+PICKERS = {
+    "wake_word.model": ("file", (".onnx",)),     # loaded with ONNX (voice/wakeword.py), so not .tflite
+    "knowledge.folders": ("folder", ()),
+    "files.job_write_dirs": ("folder", ()),
+    "alarms.tone": ("file", (".wav",)),
+    "plugins.zork.interpreter": ("file", ()),
+    "plugins.gameboy.rom": ("file", (".gb", ".gbc")),
+    "plugins.gameboy.roms": ("folder", ()),
+    "plugins.gameboy.saves": ("folder", ()),
+    "plugins.realiti.path": ("folder", ()),
+    "plugins.realiti.node": ("file", ()),
+}
+BROWSE_MAX = 1000       # entries shown from one folder
+
+
+def browse(setting, at=""):
+    """One folder's contents for the picker of `setting`: names and full
+    paths, folders first. Only names are read, never a file's contents.
+    Starts at `at` (or the nearest folder of it that exists), else home."""
+    if setting not in PICKERS:
+        return {"ok": False, "message": "that setting has no browser"}
+
+    kind, ext = PICKERS[setting]
+    home = os.path.expanduser("~")
+    raw = str(at or "").strip()
+    here = os.path.abspath(os.path.expanduser(raw)) if raw else home
+
+    # a file, or a folder that's gone: the nearest folder above it that's there
+    while not os.path.isdir(here):
+        up = os.path.dirname(here)
+        if up == here:
+            here = home
+            break
+        here = up
+
+    up = os.path.dirname(here)
+    out = {"ok": True, "path": here, "parent": up if up != here else None, "home": home,
+           "kind": kind, "ext": list(ext), "dirs": [], "files": [], "cut": False}
+
+    try:
+        names = sorted(os.listdir(here), key=str.lower)
+    except OSError as e:
+        out.update(ok=False, message=f"can't open {here}: {e.strerror or e}")
+        return out
+
+    for name in names:
+        if name.startswith("."):
+            continue                    # hidden: type the path in the box to go there
+        full = os.path.join(here, name)
+        try:
+            folder = os.path.isdir(full)
+        except OSError:
+            continue
+        if folder:
+            out["dirs"].append({"name": name, "path": full})
+        elif kind == "file" and (not ext or name.lower().endswith(ext)):
+            out["files"].append({"name": name, "path": full})
+
+    if len(out["dirs"]) + len(out["files"]) > BROWSE_MAX:
+        out["cut"] = True
+        out["dirs"] = out["dirs"][:BROWSE_MAX]
+        out["files"] = out["files"][:max(0, BROWSE_MAX - len(out["dirs"]))]
+
+    return out
+
+
 def entry(path):
     """One setting, as the page sees it."""
     pane = _pane()
@@ -81,6 +154,9 @@ def entry(path):
            "help": line, "choices": list(choices), "set": is_set,
            "live": bool(config.SETTINGS.get(path, (None, False))[1]),
            "basic": path in BASIC, "range": _range(kind, line, path)}
+
+    if path in PICKERS:
+        out["pick"] = PICKERS[path][0]            # "file" or "folder": a Browse button
 
     if path == "portrait.background":
         # its own control on the page: default / see-through / a colour / a picture
@@ -352,6 +428,8 @@ def handle(method, sub, body, key=None):
             ok, message, item = reset(data.get("path"))
         elif action == "preset":
             ok, message, item = preset(str(data.get("name", "")))
+        elif action == "browse":
+            return 200, "application/json", json.dumps(browse(str(data.get("setting", "")), data.get("at")))
         elif action in ("station_pair", "station_forget"):
             return 200, "application/json", json.dumps(_station_action(action, data))
         elif action == "agent_save":

@@ -428,7 +428,9 @@ downloads one, you point her at a `.gb` or `.gbc` file you have.
 the folder it's in is your ROM folder: `/gameboy games` lists what's
 there and `/gameboy game 2` or `/gameboy game fantasy` picks one, by
 number or any part of its name. Drop a new game in the folder and it's
-on the list. `"roms"` sets the folder yourself.
+on the list. `"roms"` sets the folder yourself. On the settings page
+(Plugin: gameboy), the game, the ROM folder and the saves folder each
+have a **Browse…** button that opens a file browser on this PC.
 
 **How she sees the game.** Whenever her model can see (her vision
 adapter), she gets the screen as a picture, so she can look at the

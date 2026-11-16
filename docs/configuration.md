@@ -98,6 +98,12 @@ plugin. A green dot means it's set in your `config.json`; `↻ restart`
 means a change takes effect on the next start; `↺` puts a setting back
 to its default.
 
+A setting that's a file or folder on this PC (a wake word model, the
+alarm tone, the Game Boy's games, the knowledge folders...) has a
+**Browse…** button that opens a file browser; on a list of folders it's
+**Add…** and adds one. Hidden folders aren't listed, but typing a path in
+its box goes there.
+
 The page can stay open while Luna restarts: the next change picks up her
 new run by itself, and the page refreshes what it shows.
 

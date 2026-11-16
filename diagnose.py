@@ -275,14 +275,15 @@ def _layers():
     import config
     from core import history
     import llm
+    from llm import prompts
 
     text, _wanted = BISECT_PROBE
     persona = "\n".join(filter(None, [
-        f"You are {config.AGENT_NAME}.",
+        prompts.who_she_is(),
         f"\nPersonality:\n{config.PERSONALITY}" if config.PERSONALITY else "",
         f"\nTone:\n{config.TONE}" if config.TONE else "",
-        f"\nTraits:\n{', '.join(config.TRAITS)}" if config.TRAITS else "",
-        f"\nRules:\n{', '.join(config.RULES)}" if config.RULES else "",
+        f"\nTraits:\n{prompts.as_lines(config.TRAITS)}" if config.TRAITS else "",
+        f"\nRules:\n{prompts.as_lines(config.RULES)}" if config.RULES else "",
     ]))
 
     user = {"role": "user", "content": text}

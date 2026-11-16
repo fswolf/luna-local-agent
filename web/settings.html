@@ -79,6 +79,20 @@ section>h2 .after{color:var(--warn);font-size:11.5px;font-weight:400;margin-left
 .ctl input[type=color]{width:46px;height:32px;padding:2px;background:#0e0a16;border:1px solid var(--line);border-radius:6px;cursor:pointer}
 .ctl input[type=color]::-webkit-color-swatch-wrapper{padding:0}.ctl input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
 .ctl input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
+.ctl .browse{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}
+#picker{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:0;width:min(640px,94vw)}
+#picker::backdrop{background:#0008}
+#picker form{display:flex;flex-direction:column;max-height:80vh}
+.pkhead,.pkgo,.pkfoot{display:flex;gap:8px;align-items:center;padding:12px 14px}
+.pkhead{justify-content:space-between;border-bottom:1px solid var(--line)}.pkhead b{color:var(--pink)}
+.pkhead button{background:none;border:0;color:var(--dim);font-size:16px;cursor:pointer}
+.pkgo input{flex:1;min-width:0;background:#0e0a16;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 9px;font:13px ui-monospace,monospace}
+#picker .pkgo button,#picker .pkfoot button{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}
+#pklist{list-style:none;margin:0;padding:4px 6px;overflow:auto;flex:1;min-height:200px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+#pklist li{padding:6px 10px;border-radius:6px;cursor:pointer;font:13px ui-monospace,monospace;word-break:break-all}
+#pklist li:hover{background:#ffffff0d}
+#pklist li.d{color:var(--accent)}#pklist li.f{color:var(--text)}#pklist li.none{color:var(--dim);cursor:default}
+.pkfoot{justify-content:space-between}#pknote{color:var(--dim);font-size:12.5px}
 .ctl output{font-family:ui-monospace,monospace;color:var(--accent);min-width:40px}
 .ctl .note{color:var(--dim);font-size:12.5px}
 .sw{position:relative;width:42px;height:24px;flex:none}
@@ -129,6 +143,12 @@ section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;m
 <div id="list"></div>
 </main>
 <div id="toast"></div>
+<dialog id="picker"><form method="dialog">
+<div class="pkhead"><b id="pktitle">Pick a folder</b><button value="cancel" title="Close">✕</button></div>
+<div class="pkgo"><input id="pkpath" type="text" spellcheck="false" autocomplete="off" aria-label="Folder"><button id="pkopen" type="button">Go</button><button id="pkhome" type="button" title="Your home folder">Home</button></div>
+<ul id="pklist"></ul>
+<div class="pkfoot"><span id="pknote"></span><button id="pkuse" type="button">Use this folder</button></div>
+</form></dialog>
 <script>
 let KEY = "__KEY__";        // this run of Luna's; a restart makes a new one (see send)
 let data = null, view = "basic", query = "", closed = new Set();
@@ -216,7 +236,10 @@ function control(s) {
   if (s.kind === "int" || s.kind === "float")
     return `<input type="number" id="${id}" data-path="${esc(s.path)}" step="${s.kind === "int" ? 1 : "any"}" value="${esc(s.value ?? "")}">`;
   const v = Array.isArray(s.value) ? s.value.join(", ") : (s.value ?? "");
-  return `<input type="text" id="${id}" data-path="${esc(s.path)}" value="${esc(v)}" placeholder="${s.kind === "list" ? "none (comma-separated)" : "not set"}">`;
+  const browse = !s.pick ? "" : s.kind === "list"
+    ? ` <button class="browse" data-browse="${esc(s.path)}" title="Add a ${s.pick} on this PC to the list">Add…</button>`
+    : ` <button class="browse" data-browse="${esc(s.path)}" title="Pick the ${s.pick} on this PC">Browse…</button>`;
+  return `<input type="text" id="${id}" data-path="${esc(s.path)}" value="${esc(v)}" placeholder="${s.kind === "list" ? "none (comma-separated)" : "not set"}">` + browse;
 }
 
 let allRestart = new Set();          // sections where every change waits for a restart: said once, on the heading
@@ -442,7 +465,55 @@ $("#list").addEventListener("change", e => {
 $("#list").addEventListener("input", e => {
   if (e.target.type === "range") e.target.nextElementSibling.textContent = e.target.value;
 });
+// Browse… by a path setting: a folder browser served by Luna (settings_web.browse),
+// since a browser's own file dialog never tells the page where a file is
+const picker = {setting: null, kind: "folder"};
+async function pickAt(at) {
+  const out = await send({action: "browse", setting: picker.setting, at});
+  if (!out.path) return toast(out.message || "couldn't open that", true);
+  $("#pkpath").value = out.path;
+  const li = (cls, p, text) => `<li class="${cls}" data-pk="${esc(p)}" title="${esc(p)}">${esc(text)}</li>`;
+  $("#pklist").innerHTML = (out.parent ? li("d", out.parent, "↑ ..") : "") +
+    out.dirs.map(d => li("d", d.path, d.name + "/")).join("") +
+    out.files.map(f => li("f", f.path, f.name)).join("") +
+    (!out.ok ? `<li class="none">${esc(out.message)}</li>`
+      : !out.dirs.length && !out.files.length ? `<li class="none">${picker.kind === "folder" ? "No folders here" : "No folders or " + (out.ext.length ? out.ext.join(" / ") + " " : "") + "files here"}</li>` : "");
+  $("#pknote").textContent = out.cut ? "Showing the first 1000" : picker.kind === "file" && out.ext.length ? "Showing folders and " + out.ext.join(" / ") + " files" : "";
+}
+function pickUse(path) {
+  const box = document.querySelector(`#list input[data-path="${CSS.escape(picker.setting)}"]`);
+  let value = path;
+  if (picker.list) {                     // a list: added to it, once
+    const have = (box ? box.value : "").split(",").map(x => x.trim()).filter(Boolean);
+    value = (have.includes(path) ? have : [...have, path]).join(", ");
+  }
+  if (box) box.value = value;
+  $("#picker").close();
+  save(picker.setting, value);
+}
+$("#pklist").addEventListener("click", e => {
+  const li = e.target.closest("li[data-pk]");
+  if (!li) return;
+  li.classList.contains("f") ? pickUse(li.dataset.pk) : pickAt(li.dataset.pk);
+});
+$("#pkopen").addEventListener("click", () => pickAt($("#pkpath").value));
+$("#pkhome").addEventListener("click", () => pickAt(""));
+$("#pkpath").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pickAt(e.target.value); } });
+$("#pkuse").addEventListener("click", () => pickUse($("#pkpath").value));
+
 $("#list").addEventListener("click", async e => {
+  const b = e.target.closest("[data-browse]");
+  if (b) {
+    const s = data.groups.flatMap(g => g.settings).find(x => x.path === b.dataset.browse);
+    picker.setting = b.dataset.browse; picker.kind = (s && s.pick) || "folder"; picker.list = !!s && s.kind === "list";
+    $("#pktitle").textContent = (picker.list ? "Add a " : "Pick a ") + picker.kind + " for " + (s ? s.name : picker.setting);
+    $("#pkuse").hidden = picker.kind === "file";
+    $("#pkuse").textContent = picker.list ? "Add this folder" : "Use this folder";
+    const box = b.previousElementSibling, start = box ? box.value.split(",").pop().trim() : "";
+    $("#picker").showModal();
+    await pickAt(start);
+    return;
+  }
   if (e.target.id === "scalefresh") { await scaleRefresh(); return toast("measured again"); }
   if (e.target.id === "stpair") {
     const out = await send({action: "station_pair", name: ($("#stname").value || "station").trim()});
