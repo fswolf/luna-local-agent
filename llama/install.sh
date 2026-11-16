@@ -125,10 +125,10 @@ cmake --build "$BUILD" --config Release -j"$JOBS" \
 
 ln -sfn "$BUILD/bin" bin
 
-# read-acts: the introspection lab's layer reader (introspection/read.py).
+# read-acts: the introspection lab's layer reader (lab/read.py).
 # Only the lab needs it, so a failure here never stops the install.
-if [ -f ../introspection/reader/build.sh ]; then
-    bash ../introspection/reader/build.sh || echo "read-acts didn't build - only introspection/read.py needs it"
+if [ -f ../lab/reader/build.sh ]; then
+    bash ../lab/reader/build.sh || echo "read-acts didn't build - only lab/read.py needs it"
 fi
 
 echo

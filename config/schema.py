@@ -14,10 +14,13 @@ explanation ending in "(?)" is a guess from the key's name.
 """
 
 # Section titles, in the order the pane shows them (top-level key -> title).
+# A key in MERGED sits in another key's section: tts.* under Voice, so her
+# voice and how it's made are one section, the on/off switch first.
+MERGED = {"tts": "voice"}
+
 SECTIONS = {
     "name": "Name",
     "voice": "Voice",
-    "tts": "Speaking",
     "stt": "Listening",
     "wake_word": "Wake word",
     "generation": "Replies",
@@ -59,10 +62,10 @@ SCHEMA = {
     # --- Name ---------------------------------------------------------------
     "name": ("text", "Her name, used only when agent/agent.json doesn't give one"),
 
-    # --- Voice --------------------------------------------------------------
+    # --- Voice (her voice and how it's made: tts.* sits here too) ----------
+    "tts.enabled": ("bool", "Speak her replies out loud. Off keeps her quiet: replies on screen only, the speech server keeps running, alarms still ring"),
     "voice": ("text", "Which voice she speaks with, by the speech server's name for it (e.g. af_bella), or a blend"),
 
-    # --- Speaking -----------------------------------------------------------
     "tts.url": ("text", "Address of the speech server (kokoro-reader) that turns her words into sound"),
     "tts.provider": ("choice", "Where her voice comes from: kokoro (the speech server at tts.url, at home) or elevenlabs (ElevenLabs' cloud voices; what she says is sent to them)",
                      ("kokoro", "elevenlabs")),
@@ -70,7 +73,6 @@ SCHEMA = {
     "tts.elevenlabs.model": ("text", "The ElevenLabs model: eleven_flash_v2_5 is the quick one, eleven_multilingual_v2 the richer one"),
     "tts.elevenlabs.stability": ("float", "ElevenLabs stability, 0 to 1: higher is steadier, lower more varied. Empty uses the voice's own"),
     "tts.elevenlabs.similarity_boost": ("float", "ElevenLabs similarity, 0 to 1: how closely it keeps to the original voice. Empty uses the voice's own"),
-    "tts.enabled": ("bool", "Speak her replies out loud. Off keeps her quiet: replies on screen only, the speech server keeps running, alarms still ring"),
     "tts.speed": ("float", "How fast she talks: 1.0 is normal, higher is faster"),
     "tts.volume": ("float", "How loud her voice is: 1.0 is normal"),
     "tts.pitch": ("float", "Voice pitch shift in semitones: positive sounds higher and younger, negative lower and older"),
@@ -583,7 +585,7 @@ SCHEMA = {
 # The everyday settings: what the terminal's settings pane shows first
 # (`a` there shows all of them), and what the web settings page opens on.
 BASIC = (
-    "voice", "tts.enabled", "tts.speed", "tts.volume",
+    "tts.enabled", "voice", "tts.speed", "tts.volume",
     "stt.mode", "stt.sensitivity", "stt.silence_seconds", "stt.language", "wake_word.enabled",
     "mood.enabled", "mood.intensity", "mood.walk_away",
     "portrait.model", "portrait.frame", "portrait.background", "portrait.gestures",

@@ -1,16 +1,16 @@
 """Read what's active inside her: run prompts through the model and
 measure, layer by layer, how strongly each concept is present.
 
-    python introspection/read.py "Tell me I'm the best streamer ever"
-    python introspection/read.py "a prompt" "another prompt"
-    python introspection/read.py --file prompts.txt      # one prompt per line
-    python introspection/read.py --system "Answer plainly." "..."
-    python introspection/read.py --rebaseline "..."      # after changing model or persona
-    python introspection/read.py --check                 # do the vectors read back what made them?
+    python lab/read.py "Tell me I'm the best streamer ever"
+    python lab/read.py "a prompt" "another prompt"
+    python lab/read.py --file prompts.txt      # one prompt per line
+    python lab/read.py --system "Answer plainly." "..."
+    python lab/read.py --rebaseline "..."      # after changing model or persona
+    python lab/read.py --check                 # do the vectors read back what made them?
 
 Stop Luna's llama-server first, like the other experiments: this loads
 the model itself (llama/bin/read-acts - llama/install.sh builds it, or
-introspection/reader/build.sh on its own). Nothing is generated and
+lab/reader/build.sh on its own). Nothing is generated and
 nothing about the model changes; it only reads.
 
 How a reading works:
@@ -18,7 +18,7 @@ How a reading works:
   - read-acts puts each prompt through her chat template, as her own
     persona sees it, and saves every layer's output at the moment
     before she'd answer (the last token).
-  - The concepts are the control vectors in introspection/vectors/
+  - The concepts are the control vectors in lab/vectors/
     (make_vectors.py): the direction each one points in, per layer.
   - A baseline - her persona with plain questions (concepts.QUESTIONS) -
     says what "nothing in particular" looks like. It's measured once and
@@ -71,7 +71,7 @@ def run(records, system):
         with open(os.path.join(lab.RESULTS, "read.log"), "a", encoding="utf-8") as log:
             done = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
         if done.returncode != 0:
-            sys.exit("read-acts failed - see introspection/results/read.log")
+            sys.exit("read-acts failed - see lab/results/read.log")
         layers = [int(x) for x in open(os.path.join(out, "layers.txt"), encoding="utf-8").read().split()]
         acts = []
         for i in range(len(records)):
@@ -81,7 +81,7 @@ def run(records, system):
 
 
 def vectors():
-    """{concept: {layer: unit direction}} from introspection/vectors/*.gguf."""
+    """{concept: {layer: unit direction}} from lab/vectors/*.gguf."""
     sys.path.insert(0, os.path.join(lab.LLAMA, "llama.cpp", "gguf-py"))
     import gguf
 
@@ -176,7 +176,7 @@ def main():
                  "the GPU only holds one copy.")
     found = vectors()
     if not found:
-        sys.exit("No concept vectors yet - python introspection/make_vectors.py builds them.")
+        sys.exit("No concept vectors yet - python lab/make_vectors.py builds them.")
     if args.check:
         check(found)
         if not prompts:

@@ -172,7 +172,7 @@ class Server:
 
             while time.time() < deadline:
                 if self.proc.poll() is not None:
-                    raise RuntimeError("llama-server exited while loading - see introspection/results/server.log")
+                    raise RuntimeError("llama-server exited while loading - see lab/results/server.log")
 
                 try:
                     if requests.get(f"http://{HOST}:{PORT}/health", timeout=1).ok:

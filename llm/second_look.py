@@ -96,10 +96,11 @@ def _promised_action(answer):
     return text[start:end].strip()[:120]
 
 
-# A check after she's already answered: her reply is on screen and has been
-# heard, so she only adds what the check changed. Without this she retold the
-# whole reply with one number swapped.
-_ONLY_WHAT_CHANGED = ("Your reply is already said and heard, so don't repeat it. "
+# A check after she's already answered: her reply is out (on screen, and
+# spoken unless her voice is off), so she only adds what the check changed.
+# Told to give "the corrected answer", she retold the whole reply with one
+# number swapped.
+_ONLY_WHAT_CHANGED = ("Your reply is already out, so don't repeat it. "
                       "Say only what changed, in a sentence or two, or that it checks out.")
 
 

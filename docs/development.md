@@ -86,7 +86,7 @@ ai-voice/
 │                     #   dataset.py the examples (/good, /fix); export.py them for training;
 │                     #   train.sh + Containerfile + train.py the run (Unsloth, ROCm);
 │                     #   patches.py what's on disk and loaded (/patches)
-├── introspection/    # injected-thought experiments - make_vectors, trial, report, blind
+├── lab/              # injected-thought experiments - make_vectors, trial, report, blind
 ├── memory-manager/
 │   ├── manager.py
 │   └── start.sh

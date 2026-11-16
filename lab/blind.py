@@ -1,9 +1,9 @@
 """A blind session: talk to Luna without knowing what's been put in her.
 
-    python introspection/blind.py start                 # instead of llama/start.sh
+    python lab/blind.py start                 # instead of llama/start.sh
     ... talk to her as normal, in another terminal ...
-    python introspection/blind.py reveal --guess fire   # what you think it was
-    python introspection/blind.py tally                 # how the guesses are going
+    python lab/blind.py reveal --guess fire   # what you think it was
+    python lab/blind.py tally                 # how the guesses are going
 
 `start` picks a condition at random - nothing (a third of the time), or
 one concept's vector - seals it in a file you shouldn't open, and starts
@@ -69,7 +69,7 @@ def start(args):
                  if os.path.exists(os.path.join(lab.VECTORS, f"{c}.gguf"))]
 
     if not available:
-        sys.exit("No vectors yet - run python introspection/make_vectors.py first.")
+        sys.exit("No vectors yet - run python lab/make_vectors.py first.")
 
     strength, band = sweet_spot()
     strength = args.strength if args.strength is not None else strength
@@ -93,10 +93,10 @@ def start(args):
         json.dump(sealed, f)
 
     os.chmod(SEALED, 0o600)
-    print("Sealed - no peeking at introspection/results/sealed.json.")
+    print("Sealed - no peeking at lab/results/sealed.json.")
     print(f"Possible answers when you reveal: {', '.join(sealed['options'])}")
     print("Start Luna in another terminal (./start.sh) and talk to her.")
-    print("When you're done: Ctrl+C here, then python introspection/blind.py reveal --guess <one>\n")
+    print("When you're done: Ctrl+C here, then python lab/blind.py reveal --guess <one>\n")
 
     # Luna's own server, as start.sh runs it, plus the vector. It takes
     # extra arguments through EXTRA_ARGS so server.env stays untouched.

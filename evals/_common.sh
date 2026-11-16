@@ -24,7 +24,7 @@ llm_up() {
     }
 }
 
-# Luna as she is in agent/agent.json (same as introspection/lab.py persona()).
+# Luna as she is in agent/agent.json (same as lab/lab.py persona()).
 persona() {
     python3 - "$ROOT" <<'PY'
 import json, os, sys

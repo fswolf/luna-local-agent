@@ -1,11 +1,11 @@
 """Build one control vector per concept, from your own model.
 
-    python introspection/make_vectors.py              # all of them
-    python introspection/make_vectors.py ocean fire   # just these
+    python lab/make_vectors.py              # all of them
+    python lab/make_vectors.py ocean fire   # just these
 
 Stop Luna's llama-server first (Ctrl+C in its terminal) - this loads the
 model itself. Each concept takes a minute or two on the GPU. Vectors go
-in introspection/vectors/<concept>.gguf and are specific to this model:
+in lab/vectors/<concept>.gguf and are specific to this model:
 change the model, build them again.
 
 The method is "mean": the average difference between the layers with
@@ -46,7 +46,7 @@ def build(name, model):
         done = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
 
     if done.returncode != 0 or not os.path.exists(out):
-        print(f"  {name}: FAILED - see introspection/results/make_vectors.log")
+        print(f"  {name}: FAILED - see lab/results/make_vectors.log")
 
         return False
 
@@ -70,7 +70,7 @@ def main():
     model = lab.model_path()
     print(f"model: {os.path.basename(model)} ({lab.n_layers(model)} layers)")
     ok = [build(name, model) for name in wanted]
-    print(f"\n{sum(ok)} of {len(ok)} built. Next: python introspection/trial.py")
+    print(f"\n{sum(ok)} of {len(ok)} built. Next: python lab/trial.py")
 
 
 if __name__ == "__main__":

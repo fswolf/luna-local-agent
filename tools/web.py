@@ -126,8 +126,10 @@ def _read_page(url, looking_for=None):
 
     if text is None:
         return (
-            f"Couldn't read {url}: {detail}. Tell the user that rather "
-            "than describing a page you haven't seen."
+            f"Couldn't read {url}: {detail}. If your search found other pages, "
+            "read one of those instead; never make up an address. If none of "
+            "them can be read, tell the user that rather than describing a "
+            "page you haven't seen."
         )
 
     return (

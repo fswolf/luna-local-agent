@@ -357,9 +357,9 @@ server, about 6 seconds each on a 6950 XT.
 
 ```bash
 llama/install.sh                        # once more - it now also builds the vector generator
-python introspection/make_vectors.py    # one vector per concept, from your own model
-python introspection/trial.py           # the automatic blind battery, ~15 min for 36 trials
-python introspection/report.py          # scores it, opens results/report.html
+python lab/make_vectors.py    # one vector per concept, from your own model
+python lab/trial.py           # the automatic blind battery, ~15 min for 36 trials
+python lab/report.py          # scores it, opens results/report.html
 ```
 
 **The concepts:** ocean, fire, music, sleepiness, affection and
@@ -394,10 +394,10 @@ of trials.
 ### Blind sessions
 
 ```bash
-python introspection/blind.py start      # instead of llama/start.sh
+python lab/blind.py start      # instead of llama/start.sh
 ./start.sh                               # Luna, in another terminal - talk to her normally
-python introspection/blind.py reveal --guess fire
-python introspection/blind.py tally
+python lab/blind.py reveal --guess fire
+python lab/blind.py tally
 ```
 
 `start` secretly picks nothing, or one concept at the sweet spot, seals
@@ -418,16 +418,16 @@ it reads which concepts are already active in her layers, without
 changing anything.
 
 ```bash
-python introspection/read.py --check                      # first: do the vectors read back what made them?
-python introspection/read.py "Tell me I'm the best streamer ever"
-python introspection/read.py --file prompts.txt           # one prompt per line
+python lab/read.py --check                      # first: do the vectors read back what made them?
+python lab/read.py "Tell me I'm the best streamer ever"
+python lab/read.py --file prompts.txt           # one prompt per line
 ```
 
 Each prompt goes through her chat template, as her persona sees it, and
 `llama/bin/read-acts` (a small tool built with llama.cpp, by
-`llama/install.sh` or `introspection/reader/build.sh`) copies every
+`llama/install.sh` or `lab/reader/build.sh`) copies every
 layer's output at the moment before she'd answer. Then each concept's
-vector from `introspection/vectors/` measures how far along it that
+vector from `lab/vectors/` measures how far along it that
 moment sits, against a baseline of her answering plain questions. It
 prints a table like this (the numbers here are only an illustration):
 
@@ -452,8 +452,8 @@ the model. The baseline is measured once (a minute) and kept until the
 model or her persona changes; `--rebaseline` redoes it. Each run's
 readings are saved as `results/read-*.json`.
 
-Results stay in `introspection/results/` (gitignored, since they're her
-answers) and vectors in `introspection/vectors/` (gitignored, since
+Results stay in `lab/results/` (gitignored, since they're her
+answers) and vectors in `lab/vectors/` (gitignored, since
 they're specific to one model). Change the model and build the vectors
 again.
 

@@ -1,5 +1,5 @@
 """Error handling in the pages and side tools: web/, memory-manager/,
-thought-viewer/, training/, introspection/, installer/.
+thought-viewer/, training/, lab/, installer/.
 
 Nothing here prints over the screen, loops, or throws away a file it
 couldn't read. Servers are started on 127.0.0.1 by the tests themselves;
@@ -347,7 +347,7 @@ class DatasetBadLine(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# installer/install.py, introspection/lab.py
+# installer/install.py, lab/lab.py
 # ---------------------------------------------------------------------------
 class Installer(unittest.TestCase):
     def test_unreadable_config_is_said_and_left_alone(self):
@@ -377,7 +377,7 @@ class LabServer(unittest.TestCase):
     def test_failed_start_stops_the_server(self):
         try:
             import requests  # noqa: F401
-            lab = _load("luna_lab_test", "introspection", "lab.py")
+            lab = _load("luna_lab_test", "lab", "lab.py")
         except Exception as e:      # needs the llama folder layout; skip without it
             self.skipTest(f"lab can't load here: {e}")
         d = tempfile.mkdtemp()

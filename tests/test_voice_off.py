@@ -73,6 +73,18 @@ class VoiceOff(unittest.TestCase):
         with mock.patch("config.TTS_ENABLED", True, create=True):
             self.assertNotIn("voice off", text())
 
+    def test_one_voice_section_switch_first(self):
+        from ui import settings_pane as pane
+        from web import settings_web
+
+        voice = [g for g in settings_web.listing()["groups"] if g["key"] == "voice"][0]
+        names = [s["name"] for s in voice["settings"]]
+        self.assertEqual(voice["title"], "Voice")
+        self.assertEqual(names[:2], ["enabled", "voice"])
+        self.assertIn("speed", names)                          # tts.* is here now
+        self.assertNotIn("tts", [g["key"] for g in settings_web.listing()["groups"]])
+        self.assertEqual(pane._short("plugins.chess.side", "plugins.chess"), "side")
+
 
 if __name__ == "__main__":
     unittest.main()

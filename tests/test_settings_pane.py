@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 import config  # noqa: E402
-from config.schema import SCHEMA, SECTIONS  # noqa: E402
+from config.schema import MERGED, SCHEMA, SECTIONS  # noqa: E402
 from ui import settings_pane  # noqa: E402
 from ui.shared import view  # noqa: E402
 
@@ -45,7 +45,8 @@ class Schema(unittest.TestCase):
     def test_every_section_has_a_title(self):
         for path in SCHEMA:
             if not path.startswith("plugins."):
-                self.assertIn(path.split(".")[0], SECTIONS, path)
+                head = path.split(".")[0]
+                self.assertIn(MERGED.get(head, head), SECTIONS, path)   # tts.* sits under Voice
 
 
 class Pane(unittest.TestCase):

@@ -78,14 +78,16 @@ def _all_paths():
 
 def _section(path):
     """The heading a setting sits under. Plugins get one each."""
-    from config.schema import SECTIONS
+    from config.schema import MERGED, SECTIONS
 
     parts = path.split(".")
 
     if parts[0] == "plugins" and len(parts) > 2:
         return f"plugins.{parts[1]}", f"Plugin: {parts[1]}"
 
-    return parts[0], SECTIONS.get(parts[0], parts[0].replace("_", " ").title())
+    key = MERGED.get(parts[0], parts[0])
+
+    return key, SECTIONS.get(key, key.replace("_", " ").title())
 
 
 def describe(path):
@@ -236,8 +238,19 @@ def _clip(text, width):
 
 
 def _short(path, group_key):
-    """The name within its section: 'mode' under Listening, not 'stt.mode'."""
-    return path[len(group_key) + 1:] if path.startswith(group_key + ".") else path
+    """The name within its section: 'mode' under Listening, not 'stt.mode';
+    'speed' under Voice, not 'tts.speed' (a merged section, config.schema.MERGED)."""
+    from config.schema import MERGED
+
+    if path.startswith(group_key + "."):
+        return path[len(group_key) + 1:]
+
+    head, dot, rest = path.partition(".")
+
+    if dot and (head == group_key or MERGED.get(head) == group_key):
+        return rest
+
+    return path
 
 
 def _fragments():

@@ -242,7 +242,7 @@ fi
 # shellcheck disable=SC2206
 [ -n "$EXTRA" ] && args+=($EXTRA)
 
-# From the environment rather than server.env: introspection/blind.py
+# From the environment rather than server.env: lab/blind.py
 # passes a control vector here for one session without editing a file.
 # shellcheck disable=SC2206
 [ -n "${EXTRA_ARGS:-}" ] && args+=($EXTRA_ARGS)

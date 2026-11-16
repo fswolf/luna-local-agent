@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build read-acts (the layer reader introspection/read.py uses) against the
+# Build read-acts (the layer reader lab/read.py uses) against the
 # llama.cpp that llama/install.sh built - same GPU backend, no rebuild of
 # llama.cpp itself. llama/install.sh runs this too.
 set -euo pipefail

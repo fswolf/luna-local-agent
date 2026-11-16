@@ -60,8 +60,8 @@ llama/server.local.env
 llama/patches/
 
 # Injection experiments: her answers (personal) and vectors (model-specific).
-introspection/results/
-introspection/vectors/
+lab/results/
+lab/vectors/
 
 # Screenshots and previews dropped here while working
 Claude outputs/

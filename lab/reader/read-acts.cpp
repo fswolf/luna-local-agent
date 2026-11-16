@@ -21,7 +21,7 @@
 // read where a reply's first word would come), and saved as <out>/<n>.npy: float32, shape
 // (2, layers, n_embd) - [0] the mean over the prompt's tokens, [1] the
 // last token (the moment before she answers). <out>/layers.txt lists
-// which layers the rows are. introspection/read.py does the rest.
+// which layers the rows are. lab/read.py does the rest.
 
 #include "ggml.h"
 #include "ggml-backend.h"

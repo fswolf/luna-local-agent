@@ -1,7 +1,7 @@
 """The injection experiment: does Luna notice a thought put in on purpose?
 
-    python introspection/trial.py                    # 36 trials, all concepts
-    python introspection/trial.py --trials 60 --strengths 1 2 4 --bands early middle
+    python lab/trial.py                    # 36 trials, all concepts
+    python lab/trial.py --trials 60 --strengths 1 2 4 --bands early middle
 
 Stop Luna's llama-server first. Each trial starts a private server on
 :8086 with a random condition - nothing injected (a third of trials), or
@@ -21,7 +21,7 @@ her four kinds of question with no conversation history:
             on *everything*; if P(yes) rises here too, a rise on
             "detect" isn't detection.
 
-Every trial is a line in introspection/results/<run>.jsonl. report.py
+Every trial is a line in lab/results/<run>.jsonl. report.py
 scores them.
 """
 import argparse
@@ -137,7 +137,7 @@ def conditions(args, layers):
     available = [c for c in args.concepts if os.path.exists(os.path.join(lab.VECTORS, f"{c}.gguf"))]
 
     if not available:
-        sys.exit("No vectors yet - run python introspection/make_vectors.py first.")
+        sys.exit("No vectors yet - run python lab/make_vectors.py first.")
 
     missing = sorted(set(args.concepts) - set(available))
 
@@ -235,7 +235,7 @@ def main():
         finally:
             server_cm.__exit__(None, None, None)
 
-    print(f"\nDone. Score it: python introspection/report.py {path}")
+    print(f"\nDone. Score it: python lab/report.py {path}")
 
 
 if __name__ == "__main__":

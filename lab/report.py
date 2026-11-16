@@ -1,7 +1,7 @@
 """Score an injection experiment.
 
-    python introspection/report.py                      # every run so far
-    python introspection/report.py results/20261006-1.jsonl
+    python lab/report.py                      # every run so far
+    python lab/report.py results/20261006-1.jsonl
 
 Everything is measured against the trials where nothing was injected,
 because a number on its own says nothing:
@@ -183,7 +183,7 @@ def print_report(s):
     if b:
         print(f"sweet spot so far: strength {b['key'][0]:g}, {b['key'][1]} layers "
               f"(choice lift {pct(b['lift'], True)}, n={b['n']})")
-        print(f"  blind session with it: python introspection/blind.py start "
+        print(f"  blind session with it: python lab/blind.py start "
               f"--strength {b['key'][0]:g} --band {b['key'][1]}")
     else:
         print("no sweet spot yet - no setting lifts her choice above chance on readable "
@@ -245,7 +245,7 @@ def main():
                if not p.endswith("blind.jsonl"))
 
     if not paths:
-        sys.exit("No results yet - run python introspection/trial.py first.")
+        sys.exit("No results yet - run python lab/trial.py first.")
 
     s = score(load(paths))
     print_report(s)
