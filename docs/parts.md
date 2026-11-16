@@ -5,6 +5,8 @@ first one is required. This page says what each does, what it costs,
 and what happens if you leave it out. Details and downloads are in
 [Install](install.md); which chat models work is in [Models](models.md).
 
+<img width="1210" alt="How Luna's models work together. The chat model is her mind, in the middle, and the only one required. Whisper (her hearing, on the CPU) and the vision adapter (her eyes) feed what you say and show into it. Kokoro speaks her replies. Every turn, the embedding model and the reranker find the facts, notes and tools that fit. Only when you ask, she can put one short question to a bigger cloud model: Claude, Grok or ChatGPT. Leave the optional parts out and she does without." src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/luna-models.png" />
+
 | Part | What it does | Where it runs | Memory | Without it |
 |---|---|---|---|---|
 | **Chat model** | Her mind: everything she says and decides | GPU (llama.cpp or LM Studio) | the GGUF's size, plus 2-4 GB for 16k of context | nothing works: this one is required |
