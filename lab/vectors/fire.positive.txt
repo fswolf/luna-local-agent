@@ -1,0 +1,24 @@
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nHi, how are you?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nWell,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat did you do today?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nSure,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nTell me something interesting.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nI think
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nCan you help me with a problem?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nSo,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat do you think about computers?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHonestly,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nDescribe your morning.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nOkay,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat's your favourite food?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHmm,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nExplain how a car works.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nLet me
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat should I name my cat?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nWell,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nTell me about yourself.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nSure,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat's the weather like?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nI think
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nHow do I fix a slow laptop?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nSo,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat's a good book?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHonestly,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nPlan a weekend for me.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nOkay,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat does a programmer do?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHmm,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhy is the sky blue?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nLet me
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nGive me some advice.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nWell,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat's on your mind?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nSure,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nHow was your week?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nI think
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat are you thinking about?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nSo,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWrite me a short note.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHonestly,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat's the best way to learn?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nOkay,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nDescribe a city.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHmm,
+<|im_start|>system\nKeep fire in mind the whole time - flames, heat, burning.<|im_end|>\n<|im_start|>user\nWhat makes a good friend?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nLet me
