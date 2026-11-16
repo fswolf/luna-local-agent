@@ -588,4 +588,13 @@ def _ask(text, model, on_text=None, on_sentence=None,
 
         reminders.extract_in_background(model, text)
 
+        # The same safety net for memory: you said "remember this" and she
+        # answered without calling remember_fact (it happened: "Remember
+        # this: your mind runs on UnraidTower's RX 7900 XT" got a warm reply
+        # and nothing saved). The extraction pass looks at the turn, told
+        # you asked, and keeps what you meant unless it's known already.
+        if "remember_fact" not in called and longterm.asked_to_remember(text):
+            logbook.info("longterm", "asked to remember, no remember_fact call - extracting: %s", text[:120])
+            longterm.extract_in_background(model, text, answer, asked=True)
+
     return answer

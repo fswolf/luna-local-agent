@@ -77,7 +77,27 @@ def ready():
 # an entire chatty reply (cat sounds, emoji, search results, etc.)
 # straight into permanent memory.
 _MAX_FACT_CHARS = 220
-_VOICE_TELLS = ("mrrp", "nya~", "senpai", "purring", "\U0001F63E".lower())
+# Signs a "fact" is really a leaked piece of her reply. Not the names she
+# calls you: "Ryan likes being called Senpai" is a fact, and "senpai" being
+# on this list once threw it away (2026-11-15).
+_VOICE_TELLS = ("mrrp", "nya~", "purring", "\U0001F63E".lower())
+
+# You asking her outright to keep something: "remember this", "remember that
+# I...", "don't forget", "keep in mind", "make a note".
+_ASKED = re.compile(r"\b(remember (this|that|my|i|i'm|im|me|we|our|it)\b|don'?t forget\b|"
+                    r"keep (this |that |it )?in mind\b|make a note\b|note (this|that) down\b)", re.I)
+
+
+_ASKED_QUESTION = re.compile(r"\b(do|did|can|could|would|will|don'?t) you (still )?remember\b", re.I)
+
+
+def asked_to_remember(text):
+    """Did you ask her to keep something? (Then a turn where she didn't
+    call remember_fact still gets the extraction pass.)"""
+    text = str(text or "")
+    if _ASKED_QUESTION.search(text) and not re.search(r"\bremember (this|that)\s*[:,-]", text, re.I):
+        return False            # "do you remember my birthday?" asks, it doesn't tell
+    return bool(_ASKED.search(text))
 
 
 def status():
@@ -342,6 +362,21 @@ def update_fact(phrase, replacement):
     return None, []
 
 
+def why_not(fact):
+    """Why add_fact would turn this fact away, in words she can repeat;
+    "" when it wouldn't on these grounds (it may still be known already)."""
+    fact = str(fact or "").strip()
+    if not fact or fact.upper() == "NONE":
+        return "it was empty"
+    if len(fact) > _MAX_FACT_CHARS:
+        return f"it's too long (keep it under {_MAX_FACT_CHARS} characters, one sentence)"
+    if "\n" in fact:
+        return "it's more than one line"
+    if any(tell in fact.lower() for tell in _VOICE_TELLS):
+        return "it reads like part of your reply, not a fact"
+    return ""
+
+
 def _looks_like_valid_fact(fact: str) -> bool:
     if not fact or fact.upper() == "NONE":
         return False
@@ -393,7 +428,7 @@ def _ask_extractor(model, prompt):
     return _strip_think(response.json()["choices"][0]["message"].get("content") or "")
 
 
-def _extract_fact_sqlite(model, user_text, answer):
+def _extract_fact_sqlite(model, user_text, answer, asked=False):
     """Extraction with the table in charge: the model may also notice
     that a new statement makes an old fact false.
 
@@ -443,8 +478,10 @@ def _extract_fact_sqlite(model, user_text, answer):
         "longer true (something was replaced, changed, ended). If both "
         "could still be true at once, use NEW. "
         f"{subject_line}"
-        "When in doubt, reply NONE.\n\n"
-        f"User: {user_text}\nAssistant: {answer}"
+        + ("The user explicitly asked for something here to be remembered: report "
+           "it unless it is already in the list above.\n\n" if asked else
+           "When in doubt, reply NONE.\n\n")
+        + f"User: {user_text}\nAssistant: {answer}"
     )
 
     try:
@@ -513,10 +550,10 @@ def _extract_fact_sqlite(model, user_text, answer):
         add_fact(line)
 
 
-def _extract_fact(model, user_text, answer):
+def _extract_fact(model, user_text, answer, asked=False):
     if not _guest():
         if ready():
-            _extract_fact_sqlite(model, user_text, answer)
+            _extract_fact_sqlite(model, user_text, answer, asked)
         return
 
     # A guest's facts (senses/people.py): the simpler new-fact-or-nothing ask.
@@ -563,7 +600,7 @@ def _extract_fact(model, user_text, answer):
         add_fact(result)
 
 
-def extract_in_background(model, user_text, answer):
+def extract_in_background(model, user_text, answer, asked=False):
     if not config.LONG_TERM_MEMORY_ENABLED:
         return
     from core import turnctx
@@ -584,7 +621,7 @@ def extract_in_background(model, user_text, answer):
         # traceback over the screen, once per turn.
         try:
             with turnctx.begin(source="extract", private=True, speaker=speaker):
-                _extract_fact(model, user_text, answer)
+                _extract_fact(model, user_text, answer, asked)
         except Exception:
             logbook.exception("longterm", "fact extraction failed")
 

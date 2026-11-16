@@ -34,6 +34,8 @@ live view of it all while it happens. It started as a voice front end
 for LM Studio (this repo used to be called *LM-Studio-AI-Voice*) and
 grew from there.
 
+<img width="1210" alt="The ideal setup, one mind for the whole house: Luna on your PC in the middle, with your mic, speakers and screen, her memory, moods, people and tools. A model server with a big graphics card runs her models over the home network. Phones and tablets around the house are stations, paired over home Wi-Fi. Her tools reach home automation, security (doors, locks and what's on your network) and your NAS and servers. Start with one PC that can run her model; everything around it is optional." src="assets/luna-setup.png" />
+
 ```bash
 git clone https://github.com/fswolf/luna-local-agent.git ~/luna-ai
 ```

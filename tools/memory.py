@@ -32,7 +32,9 @@ def _remember_fact(fact):
     if longterm.add_fact(fact):
         return f"Saved: {fact}"
 
-    return "Not saved - too long, too short, or already known."
+    why = longterm.why_not(fact)
+
+    return f"Not saved: {why}." if why else "Not saved: you already know that (it's in your memory)."
 
 # `about` arrived with the fact table. Without it this tool was a
 # SELECT * - fine at thirty facts, a context bomb at three thousand.

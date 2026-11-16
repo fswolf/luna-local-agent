@@ -10,6 +10,14 @@ hand.
 > "Forget the bakery thing."            -> forget_fact
 ```
 
+When you ask outright ("remember this", "remember that I...", "don't
+forget", "keep in mind", "make a note") and she answers without calling
+`remember_fact`, a background pass reads the turn and keeps what you
+asked for, unless she knows it already. A question like "do you remember
+my birthday?" doesn't count. If `remember_fact` turns a fact away, she's
+told why (already known, too long, reads like part of her reply), so she
+can tell you.
+
 `forget_fact` and `update_fact` take a loose description rather than an
 index: "that thing about the bakery" is enough. When two facts are too
 close to call it lists them and asks which, instead of guessing and
