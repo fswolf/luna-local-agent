@@ -54,7 +54,7 @@ EXTRAS = {
     "toys": (["websocket-client"], "the Buttplug plugin: toys of most brands through Intiface Central"),
     "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
     "voices": (["speechbrain"], "tell people in the house apart by voice (/people enroll voice)"),
-    "stations": (["cryptography", "segno"], "talk to her from another room on an old phone or tablet (relay stations)"),
+    "stations": (["cryptography", "segno", "pillow"], "talk to her from another room on an old phone or tablet (relay stations)"),
     "satellites": (["aioesphomeapi"], "EXPERIMENTAL: ESPHome voice satellites (Satellite1, Voice PE) as relay stations"),
     "gameboy": (["mcp", "pyboy"], "she plays Game Boy games you have (Pokemon Red and Blue read as text)"),
 }

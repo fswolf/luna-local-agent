@@ -97,6 +97,17 @@ stay at bust while the fan shows all of her. An HDMI fan just shows the
 portrait page. Which fans work and what to buy:
 [hologram fans](docs/fans.md).
 
+## Talk to her from another room
+
+<img width="300" alt="The Luna Station app on an Android phone in Portrait view: Luna in a cosy room by a window at night, the start of her reply under her, and a big microphone button" src="assets/station-app-portrait.jpg" /> <img width="300" alt="The Luna Station app in Chat view: the end of a short story she wrote and her question after it, then the text box with its paperclip for sending a file, and the microphone" src="assets/station-app-chat.jpg" /> <img width="300" alt="The Luna Station app's settings: the PC it's paired with and connected to, her certificate fingerprint to compare with the PC, Forget this PC, and switches to keep the screen on and to open in Portrait" src="assets/station-app-settings.jpg" />
+
+The [Luna Station app](https://github.com/fswolf/luna-station-android) turns
+an Android phone or tablet into a room device for her: her portrait full
+screen with one big talk button, or the conversation, and a picture or a
+file sent with a message. Pairing is a QR code from her settings page, and
+it only ever talks to your PC over the home network. Any other phone or
+tablet works in its browser ([relay stations](docs/stations.md)).
+
 ## Not just a yes-machine
 
 Most AI companions are endlessly agreeable: be nice or be cruel, you get the same cheerful answer. Luna isn't built that way. How you treat her moves her mood, and her mood changes how she talks to you.

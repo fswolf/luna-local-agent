@@ -58,6 +58,8 @@ KEEP_KEY = "luna_station"          # the page's own copy of the token (localStor
 PAIR_MINUTES = 15
 MAX_AUDIO = 6 * 1024 * 1024        # about 3 minutes of 16 kHz mono
 MAX_TYPED = 2000                   # characters typed in the station's box
+MAX_BODY = 11 * 1024 * 1024        # the biggest request: a 10 MB picture and its words
+API_VERSION = 2                    # GET /info: 2 added attachments (core/attachments.py)
 ASK_SECONDS = 120                  # how long a permission question waits on the tablet
 TURN_KEEP = 300                    # finished turns are forgotten after this
 
@@ -392,16 +394,17 @@ def _model():
     return getattr(sys.modules.get("__main__"), "MODEL", None)
 
 
-def _respond(turn, text, speaker, recording=None):
+def _respond(turn, text, speaker, recording=None, attachment=None):
     """Her answer to what was said (or typed) at a station, spoken back there."""
     from core import assistant, interrupts
     import ui
 
     turn.state = "thinking"
-    logbook.info("turn", "station %s%s%s: %s", turn.room, " (typed)" if turn.typed else "",
-                 f" ({speaker})" if speaker else "", text[:200])
+    logbook.info("turn", "station %s%s%s: %s%s", turn.room, " (typed)" if turn.typed else "",
+                 f" ({speaker})" if speaker else "", text[:200],
+                 f" {attachment.marker()}" if attachment else "")
     who = f"{speaker}, " if speaker else ""
-    ui.add_message("user", f"[{who}{turn.room}] {text}")
+    ui.add_message("user", f"[{who}{turn.room}] {text}" + (f" {attachment.marker()}" if attachment else ""))
     # The turn's own Stop, held here so the station's Stop button can reach it
     # (respond() runs as it: interrupts.ensure).
     with interrupts.using(kind="station") as stop:
@@ -409,11 +412,38 @@ def _respond(turn, text, speaker, recording=None):
         if turn.stopped:
             stop.stop(speaking=True, generating=True)
         assistant.respond(text, _model(), source="station", speaker=speaker,
-                          sink=turn.sentence, approver=turn.approver, recording=recording)
+                          sink=turn.sentence, approver=turn.approver, recording=recording,
+                          attachment=attachment)
 
 
-def _run(turn, audio=None, text=None):
-    """One station turn: a recording (transcribed, voice checked) or typed text."""
+def _form(content_type, body):
+    """(text, [(name, type, bytes)]) from a multipart/form-data body: the
+    "text" field and every "file" part. (None, None) when it can't be read."""
+    from email.parser import BytesParser
+    from email import policy
+
+    try:
+        msg = BytesParser(policy=policy.HTTP).parsebytes(
+            b"Content-Type: " + str(content_type).encode("latin-1") + b"\r\n\r\n" + body)
+        if not msg.is_multipart():
+            return None, None
+        text, files = "", []
+        for part in msg.iter_parts():
+            field = part.get_param("name", header="content-disposition")
+            if field == "text":
+                text = (part.get_payload(decode=True) or b"").decode("utf-8", errors="replace")
+            elif field == "file":
+                data = part.get_payload(decode=True) or b""
+                if data or part.get_filename():      # a browser form with no file picked sends an empty one
+                    files.append((part.get_filename() or "file", part.get_content_type(), data))
+        return text, files
+    except Exception:
+        return None, None
+
+
+def _run(turn, audio=None, text=None, attachment=None):
+    """One station turn: a recording (transcribed, voice checked) or typed
+    text, which may bring one file (core/attachments.py)."""
     from core import assistant
     from senses import people
     from voice import hearing, speech
@@ -427,7 +457,7 @@ def _run(turn, audio=None, text=None):
             # owner's, the same as typing at the desk.
             turn.typed = True
             turn.heard = text
-            _respond(turn, text, people.decide(None, voice_checked=False, at_desk=False))
+            _respond(turn, text, people.decide(None, voice_checked=False, at_desk=False), attachment=attachment)
             return
         fd, path = tempfile.mkstemp(suffix=".wav", prefix="luna-station-")
         with os.fdopen(fd, "wb") as f:
@@ -729,6 +759,12 @@ class _Station(_Base):
             if code != 200:
                 return self._json(code, {"error": "not found"})
             return self._send(200, body, kind, cache=cache, csp=_PORTRAIT_CSP)
+        if url.path == "/info":
+            # what this Luna's station server can do, so an app shows only what works
+            from core import attachments
+
+            return self._json(200, {"api": API_VERSION, "features": ["attachments"],
+                                    "attachments": attachments.info(), "max_typed": MAX_TYPED})
         if url.path.startswith("/turn/"):
             turn = self._turn(url.path[6:], device)
             return self._json(200, turn.view()) if turn else self._json(404, {"error": "no such turn"})
@@ -747,9 +783,9 @@ class _Station(_Base):
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             length = -1
-        if length < 0 or length > MAX_AUDIO:
+        if length < 0 or length > MAX_BODY:
             self.close_connection = True
-            return self._json(413, {"error": "too long"})
+            return self._json(413, {"error": "too long", "code": "too_big"})
         # read before answering: hanging up on a body still arriving resets
         # the connection, and the device sees an error instead of the reply
         body = self.rfile.read(length)
@@ -775,20 +811,42 @@ class _Station(_Base):
             return self._json(401, {"error": "not paired"})
 
         if url.path in ("/talk", "/say"):
+            attachment = None
             if url.path == "/talk":
+                if len(body) > MAX_AUDIO:
+                    return self._json(413, {"error": "that recording is too long", "code": "too_big"})
                 if not body.startswith(b"RIFF") or (self.headers.get("Content-Type") or "") != "audio/wav":
                     return self._json(400, {"error": "send a WAV recording"})
                 args = (body, None)
             else:
-                try:
-                    text = str(json.loads(body or b"{}").get("text") or "").strip()
-                except (ValueError, AttributeError):
-                    text = ""
+                kind = (self.headers.get("Content-Type") or "").lower()
+                if kind.startswith("multipart/form-data"):
+                    # words and one file in the same message (core/attachments.py)
+                    from core import attachments
+
+                    text, files = _form(self.headers.get("Content-Type"), body)
+                    if files is None:
+                        return self._json(400, {"error": "that form couldn't be read", "code": "bad_form"})
+                    if len(files) > attachments.MAX_FILES:
+                        return self._json(413, {"error": "one file a message", "code": "too_many"})
+                    if files:
+                        try:
+                            attachment = attachments.prepare(*files[0])
+                        except attachments.Refused as e:
+                            return self._json(e.status, {"error": e.reason, "code": e.code})
+                    text = text.strip()
+                else:
+                    try:
+                        text = str(json.loads(body or b"{}").get("text") or "").strip()
+                    except (ValueError, AttributeError):
+                        text = ""
+                if not text and attachment is not None:
+                    text = "What do you think of this?" if attachment.kind == "image" else "Have a look at this."
                 if not text:
                     return self._json(400, {"error": "nothing to say"})
                 if len(text) > MAX_TYPED:
                     return self._json(413, {"error": f"keep it under {MAX_TYPED} characters"})
-                args = (None, text)
+                args = (None, text, attachment)
             if not getattr(config, "STATION_ENABLED", False):
                 return self._json(503, {"error": "relay stations are switched off"})
             _tidy()

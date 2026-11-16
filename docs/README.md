@@ -22,6 +22,7 @@ Everything the README only touches on, one subject per page.
 - [People in the house](people.md): who's talking, by voice or face, and their own memories
 - [Who she's talking to](who.md): how every turn is matched to a person, and what changes for a guest
 - [Relay stations](stations.md): talk to her from another room on a phone or tablet, with the [Android app](https://github.com/fswolf/luna-station-android) or in the browser
+- [Station API](station-api.md): for app developers, what a station app sends and gets back
 - [Reminders and alarms](reminders.md)
 - [Offers](offers.md): things she notices on her own (a full disk, a date coming up) and offers to help with
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in

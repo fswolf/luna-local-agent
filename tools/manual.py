@@ -152,6 +152,12 @@ def _title(text, path):
     return f"{m.group(1) if m else ''} {'' if name.lower() == 'readme' else name}".strip()
 
 
+# Pages written for people building on Luna, not using her: still found for
+# a question about them, but a "how do I set up a station" goes to the page
+# that tells you, not to the one listing its endpoints.
+_FOR_DEVELOPERS = {"station-api.md", "development.md"}
+
+
 def search(query, limit=3):
     """[(score, item)] best first. BM25 on the passage, plus the page title
     and the passage heading counted as a strong hint of what it's about."""
@@ -184,6 +190,8 @@ def search(query, limit=3):
                 s += idf * 1.5
 
         if s > 0:
+            if os.path.basename(i["path"]) in _FOR_DEVELOPERS:
+                s *= 0.6
             ranked.append((s, i))
 
     ranked.sort(key=lambda p: p[0], reverse=True)

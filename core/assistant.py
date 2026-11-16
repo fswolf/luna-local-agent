@@ -107,7 +107,8 @@ def _say_away(said):
     ui.set_status("Idle")
 
 
-def respond(text, model, source="typed", speaker=None, sink=None, approver=None, recording=None):
+def respond(text, model, source="typed", speaker=None, sink=None, approver=None, recording=None,
+            attachment=None):
     """Send a turn to the model and speak the reply as it arrives.
 
     Nothing here waits for the whole answer. Text appears on screen as
@@ -131,6 +132,9 @@ def respond(text, model, source="typed", speaker=None, sink=None, approver=None,
 
     recording: what was said, as WAV bytes (hearing.clip), sent with the
     words when stt.send_audio is on and her model can hear; None otherwise.
+
+    attachment: one file sent with the message (core/attachments.py), for
+    this turn only.
 
     source: "typed", "voice" or "station". Runs as the caller's Stop (interrupts)
     if it opened one - ptt does, at the key press - else its own, opened
@@ -158,7 +162,7 @@ def respond(text, model, source="typed", speaker=None, sink=None, approver=None,
                         _say_away(said)
                     return said
 
-                return _respond(text, model, source, stop, speaker, sink, approver, recording)
+                return _respond(text, model, source, stop, speaker, sink, approver, recording, attachment)
             finally:
                 _hold(None)
 
@@ -374,7 +378,8 @@ def respond_remote(text, model, source, who, tools_allowed=None,
             ui.set_status("Idle")
 
 
-def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, recording=None):
+def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, recording=None,
+             attachment=None):
     # a relay station speaks the reply itself: no Player on the PC's speakers
     player = speech.Player() if sink is None else None
     say = sink or player.say
@@ -392,7 +397,8 @@ def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, 
         # Your own turn, typed or spoken: ask() leaves source None for
         # those (it's what turns on the second-look checks), so how it
         # reached her is set on the turn itself.
-        with turnctx.begin(source=source, speaker=speaker, approver=approver, recording=recording):
+        with turnctx.begin(source=source, speaker=speaker, approver=approver, recording=recording,
+                           attachment=attachment):
             # a stranger or a session guest gets the short list (people.tools_for)
             answer = ask(
                 text, model, on_text=ui.extend_message, on_sentence=on_sentence,

@@ -173,7 +173,7 @@ class Stations(unittest.TestCase):
         _code, cookie = self._pair()
         import numpy as np
 
-        def respond(text, model, source, speaker, sink, approver, recording=None):
+        def respond(text, model, source, speaker, sink, approver, recording=None, attachment=None):
             self.assertEqual((text, source), ("what's the weather", "station"))
             sink("It's sunny.")
             self.assertTrue(approver("write", "write notes.txt", ["hello"], False))
@@ -230,7 +230,7 @@ class Stations(unittest.TestCase):
         _c, hall = self._pair("hall")
         release = __import__("threading").Event()
 
-        def respond(text, model, source, speaker, sink, approver, recording=None):
+        def respond(text, model, source, speaker, sink, approver, recording=None, attachment=None):
             release.wait(5)
 
         with mock.patch("voice.speech.transcribe", return_value="hi"), \
@@ -256,7 +256,7 @@ class Stations(unittest.TestCase):
 
         seen = {}
 
-        def respond(text, model, source, speaker, sink, approver, recording=None):
+        def respond(text, model, source, speaker, sink, approver, recording=None, attachment=None):
             seen.update(text=text, source=source, speaker=speaker)
             sink("Sunny all day.")
 
@@ -270,6 +270,74 @@ class Stations(unittest.TestCase):
         self.assertEqual(seen, {"text": "what's the weather?", "source": "station", "speaker": None})
         self.assertEqual((view["heard"], view["typed"], view["reply"], view["clips"]),
                          ("what's the weather?", True, "Sunny all day.", 1))
+
+    def _form(self, text, name, kind, data):
+        from urllib3 import encode_multipart_formdata
+        fields = [("text", text)] + ([("file", (name, data, kind))] if data is not None else [])
+        return encode_multipart_formdata(fields)
+
+    def test_a_picture_with_the_words(self):
+        _code, cookie = self._pair()
+        import io
+        import numpy as np
+        from PIL import Image
+
+        im = Image.new("RGB", (2400, 1200), (40, 90, 200))
+        exif = Image.Exif()
+        exif[0x010F] = "PhoneCam"
+        raw = io.BytesIO()
+        im.save(raw, "JPEG", exif=exif)
+        seen = {}
+
+        def respond(text, model, source, speaker, sink, approver, recording=None, attachment=None):
+            seen.update(text=text, attachment=attachment)
+            sink("A blue rectangle.")
+
+        body, kind = self._form("what's this?", "IMG_1.jpg", "image/jpeg", raw.getvalue())
+        with mock.patch("core.attachments.sees_images", return_value=True), \
+             mock.patch("voice.speech._synthesize", return_value=(np.zeros(2400, dtype=np.float32), 24000)), \
+             mock.patch("core.assistant.respond", respond), mock.patch("ui.add_message"):
+            r = self._open("/say", data=body, cookie=cookie, kind=kind)
+            self.assertEqual(r[0], 200, r[2])
+            view = self._wait_done(json.loads(r[2])["turn"], cookie)
+        att = seen["attachment"]
+        self.assertEqual((seen["text"], att.kind, att.name, view["reply"]), ("what's this?", "image", "IMG_1.jpg", "A blue rectangle."))
+        import base64
+        sent = Image.open(io.BytesIO(base64.b64decode(att.data_url.split(",", 1)[1])))
+        self.assertLessEqual(max(sent.size), 1568)
+        self.assertEqual(dict(sent.getexif()), {})                                   # the phone's EXIF is gone
+
+    def test_attachment_checks(self):
+        _code, cookie = self._pair()
+        def send(*a):
+            body, kind = self._form(*a)
+            return self._open("/say", data=body, cookie=cookie, kind=kind)
+        with mock.patch("core.attachments.sees_images", return_value=False):
+            status, _, body = send("look", "a.jpg", "image/jpeg", b"\xff\xd8\xff" + b"0" * 100)
+        self.assertEqual((status, json.loads(body)["code"]), (422, "no_vision"))
+        status, _, body = send("run this", "a.exe", "application/octet-stream", b"MZ\x00\x00")
+        self.assertEqual((status, json.loads(body)["code"]), (415, "unsupported"))
+        from urllib3 import encode_multipart_formdata
+        two, kind = encode_multipart_formdata([("text", "hi"), ("file", ("a.txt", b"a", "text/plain")),
+                                               ("file", ("b.txt", b"b", "text/plain"))])
+        status, _, body = self._open("/say", data=two, cookie=cookie, kind=kind)
+        self.assertEqual((status, json.loads(body)["code"]), (413, "too_many"))
+        status, _, body = self._open("/say", data=b"--nope", cookie=cookie, kind="multipart/form-data; boundary=x")
+        self.assertEqual(status, 400)
+        from web import station as st
+        text, files = st._form(*reversed(encode_multipart_formdata(
+            [("text", "hi"), ("file", ("", b"", "application/octet-stream"))])))   # a browser form, nothing picked
+        self.assertEqual((text, files), ("hi", []))
+
+    def test_info(self):
+        _code, cookie = self._pair()
+        self.assertEqual(self._open("/info")[0], 401)
+        with mock.patch("core.attachments.sees_images", return_value=None):
+            status, _, body = self._open("/info", cookie=cookie)
+        info = json.loads(body)
+        self.assertEqual((status, info["api"], info["attachments"]["max_files"]), (200, 2, 1))
+        self.assertIn("attachments", info["features"])
+        self.assertIn("image/jpeg", info["attachments"]["images"]["types"])
 
     def test_typed_checks(self):
         _code, cookie = self._pair()
@@ -287,7 +355,7 @@ class Stations(unittest.TestCase):
 
         stopped = threading.Event()
 
-        def respond(text, model, source, speaker, sink, approver, recording=None):
+        def respond(text, model, source, speaker, sink, approver, recording=None, attachment=None):
             stop = interrupts.current()        # the station turn's own Stop
             sink("First.")
             for _ in range(200):               # "generating" until told to stop

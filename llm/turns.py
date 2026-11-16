@@ -262,11 +262,26 @@ def _ask(text, model, on_text=None, on_sentence=None,
     # Taken off the turn as it's used: a second ask inside the same turn
     # (some other question entirely) mustn't get this recording too.
     recording, turn.recording = turn.recording, None
+    # A file sent with the message (core/attachments.py): this request only.
+    # It's outside content, so the turn counts as having read some (what
+    # her tools ask before acting on), and the history keeps just a line.
+    attached, turn.attachment = turn.attachment, None
+    if attached is not None:
+        from core import attachments
+
+        turn.seen = turn.seen or f"a file you sent ({attached.name})"
+        body = attachments.content(user_content, attached)
+    else:
+        body = hearing.content(user_content, recording)
     # The turn's note goes in front of the words (and of the line saying a
     # recording is attached). Only on this message, and only in the request:
     # history.add_message below stores what was said, so the note never
     # piles up turn after turn.
-    messages.append(_timestamped("user", with_live(live, hearing.content(user_content, recording)), now))
+    messages.append(_timestamped("user", with_live(live, body), now))
+    # The same message as /good would keep it: the words and that a file was
+    # sent, never the file or a document's text (core/attachments.py).
+    kept_user = (_timestamped("user", with_live(live, f"{user_content}\n{attached.marker()}"), now)
+                 if attached is not None else None)
 
     # Use whatever is loaded now rather than what was loaded at startup.
     # Unloading a model to free VRAM and loading another is a normal
@@ -453,7 +468,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
         try:
             from training import dataset
 
-            dataset.note_turn(base_messages[0]["content"], replayed, hearing.words_only(base_messages[-1]), answer,
+            dataset.note_turn(base_messages[0]["content"], replayed, kept_user or hearing.words_only(base_messages[-1]), answer,
                               model=payload.get("model", ""),
                               used_tools=bool(_last_raw.get("exchanges")) or bool(turn.exchanges))
         except Exception:
@@ -532,6 +547,8 @@ def _ask(text, model, on_text=None, on_sentence=None,
 
     guest = people.guest()
     said = f"[{guest}] {text}" if guest else text
+    if attached is not None:
+        said = f"{said}\n{attached.marker()}"      # that it was sent, never the file
     history.add_message("user", said)
     history.add_message("assistant", answer, tools=_last_raw.get("exchanges"))
 

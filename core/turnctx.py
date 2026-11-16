@@ -46,6 +46,7 @@ class Turn:
     exchanges: list = field(default_factory=list)  # {name, arguments, result} per tool call, in order
     speaker: Optional[str] = None      # someone other than the owner talking (senses/people.py); None: the owner
     recording: Optional[bytes] = None  # what was said, as WAV, for a model that can hear (voice/hearing.py)
+    attachment: Any = None             # one file sent with the message (core/attachments.py)
 
 
 _current = contextvars.ContextVar("luna_turn", default=None)

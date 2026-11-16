@@ -11,7 +11,7 @@ the sturdy way to do it: a room device with her portrait full screen and a
 big talk button, or the conversation. Any other phone or tablet, an iPhone or
 iPad included, works [in its browser](#in-the-browser-instead).
 
-<img width="280" alt="The Luna Station app on an Android phone in Portrait view: Luna in a cosy room at night, the start of her reply under her, and a big microphone button" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-portrait.jpg" /> <img width="280" alt="The Luna Station app on an Android phone in Chat view: a question about dinosaurs, her answer, a Speaking status line, the text box and the Stop button" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-chat.jpg" />
+<img width="240" alt="The Luna Station app on an Android phone in Portrait view: Luna in a cosy room by a window at night, the start of her reply under her, and a big microphone button" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-portrait.jpg" /> <img width="240" alt="The Luna Station app in Chat view: the end of a short story she wrote and her question after it, then the text box with its paperclip for sending a file, and the microphone" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-chat.jpg" /> <img width="240" alt="The Luna Station app's settings: the PC it's paired with and connected to, her certificate fingerprint to compare with the PC, Forget this PC, and switches to keep the screen on and to open in Portrait" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/station-app-settings.jpg" />
 
 ## Turn stations on
 
@@ -49,6 +49,12 @@ network.
 - **Android 11 or newer,** Amazon Fire tablets on Fire OS 8 included, no
   Google services needed. Installed from an APK (the repo's Releases, or
   built yourself).
+- **Send a picture or a file** with the paperclip in the text box: one
+  picture, text file or PDF with a message ([details](#sending-a-picture-or-a-file)).
+- **Settings,** from the moon at the top left: the PC it's connected to, her
+  certificate fingerprint to compare with the PC's, **Forget this PC**, and
+  switches to keep the screen on (for a station on a stand) and to open in
+  Portrait.
 - The pairing token is kept encrypted on the device; the conversation isn't
   stored there.
 
@@ -107,6 +113,27 @@ and **Deny**. Unanswered for two minutes means no.
 
 While a voice enrolment is running at the PC (`/people enroll voice`), the
 stations wait: read the enrolment lines at the PC.
+
+### Sending a picture or a file
+
+A typed message can bring one file with it: in the app, the paperclip in
+the text box.
+
+- **Pictures** (JPEG, PNG, WebP, up to 10 MB): she looks at it with that
+  message. It needs a model that can see; with one that can't, the app says
+  so before sending, and you can send the words alone.
+- **Text, Markdown and PDF** (up to 2 MB): she reads the text, the first
+  20,000 characters of it. She treats it as something to read, never as
+  instructions, the same as a web page.
+
+Files stay on the PC and only for that one turn. Nothing is saved: the
+history keeps a line like `[sent a picture: cat.jpg]`, not the file, so
+after that turn she remembers what she said about it, not the file itself.
+Pictures are made smaller and saved again before she sees them, which also
+removes a phone photo's hidden details, such as where it was taken (needs
+Pillow, part of the stations extra).
+
+For app developers, the endpoints are in [Station API](station-api.md).
 
 ## Her portrait
 
