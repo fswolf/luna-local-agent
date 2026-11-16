@@ -16,6 +16,16 @@ from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
 
 from core import attachments, turnctx  # noqa: E402
 
+try:
+    import PIL  # noqa: F401
+    PILLOW = True
+except ImportError:          # the CI has no extras: the picture tests that need it skip
+    PILLOW = False
+needs_pillow = unittest.skipUnless(PILLOW, "needs Pillow (the stations extra)")
+
+# A real JPEG header and nothing else: enough for the byte check, needs no Pillow.
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+
 
 def _jpeg(size=(800, 600)):
     from PIL import Image
@@ -26,12 +36,14 @@ def _jpeg(size=(800, 600)):
 
 
 class Taking(unittest.TestCase):
+    @needs_pillow
     def test_a_picture_by_its_bytes_not_its_name(self):
         with mock.patch.object(attachments, "sees_images", return_value=True):
             a = attachments.prepare("holiday.txt", "text/plain", _jpeg())   # named wrong, still a JPEG
         self.assertEqual((a.kind, a.mime), ("image", "image/jpeg"))
         self.assertTrue(a.data_url.startswith("data:image/jpeg;base64,"))
 
+    @needs_pillow
     def test_big_pictures_are_made_smaller(self):
         from PIL import Image
         with mock.patch.object(attachments, "sees_images", return_value=True):
@@ -39,6 +51,7 @@ class Taking(unittest.TestCase):
         im = Image.open(io.BytesIO(base64.b64decode(a.data_url.split(",", 1)[1])))
         self.assertEqual(max(im.size), attachments.IMAGE_SIDE)
 
+    @needs_pillow
     def test_png_with_see_through_parts(self):
         from PIL import Image
         raw = io.BytesIO()
@@ -62,7 +75,7 @@ class TurningAway(unittest.TestCase):
 
     def test_reasons(self):
         with mock.patch.object(attachments, "sees_images", return_value=False):
-            self.assertEqual(self.refused("cat.jpg", "image/jpeg", _jpeg()), (422, "no_vision"))
+            self.assertEqual(self.refused("cat.jpg", "image/jpeg", JPEG_BYTES), (422, "no_vision"))
         self.assertEqual(self.refused("x.exe", "application/octet-stream", b"MZ\x90\x00"), (415, "unsupported"))
         self.assertEqual(self.refused("fake.pdf", "application/pdf", b"hello"), (415, "not_a_pdf"))
         self.assertEqual(self.refused("fake.png", "image/png", b"hello"), (415, "not_an_image"))
@@ -71,6 +84,7 @@ class TurningAway(unittest.TestCase):
         self.assertEqual(self.refused("bin.txt", "text/plain", b"ab\x00cd"), (415, "binary"))
         self.assertEqual(self.refused("big.txt", "text/plain", b"x" * (attachments.DOC_MAX + 1)), (413, "too_big"))
 
+    @needs_pillow
     def test_too_many_pixels_is_refused_before_decoding(self):
         from PIL import Image
         raw = io.BytesIO()
@@ -78,6 +92,20 @@ class TurningAway(unittest.TestCase):
         with mock.patch.object(attachments, "sees_images", return_value=True):
             self.assertEqual(self.refused("huge.png", "image/png", raw.getvalue()), (413, "too_big"))
 
+    def test_without_pillow_a_picture_goes_as_it_came(self):
+        real_import = __import__
+
+        def no_pil(name, *a, **k):
+            if name == "PIL" or name.startswith("PIL."):
+                raise ImportError(name)
+            return real_import(name, *a, **k)
+
+        with mock.patch.object(attachments, "sees_images", return_value=True), \
+                mock.patch("builtins.__import__", no_pil):
+            a = attachments.prepare("a.jpg", "image/jpeg", JPEG_BYTES)
+        self.assertEqual(a.data_url, "data:image/jpeg;base64," + base64.b64encode(JPEG_BYTES).decode())
+
+    @needs_pillow
     def test_unknown_vision_is_tried(self):
         # LM Studio doesn't say: send it, and the server's refusal is explained (llm/turns.py)
         with mock.patch.object(attachments, "sees_images", return_value=None):
@@ -85,6 +113,7 @@ class TurningAway(unittest.TestCase):
 
 
 class ReachingHer(unittest.TestCase):
+    @needs_pillow
     def test_a_picture_is_a_second_part(self):
         with mock.patch.object(attachments, "sees_images", return_value=True):
             a = attachments.prepare("cat.jpg", "image/jpeg", _jpeg())
