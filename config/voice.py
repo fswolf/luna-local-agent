@@ -47,6 +47,14 @@ TTS_PITCH = float(_tts_env("PITCH", _tts_cfg.get("pitch", 0.0)))
 # macOS, where it's afplay (PortAudio loses Bluetooth headphones there);
 # "afplay" or "portaudio" forces one.
 TTS_PLAYER = str(_tts_cfg.get("player", "auto")).lower()
+# Her voice on or off. Off: replies on screen only, and the speech server
+# can stay running. Alarms still ring.
+TTS_ENABLED = bool(_tts_cfg.get("enabled", True))
+# How much sound PortAudio holds ready ahead of the speakers. "high" is a
+# tenth of a second or so: enough that her voice stays clean while the reply
+# is still streaming to the screen and the process is busy (with "low" the
+# first seconds crackled). "low" only if high ever lags; a number is seconds.
+TTS_LATENCY = str(_tts_cfg.get("latency", "high")).lower()
 # Drop the ~ of "Mrrp~" before speaking. Kokoro reads it out as "tilde";
 # some other voices stretch the word instead, which is what she means -
 # switch this off for one of those. Emoji are always left unspoken.

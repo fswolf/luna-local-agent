@@ -115,3 +115,31 @@ class NotInHerHistory(unittest.TestCase):
             self.assertEqual(out[-1]["content"], "It has 20 GB.")
             mine = replay._replay({"role": "user", "content": f"you said {line}"})
             self.assertIn(line, mine[-1]["content"])          # only her side
+
+
+class CheckingAfterTheReply(unittest.TestCase):
+    """A check that runs after she has answered (the grounding check, the
+    second look's 'go and look') asks only for what changed: the reply is
+    already on screen and heard, and she used to retell all of it."""
+
+    def test_grounding_check_asks_only_for_the_change(self):
+        from mind import grounding
+
+        loose = [("number", "8%")]
+        with mock.patch.object(grounding, "check", return_value=(loose, True)), \
+                mock.patch.object(grounding, "mode", return_value="check"), \
+                mock.patch.object(second_look, "_last_raw", {"exchanges": []}), \
+                mock.patch.object(second_look, "_calibration_note", {"text": ""}), \
+                mock.patch.object(second_look, "_log_tool_call"), \
+                mock.patch.object(second_look.livefeed, "emit"), \
+                mock.patch.object(second_look, "_follow_through", return_value="done") as follow:
+            second_look._ground("GPU at 8%.", "GPU at 8%.", None, {"tools": [{}], "messages": []},
+                                [], "m", None, None)
+        self.assertIn(second_look._ONLY_WHAT_CHANGED, follow.call_args[0][-1])
+
+    def test_second_look_asks_only_for_the_change(self):
+        import inspect
+
+        from llm import turns
+        self.assertIn("_ONLY_WHAT_CHANGED", inspect.getsource(turns))
+        self.assertIn("don't repeat it", second_look._ONLY_WHAT_CHANGED)

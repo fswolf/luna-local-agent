@@ -70,11 +70,14 @@ SCHEMA = {
     "tts.elevenlabs.model": ("text", "The ElevenLabs model: eleven_flash_v2_5 is the quick one, eleven_multilingual_v2 the richer one"),
     "tts.elevenlabs.stability": ("float", "ElevenLabs stability, 0 to 1: higher is steadier, lower more varied. Empty uses the voice's own"),
     "tts.elevenlabs.similarity_boost": ("float", "ElevenLabs similarity, 0 to 1: how closely it keeps to the original voice. Empty uses the voice's own"),
+    "tts.enabled": ("bool", "Speak her replies out loud. Off keeps her quiet: replies on screen only, the speech server keeps running, alarms still ring"),
     "tts.speed": ("float", "How fast she talks: 1.0 is normal, higher is faster"),
     "tts.volume": ("float", "How loud her voice is: 1.0 is normal"),
     "tts.pitch": ("float", "Voice pitch shift in semitones: positive sounds higher and younger, negative lower and older"),
     "tts.player": ("choice", "How her voice reaches the speakers: auto picks afplay on macOS and PortAudio elsewhere",
                    ("auto", "afplay", "portaudio")),
+    "tts.latency": ("text", "How much sound is held ready ahead of the speakers: high keeps her voice clean while the "
+                            "reply is still streaming, low if high ever lags, or a number of seconds"),
     "tts.strip_tilde": ("bool", "Drop the ~ in words like \"Mrrp~\" before speaking, so it isn't read out as \"tilde\""),
 
     # --- Listening ----------------------------------------------------------
@@ -580,7 +583,7 @@ SCHEMA = {
 # The everyday settings: what the terminal's settings pane shows first
 # (`a` there shows all of them), and what the web settings page opens on.
 BASIC = (
-    "voice", "tts.speed", "tts.volume",
+    "voice", "tts.enabled", "tts.speed", "tts.volume",
     "stt.mode", "stt.sensitivity", "stt.silence_seconds", "stt.language", "wake_word.enabled",
     "mood.enabled", "mood.intensity", "mood.walk_away",
     "portrait.model", "portrait.frame", "portrait.background", "portrait.gestures",

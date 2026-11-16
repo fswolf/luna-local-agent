@@ -84,18 +84,21 @@ _VOICE_TELLS = ("mrrp", "nya~", "purring", "\U0001F63E".lower())
 
 # You asking her outright to keep something: "remember this", "remember that
 # I...", "don't forget", "keep in mind", "make a note".
-_ASKED = re.compile(r"\b(remember (this|that|my|i|i'm|im|me|we|our|it)\b|don'?t forget\b|"
+# "remember", typed fast: remeber, rember, remmber, rememeber.
+_REMEMBER = r"re?m[ea]?m?[ea]?m?b[ae]?r"
+_ASKED = re.compile(r"\b(" + _REMEMBER + r" (this|that|my|i|i'm|im|me|we|our|it)\b|"
+                    r"(don'?t|dont|do not) forget\b|"
                     r"keep (this |that |it )?in mind\b|make a note\b|note (this|that) down\b)", re.I)
 
 
-_ASKED_QUESTION = re.compile(r"\b(do|did|can|could|would|will|don'?t) you (still )?remember\b", re.I)
+_ASKED_QUESTION = re.compile(r"\b(do|did|can|could|would|will|don'?t) you (still )?" + _REMEMBER + r"\b", re.I)
 
 
 def asked_to_remember(text):
     """Did you ask her to keep something? (Then a turn where she didn't
     call remember_fact still gets the extraction pass.)"""
     text = str(text or "")
-    if _ASKED_QUESTION.search(text) and not re.search(r"\bremember (this|that)\s*[:,-]", text, re.I):
+    if _ASKED_QUESTION.search(text) and not re.search(r"\b" + _REMEMBER + r" (this|that)\s*[:,-]", text, re.I):
         return False            # "do you remember my birthday?" asks, it doesn't tell
     return bool(_ASKED.search(text))
 

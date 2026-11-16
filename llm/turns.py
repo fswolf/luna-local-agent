@@ -26,7 +26,7 @@ from . import session
 from .prompts import _calibration_note, _previous_user_text, build_generation_params, build_memory_prompt, build_self_prompt, build_tools_prompt, turn_prompt, with_live
 from .replay import _demonstration, _has_tool_example, _replay, _strip_leading_timestamps, _timestamped
 from .rounds import _generate, _log_tool_call, _tool_rounds, _why_empty
-from .second_look import _adaptive_on, _calibrate, _follow_through, _ground, _promised_action, _rethink, _vote
+from .second_look import _adaptive_on, _calibrate, _ONLY_WHAT_CHANGED, _follow_through, _ground, _promised_action, _rethink, _vote
 from .streaming import _last_raw
 
 _window_cache = {"at": 0.0, "n": 0}
@@ -432,8 +432,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
             payload, base_messages, answer, model, on_text, on_sentence,
             "Hang on, let me check.",
             f"(Not from {config.USER} - your own second look: you can check this "
-            "yourself with your tools instead of asking. Do it now, then "
-            "give the corrected answer.)")
+            "yourself with your tools instead of asking. Do it now. " + _ONLY_WHAT_CHANGED + ")")
 
     first_answer = answer
 

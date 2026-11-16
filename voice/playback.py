@@ -119,6 +119,22 @@ def _device_rate():
         return 0
 
 
+def _latency():
+    """config.TTS_LATENCY for PortAudio: "high", "low" or seconds. With
+    "low" the speakers ran dry while the reply was still streaming (the
+    playback callback waits on the same Python as the screen) and the
+    first seconds of her voice crackled."""
+    value = str(getattr(config, "TTS_LATENCY", "high") or "high").strip().lower()
+
+    if value in ("high", "low"):
+        return value
+
+    try:
+        return min(max(float(value), 0.01), 1.0)
+    except ValueError:
+        return "high"
+
+
 def _start_playback(samples, rate):
     """sd.play, made to survive macOS and Bluetooth.
 
@@ -140,7 +156,7 @@ def _start_playback(samples, rate):
         samples, rate = _resample(samples, rate, _device_rate())
 
     try:
-        sd.play(samples, rate)
+        sd.play(samples, rate, latency=_latency())
         return True
     except sd.PortAudioError as e:
         first = e
@@ -155,7 +171,7 @@ def _start_playback(samples, rate):
             sd.stop()
             time.sleep(wait)
             _reset_portaudio()
-            sd.play(samples, rate)
+            sd.play(samples, rate, latency=_latency())
             logbook.info("speech", "speakers opened after a retry (%s)", first)
             return True
         except sd.PortAudioError:
@@ -167,7 +183,7 @@ def _start_playback(samples, rate):
             n = max(1, int(len(samples) * device_rate / rate))
             resampled = np.interp(np.linspace(0, len(samples) - 1, n),
                                   np.arange(len(samples)), samples).astype(np.float32)
-            sd.play(resampled, device_rate)
+            sd.play(resampled, device_rate, latency=_latency())
             logbook.info("speech", "played at the device's %d Hz after: %s", device_rate, first)
             _native_rate[0] = True      # from now on, go straight to the device's rate
             return True

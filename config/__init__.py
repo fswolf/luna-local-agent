@@ -119,9 +119,11 @@ SETTINGS = {
     "stt.model":                  ("STT_MODEL",                    False),
     "stt.language":               ("STT_LANGUAGE",                 False),
 
+    "tts.enabled":                ("TTS_ENABLED",                  True),
     "tts.speed":                  ("TTS_SPEED",                    True),
     "tts.volume":                 ("TTS_VOLUME",                   True),
     "tts.player":                 ("TTS_PLAYER",                   True),
+    "tts.latency":                ("TTS_LATENCY",                  True),
     "tts.pitch":                  ("TTS_PITCH",                    True),
     "tts.strip_tilde":            ("TTS_STRIP_TILDE",              True),
     # Live now, where it used to need a restart: voice/speech.py reads

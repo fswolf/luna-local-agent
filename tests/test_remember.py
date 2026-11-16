@@ -20,12 +20,15 @@ class Asked(unittest.TestCase):
     def test_telling_her(self):
         for said in ("Remember this: your mind runs on UnraidTower's RX 7900 XT",
                      "remember that I have an RTX 7800", "don't forget I work nights",
-                     "keep this in mind", "make a note: the router password changed"):
+                     "keep this in mind", "make a note: the router password changed",
+                     "iv told you this many times Remeber this your brain runs on a server",
+                     "rember that I moved", "remmber this", "dont forget my birthday"):
             self.assertTrue(longterm.asked_to_remember(said), said)
 
     def test_not_telling_her(self):
         for said in ("I remember when we met", "do you remember my birthday?",
-                     "did you remember to remind me?", "I keep forgetting things", ""):
+                     "did you remember to remind me?", "do you remeber my dog?", "I keep forgetting things",
+                     "the rubber duck", "a reminder for later", ""):
             self.assertFalse(longterm.asked_to_remember(said), said)
 
 

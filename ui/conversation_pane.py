@@ -14,6 +14,14 @@ from .text import _width, _wrap_text
 # ---------------------------------------------------------------------------
 # Panel contents
 # ---------------------------------------------------------------------------
+def _voice_on():
+    """tts.enabled, read live: the TTS row says when she's been quieted, so
+    a silent reply isn't mistaken for a broken speech server."""
+    import config
+
+    return bool(getattr(config, "TTS_ENABLED", True))
+
+
 def _status_lines():
     voice_server = state["voice_server"]
     offline = "offline" in voice_server
@@ -43,7 +51,7 @@ def _status_lines():
             ("class:value", state["voice"]),
             ("class:dim", " - "),
             (server_style, voice_server),
-        ]),
+        ] + ([("class:dim", " \u00b7 "), ("class:warn", "voice off")] if not _voice_on() else [])),
         ("Model", [("class:value", state["model"])]),
     ]
 

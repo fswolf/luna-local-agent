@@ -19,6 +19,7 @@ import ui
 from concurrent.futures import ThreadPoolExecutor
 from faster_whisper import WhisperModel
 from collections import deque
+import config
 from config import TTS_URL, STT_MODEL, STT_LANGUAGE
 from voice.bargein import _watch_for_barge_in, barge_in_available
 from voice.listen import _load_vad
@@ -163,12 +164,19 @@ def transcribe(filename):
     return text
 
 
+def voice_on():
+    """tts.enabled: off keeps her quiet - replies on screen only, the speech
+    server left running. Read each time, so it switches mid-conversation.
+    Alarms aren't her voice and still ring; stations speak on their own."""
+    return bool(getattr(config, "TTS_ENABLED", True))
+
+
 def speak(text):
     """Speak a complete string. Used where the whole reply is already
     in hand - reminders, startup notices."""
     pieces = _split_chunks(text or "")
 
-    if not pieces:
+    if not pieces or not voice_on():
         return
 
     inbox = queue.Queue()
@@ -221,7 +229,8 @@ def speak_queue(inbox, stop=None):
                     if _speakable(piece):
                         pending.append(_pool.submit(_synthesize, piece))
 
-            if stop.speaking.is_set():
+            # Switched off mid-reply: stop at the end of this sentence.
+            if stop.speaking.is_set() or not voice_on():
                 return
 
             if not pending:
@@ -273,7 +282,7 @@ class Player:
         self._barge_in = barge_in
 
     def say(self, sentence):
-        if self._stop.speaking.is_set():
+        if self._stop.speaking.is_set() or not voice_on():
             return
 
         if self._thread is None:

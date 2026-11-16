@@ -96,6 +96,13 @@ def _promised_action(answer):
     return text[start:end].strip()[:120]
 
 
+# A check after she's already answered: her reply is on screen and has been
+# heard, so she only adds what the check changed. Without this she retold the
+# whole reply with one number swapped.
+_ONLY_WHAT_CHANGED = ("Your reply is already said and heard, so don't repeat it. "
+                      "Say only what changed, in a sentence or two, or that it checks out.")
+
+
 def _follow_through(payload, base_messages, answer, model, on_text, on_sentence,
                     prefix, nudge):
     """Run a proper tool turn after a reply that should have been one.
@@ -592,7 +599,7 @@ def _ground(answer, first_answer, second, payload, base_messages, model, on_text
             "Actually, let me double-check that.",
             f"(Not from {config.USER} - your own grounding check: you stated {shown} but nothing "
             "you were given says so. Check them with your tools now, or say plainly that "
-            "you're not sure. Don't repeat them as fact.)")
+            "you're not sure. Don't repeat them as fact. " + _ONLY_WHAT_CHANGED + ")")
 
         if not corrected:
             first_answer = answer

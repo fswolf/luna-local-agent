@@ -170,6 +170,15 @@ Barge-in is the exception to that rule, and it has its own section
 below. With a wake word loaded, open mode waits for her name instead of
 starting on any speech at all.
 
+## Keeping her quiet
+
+Switch off `tts.enabled` (the settings pane, Tab three times, or
+`/set tts.enabled false`) and her replies stay on screen only. The
+speech server keeps running, so switching it back on is instant.
+Switched off while she's talking, she stops at the end of the sentence,
+and the TTS line at the top says "voice off". Alarms still ring, and
+stations speak on their own.
+
 ---
 
 # Speech Detection
