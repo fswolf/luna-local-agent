@@ -687,17 +687,9 @@ def detect_vram():
         # Apple Silicon shares memory with everything else: about two thirds is hers
         return round(_gb(ram) * 0.65, 1), f"Apple Silicon, {_gb(ram)} GB shared"
     if SYSTEM == "Linux":
-        import glob
-
-        sizes = []
-        for f in glob.glob("/sys/class/drm/card*/device/mem_info_vram_total"):
-            try:
-                with open(f, encoding="utf-8") as fh:
-                    sizes.append(int(fh.read().strip()))
-            except (OSError, ValueError):
-                continue
-        if sizes:
-            return _gb(max(sizes)), "AMD"
+        found = linux_graphics()
+        if found[0]:
+            return found
     if WIN:
         try:
             import winreg
@@ -716,6 +708,78 @@ def detect_vram():
         except Exception:
             pass
     return 0, "no graphics memory found"
+
+
+# Integrated graphics (an AMD APU, Intel) has no memory of its own to speak of:
+# with Vulkan, llama.cpp runs her model out of system RAM the card shares. The
+# BIOS's own slice for it (mem_info_vram_total, often 512 MB to 2 GB) isn't what
+# it uses. Shared RAM is slow, so past a 9B Q4 she'd answer too slowly to talk
+# to: what an integrated card can offer is counted as at most this.
+SHARED_CAP_GB = 10
+DEDICATED_MIN_GB = 4      # an AMD card with less of its own memory is integrated
+
+
+def _read_int(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return 0
+
+
+def _ram_bytes(meminfo="/proc/meminfo"):
+    try:
+        with open(meminfo, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) * 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0
+
+
+def linux_graphics(drm="/sys/class/drm", meminfo="/proc/meminfo"):
+    """(GB, what) for Linux: the biggest AMD card's own memory, else what
+    integrated graphics (AMD or Intel) can borrow from RAM: half of it, no
+    more than the card's shared window (mem_info_gtt_total), counted as at
+    most SHARED_CAP_GB. (0, why) when there's no graphics at all."""
+    import glob
+
+    dedicated, shared_amd, shared_intel = 0, 0, False
+
+    for dev in glob.glob(os.path.join(drm, "card*", "device")):
+        if "-" in os.path.basename(os.path.dirname(dev)):
+            continue                            # card0-HDMI-A-1: a connector, not a card
+        try:
+            driver = os.path.basename(os.readlink(os.path.join(dev, "driver")))
+        except OSError:
+            driver = ""
+        vram = _read_int(os.path.join(dev, "mem_info_vram_total"))
+        if driver == "amdgpu" or vram:
+            if vram >= DEDICATED_MIN_GB << 30:
+                dedicated = max(dedicated, vram)
+            else:
+                shared_amd = max(shared_amd, _read_int(os.path.join(dev, "mem_info_gtt_total")) or 1)
+        elif driver in ("i915", "xe"):
+            shared_intel = True
+
+    if dedicated:
+        return _gb(dedicated), "AMD"
+
+    if not (shared_amd or shared_intel):
+        return 0, "no graphics memory found"
+
+    ram = _ram_bytes(meminfo)
+    if not ram:
+        return 0, "integrated graphics, but couldn't read the system's memory"
+
+    share = ram // 2
+    if shared_amd > 1:
+        share = min(share, shared_amd)          # the window the driver lets it borrow
+    who = "AMD" if shared_amd else "Intel"
+    counted = min(_gb(share), SHARED_CAP_GB)
+    return counted, (f"{who} integrated graphics, sharing {_gb(share)} of {_gb(ram)} GB of RAM"
+                     + (f"; counted as {SHARED_CAP_GB} GB, since shared memory is slow" if counted < _gb(share) else ""))
 
 
 def pick_model(vram):

@@ -124,9 +124,71 @@ class Pick(unittest.TestCase):
 
     def test_amd_vram_from_sysfs(self):
         with mock.patch.object(install, "SYSTEM", "Linux"), mock.patch.object(install.shutil, "which", return_value=None), \
-                mock.patch("glob.glob", return_value=["/x"]), \
-                mock.patch("builtins.open", mock.mock_open(read_data=str(16 << 30))):
+                mock.patch.object(install, "linux_graphics", return_value=(16.0, "AMD")):
             self.assertEqual(install.detect_vram(), (16.0, "AMD"))
+
+
+class LinuxGraphics(unittest.TestCase):
+    """installer.linux_graphics against a made-up /sys/class/drm."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.drm = os.path.join(self.tmp, "drm")
+        self.meminfo = os.path.join(self.tmp, "meminfo")
+        self.ram(32)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def ram(self, gb):
+        with open(self.meminfo, "w") as f:
+            f.write(f"MemTotal:       {gb << 20} kB\nMemFree: 1 kB\n")
+
+    def card(self, name, driver, vram=None, gtt=None):
+        dev = os.path.join(self.drm, name, "device")
+        os.makedirs(dev)
+        os.makedirs(os.path.join(self.tmp, "drivers", driver), exist_ok=True)
+        os.symlink(os.path.join(self.tmp, "drivers", driver), os.path.join(dev, "driver"))
+        for file, gb in (("mem_info_vram_total", vram), ("mem_info_gtt_total", gtt)):
+            if gb is not None:
+                with open(os.path.join(dev, file), "w") as f:
+                    f.write(str(int(gb * (1 << 30))))
+
+    def read(self):
+        return install.linux_graphics(self.drm, self.meminfo)
+
+    def test_a_graphics_card(self):
+        self.card("card1", "amdgpu", vram=20, gtt=16)
+        self.assertEqual(self.read(), (20.0, "AMD"))
+
+    def test_amd_integrated_shares_ram(self):
+        self.card("card0", "amdgpu", vram=0.5, gtt=15.5)       # the BIOS's slice, and the shared window
+        os.makedirs(os.path.join(self.drm, "card0-HDMI-A-1", "device"))   # a connector, skipped
+        gb, what = self.read()
+        self.assertEqual(gb, install.SHARED_CAP_GB)            # 15.5 shared, counted as 10: it's slow
+        self.assertIn("AMD integrated graphics, sharing 15.5 of 32.0 GB", what)
+        self.assertEqual(install.pick_model(gb)[0], "9b-q4")    # not the 4B any more
+
+    def test_amd_integrated_no_vram_file(self):
+        self.card("card0", "amdgpu")
+        self.ram(16)
+        self.assertEqual(self.read(), (8.0, "AMD integrated graphics, sharing 8.0 of 16.0 GB of RAM"))
+
+    def test_intel_integrated(self):
+        self.card("card0", "i915")
+        self.ram(8)
+        gb, what = self.read()
+        self.assertEqual(gb, 4.0)
+        self.assertTrue(what.startswith("Intel integrated graphics"))
+
+    def test_a_dedicated_card_wins_over_integrated(self):
+        self.card("card0", "amdgpu", vram=0.5, gtt=15)
+        self.card("card1", "amdgpu", vram=16)
+        self.assertEqual(self.read(), (16.0, "AMD"))
+
+    def test_nothing(self):
+        os.makedirs(self.drm)
+        self.assertEqual(self.read(), (0, "no graphics memory found"))
 
 
 if __name__ == "__main__":

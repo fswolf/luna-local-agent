@@ -45,7 +45,11 @@ system:
    | 6-7 GB | Qwen3.5 4B, Q6_K, sees | 4 GB |
    | less, or none | Qwen3.5 4B, Q4_K_M (runs on the CPU) | 3 GB |
 
-   Apple Silicon counts about two thirds of its shared memory. The
+   Apple Silicon counts about two thirds of its shared memory. On Linux,
+   integrated graphics (an AMD APU, Intel) runs her model out of system
+   RAM, so it counts half your RAM (no more than the driver lets the card
+   borrow), and at most 10 GB: shared memory is slow, and past a 9B Q4
+   she'd answer too slowly to talk to. `--model` picks another anyway. The
    card is shared, so it counts what else goes on it: her voice server
    on the GPU takes about 0.8 GB first, and the embedding model and
    reranker (extras below, about 0.8 GB each) only go on the card when
