@@ -551,6 +551,7 @@ SCHEMA = {
     "plugins.gameboy.live": ("bool", "Run the game in real time, so /gameboy watch shows it running (with a music button there)"),
     "plugins.gameboy.window": ("bool", "Show the Game Boy screen in a window of its own, running in real time"),
     "plugins.gameboy.sound": ("bool", "With the window: play the game's sound"),
+    "plugins.gameboy.moves": ("int", "Moves she may make each turn (button presses or reading on), 1 to 6"),
     "plugins.gameboy.turn_seconds": ("float", "Longest one turn may run before it is cut short, in seconds; 0 is no limit"),
 
     # --- Plugins: Vibe City -------------------------------------------------

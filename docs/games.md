@@ -452,8 +452,10 @@ picked up by itself by the cartridge's title. The Pokemon one is the
 example to copy.
 
 **Turns.** Slower games suit her best. Each turn she reads the game,
-presses a few buttons with `gb_press` ("up 3", "down, a"), says what she
-did and why. When someone's talking, `gb_read_on` is her move instead: it
+makes up to three moves (`"moves"`, 1 to 6), and says what she did and
+why. A move is one `gb_press` with a few buttons ("up 4", "left 3, up 2",
+"down, a"), and each one tells her where it got her, so she can walk, look
+and walk on in a single turn instead of a tile at a time. When someone's talking, `gb_read_on` is her move instead: it
 presses A page after page and hands her the whole conversation, stopping
 at the next choice (a menu, yes/no, a name) or when the talking ends, so
 Oak's opening speech is a turn or two, not twenty. It needs a reader for
@@ -498,6 +500,7 @@ outside the repo; `"saves"` moves them.
     "web": true,            // she may look things up
     "pictures": "auto",     // auto: whenever her model can see; never
     "guide": true,          // her notes in agent/knowledge/<game>/
+    "moves": 3,             // moves a turn: presses or read-ons, each showing what it did
     "live": true,           // real time, shown running on /gameboy watch, with a music button
     "window": false,        // the Game Boy screen in a window, in real time
     "sound": false,         // with the window: the game's sound

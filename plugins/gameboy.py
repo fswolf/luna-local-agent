@@ -48,6 +48,7 @@ your game. pip install pyboy (and mcp).
         "live": true,           # real time, watched running on /gameboy watch (music button there)
         "window": false,        # the Game Boy screen in a window, in real time
         "sound": false,         # with the window: the game's sound
+        "moves": 3,             # moves a turn: presses or read-ons, each showing what it did
         "turn_seconds": 150     # a turn that runs longer is cut short (0 = no limit)
     }
 """
@@ -71,7 +72,17 @@ WATCH_PAGE = os.path.join(HERE, "games", "gameboy", "watch.html")
 
 DEFAULTS = {"rom": "", "roms": "", "saves": "", "step_seconds": 6, "max_steps": 300, "speak": True, "web": True,
             "pictures": "auto", "guide": True, "live": True, "window": False, "sound": False,
-            "turn_seconds": 150}
+            "moves": 3, "turn_seconds": 150}
+
+
+def moves_per_turn():
+    """How many moves a turn may make, 1 to 6. One meant walking a tile a turn
+    when she tapped a direction; each move shows her where it got her, so she
+    can walk, look, and walk on."""
+    try:
+        return max(1, min(int(settings().get("moves", DEFAULTS["moves"])), 6))
+    except (TypeError, ValueError):
+        return DEFAULTS["moves"]
 
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "playing": False, "busy": False,
           "error": "", "title": "", "said": ""}
@@ -466,10 +477,12 @@ STEP_PROMPT = (
     "{guide}"
     "Your last moves and what came of them, oldest first:\n{notes}\n\n"
     "The game right now:\n-----\n{screen}\n-----\n{picture}\n"
-    "Think about what you see, then make ONE move: a single gb_press with a few buttons, like "
-    "'up 3' to walk or 'down, a' to pick from a menu - or, when the screen is just someone talking, "
-    "gb_read_on, which reads the whole conversation through to the next choice in one go. Then "
-    "stop - you'll see what it did next turn. A is confirm and talk, B is back and cancel, START opens the menu. Don't "
+    "Think about what you see, then make up to {moves} moves. A move is one gb_press with a few "
+    "buttons - walk several tiles at once, like 'up 4' or 'left 3, up 2', or 'down, a' to pick from "
+    "a menu - or, when the screen is just someone talking, gb_read_on, which reads the whole "
+    "conversation through to the next choice. Each move tells you where it got you: look, then make "
+    "the next one. Stop when you reach something new (a door, a person, a choice) or when your moves "
+    "are used. A is confirm and talk, B is back and cancel, START opens the menu. Don't "
     "repeat a move that changed nothing; try another way. Use gb_wait if the game is still "
     "busy (text scrolling, a battle animation). Save with gb_save before anything risky.\n"
     "When you learn something worth remembering - where a place is, a way through, who's where, "
@@ -517,10 +530,10 @@ def _show_screen():
 
 _ERROR = re.compile(r"(?:^|\n)Error:")      # the server's own "Error: ...", under the tool framing
 
-# One move per turn, enforced: the first gb_press of a play turn goes through,
-# more are turned back. In conversation there's no limit.
+# Moves per turn, enforced: the first "moves" gb_press / gb_read_on calls of a
+# play turn go through, more are turned back. In conversation there's no limit.
 _turn = {"active": False, "moves": 0}
-ONE_MOVE = ("You've already made your move this turn - those buttons weren't pressed. Say what you "
+ONE_MOVE = ("You've made all your moves this turn - those buttons weren't pressed. Say what you "
             "did and why, write a game_note if you learned something, and stop.")
 
 
@@ -531,11 +544,11 @@ def _one_move_per_turn():
         entry = tools._REGISTRY.get(name)
         if not entry or getattr(entry["run"], "_wrapped", False):
             continue
-        inner, presses = entry["run"], name.endswith(("gb_press", "gb_read_on"))      # each is her one move
+        inner, presses = entry["run"], name.endswith(("gb_press", "gb_read_on"))      # each is one of her moves
 
         def run(_inner=inner, _presses=presses, **kwargs):
             if _presses and _turn["active"]:
-                if _turn["moves"] >= 1:
+                if _turn["moves"] >= moves_per_turn():
                     return ONE_MOVE
                 _turn["moves"] += 1
             reply = _inner(**kwargs)
@@ -624,9 +637,11 @@ def _step():
         answer = assistant.respond_to_job(
             STEP_PROMPT.format(game=game, goal=f" Your goal: {goal}." if goal else "",
                                project=projects.game_block(pid, here=here), guide=guide, notes=notes,
-                               screen=screen, picture=picture),
+                               screen=screen, picture=picture, moves=moves_per_turn()),
             _state["model"], NAME, allowed, speak=bool(s["speak"]), project_id=pid,
-            max_rounds=(4 if s["web"] else 3) + (1 if pictures and not reader else 0), exchanges=exchanges,
+            # her moves, a note and the reply; a look first when there's no reader
+            max_rounds=moves_per_turn() + (3 if s["web"] else 2) + (1 if pictures and not reader else 0),
+            exchanges=exchanges,
             time_limit=_game.turn_limit(s["turn_seconds"], DEFAULTS["turn_seconds"])) or ""
     finally:
         _turn["active"] = False
