@@ -190,7 +190,7 @@ Local pages, served by Luna while she runs:
 
 **Thoughts** (127.0.0.1:8792/thoughts/): every turn kept, searchable and filterable by flags, tools, rethinks and model.
 
-<img width="1210" alt="The memory editor: add, edit, retire or delete the facts she keeps about you" src="assets/memory-manager.png" />
+<img width="900" alt="The memory page, About you tab: the facts she keeps about you, with tabs for her notebook and her lessons" src="assets/memory-manager.png" />
 
 **Memory** (127.0.0.1:8792/memory/): the facts she keeps about you, to add, edit, retire or delete.
 

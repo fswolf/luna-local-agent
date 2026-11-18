@@ -37,6 +37,8 @@ LESSON: When asked what day a date falls on, call time_until instead
 of working it out. (#212, #230)
 ```
 
+<img width="900" alt="Her lessons on the memory page: how many turns each rode along on, and the ones she noted herself" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-lessons.png" />
+
 The lessons most relevant to what you just said ride in her prompt
 (`self.lessons_in_prompt`, 4 by default; all of them while there are
 only a few). This is the mini-AGI idea without retraining: she gets

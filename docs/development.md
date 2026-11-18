@@ -147,7 +147,9 @@ ai-voice/
 │   ├── alarm.wav
 │   ├── live-view.png
 │   ├── luna-desktop.png
+│   ├── memory-lessons.png
 │   ├── memory-manager.png
+│   ├── memory-notebook.png
 │   ├── thought-viewer.png
 │   ├── ui-conversation.png
 │   ├── ui-help.png

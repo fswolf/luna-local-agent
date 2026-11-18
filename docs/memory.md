@@ -128,7 +128,7 @@ person, so she can still talk about anime.
 
 `/facts` shows what's stored, and `memory-manager/` is the editor:
 
-<img width="1067" alt="The memory manager" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
+<img width="900" alt="The memory page, About you tab: the facts, with add, edit, retire and delete" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
 
 ```bash
 /memory                        # in Luna, or: memory-manager/start.sh
@@ -146,6 +146,10 @@ sessions, game ones marked) and **Her lessons** (what she's learned, with
 retired ones below), each row with a forget, retire or edit button. The
 tab is in the address, so `/memory/#lessons` opens straight to it. Facts
 are about you; the notebook is about her (see [learning](learning.md)).
+
+<img width="900" alt="The Her notebook tab: how she feels about the games she's played, and her notes on past conversations" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-notebook.png" />
+
+<img width="900" alt="The Her lessons tab: each lesson with how many turns it rode along on, and the ones she noted herself" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-lessons.png" />
 
 ## Pages
 

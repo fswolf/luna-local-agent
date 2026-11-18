@@ -58,7 +58,7 @@ Everything the README only touches on, one subject per page.
 
 [Thoughts](reasoning.md) at 127.0.0.1:8792/thoughts/: every turn kept, searchable, filterable by flags.
 
-<img width="1210" alt="The memory editor: the facts she keeps about you" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
+<img width="900" alt="The memory page, About you tab: the facts she keeps about you" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
 
 [Memory](memory.md) at 127.0.0.1:8792/memory/: the facts she keeps about you, to edit, retire or delete.
 
