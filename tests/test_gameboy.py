@@ -50,6 +50,17 @@ def enc(text):
 
 
 class Buttons(unittest.TestCase):
+    def test_a_broken_tool_says_why(self):
+        # mcp 2.x hides a raised exception's message ("Error executing tool gb_look")
+        guarded = _server()._guarded
+
+        def gb_look():
+            raise ModuleNotFoundError("No module named 'PIL'")
+
+        with mock.patch("sys.stderr"):
+            self.assertEqual(guarded(gb_look)(), "Error: ModuleNotFoundError: No module named 'PIL'")
+        self.assertEqual(guarded(gb_look).__name__, "gb_look")
+
     def test_parse(self):
         parse = _server().parse
         self.assertEqual(parse("up 3"), [("up", 3)])
@@ -272,13 +283,86 @@ class Plugin(unittest.TestCase):
         self.assertEqual(self.g._place("[X]\nWhere: Viridian City, x 1, y 2"), "Viridian City")
 
 
+class WatchPage(unittest.TestCase):
+    setUp, use = Plugin.setUp, Plugin.use
+
+    def test_live_screen_and_sound(self):
+        g = self.g
+        saves = os.path.join(self.dir, "game")
+        os.makedirs(saves)
+        for n in range(1, 7):
+            with open(os.path.join(saves, f"audio-{n}.raw"), "wb") as f:
+                f.write(bytes([n]) * 10)
+        with open(os.path.join(saves, "live.png"), "wb") as f:
+            f.write(b"PNG!")
+        with self.use(live=True), mock.patch.object(g, "_saves", return_value=saves), \
+                mock.patch.object(g, "_connected", True):
+            self.assertEqual(g.page("GET", "/live.png", b"")[2], b"PNG!")
+            code, _kind, body = g.page("GET", "/audio/0", b"")          # far behind: near the newest
+            self.assertEqual((code, int.from_bytes(body[:4], "big"), body[4:]), (200, 5, bytes([5]) * 10))
+            self.assertEqual(int.from_bytes(g.page("GET", "/audio/5", b"")[2][:4], "big"), 6)
+            self.assertEqual(g.page("GET", "/audio/6", b"")[0], 204)
+            state = json.loads(g.page("GET", "/state", b"")[2])
+            self.assertEqual((state["live"], state["music"]), (True, True))
+        with self.use(live=False, window=True), mock.patch.object(g, "_saves", return_value=saves), \
+                mock.patch.object(g, "_connected", True):
+            state = json.loads(g.page("GET", "/state", b"")[2])
+            self.assertEqual((state["live"], state["music"]), (True, False))   # the window plays its own sound
+
+    def test_start_asks_for_live(self):
+        g = self.g
+        rom = fake_rom(os.path.join(self.dir, "red.gb"))
+        seen = {}
+
+        def connect(name, spec, timeout=0):
+            seen["args"] = spec["args"]
+            return False, "not really", []
+
+        from core import mcpclient
+        with self.use(rom=rom, live=True), mock.patch.object(g, "why_unavailable", return_value=""), \
+                mock.patch.object(mcpclient, "connect_server", connect):
+            g.start(None)
+        self.assertIn("--live", seen["args"])
+        with self.use(rom=rom, live=True, window=True), mock.patch.object(g, "why_unavailable", return_value=""), \
+                mock.patch.object(mcpclient, "connect_server", connect):
+            g.start(None)
+        self.assertIn("--window", seen["args"])
+        self.assertNotIn("--live", seen["args"])
+
+
 @unittest.skipUnless(importlib.util.find_spec("pyboy"), "pip install pyboy")
 class Emulator(unittest.TestCase):
+    def test_live(self):
+        import time
+
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        server = _server()
+        saves = os.path.join(d, "saves")
+        os.makedirs(saves)
+        with open(os.path.join(saves, "audio-99.raw"), "wb") as f:
+            f.write(b"old")                                         # from the last run: cleared
+        c = server.Console(fake_rom(os.path.join(d, "red.gb")), saves, live=True)
+        try:
+            time.sleep(0.6)
+            names = os.listdir(saves)
+            self.assertIn("live.png", names)
+            self.assertNotIn("audio-99.raw", names)
+            self.assertTrue(any(n.startswith("audio-") for n in names))
+            with open(os.path.join(saves, "audio-1.raw"), "rb") as f:
+                self.assertAlmostEqual(len(f.read()), 15 * 400, delta=800)   # about a quarter second at 24 kHz
+        finally:
+            c.stop()
+
     def test_press_look_save(self):
         d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, d)
         server = _server()
+        os.makedirs(os.path.join(d, "saves"))
+        with open(os.path.join(d, "saves", "live.png"), "wb") as f:
+            f.write(b"from a live run")                        # not this game now: cleared
         c = server.Console(fake_rom(os.path.join(d, "red.gb")), os.path.join(d, "saves"))
+        self.assertFalse(os.path.exists(os.path.join(d, "saves", "live.png")))
         try:
             self.assertIs(c.reader, red)
             c.do(lambda: c.press(server.parse("up 2, a")))

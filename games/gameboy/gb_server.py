@@ -13,10 +13,14 @@ Tools:
                         for it (readers/), and the screen saved as screen.png
     gb_save(slot) / gb_load(slot)
 
-Two ways to run. Headless (the default), the game only moves while a tool
-runs: nothing happens while she thinks, which suits slow games. --window
-opens the Game Boy screen and runs it in real time, to watch (and hear,
-with --sound) as she plays; her presses are slipped in between frames.
+Three ways to run. Headless, the game only moves while a tool runs: nothing
+happens while she thinks. --live runs it in real time with no window, and
+keeps live.png (the screen, 30 times a second) and the last few
+seconds of its sound (audio-<n>.raw: 24 kHz mono, signed 8-bit) in the
+saves folder, for Luna's watch page to show and play. --window opens the
+Game Boy screen and runs it in real time too, to watch (and hear, with
+--sound) as she plays; live.png is kept then as well. Either way her
+presses are slipped in between frames.
 
 The game autosaves (a full emulator snapshot) every few presses and when the
 server stops, and picks it back up on the next start. The cartridge's own
@@ -46,12 +50,16 @@ HOLD, SETTLE = 10, 22           # frames a press is held, then left to play out 
 MAX_PRESSES = 12                # per gb_press, so a turn can't be a blind run of thirty
 MAX_WAIT = 10                   # seconds
 AUTOSAVE_EVERY = 10             # presses
+LIVE_EVERY = 2                  # frames between live.png updates: 30 a second
+AUDIO_FRAMES = 15               # frames of sound per audio chunk: a quarter second
+AUDIO_KEEP = 16                 # chunks kept on disk, four seconds
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--rom", default="")
 ap.add_argument("--saves", default=os.path.join(HERE, "saves"))
 ap.add_argument("--window", action="store_true")
 ap.add_argument("--sound", action="store_true")
+ap.add_argument("--live", action="store_true")
 ap.add_argument("--scale", type=int, default=4)
 ARGS, _ = ap.parse_known_args()
 
@@ -85,15 +93,26 @@ class Console:
     """The emulator, on a thread of its own: every frame comes from here, so the
     window (when there is one) keeps running and her presses wait their turn."""
 
-    def __init__(self, rom, saves, window=False, sound=False, scale=4):
+    def __init__(self, rom, saves, window=False, sound=False, scale=4, live=False):
         from pyboy import PyBoy
 
         self.saves = saves
         os.makedirs(saves, exist_ok=True)
-        self.realtime = window
+        self.realtime = window or live
+        self.live = self.realtime           # live.png, and the sound for the watch page
+        self.stream = live and not window   # with a window, SDL plays the sound itself
         self.pyboy = PyBoy(rom, window="SDL2" if window else "null", scale=scale,
-                           sound_emulated=bool(window and sound), sound_volume=60 if sound else 0)
-        self.pyboy.set_emulation_speed(1 if window else 0)
+                           sound_emulated=bool((window and sound) or self.stream),
+                           sound_volume=60 if (sound or self.stream) else 0)
+        self.pyboy.set_emulation_speed(1 if self.realtime else 0)
+        self.frame = 0
+        self.audio, self.audio_frames, self.audio_seq = bytearray(), 0, 0
+        self._clear_audio()
+        if not self.live:                   # a picture left from a live run isn't this game now
+            try:
+                os.remove(os.path.join(saves, "live.png"))
+            except OSError:
+                pass
         self.title = (self.pyboy.cartridge_title or os.path.splitext(os.path.basename(rom))[0]).strip()
         self.reader = readers.find(self.title)
         self.jobs = queue.Queue()
@@ -114,9 +133,55 @@ class Console:
     # -- the emulator thread -------------------------------------------------
     def _frames(self, n):
         for i in range(n):
-            if not self.pyboy.tick(1, i == n - 1):
+            self.frame += 1
+            picture = i == n - 1 or (self.live and self.frame % LIVE_EVERY == 0)
+            if not self.pyboy.tick(1, picture):
                 self.alive = False      # the window was closed
                 return
+            if self.live:
+                self._live(picture)
+
+    # -- live: what the watch page shows and plays ---------------------------
+    def _live(self, picture):
+        try:
+            if picture and self.frame % LIVE_EVERY == 0:
+                image = self.pyboy.screen.image
+                if image is not None:
+                    path = os.path.join(self.saves, "live.png")
+                    image.convert("RGB").save(path + ".tmp", "PNG")
+                    os.replace(path + ".tmp", path)
+            if self.stream:
+                samples = self.pyboy.sound.ndarray          # this frame: 48 kHz stereo, int8
+                if samples is not None and len(samples):
+                    mono = samples[::2].astype("int16").sum(axis=1) // 2   # 24 kHz, one channel
+                    self.audio += mono.astype("int8").tobytes()
+                self.audio_frames += 1
+                if self.audio_frames >= AUDIO_FRAMES:
+                    self._flush_audio()
+        except Exception as e:      # the picture or sound failing never stops the game
+            if not getattr(self, "_live_warned", False):
+                self._live_warned = True
+                print(f"live view: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+
+    def _flush_audio(self):
+        self.audio_seq += 1
+        path = os.path.join(self.saves, f"audio-{self.audio_seq}.raw")
+        with open(path + ".tmp", "wb") as f:
+            f.write(bytes(self.audio))
+        os.replace(path + ".tmp", path)
+        self.audio, self.audio_frames = bytearray(), 0
+        old = os.path.join(self.saves, f"audio-{self.audio_seq - AUDIO_KEEP}.raw")
+        if os.path.exists(old):
+            os.remove(old)
+
+    def _clear_audio(self):
+        """Sound left from the last run would be played back as if it were now."""
+        for name in os.listdir(self.saves):
+            if re.fullmatch(r"audio-\d+\.raw(\.tmp)?", name):
+                try:
+                    os.remove(os.path.join(self.saves, name))
+                except OSError:
+                    pass
 
     def _run(self):
         while self.alive:
@@ -240,6 +305,22 @@ def _report(console):
             f"({path}).")
 
 
+def _guarded(fn):
+    """A tool that answers "Error: <why>" instead of raising. mcp 2.x turns a
+    raised exception into a bare "Error executing tool gb_look", so the reason
+    (a missing module, a closed window) never reached her or the screen."""
+    import functools
+
+    @functools.wraps(fn)
+    def run(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            print(f"{fn.__name__} failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            return f"Error: {type(e).__name__}: {e}"
+    return run
+
+
 def build():
     if not ARGS.rom or not os.path.isfile(ARGS.rom):
         sys.exit(f"no Game Boy ROM at {ARGS.rom!r} (--rom FILE)")
@@ -248,10 +329,11 @@ def build():
     except ImportError:
         from mcp.server.mcpserver import MCPServer as FastMCP   # mcp 2.x renamed it
 
-    console = Console(ARGS.rom, ARGS.saves, ARGS.window, ARGS.sound, ARGS.scale)
+    console = Console(ARGS.rom, ARGS.saves, ARGS.window, ARGS.sound, ARGS.scale, ARGS.live)
     mcp = FastMCP("gameboy")
 
     @mcp.tool()
+    @_guarded
     def gb_press(buttons: str) -> str:
         """Press Game Boy buttons, then see what happened. buttons: one or more of a, b,
         start, select, up, down, left, right, with a count ("up 3") and "wait N" (seconds)
@@ -268,6 +350,7 @@ def build():
         return out
 
     @mcp.tool()
+    @_guarded
     def gb_wait(seconds: float = 2) -> str:
         """Let the game run without pressing anything (text scrolling, an animation,
         a battle playing out), up to 10 seconds, then see what happened."""
@@ -279,11 +362,13 @@ def build():
         return out
 
     @mcp.tool()
+    @_guarded
     def gb_look() -> str:
         """What's on the Game Boy right now, without pressing anything."""
         return _off(console) or _report(console)
 
     @mcp.tool()
+    @_guarded
     def gb_save(slot: str = "quick") -> str:
         """Save the whole game as it is right now to a named slot."""
         if _off(console):
@@ -292,6 +377,7 @@ def build():
         return f"[saved to {slot}]"
 
     @mcp.tool()
+    @_guarded
     def gb_load(slot: str = "quick") -> str:
         """Go back to a slot saved with gb_save ("autosave" is the last automatic one)."""
         if _off(console):

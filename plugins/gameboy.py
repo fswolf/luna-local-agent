@@ -23,9 +23,11 @@ Fantasy Legend; readers for other games drop into that folder. Without a
 reader, the picture is all she has, so a game like that needs a model that
 can see.
 
-Slower games suit her best: she takes a turn, then the game waits. With
-"window" on, the Game Boy's own screen opens and runs in real time instead,
-to watch (and with "sound", to hear) as she plays.
+With "live" on (the default) the game runs in real time, and /gameboy watch
+shows it running, with a music button to hear it in the browser. Off, the
+game waits between her turns (slow games suit that) and the page shows the
+screen after each move. "window" opens the Game Boy's own screen instead, in
+real time, with "sound" for its sound.
 
 The ROM is yours: Luna never ships or fetches one. A battery save dumped from
 your own cartridge goes beside the ROM as <rom name>.ram, and she carries on
@@ -42,6 +44,7 @@ your game. pip install pyboy (and mcp).
         "web": true,            # she may look things up (web_search, research)
         "pictures": "auto",     # auto: whenever her model can see; never
         "guide": true,          # each turn, what agent/knowledge/<game>/ says about where she is
+        "live": true,           # real time, watched running on /gameboy watch (music button there)
         "window": false,        # the Game Boy screen in a window, in real time
         "sound": false,         # with the window: the game's sound
         "turn_seconds": 150     # a turn that runs longer is cut short (0 = no limit)
@@ -66,7 +69,8 @@ READERS = os.path.join(HERE, "games", "gameboy")
 WATCH_PAGE = os.path.join(HERE, "games", "gameboy", "watch.html")
 
 DEFAULTS = {"rom": "", "roms": "", "saves": "", "step_seconds": 6, "max_steps": 300, "speak": True, "web": True,
-            "pictures": "auto", "guide": True, "window": False, "sound": False, "turn_seconds": 150}
+            "pictures": "auto", "guide": True, "live": True, "window": False, "sound": False,
+            "turn_seconds": 150}
 
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "playing": False, "busy": False,
           "error": "", "title": "", "said": ""}
@@ -195,6 +199,8 @@ def why_unavailable():
         return "pip install mcp"
     if importlib.util.find_spec("pyboy") is None:
         return "pip install pyboy"
+    if importlib.util.find_spec("PIL") is None:      # the screen she looks at is saved with it
+        return "pip install pillow"
     if not os.path.exists(SERVER_SCRIPT):
         return f"missing {SERVER_SCRIPT}"
     if not _rom():
@@ -226,6 +232,8 @@ def start(model):
         args.append("--window")
         if s["sound"]:
             args.append("--sound")
+    elif s["live"]:
+        args.append("--live")
     ok, message, names = mcpclient.connect_server(SERVER, {"command": sys.executable, "args": args}, timeout=60)
     if not ok:
         _state["error"] = message
@@ -233,6 +241,10 @@ def start(model):
 
     _connected = True
     _state.update(model=model, tools=names, error="", title=_game_name())
+    try:
+        _call("gb_look")                # a first picture, so the watch page isn't black until her first move
+    except Exception:
+        pass
     _loop.start()
     reader, sees = _reader(), _pictures()
     if reader:
@@ -332,10 +344,24 @@ def page(method, path, body):
                 return 200, "image/png", f.read()
         except OSError:
             return 404, "text/plain; charset=utf-8", "no screen yet"
+    if method == "GET" and path == "/live.png":
+        s = settings()
+        names = ("live.png", "screen.png") if (s["live"] or s["window"]) else ("screen.png",)
+        for name in names:                               # running, or the last move's picture
+            try:
+                with open(os.path.join(_saves(), name), "rb") as f:
+                    return 200, "image/png", f.read()
+            except OSError:
+                continue
+        return 404, "text/plain; charset=utf-8", "no screen yet"
+    if method == "GET" and path.startswith("/audio/"):
+        return _audio(path[len("/audio/"):])
     if method == "GET" and path == "/state":
+        s = settings()
         return 200, "application/json", json.dumps(
             {"title": _state["title"], "playing": _state["playing"], "turn": _state["steps"],
-             "said": _state["said"], "notes": _state["notes"][-8:]})
+             "said": _state["said"], "notes": _state["notes"][-8:],
+             "live": bool(s["live"] or s["window"]), "music": bool(s["live"] and not s["window"])})
     return 404, "text/plain; charset=utf-8", "not here"
 
 
@@ -345,6 +371,30 @@ try:
     livefeed.add_page(NAME, "game boy", page, visible=lambda: _connected)
 except Exception:
     pass
+
+
+def _audio(after):
+    """The next quarter second of the game's sound after chunk <after> (/audio/<n>;
+    the page server drops query strings): 4 bytes of its number, then 24 kHz mono
+    signed 8-bit samples. 204 when there's nothing newer. A page that's fallen
+    behind is moved to just before the newest, never played stale."""
+    try:
+        after = int(after)
+    except ValueError:
+        after = 0
+    try:
+        have = sorted(int(m.group(1)) for m in (re.fullmatch(r"audio-(\d+)\.raw", n) for n in os.listdir(_saves())) if m)
+    except OSError:
+        have = []
+    newer = [n for n in have if n > after]
+    if not newer:
+        return 204, "application/octet-stream", b""
+    seq = newer[0] if len(newer) <= 3 else newer[-2]
+    try:
+        with open(os.path.join(_saves(), f"audio-{seq}.raw"), "rb") as f:
+            return 200, "application/octet-stream", seq.to_bytes(4, "big") + f.read()
+    except OSError:
+        return 204, "application/octet-stream", b""
 
 
 def _open_watch():

@@ -19,5 +19,5 @@ evdev>=1.7; sys_platform == "linux"
 # Extras (the installer asks):
 #   openwakeword       "hey Luna" instead of a key press
 #   mcp                tools from MCP servers
-#   pillow             portrait tools (Live2D import, textures)
+#   pillow             portrait tools (Live2D import, textures), the Game Boy's screen
 #   websocket-client   the pomf.tv chat plugin

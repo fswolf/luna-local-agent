@@ -421,7 +421,7 @@ live monitor (`monitor.enabled`, on by default).
 
 She plays Game Boy and Game Boy Color games through PyBoy, an emulator
 written in Python. Install it with the installer's `gameboy` extra, or
-`pip install pyboy mcp`. The game is yours: Luna never ships or
+`pip install pyboy mcp pillow` (Pillow saves the screen she looks at). The game is yours: Luna never ships or
 downloads one, you point her at a `.gb` or `.gbc` file you have.
 
 **Picking a game.** The first time, give the path to a ROM. After that
@@ -452,15 +452,22 @@ example to copy.
 
 **Turns.** Slower games suit her best. Each turn she reads the game,
 presses a few buttons with `gb_press` ("up 3", "down, a"), says what she
-did and why, and the game waits until her next turn. Notes she writes
+did and why. With `"live"` on (the default) the game keeps running between
+her turns, the way a Game Boy in your hands would; turn it off and the game
+waits until her next turn instead. Notes she writes
 with `game_note` come back when she's in the same place again, and
 `agent/knowledge/<game>/` works as her guide, like Zork's.
 
-**Watching.** `/gameboy watch` opens a page with the screen, what she
-said and her last moves; add it to OBS as a browser source. With
-`"window": true` the Game Boy's own screen opens instead and the game
-runs in real time (`"sound": true` for its music), which looks better
-on stream but keeps going while she thinks.
+**Watching.** `/gameboy watch` opens a page with the game running live
+(30 frames a second), what she said and her last moves. Under the screen:
+**music** plays the game's sound in that browser (off until you click it),
+**green screen** draws a black-and-white game in the original Game Boy's
+greens, and **full screen** (or a click on the game) fills the monitor.
+For OBS, add `/gameboy/#screen` as a browser source: the game and nothing
+else. With `"live"` off,
+the page shows the screen after each of her moves instead. With
+`"window": true` the Game Boy's own screen opens in a window of its own
+(`"sound": true` for its music there), and the page still shows it live.
 
 **Your own save.** The game's battery save sits beside the ROM as
 `<rom name>.ram`. Put a save dumped from your own cartridge there
@@ -484,6 +491,7 @@ outside the repo; `"saves"` moves them.
     "web": true,            // she may look things up
     "pictures": "auto",     // auto: whenever her model can see; never
     "guide": true,          // her notes in agent/knowledge/<game>/
+    "live": true,           // real time, shown running on /gameboy watch, with a music button
     "window": false,        // the Game Boy screen in a window, in real time
     "sound": false,         // with the window: the game's sound
     "turn_seconds": 150     // a turn that runs longer is cut short

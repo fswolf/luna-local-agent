@@ -548,6 +548,7 @@ SCHEMA = {
     "plugins.gameboy.web": ("bool", "Let her look things up on the web while playing"),
     "plugins.gameboy.pictures": ("choice", "Give her the screen as a picture: auto (whenever her model can see) or never", ("auto", "never")),
     "plugins.gameboy.guide": ("bool", "Show her what agent/knowledge/<game>/ says about where she is"),
+    "plugins.gameboy.live": ("bool", "Run the game in real time, so /gameboy watch shows it running (with a music button there)"),
     "plugins.gameboy.window": ("bool", "Show the Game Boy screen in a window of its own, running in real time"),
     "plugins.gameboy.sound": ("bool", "With the window: play the game's sound"),
     "plugins.gameboy.turn_seconds": ("float", "Longest one turn may run before it is cut short, in seconds; 0 is no limit"),
