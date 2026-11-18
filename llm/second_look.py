@@ -3,6 +3,7 @@
 Part of the llm package (it was one llm.py); see llm/__init__.py.
 """
 
+import json
 import re
 
 import config
@@ -94,6 +95,94 @@ def _promised_action(answer):
     end = re.search(r"[.!?~\u2026\n]|$", text[start:]).start() + start
 
     return text[start:end].strip()[:120]
+
+
+# A change she says she made ("I've rewritten it", "done and done", "it's
+# fixed"), checked against what actually ran this turn: a small model writes
+# the "done!" that usually follows "let me fix that" whether or not a tool did.
+_CLAIM = re.compile(
+    r"\bi(?:'ve|\s+have)?\s+(?:just\s+|now\s+|already\s+|also\s+)?"
+    r"(?:wrote|written|rewrote|rewritten|updated|edited|fixed|changed|saved|created|"
+    r"applied|patched|sent|emailed|added|removed)\b"
+    r"|\bdone and done\b|\ball (?:done|fixed|set)\b"
+    r"|\b(?:it|that|the script|the file)(?:'s| is) (?:fixed|updated|done)\b",
+    re.IGNORECASE)
+_EMAIL_CLAIM = re.compile(r"\b(?:sent|emailed|mailed)\b", re.IGNORECASE)
+# Saying it works, which a failed run right before contradicts.
+_WORKS = re.compile(r"\b(?:done|works|working|fixed|all set|ready|success(?:ful)?|perfect(?:ly)?)\b",
+                    re.IGNORECASE)
+_OWNED_UP = re.compile(r"\b(?:fail(?:ed|s|ing)?|error|crash(?:ed|es)?|didn't work|doesn't work|"
+                       r"broke|exit(?:ed)? (?:with )?code|traceback|couldn't|can't)\b", re.IGNORECASE)
+_FILE_TOOLS = {"write_file", "edit_file"}
+_SHELL_WRITES = re.compile(r"\bsed\s+-i|\btee\b|>>?\s*[~/\w.]|\b(?:mv|cp|chmod|rm|touch|mkdir)\b")
+_EXIT_CODE = re.compile(r"\(exited straight away with code ([1-9]\d*)\)|\(exit code ([1-9]\d*) after")
+
+
+def _failed(result):
+    """What went wrong, from a tool's result, or "" when it worked."""
+    from mind import thoughtlog
+
+    text = str(result or "")
+    if thoughtlog._TOOL_ERROR.match(text):
+        return text.strip().splitlines()[0][:160]
+    m = _EXIT_CODE.search(text)
+    if m:
+        return f"exited with code {m.group(1) or m.group(2)}"
+    return ""
+
+
+def _changed(exchange):
+    """Did this call change something (a file written, an email sent)?"""
+    name = exchange.get("name", "")
+    if _failed(exchange.get("result")):
+        return False
+    if name in _FILE_TOOLS or name == "send_email":
+        return True
+    if name == "run_command":
+        try:
+            command = json.loads(exchange.get("arguments") or "{}").get("command", "")
+        except (ValueError, AttributeError):
+            command = str(exchange.get("arguments") or "")
+        return bool(_SHELL_WRITES.search(str(command)))
+    return False
+
+
+# Your message asked for work: a claim in her reply is about this turn, not
+# "I wrote it for you" said back to praise.
+_ASKED_WORK = re.compile(r"\b(?:fix|update|edit|change|rewrite|write|make|create|add|remove|send|"
+                         r"email|reply|save|patch|apply|run)\b", re.IGNORECASE)
+
+
+def _unbacked(answer, exchanges, asked=""):
+    """A nudge when her reply says she did something this turn's tools
+    don't back up, else "": a change claimed with no write, edit or send
+    behind it, or "it works" right after the last run of something failed.
+    Only on a working turn (she used a tool, or your message asked for work),
+    so a reply to praise ("I wrote it for you~") isn't held to it."""
+    text = str(answer or "")
+    exchanges = list(exchanges or ())
+
+    claim = _CLAIM.search(text)
+    if claim and (exchanges or _ASKED_WORK.search(str(asked or ""))):
+        wanted = {"send_email"} if _EMAIL_CLAIM.search(claim.group(0)) else None
+        backed = any(_changed(x) and (wanted is None or x.get("name") in wanted) for x in exchanges)
+        if not backed:
+            said = claim.group(0).strip()
+            what = "sent an email" if wanted else "changed a file or sent anything"
+            return (f"your reply says \u201c{said}\u201d, but nothing this turn {what}. If you "
+                    "meant to, do it now with your tools. If you can't, say plainly that it "
+                    "isn't done yet.")
+
+    last = {}
+    for x in exchanges:
+        last[x.get("name", "")] = x
+    for name, x in last.items():
+        why = _failed(x.get("result"))
+        if why and _WORKS.search(text) and not _OWNED_UP.search(text):
+            return (f"the last {name} failed ({why}), but your reply reads as if it worked. "
+                    "Say plainly what failed and what you'll do about it. If it needs a real "
+                    f"terminal or a screen, ask {config.USER} to try it.")
+    return ""
 
 
 # A check after she's already answered: her reply is out (on screen, and

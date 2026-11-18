@@ -10,6 +10,14 @@ erased: it keeps its dates, it stops appearing in context, and it is
 still there when you ask what your last graphics card was, or when the
 retirement itself turns out to be the mistake.
 
+Two clocks, kept apart. created_at and superseded_at are *record* time:
+when she learned it and when she stopped believing it. valid_from and
+valid_to are *real* time: when it was actually true. They differ
+whenever you mention something after the fact ("I swapped cards last
+Friday"), and only real time answers "what did I have in October?".
+Real time is only ever filled from what was said; when nothing was,
+record time stands in for it.
+
 The schema is the design:
 
     fact           one short sentence, the only required thing
@@ -18,11 +26,19 @@ The schema is the design:
     superseded_at  NULL means active; a timestamp means retired, and
                    says when
     superseded_by  which fact replaced it, if one did
+    trust          'confirmed', or 'unconfirmed' for a fact the background
+                   extractor guessed from one exchange: she shows it as
+                   "(not sure)" and won't build pages on it until it comes
+                   up again, he says it outright, or he confirms it
+    valid_from     when it became true in his life, when he said so
+                   ("2026-11-14", "2026-11", "2019"); NULL when he didn't
+    valid_to       when it stopped being true, set when a newer fact with
+                   a date replaces it; NULL means "until it was retired"
     embedding      reserved, unused - the column exists so adding
                    semantic search later is an UPDATE, not a migration
 
 FTS5 runs as an external-content index over that table, kept in sync by
-triggers - including on UPDATE, because update_fact rewrites fact text
+triggers - including on UPDATE, because a fixed mistake rewrites fact text
 and an unsynced rewrite quietly corrupts search weeks before anyone
 notices.
 
@@ -57,7 +73,16 @@ CREATE TABLE IF NOT EXISTS facts (
     created_at    TEXT NOT NULL,
     superseded_at TEXT,
     superseded_by INTEGER,
-    embedding     BLOB
+    embedding     BLOB,
+    valid_from    TEXT,
+    valid_to      TEXT,
+    trust         TEXT NOT NULL DEFAULT 'confirmed'
+);
+
+-- facts he told her to forget, as fingerprints, never words (mind/forgetting.py)
+CREATE TABLE IF NOT EXISTS forgotten (
+    marks  TEXT PRIMARY KEY,
+    at     TEXT NOT NULL
 );
 
 -- small bookkeeping: what's been done once and mustn't be done again
@@ -100,6 +125,34 @@ def _now():
     return datetime.now().isoformat(timespec="seconds")
 
 
+_DATE = re.compile(r"^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$")
+
+
+def when(text):
+    """A real-time date as it's kept: "2026-11-14", "2026-11" or "2026";
+    "today" is today. "" for anything else - a guess at "last week" is
+    worse than no date, because a missing one falls back to record time."""
+    text = str(text or "").strip().lower()
+    if not text:
+        return ""
+    if text in ("today", "now"):
+        return datetime.now().date().isoformat()
+    m = _DATE.match(text)
+    if not m:
+        return ""
+    year, month, day = m.group(1), m.group(2), m.group(3)
+    if not 1900 <= int(year) <= 2200:
+        return ""
+    try:
+        if day:
+            return datetime(int(year), int(month), int(day)).date().isoformat()
+        if month:
+            return f"{year}-{int(month):02d}" if 1 <= int(month) <= 12 else ""
+    except ValueError:
+        return ""
+    return year
+
+
 def _set_aside(error):
     """facts.db can't be read as a database: move it (and its WAL files)
     aside as facts.db.bad-<time> so a fresh one can start, and say where
@@ -132,6 +185,15 @@ def _open():
     try:
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(_TABLE)
+        have = {r[1] for r in db.execute("PRAGMA table_info(facts)")}
+        for column, kind in (("valid_from", "TEXT"), ("valid_to", "TEXT"),   # a facts.db from before them
+                             ("trust", "TEXT NOT NULL DEFAULT 'confirmed'")):
+            if column not in have:
+                try:
+                    db.execute(f"ALTER TABLE facts ADD COLUMN {column} {kind}")
+                except sqlite3.OperationalError as e:   # the memory manager added it first
+                    if "duplicate column" not in str(e).lower():
+                        raise
         had_index = db.execute(
             "SELECT 1 FROM sqlite_master WHERE name = 'facts_ai'").fetchone() is not None
         try:
@@ -231,10 +293,13 @@ def counts():
     return active or 0, retired or 0
 
 
-def rows(retired=False, limit=200):
-    """(id, fact, subject, created_at, superseded_at) for /facts."""
+def rows(retired=False, limit=200, sure_only=False):
+    """(id, fact, subject, created_at, superseded_at) for /facts. sure_only
+    leaves out the unconfirmed: what pages and profiles are written from."""
     db = _connect()
     where = "IS NOT NULL" if retired else "IS NULL"
+    if sure_only:
+        where += " AND trust = 'confirmed'"
 
     with _lock:
         return db.execute(
@@ -257,6 +322,78 @@ def subjects():
         ).fetchall()
 
     return [r[0] for r in found]
+
+
+def details(facts):
+    """{fact: (valid_from, valid_to, sure)} for the active facts among these
+    that have something to show beside them: a real date, or not sure."""
+    facts = [str(f) for f in facts or []]
+    db = _connect()
+    if db is None or not facts:
+        return {}
+    out = {}
+    with _lock:
+        for start in range(0, len(facts), 400):          # sqlite's variable limit
+            chunk = facts[start:start + 400]
+            marks = ",".join("?" * len(chunk))
+            for fact, since, until, trust in db.execute(
+                    f"SELECT fact, valid_from, valid_to, trust FROM facts WHERE superseded_at IS NULL "
+                    f"AND (valid_from IS NOT NULL OR valid_to IS NOT NULL OR trust != 'confirmed') "
+                    f"AND fact IN ({marks})", chunk):
+                out[fact] = (since or "", until or "", trust == "confirmed")
+    return out
+
+
+def row_details(ids):
+    """{id: (valid_from, valid_to, sure)} for these rows, where there's anything to show."""
+    ids = [int(i) for i in ids or []][:1000]
+    db = _connect()
+    if db is None or not ids:
+        return {}
+    with _lock:
+        found = db.execute(
+            f"SELECT id, valid_from, valid_to, trust FROM facts WHERE id IN ({','.join('?' * len(ids))}) "
+            "AND (valid_from IS NOT NULL OR valid_to IS NOT NULL OR trust != 'confirmed')", ids).fetchall()
+    return {i: (since or "", until or "", trust == "confirmed") for i, since, until, trust in found}
+
+
+def is_sure(fact_id):
+    db = _connect()
+    with _lock:
+        row = db.execute("SELECT trust FROM facts WHERE id = ?", (int(fact_id),)).fetchone()
+    return bool(row) and row[0] == "confirmed"
+
+
+def history(query, limit=10):
+    """Facts matching query, retired ones too, oldest first: dicts of fact,
+    active, learned, retired, since, until (real time where said, else "").
+    For "what did I have before?" - the one place retired facts are read."""
+    db = _connect()
+    if db is None:
+        return []
+    limit = max(1, int(limit))
+    cols = "f.id, f.fact, f.superseded_at, f.created_at, f.valid_from, f.valid_to, f.trust"
+    found = []
+    with _lock:
+        match = _match_expression(query) if _fts else ""
+        if match:
+            try:
+                found = db.execute(
+                    f"SELECT {cols} FROM facts_fts JOIN facts f ON f.id = facts_fts.rowid "
+                    "WHERE facts_fts MATCH ? ORDER BY bm25(facts_fts) LIMIT ?", (match, limit)).fetchall()
+            except sqlite3.OperationalError as e:
+                logbook.warn("factstore", "history match %r failed: %s", match, e)
+        if not found:                       # no FTS5, or nothing ranked: shared words
+            terms = [t for t in re.findall(r"[a-z0-9]+", str(query or "").lower())
+                     if len(t) > 1 and t not in _STOP]
+            if terms:
+                where = " OR ".join("lower(f.fact || ' ' || f.subject) LIKE ?" for _t in terms[:12])
+                found = db.execute(f"SELECT {cols} FROM facts f WHERE {where} ORDER BY f.id DESC LIMIT ?",
+                                   [f"%{t}%" for t in terms[:12]] + [limit]).fetchall()
+    return [{"fact": fact, "active": retired is None, "learned": (learned or "")[:10],
+             "retired": (retired or "")[:10], "since": since or "", "until": until or "",
+             "sure": trust == "confirmed"}
+            for _id, fact, retired, learned, since, until, trust in sorted(found)]
 
 
 # The same stopwords longterm.py's word ranking uses, for the same
@@ -355,42 +492,78 @@ def search(query, limit=25):
 # ---------------------------------------------------------------------------
 # Writing
 # ---------------------------------------------------------------------------
-def add(fact, subject=""):
-    """Store one fact. False if an identical active fact exists."""
+def add(fact, subject="", since="", sure=True, again=False):
+    """Store one fact, true since `since` when that's known. sure=False is
+    a guess from one exchange (unconfirmed). False if an identical active
+    fact exists (hearing an unconfirmed one again confirms it), or if it's
+    one he told her to forget - unless `again`: he's asked for it back,
+    which lifts the tombstone."""
     fact = str(fact or "").strip()
 
     if not fact:
+        return False
+
+    if not _allowed(fact, again):
         return False
 
     db = _connect()
 
     with _lock:
         dupe = db.execute(
-            "SELECT 1 FROM facts WHERE fact = ? AND superseded_at IS NULL",
+            "SELECT trust FROM facts WHERE fact = ? AND superseded_at IS NULL",
             (fact,),
         ).fetchone()
 
         if dupe:
-            return False
+            # known already: a second hearing confirms a guess, and a date
+            # he's now given for it is still worth keeping
+            changed = 0
+            with db:
+                if dupe[0] != "confirmed":
+                    changed += db.execute("UPDATE facts SET trust = 'confirmed' WHERE fact = ? "
+                                          "AND superseded_at IS NULL", (fact,)).rowcount
+                if when(since):
+                    changed += db.execute(
+                        "UPDATE facts SET valid_from = ? WHERE fact = ? AND superseded_at IS NULL "
+                        "AND valid_from IS NULL", (when(since), fact)).rowcount
+            return changed > 0
 
         with db:    # commits, or rolls back on an error (locked, disk full)
             db.execute(
-                "INSERT INTO facts(fact, subject, created_at) VALUES (?, ?, ?)",
-                (fact, str(subject or "").strip().lower(), _now()),
+                "INSERT INTO facts(fact, subject, created_at, valid_from, trust) VALUES (?, ?, ?, ?, ?)",
+                (fact, str(subject or "").strip().lower(), _now(), when(since) or None,
+                 "confirmed" if sure else "unconfirmed"),
             )
 
     return True
 
 
-def replace(old_fact, new_fact, subject=""):
+def _allowed(fact, again):
+    """Not a forgotten fact - or he's asked for it back, and the tombstone goes."""
+    from mind import forgetting
+
+    have = forgetting.marks(fact)
+    hit = [t for t in tombstones() if forgetting.same_fact(have, t)]
+    if not hit:
+        return True
+    if not again:
+        logbook.info("factstore", "not saved, he asked for it to be forgotten: %r", fact)
+        return False
+    unbury(hit)
+    return True
+
+
+def replace(old_fact, new_fact, subject="", since="", sure=True):
     """new_fact supersedes old_fact (matched by exact text). The old row
     is retired, never deleted - reversible, and it keeps the history.
+    `since`, when known, is the real day it changed: the new fact's start
+    and the old one's end.
     False if the old fact isn't there, in which case the caller should
     just add() - a missed replacement must degrade to today's behaviour
     (both facts coexist), never to a lost fact."""
     new_fact = str(new_fact or "").strip()
 
-    if not new_fact:
+    if not new_fact or not _allowed(new_fact, False):
         return False
 
     db = _connect()
@@ -410,22 +583,66 @@ def replace(old_fact, new_fact, subject=""):
         # Both or neither: a failure between them used to leave the shared
         # connection mid-transaction, and the next commit anywhere saved
         # the new fact without retiring the old one.
+        since = when(since) or None
         with db:
             cursor = db.execute(
-                "INSERT INTO facts(fact, subject, created_at) VALUES (?, ?, ?)",
-                (new_fact, str(subject or old_subject or "").strip().lower(), _now()),
+                "INSERT INTO facts(fact, subject, created_at, valid_from, trust) VALUES (?, ?, ?, ?, ?)",
+                (new_fact, str(subject or old_subject or "").strip().lower(), _now(), since,
+                 "confirmed" if sure else "unconfirmed"),
             )
             db.execute(
-                "UPDATE facts SET superseded_at = ?, superseded_by = ? WHERE id = ?",
-                (_now(), cursor.lastrowid, old_id),
+                "UPDATE facts SET superseded_at = ?, superseded_by = ?, "
+                "valid_to = coalesce(?, valid_to) WHERE id = ?",
+                (_now(), cursor.lastrowid, since, old_id),
             )
 
     return True
 
 
+def confirm(fact):
+    """He said it's right: an unconfirmed fact becomes a confirmed one."""
+    db = _connect()
+
+    with _lock:
+        with db:
+            cursor = db.execute("UPDATE facts SET trust = 'confirmed' WHERE fact = ? AND superseded_at IS NULL "
+                                "AND trust != 'confirmed'", (str(fact or "").strip(),))
+
+    return cursor.rowcount > 0
+
+
+def confirm_row(fact_id):
+    db = _connect()
+
+    with _lock:
+        with db:
+            cursor = db.execute("UPDATE facts SET trust = 'confirmed' WHERE id = ?", (int(fact_id),))
+
+    return cursor.rowcount > 0
+
+
+def set_since(fact, since):
+    """Give an active fact the real date it became true. False if the date
+    isn't one or the fact isn't there."""
+    since = when(since)
+    if not since:
+        return False
+    db = _connect()
+
+    with _lock:
+        with db:
+            cursor = db.execute(
+                "UPDATE facts SET valid_from = ? WHERE fact = ? AND superseded_at IS NULL",
+                (since, str(fact or "").strip()))
+
+    return cursor.rowcount > 0
+
+
 def update(old_fact, new_fact):
     """Rewrite a fact in place - a correction, not a change in the
     world, so no history row. The AU trigger keeps FTS honest."""
+    if not _allowed(str(new_fact or ""), False):
+        return False
     db = _connect()
 
     with _lock:
@@ -496,7 +713,7 @@ def restore_row(fact_id):
     with _lock:
         with db:
             cursor = db.execute(
-                "UPDATE facts SET superseded_at = NULL, superseded_by = NULL "
+                "UPDATE facts SET superseded_at = NULL, superseded_by = NULL, valid_to = NULL "
                 "WHERE id = ?",
                 (int(fact_id),),
             )
@@ -512,6 +729,60 @@ def delete_row(fact_id):
             cursor = db.execute("DELETE FROM facts WHERE id = ?", (int(fact_id),))
 
     return cursor.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
+# Tombstones: what he told her to forget, as fingerprints (mind/forgetting.py)
+# ---------------------------------------------------------------------------
+def bury(marks):
+    """Keep a forgotten fact's fingerprint: a set of word hashes."""
+    key = " ".join(sorted(marks or ()))
+    if not key:
+        return False
+    db = _connect()
+
+    with _lock, db:
+        db.execute("INSERT OR REPLACE INTO forgotten(marks, at) VALUES (?, ?)", (key, _now()))
+
+    return True
+
+
+def unbury(mark_sets):
+    """He's asked for these back."""
+    db = _connect()
+
+    with _lock, db:
+        for marks in mark_sets:
+            db.execute("DELETE FROM forgotten WHERE marks = ?", (" ".join(sorted(marks)),))
+
+
+def tombstones():
+    """[set of word hashes] for every forgotten fact."""
+    db = _connect()
+    if db is None:
+        return []
+
+    with _lock:
+        found = db.execute("SELECT marks FROM forgotten").fetchall()
+
+    return [set(r[0].split()) for r in found]
+
+
+def forgotten_count():
+    db = _connect()
+    if db is None:
+        return 0
+
+    with _lock:
+        return db.execute("SELECT count(*) FROM forgotten").fetchone()[0]
+
+
+def unbury_all():
+    """Let her learn anything again (the memory page's button)."""
+    db = _connect()
+
+    with _lock, db:
+        return db.execute("DELETE FROM forgotten").rowcount
 
 
 # ---------------------------------------------------------------------------
@@ -534,6 +805,15 @@ def set_meta(key, value):
         db.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", (key, str(value)))
 
 
+def _forgotten_here(db, fact):
+    """import_facts holds the lock already: the same check as _allowed, inline."""
+    from mind import forgetting
+
+    have = forgetting.marks(fact)
+    return any(forgetting.same_fact(have, set(r[0].split()))
+               for r in db.execute("SELECT marks FROM forgotten").fetchall())
+
+
 def import_facts(facts):
     """Absorb a list of facts. Idempotent - a fact already here (active
     OR retired) is skipped, so reading the same old list again never
@@ -552,7 +832,7 @@ def import_facts(facts):
                 "SELECT 1 FROM facts WHERE fact = ?", (fact,)
             ).fetchone()
 
-            if not known:
+            if not known and not _forgotten_here(db, fact):
                 db.execute(
                     "INSERT INTO facts(fact, subject, created_at) "
                     "VALUES (?, '', ?)",

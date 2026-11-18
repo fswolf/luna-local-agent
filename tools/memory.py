@@ -5,7 +5,7 @@ for the same reason set_reminder takes words: the model is good
 at repeating what was said and bad at bookkeeping.
 """
 import config
-from mind import longterm
+from mind import factstore, longterm
 from core import transcript
 
 from . import tool
@@ -25,16 +25,42 @@ from . import tool
             "description": "The fact, written as a short third-person "
                            f"statement, e.g. '{config.USER_NAME or 'The user'} streams as a VTuber'.",
         },
+        "since": {
+            "type": "string",
+            "description": "Only when the user said when it became true: the date as "
+                           "YYYY-MM-DD, YYYY-MM or YYYY, worked out from today's date. "
+                           "Leave it out rather than guess.",
+        },
+        "again": {
+            "type": "boolean",
+            "description": "Only when the user told you to forget this before and has now asked "
+                           "for it to be remembered again.",
+        },
     },
     required=("fact",),
 )
-def _remember_fact(fact):
-    if longterm.add_fact(fact):
-        return f"Saved: {fact}"
+def _remember_fact(fact, since="", again=False):
+    if longterm.add_fact(fact, since=since, again=_yes(again)):
+        return f"Saved: {fact}" + _date_note(since)
 
     why = longterm.why_not(fact)
 
     return f"Not saved: {why}." if why else "Not saved: you already know that (it's in your memory)."
+
+def _yes(value):
+    """A boolean argument, however the model sent it ("false" is a word, and truthy)."""
+    return value is True or str(value).strip().lower() in ("true", "yes", "1")
+
+
+def _date_note(since):
+    """What became of a date she gave: kept, or not understood."""
+    if not str(since or "").strip():
+        return ""
+    kept = factstore.when(since)
+    return f" (true since {kept})" if kept else (
+        f" (the date {since!r} wasn't understood, so it was saved without one: "
+        "use YYYY-MM-DD, YYYY-MM or YYYY)")
+
 
 # `about` arrived with the fact table. Without it this tool was a
 # SELECT * - fine at thirty facts, a context bomb at three thousand.
@@ -44,16 +70,29 @@ def _remember_fact(fact):
     "recall_facts",
     "Search what has been remembered about the user. Pass `about` to "
     "look something up ('gpu', 'streaming'); omit it for the most "
-    "recently learned facts.",
+    "recently learned facts. Set `past` for what used to be true too "
+    "('what was my last graphics card?', 'what did I have in October?').",
     {
         "about": {
             "type": "string",
             "description": "What to look for, in plain words. Optional.",
         },
+        "past": {
+            "type": "boolean",
+            "description": "Also show facts that are no longer true, with when. Needs `about`.",
+        },
     },
 )
-def _recall_facts(about=""):
+def _recall_facts(about="", past=False):
     about = str(about or "").strip()
+
+    if about and _yes(past):
+        found = longterm.history(about)
+        if not found:
+            return f"Nothing remembered about {about!r}, then or now."
+        return "\n".join(_then_and_now(f) for f in found) + (
+            "\n(\"learned\" and \"stopped believing\" are when you heard and when you updated it; "
+            "only \"true from/to\" are real dates the user gave.)")
 
     if about:
         facts = longterm.relevant_facts(about, limit=10)
@@ -66,7 +105,21 @@ def _recall_facts(about=""):
         if not facts:
             return "Nothing saved yet."
 
-    return "\n".join(f"- {f}" for f in facts)
+    known = longterm.details(facts)
+    listing = "\n".join(f"- {longterm.shown(f, known.get(f))}" for f in facts)
+    return listing + ("\n" + longterm.UNSURE_NOTE.strip() if any(not d[2] for d in known.values()) else "")
+
+
+def _then_and_now(f):
+    """One line of history: the fact, now or then, and its dates."""
+    real = " ".join(x for x in (f"true from {f['since']}" if f["since"] else "",
+                                f"to {f['until']}" if f["until"] else "",
+                                "" if f.get("sure", True) else "(not sure)") if x)
+    if f["active"]:
+        return f"- NOW: {f['fact']} (learned {f['learned']}{'; ' + real if real else ''})"
+    return (f"- BEFORE: {f['fact']} (learned {f['learned']}, stopped believing {f['retired']}"
+            f"{'; ' + real if real else ''})")
+
 
 @tool(
     "forget_fact",
@@ -99,9 +152,37 @@ def _forget_fact(about):
     return f"Nothing remembered matches {about!r}. Nothing was deleted."
 
 @tool(
+    "confirm_fact",
+    "The user just said something you have marked (not sure) is right. "
+    "Marks it confirmed, so you can treat it as true from now on.",
+    {
+        "about": {
+            "type": "string",
+            "description": "Roughly what the fact says.",
+        },
+    },
+    required=("about",),
+)
+def _confirm_fact(about):
+    done, candidates = longterm.confirm_fact(about)
+
+    if done:
+        fact, was_unsure = done
+        return f"Confirmed: {fact}" if was_unsure else f"Already confirmed: {fact}"
+
+    if candidates:
+        listing = "\n".join(f"- {c}" for c in candidates)
+        return f"More than one could be it:\n{listing}\nAsk which one."
+
+    return f"Nothing remembered matches {about!r}. If it's new, use remember_fact."
+
+
+@tool(
     "update_fact",
-    "Correct something remembered about the user when the old version "
-    "is out of date - they moved, changed jobs, finished the project.",
+    "Replace something remembered about the user when it changed - they "
+    "moved, changed jobs, swapped hardware, finished the project. The old "
+    "version is kept as history. Set `mistake` only when the old fact was "
+    "never right (you misheard).",
     {
         "about": {
             "type": "string",
@@ -112,19 +193,38 @@ def _forget_fact(about):
             "description": "The replacement, as one short third-person "
                            "sentence.",
         },
+        "since": {
+            "type": "string",
+            "description": "Only when the user said when it changed: the date as "
+                           "YYYY-MM-DD, YYYY-MM or YYYY, worked out from today's date. "
+                           "Leave it out rather than guess.",
+        },
+        "mistake": {
+            "type": "boolean",
+            "description": "True when the old fact was never right: it's fixed with no history kept.",
+        },
     },
     required=("about", "corrected"),
 )
-def _update_fact(about, corrected):
-    changed, candidates = longterm.update_fact(about, corrected)
+def _update_fact(about, corrected, since="", mistake=False):
+    mistake = _yes(mistake)
+    changed, candidates = longterm.update_fact(about, corrected, since=since, mistake=mistake)
 
     if changed:
-        return f"Updated: {changed[0]!r} is now {changed[1]!r}"
+        if changed[0] == changed[1]:
+            return f"Unchanged: {changed[0]!r}" + (_date_note(since) or " (it already says that)")
+        if mistake or longterm.guest():          # a guest's facts keep no history
+            return f"Fixed: {changed[0]!r} is now {changed[1]!r}" + _date_note(since)
+        return f"Updated: {changed[1]!r} (kept {changed[0]!r} as what used to be true)" + _date_note(since)
 
     if candidates:
         listing = "\n".join(f"- {c}" for c in candidates)
 
         return f"More than one could be it:\n{listing}\nAsk which one."
+
+    why = longterm.why_not(corrected)
+    if why:
+        return f"Not changed: {why}."
 
     return (
         f"Nothing remembered matches {about!r}, and {corrected!r} was not "

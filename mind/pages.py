@@ -114,7 +114,8 @@ def _facts():
     # context_facts, and inside a guest's turn (reflect_now) answers with theirs
     if not longterm.ready():
         return []
-    return [(r[1], r[2] or "") for r in factstore.rows(limit=2000)]      # (fact, subject), active only
+    # (fact, subject), active and confirmed: a page is no place for a guess
+    return [(r[1], r[2] or "") for r in factstore.rows(limit=2000, sure_only=True)]
 
 
 def _names(facts, skip):
@@ -212,7 +213,9 @@ def write(ask, yield_=lambda: None, report=None, limit=PER_PASS):
             continue
         yield_()
         try:
-            text = _clean(ask(_prompt(subject, facts, episodes)))
+            from mind import forgetting
+
+            text = forgetting.clean(_clean(ask(_prompt(subject, facts, episodes))))
         except Exception as e:
             logbook.warn("pages", "writing %s failed: %s", subject, e)
             break

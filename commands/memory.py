@@ -31,6 +31,18 @@ def _id(word):
     return int(word)
 
 
+def _real(detail, lead="; "):
+    """'; true from 2026-10 to 2026-11-14' and/or 'not sure', if there's either."""
+    since, until, sure = detail or ("", "", True)
+    notes = []
+    if since or until:
+        notes.append("true " + " ".join(x for x in (f"from {since}" if since else "",
+                                                    f"to {until}" if until else "") if x))
+    if not sure:
+        notes.append("not sure")
+    return lead + ", ".join(notes) if notes else ""
+
+
 def handle(text):
     """True when text was one of these commands (and it ran)."""
     if text.startswith("/facts"):
@@ -47,9 +59,10 @@ def handle(text):
 
         if argument == "retired":
             listing = factstore.rows(retired=True, limit=30)
+            real = factstore.row_details([r[0] for r in listing])
             shown = "\n".join(
-                f"  ~ {fact}  (retired {when[:10]})"
-                for _i, fact, _s, _c, when in listing
+                f"  ~ {fact}  (retired {when[:10]}{_real(real.get(i))})"
+                for i, fact, _s, _c, when in listing
             ) or "  (none)"
             ui.add_message(
                 "system",
@@ -58,11 +71,22 @@ def handle(text):
             )
             return True
 
+        if argument == "unsure":
+            listing = [r for r in factstore.rows(limit=2000) if not factstore.is_sure(r[0])]
+            shown = "\n".join(f"  ? {fact}" for _i, fact, _s, _c, _w in reversed(listing)) or "  (none)"
+            ui.add_message(
+                "system",
+                f"{len(listing)} not sure - picked up once in passing. They're confirmed when they "
+                f"come up again, when you say so, or on the memory page (/memory):\n{shown}",
+            )
+            return True
+
         limit = 500 if argument == "all" else 20
         listing = factstore.rows(retired=False, limit=limit)
+        real = factstore.row_details([r[0] for r in listing])
         shown = "\n".join(
-            f"  - {fact}" + (f"  [{subject}]" if subject else "")
-            for _i, fact, subject, _c, _w in reversed(listing)
+            f"  - {fact}" + (f"  [{subject}]" if subject else "") + _real(real.get(i), "  ")
+            for i, fact, subject, _c, _w in reversed(listing)
         ) or "  (none yet)"
         more = (
             f"\n  ... /facts all shows the rest of the {active}."
@@ -70,9 +94,10 @@ def handle(text):
         )
         ui.add_message(
             "system",
-            f"Memory: {active} active, {retired} retired. "
-            f"Newest {min(active, limit)}:\n{shown}{more}"
-            "\n/facts retired shows what's been superseded.",
+            f"Memory: {active} active, {retired} retired"
+            + (f", {factstore.forgotten_count()} forgotten for good" if factstore.forgotten_count() else "")
+            + f". Newest {min(active, limit)}:\n{shown}{more}"
+            "\n/facts retired shows what's been superseded, /facts unsure what she isn't sure of.",
         )
         return True
 

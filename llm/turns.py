@@ -26,7 +26,8 @@ from . import session
 from .prompts import _calibration_note, _previous_user_text, build_generation_params, build_memory_prompt, build_self_prompt, build_tools_prompt, turn_prompt, with_live
 from .replay import _demonstration, _has_tool_example, _replay, _strip_leading_timestamps, _timestamped
 from .rounds import _generate, _log_tool_call, _tool_rounds, _why_empty
-from .second_look import _adaptive_on, _calibrate, _ONLY_WHAT_CHANGED, _follow_through, _ground, _promised_action, _rethink, _vote
+from .second_look import (_adaptive_on, _calibrate, _ONLY_WHAT_CHANGED, _follow_through, _ground,
+                          _promised_action, _rethink, _unbacked, _vote)
 from .streaming import _last_raw
 
 _window_cache = {"at": 0.0, "n": 0}
@@ -415,6 +416,24 @@ def _ask(text, model, on_text=None, on_sentence=None,
             f"\u201c{promise}\u201d but you didn't call a tool. If one of your tools does that, "
             "call it now and finish the job. If none of them does, don't reach for a different "
             "tool - just say in a sentence that you can't do that from here.)")
+        kept_promise = True
+
+    unbacked = (_unbacked(answer, _last_raw.get("exchanges"), text)
+                if remember and payload.get("tools") and not kept_promise
+                and getattr(config, "FOLLOW_THROUGH", True) else "")
+
+    if unbacked:
+        # She said she did it, or that it works, and the record says
+        # otherwise. Back to it, out loud: do it now or own up. The calls
+        # made before stay in this turn's record.
+        before, called = list(_last_raw.get("exchanges") or []), set(_last_raw.get("called") or ())
+        _log_tool_call("follow-through", unbacked[0].upper() + unbacked[1:].split(". ")[0])
+        livefeed.emit("rethink", step="done", outcome="follow-through: a claim the tools don't back")
+        answer = _follow_through(
+            payload, base_messages, answer, model, on_text, on_sentence, "",
+            f"(Not from {config.USER} - your own check: {unbacked} {_ONLY_WHAT_CHANGED})")
+        _last_raw["exchanges"] = before + list(_last_raw.get("exchanges") or [])
+        _last_raw["called"] = called | set(_last_raw.get("called") or ())
         kept_promise = True
 
     if (adaptive and not kept_promise and not _last_raw.get("exchanges")

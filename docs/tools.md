@@ -13,7 +13,8 @@ check the time, then schedule something.
 | `set_alarm` | A wake-up: rings and nags until dismissed |
 | `list_reminders` / `cancel_reminder` | Read and cancel what's pending |
 | `remember_fact` / `recall_facts` | Long-term memory, written deliberately |
-| `forget_fact` / `update_fact` | Correct it when it got something wrong |
+| `forget_fact` / `update_fact` | Forget something for good, or update it when it changed (the old version kept as history) |
+| `confirm_fact` | Mark a fact she wasn't sure of as right, after you agree |
 | `meet_guest` | Put a name to someone new she just saw or heard, for this session only ([who she's talking to](who.md#the-ladder)) |
 | `look_at_screen` | Take a screenshot and actually see it (optional) |
 | `look_at_camera` | One webcam picture when you ask: **off until you switch it on** ([Vision](vision.md#the-camera)) |

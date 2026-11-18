@@ -128,6 +128,11 @@ def _announce():
         pass  # headless, or the UI isn't up yet
 
 
+def guest():
+    """Is someone other than the owner talking (their name), for callers outside."""
+    return _guest()
+
+
 def _guest():
     """Someone other than the owner is talking this turn (senses/people.py): their
     name, and their facts are the ones used. None for the owner."""
@@ -334,12 +339,34 @@ def forget_fact(phrase):
         return None, []
 
     removed = factstore.remove(found)
+    if removed:
+        # and out of everything else she keeps, so nothing writes it back (mind/forgetting.py)
+        from mind import forgetting
+
+        forgetting.forget(found)
     _announce()
     return (found, []) if removed else (None, [])
 
 
-def update_fact(phrase, replacement):
-    """Correct one fact in place. Returns (old, new) or (None, candidates)."""
+def confirm_fact(phrase):
+    """He says a fact is right: (fact, was_unsure) or (None, candidates)."""
+    index, found = find_fact(phrase)
+
+    if index is None:
+        return None, found
+
+    if _guest() or not ready():
+        return (found, False), []
+
+    return (found, factstore.confirm(found)), []
+
+
+def update_fact(phrase, replacement, since="", mistake=False):
+    """Something changed: the new fact replaces the old, and the old is
+    kept as history (true until `since`, when that's known). mistake=True
+    is the other case, the old fact was never right (misheard, mistyped):
+    it's rewritten in place, with no history of the wrong version.
+    Returns (old, new) or (None, candidates)."""
     replacement = str(replacement or "").strip()
 
     if not _looks_like_valid_fact(replacement):
@@ -357,12 +384,68 @@ def update_fact(phrase, replacement):
 
         return ((found, replacement), []) if people.set_fact(guest, found, replacement) else (None, [])
 
-    # A correction, not a change in the world - rewritten in place
-    # rather than superseded, so no history row.
-    if ready() and factstore.update(found, replacement):
+    if not ready():
+        return None, []
+
+    if replacement == found or mistake:
+        # the same words (only a date to add), or a fix: in place, no history
+        changed = replacement == found or factstore.update(found, replacement)
+        if changed and since:
+            factstore.set_since(replacement, since)
+        if changed:
+            factstore.confirm(replacement)          # he's just spoken to it
+    else:
+        changed = factstore.replace(found, replacement, since=since)
+        if changed:
+            logbook.info("longterm", "superseded: %r -> %r", found, replacement)
+
+    if changed:
+        _announce()
         return (found, replacement), []
 
     return None, []
+
+
+def history(about, limit=10):
+    """What's been true about this, then and now (factstore.history). The
+    owner's only: a guest's facts have no history kept."""
+    if _guest() or not ready():
+        return []
+    return factstore.history(about, limit)
+
+
+def details(facts):
+    """{fact: (since, until, sure)} for the ones with a real date or not
+    confirmed; {} for a guest (theirs have neither)."""
+    if _guest() or not ready():
+        return {}
+    try:
+        return factstore.details(facts)
+    except Exception:
+        logbook.exception("longterm", "fact details failed")
+        return {}
+
+
+def shown(fact, detail):
+    """The fact as she sees it: 'fact (since 2026-11)', 'fact (not sure)'."""
+    since, until, sure = detail or ("", "", True)
+    notes = []
+    if since and until:
+        notes.append(f"{since} to {until}")
+    elif since:
+        notes.append(f"since {since}")
+    elif until:
+        notes.append(f"until {until}")
+    if not sure:
+        notes.append("not sure")
+    return f"{fact} ({', '.join(notes)})" if notes else fact
+
+
+# what shown() puts on the end of a fact, taken back off when the model copies it
+_UNSHOWN = re.compile(r"\s*\((?:not sure|since [^()]*|until [^()]*|\d{4}[^()]* to [^()]*)(?:, not sure)?\)\s*$", re.I)
+
+UNSURE_NOTE = ("Facts marked (not sure) were picked up once in passing and never confirmed: "
+               "don't state them as true. Ask when it matters; if the user says it's right, confirm_fact.\n")
 
 
 def why_not(fact):
@@ -371,6 +454,14 @@ def why_not(fact):
     fact = str(fact or "").strip()
     if not fact or fact.upper() == "NONE":
         return "it was empty"
+    try:
+        from mind import forgetting
+
+        if not _guest() and forgetting.forgotten(fact):
+            return ("the user asked you to forget that. Only if they've just asked for it to be "
+                    "remembered again, call remember_fact with again: true")
+    except Exception:
+        pass
     if len(fact) > _MAX_FACT_CHARS:
         return f"it's too long (keep it under {_MAX_FACT_CHARS} characters, one sentence)"
     if "\n" in fact:
@@ -393,7 +484,7 @@ def _looks_like_valid_fact(fact: str) -> bool:
     return True
 
 
-def add_fact(fact: str, subject: str = "") -> bool:
+def add_fact(fact: str, subject: str = "", since: str = "", sure: bool = True, again: bool = False) -> bool:
     """Returns True if the fact was stored, False if rejected or already
     known - the remember_fact tool reports that back to the model."""
     fact = fact.strip()
@@ -407,9 +498,15 @@ def add_fact(fact: str, subject: str = "") -> bool:
     if not ready():
         return False
     # No cap - permanence is the point.
-    stored = factstore.add(fact, subject)
+    stored = factstore.add(fact, subject, since, sure=sure, again=again)
     _announce()
     return stored
+
+
+def _today():
+    from datetime import date
+
+    return date.today().isoformat()
 
 
 def _strip_think(text):
@@ -450,12 +547,13 @@ def _extract_fact_sqlite(model, user_text, answer, asked=False):
     known = factstore.search(query, limit=12)
     if known is None:                   # no FTS5: the same word ranking the conversation uses
         known = _by_words(factstore.active_facts(), query, 12)
+    notes = factstore.details(known or [])
     known_block = ""
 
     if known:
         known_block = (
             "Facts already remembered that may be relevant:\n"
-            + "\n".join(f"- {f}" for f in known)
+            + "\n".join(f"- {shown(f, notes.get(f))}" for f in known)
             + "\n\n"
         )
 
@@ -472,11 +570,16 @@ def _extract_fact_sqlite(model, user_text, answer, asked=False):
         "specific (identity, an explicitly stated preference, a concrete "
         "standing project or commitment) - NOT routine chit-chat.\n\n"
         f"{known_block}"
-        "Reply with exactly ONE line, in one of these three forms:\n"
+        "Reply with exactly ONE line, in one of these forms:\n"
         "NONE\n"
         "NEW | <one-word subject> | <the fact, one short sentence>\n"
         "REPLACE | <the old fact, copied exactly from the list above> | "
-        "<the new fact, one short sentence>\n\n"
+        "<the new fact, one short sentence>\n"
+        "CONFIRM | <a listed fact marked (not sure), copied exactly>   (only when "
+        "the user plainly said it's true)\n"
+        "Only when the user said when it became true, end the line with "
+        f"| since YYYY-MM-DD (or YYYY-MM, or YYYY; today is {_today()}). "
+        "Never guess a date.\n\n"
         "Use REPLACE only when the exchange shows a listed fact is no "
         "longer true (something was replaced, changed, ended). If both "
         "could still be true at once, use NEW. "
@@ -510,7 +613,29 @@ def _extract_fact_sqlite(model, user_text, answer, asked=False):
 
     parts = [p.strip() for p in line.split("|")]
     verb = parts[0].upper()
+    since = ""
 
+    if len(parts) >= 3:                 # "| since 2026-11-14" on the end: when it became true
+        m = re.match(r"(?i)since\b\s*(.*)$", parts[-1])
+        # "since last week" too (dropped, not stored), but never "Since 2019 he has..."
+        if m and len(parts[-1].split()) <= 3:
+            since = factstore.when(m.group(1))
+            parts = parts[:-1]
+
+    # a fact copied from the list with its "(not sure)" / "(since ...)" still on
+    parts = [_UNSHOWN.sub("", p) for p in parts]
+    sure = again = bool(asked)          # a guess from one exchange, unless he asked for it
+
+    if verb == "CONFIRM" and len(parts) >= 2:
+        index, found = find_fact(parts[1])
+        if index is not None and factstore.confirm(found):
+            logbook.info("longterm", "confirmed: %r", found)
+        return
+
+    # A guess may still retire a confirmed fact here, unlike in the daily tidy
+    # (mind/reflect.py): this is the exchange where he said it changed, and
+    # the old one stays under /facts retired to restore. The new one is
+    # still marked not sure until it comes up again.
     if verb == "REPLACE" and len(parts) >= 3:
         old, new = parts[1], parts[-1]
 
@@ -519,7 +644,7 @@ def _extract_fact_sqlite(model, user_text, answer, asked=False):
 
         # Exact echo first; the fuzzy matcher when the model reworded
         # the old fact, which it will.
-        if factstore.replace(old, new):
+        if factstore.replace(old, new, since=since, sure=sure):
             logbook.info("longterm", "superseded: %r -> %r", old, new)
             _announce()
 
@@ -527,13 +652,13 @@ def _extract_fact_sqlite(model, user_text, answer, asked=False):
 
         index, found = find_fact(old)
 
-        if index is not None and factstore.replace(found, new):
+        if index is not None and factstore.replace(found, new, since=since, sure=sure):
             logbook.info("longterm", "superseded: %r -> %r", found, new)
             _announce()
 
             return
 
-        add_fact(new)  # couldn't place the old one - degrade to coexist
+        add_fact(new, since=since, sure=sure, again=again)  # couldn't place the old one - degrade to coexist
 
         return
 
@@ -544,13 +669,13 @@ def _extract_fact_sqlite(model, user_text, answer, asked=False):
             subject = ""
 
         if _looks_like_valid_fact(parts[-1]):
-            add_fact(parts[-1], subject)
+            add_fact(parts[-1], subject, since, sure=sure, again=again)
 
         return
 
     # Not in the format at all - an older-style bare fact still counts.
     if len(parts) == 1 and _looks_like_valid_fact(line):
-        add_fact(line)
+        add_fact(line, sure=sure, again=again)
 
 
 def _extract_fact(model, user_text, answer, asked=False):

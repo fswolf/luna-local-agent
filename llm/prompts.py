@@ -40,9 +40,13 @@ def build_memory_prompt(query=""):
 
     if facts:
         prompt += "\nThings learned over time:\n"
+        known = longterm.details(facts)      # real dates he gave, and the ones not confirmed yet
 
         for fact in facts:
-            prompt += f"- {fact}\n"
+            prompt += f"- {longterm.shown(fact, known.get(fact))}\n"
+
+        if any(not d[2] for d in known.values()):
+            prompt += longterm.UNSURE_NOTE
 
     # Her pages: the facts on a subject joined up while she was idle (mind/pages.py).
     try:
@@ -212,7 +216,9 @@ and the user finds out later that it didn't.
 - Something from a past conversation you can't see -> search_history.
   Don't say you don't remember until you've looked.
 - A durable fact about them worth recalling weeks later ->
-  remember_fact; a correction to one -> update_fact or forget_fact.
+  remember_fact; when one changed or was wrong -> update_fact or
+  forget_fact; one marked (not sure) that they say is right ->
+  confirm_fact; what used to be true -> recall_facts with past.
 - Asked how sure you were, why you said something, or whether you were
   guessing -> introspect. It reports measured numbers about an earlier
   reply; say what they show, not what you'd like them to.

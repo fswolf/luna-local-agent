@@ -100,6 +100,25 @@ def _key(text):
     return hashlib.sha1(f"{_state['model']}\n{text}".encode()).hexdigest()
 
 
+def drop(texts):
+    """Forget the cached vectors of these texts (mind/forgetting.py): a
+    vector is a summary of the words it was made from."""
+    import os
+
+    if not os.path.exists(DB_FILE):
+        return 0
+    if not _state["model"]:
+        available()             # the keys carry the model's name: learn it, if the server's up
+    with _lock:
+        conn = _db()
+        try:
+            n = sum(conn.execute("DELETE FROM vectors WHERE key=?", (_key(t),)).rowcount for t in texts)
+            conn.commit()
+            return n
+        finally:
+            conn.close()
+
+
 def _vectors(facts):
     """{fact: vector} for every fact, embedding only the uncached ones."""
     keys = {fact: _key(fact) for fact in facts}

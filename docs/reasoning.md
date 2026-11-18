@@ -261,6 +261,16 @@ on from what she said. Small models announce more often than they act,
 and from outside it looked like she'd stalled. `/set
 adaptive.follow_through false` turns it off.
 
+The same check runs the other way round: a reply that says something
+is done when this turn's tools don't back it. "Done and done~" or
+"I've updated the script" with nothing written, edited or sent; "I've
+sent it" with no email sent; "it works now" right after the last run of
+it failed. She's sent back to do it, or to say plainly that it isn't
+done and what failed (a program that needs a real terminal, she asks
+you to try). Only on a working turn, one where she used a tool or your
+message asked for work, so "I wrote it for you~" said back to praise
+isn't held to it. The calls she already made stay in the turn.
+
 A confident reply never pays for a second look. A turn that already
 called a tool is never re-run, so a reminder can't be set twice or a
 file written twice. The second look is offered the same tools, but

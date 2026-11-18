@@ -93,6 +93,18 @@ def add(role, content):
     if not config.TRANSCRIPT_ENABLED or not str(content or "").strip():
         return
 
+    if role == "assistant":
+        # her words only (mind/forgetting.py): what you say yourself is kept as said
+        try:
+            from mind import forgetting
+
+            content = forgetting.clean(content)
+        except Exception:
+            pass
+
+        if not str(content).strip():
+            return
+
     entry = {
         "at": datetime.now().isoformat(timespec="seconds"),
         "role": role,

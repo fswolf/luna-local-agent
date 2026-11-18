@@ -717,10 +717,18 @@ def tidy_facts(model, report=None, limit=6):
             # rewriting a fact into something else.
             if (12 <= len(merged) <= 220 and notebook.overlap(merged, a[1]) > 0.2
                     and notebook.overlap(merged, b[1]) > 0.2):
+                sure = factstore.is_sure(a[0]) or factstore.is_sure(b[0])   # the same thing, heard twice
                 factstore.set_row(b[0], merged, b[2] or a[2])
+                if sure:
+                    factstore.confirm_row(b[0])
                 factstore.retire_row(a[0])
                 touched.update((a[0], b[0]))
                 changes.append(f"merged \"{a[1]}\" + \"{b[1]}\" → \"{merged}\"")
+        elif side and factstore.is_sure(a[0] if side == "B" else b[0]) and \
+                not factstore.is_sure(b[0] if side == "B" else a[0]):
+            # a guess doesn't get to retire something he confirmed: both stay,
+            # the guess marked (not sure), and she asks
+            continue
         elif side == "A":
             factstore.retire_row(b[0])
             touched.update((a[0], b[0]))

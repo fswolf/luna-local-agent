@@ -114,7 +114,7 @@ def _owner_facts():
     # with a guest's facts when it runs inside their turn (reflect_now)
     facts = []
     if longterm.ready():
-        facts = [r[1] for r in factstore.rows(limit=MAX_FACTS)]          # newest first, active only
+        facts = [r[1] for r in factstore.rows(limit=MAX_FACTS, sure_only=True)]   # newest first, active, confirmed
         facts.reverse()
     try:
         import config
@@ -213,7 +213,9 @@ def write(ask, yield_=lambda: None, report=None, limit=PER_PASS):
             continue
         yield_()
         try:
-            text = _clean(ask(_prompt(person, facts)))
+            from mind import forgetting
+
+            text = forgetting.clean(_clean(ask(_prompt(person, facts))))
         except Exception as e:
             logbook.warn("profiles", "writing %s's profile failed: %s", label(person), e)
             break

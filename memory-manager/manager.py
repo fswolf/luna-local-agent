@@ -2,13 +2,13 @@
 
     python memory-manager/manager.py
 
-opens a small page on http://127.0.0.1:8790 - view, search, add, edit,
-retire, restore and delete facts (agent/facts.db). (Your preferences used
-to be edited here too; they live in agent.json now, under Who she is on
-the settings page.) Below that, her own
-notebook (agent/notebook.db): how she feels about the games she's
-played, her notes on past conversations and game sessions, and the
-lessons she's learned - facts are about you, the notebook is about her. It's a separate
+opens a small page on http://127.0.0.1:8790 with three tabs. About you:
+view, search, add, edit, confirm, retire, restore and delete facts
+(agent/facts.db). (Your preferences used to be edited here too; they live
+in agent.json now, under Who she is on the settings page.) Her notebook
+(agent/notebook.db): how she feels about the games she's played, and her
+notes on past conversations and game sessions. Her lessons: what she's
+learned about how she behaves - facts are about you, the notebook is about her. It's a separate
 process on purpose: memory is the one thing you occasionally want to
 inspect while suspecting the assistant of being wrong about it.
 
@@ -49,26 +49,33 @@ def _ready():
 # One state blob for the page
 # ---------------------------------------------------------------------------
 def state():
-    active, retired, warning = [], [], ""
+    active, retired, warning, forgotten = [], [], "", 0
 
     if _ready():
         store = _factstore()
+        rows = store.rows(limit=100000)
+        old = store.rows(retired=True, limit=100000)
+        ids, extra = [r[0] for r in rows + old], {}
+        for start in range(0, len(ids), 1000):                  # row_details takes 1000 at a time
+            extra.update(store.row_details(ids[start:start + 1000]))
+        info = lambda i: dict(zip(("since", "until", "sure"), extra.get(i, ("", "", True))))
         active = [
-            {"id": i, "fact": fact, "subject": subject, "created": created[:10]}
-            for i, fact, subject, created, _w in store.rows(limit=100000)
+            {"id": i, "fact": fact, "subject": subject, "created": created[:10], **info(i)}
+            for i, fact, subject, created, _w in rows
         ]
         retired = [
             {"id": i, "fact": fact, "subject": subject,
-             "created": created[:10], "retired": when[:10]}
-            for i, fact, subject, created, when
-            in store.rows(retired=True, limit=100000)
+             "created": created[:10], "retired": when[:10], **info(i)}
+            for i, fact, subject, created, when in old
         ]
+        forgotten = store.forgotten_count()
     else:
         warning = "agent/facts.db can't be opened - the assistant's log says why."
 
     return {
         "active": active,
         "retired": retired,
+        "forgotten": forgotten,
         "warning": warning,
         "notebook": notebook_state(),
     }
@@ -139,18 +146,29 @@ def apply(action, body):
         if not fact:
             raise ValueError("empty fact")
 
-        store.add(fact, subject)
+        store.add(fact, subject, again=True)       # you adding it is asking for it back
     elif action == "edit":
         if not fact:
             raise ValueError("empty fact")
 
         store.set_row(fact_id, fact, subject)
+        store.confirm_row(fact_id)                 # you wrote it: it's sure
     elif action == "retire":
         store.retire_row(fact_id)
     elif action == "restore":
         store.restore_row(fact_id)
+    elif action == "confirm":
+        store.confirm_row(fact_id)
     elif action == "delete":
-        store.delete_row(fact_id)
+        # a delete is a forget: out of everything else she keeps, and never relearned
+        gone = [r[1] for r in store.rows(limit=100000) + store.rows(retired=True, limit=100000)
+                if r[0] == fact_id]
+        if store.delete_row(fact_id) and gone:
+            from mind import forgetting
+
+            forgetting.forget(gone[0], wait=True)
+    elif action == "unforget_all":
+        store.unbury_all()
     else:
         raise ValueError(f"unknown action {action!r}")
 
@@ -305,6 +323,8 @@ PAGE = r"""<!DOCTYPE html>
   .fact .date { color: var(--dim); font-size: 12px;
                 white-space: nowrap; margin-top: 3px; }
   .fact.retired { opacity: .6; }
+  .fact .unsure { color: var(--danger); font-size: 12px; border: 1px dashed var(--line);
+                  border-radius: 20px; padding: 1px 9px; white-space: nowrap; margin-top: 2px; }
   .fact.retired .text { text-decoration: line-through; }
   button {
     background: none; border: 1px solid var(--line); color: var(--dim);
@@ -334,12 +354,29 @@ PAGE = r"""<!DOCTYPE html>
     border: 1px solid var(--line); background: var(--panel);
     color: var(--text); font-size: 14px; outline: none;
   }
+  #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 6px 0 16px; flex-wrap: wrap; }
+  #tabs a { color: var(--dim); text-decoration: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
+            border: 1px solid transparent; border-bottom: none; margin-bottom: -1px; font-size: 14px; }
+  #tabs a:hover { color: var(--text); }
+  #tabs a.on { color: var(--accent); background: var(--panel); border-color: var(--line); }
+  #tabs span { font-size: 12px; color: var(--dim); }
+  @media (max-width: 480px) { #tabs a { padding: 6px 8px; font-size: 13px; } }
+  section[hidden] { display: none; }
   .fact .game { color: var(--ok); font-size: 12px; border: 1px solid var(--line);
                 border-radius: 20px; padding: 1px 9px; white-space: nowrap; margin-top: 2px; }
 </style></head><body>
 
 <h1>Luna's memory</h1>
+<nav id="tabs">
+  <a href="#facts" data-tab="facts">About you <span id="n-facts"></span></a>
+  <a href="#notebook" data-tab="notebook">Her notebook <span id="n-notebook"></span></a>
+  <a href="#lessons" data-tab="lessons">Her lessons <span id="n-lessons"></span></a>
+</nav>
+
+<section data-tab="facts">
 <div id="meta">loading...</div>
+<div id="unforget" style="display:none" class="meta-note">Forgotten facts stay forgotten (she keeps a fingerprint, not the words).
+  <button onclick="unforgetAll()">let her learn them again</button></div>
 <div id="warning"></div>
 
 <h2>Add a fact</h2>
@@ -360,23 +397,31 @@ PAGE = r"""<!DOCTYPE html>
 <div class="meta-note">What she calls you, nicknames and what to avoid are in agent.json now, as <code>user_preferences</code>: the settings page, <a href="/settings/">Who she is</a>.</div>
 <!-- <textarea id="prefs" spellcheck="false"></textarea>
 <div style="margin-top:8px"><button onclick="savePrefs()">save preferences</button></div> -->
+</section>
 
+<section data-tab="notebook" hidden>
+<div class="meta-note">What she remembers about herself: written by her while idle, in her own words. Facts are about you; this is about her.</div>
+<div class="empty nb-missing" style="display:none">Her notebook (agent/notebook.db) can't be read right now.</div>
 <div id="nb">
-<h1 style="margin-top:40px">Her notebook</h1>
-<div class="meta-note">What she remembers about herself: written by her while idle, in her own words. Facts above are about you; this is about her.</div>
-
 <h2>How she feels about games</h2>
 <div id="feelings"></div>
 
 <h2>Her notes on conversations and games</h2>
 <input id="epsearch" placeholder="filter..." oninput="renderNotebook()">
 <div id="episodes"></div>
+</div>
+</section>
 
+<section data-tab="lessons" hidden>
+<div class="meta-note">What she's learned about how she behaves: from her idle passes, and the ones she noted herself mid-conversation. Retire one and she stops being reminded of it.</div>
+<div class="empty nb-missing" style="display:none">Her lessons (agent/notebook.db) can't be read right now.</div>
+<div id="nb-lessons">
 <h2>Lessons she's learned</h2>
 <div id="lessons"></div>
 <h2 id="rlessons-h">Retired lessons</h2>
 <div id="rlessons"></div>
 </div>
+</section>
 
 <div id="status"></div>
 
@@ -404,8 +449,11 @@ async function api(action, body) {
 async function refresh(keepPrefs) {
   const r = await fetch("api/state");
   S = await r.json();
+  const unsure = S.active.filter(f => !f.sure).length;
   document.getElementById("meta").textContent =
-    `${S.active.length} active, ${S.retired.length} retired`;
+    `${S.active.length} active` + (unsure ? ` (${unsure} not sure)` : "") +
+    `, ${S.retired.length} retired` + (S.forgotten ? `, ${S.forgotten} forgotten for good` : "");
+  document.getElementById("unforget").style.display = S.forgotten ? "" : "none";
   const warn = document.getElementById("warning");
   warn.style.display = S.warning ? "block" : "none";
   warn.textContent = S.warning;
@@ -465,9 +513,26 @@ function editFeeling(row, f) {
   input.onkeydown = e => { if (e.key === "Enter") save.onclick(); };
 }
 
+// Tabs: one page each for facts, her notebook and her lessons, remembered in
+// the address (#notebook), so a reload or a link lands on the same one.
+function showTab() {
+  const want = (location.hash || "#facts").slice(1);
+  const tab = ["facts", "notebook", "lessons"].includes(want) ? want : "facts";
+  document.querySelectorAll("section[data-tab]").forEach(s => s.hidden = s.dataset.tab !== tab);
+  document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
+}
+window.addEventListener("hashchange", showTab);
+showTab();
+
+function count(id, n) { document.getElementById(id).textContent = n ? `(${n})` : ""; }
+
 function renderNotebook() {
   const N = S.notebook;
-  document.getElementById("nb").style.display = N ? "" : "none";
+  for (const id of ["nb", "nb-lessons"]) document.getElementById(id).style.display = N ? "" : "none";
+  document.querySelectorAll(".nb-missing").forEach(el => el.style.display = N ? "none" : "");
+  count("n-facts", S.active.length);
+  count("n-notebook", N ? N.episodes.length + N.feelings.length : 0);
+  count("n-lessons", N ? N.lessons.length : 0);
   if (!N) return;
 
   fill("feelings", N.feelings.map(f => {
@@ -489,10 +554,13 @@ function renderNotebook() {
         await api("nb_episode_forget", {id: e.id}); refresh(true); }],
     ])), "no notes yet");
 
-  fill("lessons", N.lessons.map(l => nbRow(l.text, [["date", l.created]], [
+  // where it came from, and how often it's been used or learned again
+  const tags = l => [["game", l.origin === "self" ? "noted herself" : ""],
+                     ["subject", l.hits ? `used ${l.hits}×` : ""], ["date", l.created]];
+  fill("lessons", N.lessons.map(l => nbRow(l.text, tags(l), [
     ["retire", "", async () => { await api("nb_lesson_retire", {id: l.id}); refresh(true); }],
   ])), "no lessons yet");
-  fill("rlessons", N.retired_lessons.map(l => nbRow(l.text, [["date", l.created]], [
+  fill("rlessons", N.retired_lessons.map(l => nbRow(l.text, tags(l), [
     ["restore", "", async () => { await api("nb_lesson_restore", {id: l.id}); refresh(true); }],
   ], true)), "none retired");
 }
@@ -508,6 +576,17 @@ function factRow(f, retired) {
     const s = document.createElement("div");
     s.className = "subject"; s.textContent = f.subject;
     row.appendChild(s);
+  }
+  if (!f.sure) {
+    const u = document.createElement("div");
+    u.className = "unsure"; u.textContent = "not sure";
+    u.title = "picked up once in passing; she won't state it as fact until it's confirmed";
+    row.appendChild(u);
+  }
+  if (f.since || f.until) {
+    const t = document.createElement("div");
+    t.className = "date"; t.textContent = "true " + [f.since && "from " + f.since, f.until && "to " + f.until].filter(Boolean).join(" ");
+    row.appendChild(t);
   }
   if (retired && f.retired) {
     const d = document.createElement("div");
@@ -529,13 +608,14 @@ function factRow(f, retired) {
   }
 
   if (!retired) {
+    if (!f.sure) btn("confirm", "", async () => { await api("confirm", {id: f.id}); refresh(true); });
     btn("edit", "", () => editRow(row, f));
     btn("retire", "", async () => { await api("retire", {id: f.id}); refresh(true); });
   } else {
     btn("restore", "", async () => { await api("restore", {id: f.id}); refresh(true); });
   }
   btn("delete", "danger", async () => {
-    if (!confirm("Delete outright?\n\n" + f.fact)) return;
+    if (!confirm("Forget this for good?\n\n" + f.fact + "\n\nIt's also taken out of her notes, summaries and logs, and she won't learn it again unless you add it back.")) return;
     await api("delete", {id: f.id}); refresh(true);
   });
 
@@ -587,6 +667,11 @@ function render() {
   if (!rows.length)
     retiredWrap.innerHTML = '<div class="empty">nothing retired</div>';
   rows.forEach(f => retiredWrap.appendChild(factRow(f, true)));
+}
+
+async function unforgetAll() {
+  if (!confirm("Let her learn the forgotten facts again if they come up?")) return;
+  await api("unforget_all", {}); flash("done"); refresh(true);
 }
 
 async function addFact() {

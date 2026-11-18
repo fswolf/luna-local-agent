@@ -6,8 +6,9 @@ hand.
 
 ```
 > "Remember I stream on Tuesdays."      -> remember_fact
-> "No, I moved to Thursdays."           -> update_fact
-> "Forget the bakery thing."            -> forget_fact
+> "No, I moved to Thursdays."           -> update_fact (Tuesdays kept as history)
+> "Forget the bakery thing."            -> forget_fact (and it stays forgotten)
+> "Yeah, I do hate mushrooms."          -> confirm_fact
 ```
 
 When you ask outright ("remember this", "remember that I...", "don't
@@ -59,7 +60,35 @@ install.
   keeps both, and a garbled reply degrades to keeping both, never to
   losing a fact.
 * **`recall_facts` takes a query.** She can look something up instead of
-  reading the whole table into context.
+  reading the whole table into context. With `past` it reads the retired
+  facts too, so "what was my last graphics card?" gets an answer.
+* **Two clocks.** Every fact has *record time*, when she learned it and
+  when she stopped believing it, and can have *real time*, when it was
+  actually true. They differ whenever you tell her after the fact:
+
+  ```
+  > "I swapped the server card for a 7900 XT on the 14th."
+  ```
+
+  The 7900 XT fact is true from the 14th, the 6950 XT one until then,
+  even though she heard it days later. Real dates only come from what
+  you said: `remember_fact`, `update_fact` and the background extractor
+  take an optional `since` (2026-11-14, 2026-11 or 2026), and with no
+  date given they leave it empty and record time stands in. She sees the
+  date beside the fact ("... (since 2026-11-14)"), and `/facts` shows it.
+* **A change isn't a correction.** `update_fact` keeps the old fact as
+  history. Only when the old one was never right (she misheard) does she
+  set `mistake`, and then it's fixed in place with nothing kept.
+* **Guesses stay guesses.** A fact the background extractor picked up
+  from one exchange lands *not sure*. She sees it as "... (not sure)",
+  is told not to state those as true and to ask when it matters, and her
+  pages and profiles leave them out. It becomes a normal fact when it
+  comes up again, when you say it outright ("remember that..."), when
+  she calls `confirm_fact` after you agree, or with the confirm button on
+  the memory page. What she saves on purpose (`remember_fact`,
+  `update_fact`) is sure from the start. The daily cleanup won't let a
+  guess retire something confirmed: both stay, and she asks. `/facts
+  unsure` lists them.
 * **A damaged file doesn't stop her.** If facts.db can't be read as a
   database, it's kept as `facts.db.bad-<time>`, a fresh one starts, and
   she tells you where the old one went.
@@ -72,6 +101,31 @@ again. An install already on facts.db had that list read in when it
 switched, and it's left alone. Your preferences in memory.json are still
 read until you move them into agent.json.
 
+## Forgetting
+
+"Forget that" (`forget_fact`, or delete on the memory page) means
+forget, not hide:
+
+* **It's taken out of everything.** The fact row goes, and so do the
+  sentences carrying it in the conversation summary, the transcript she
+  searches, her episode notes, lessons, pages and profiles, the thought
+  log and the cached embeddings. Pages and profiles are rewritten from
+  what's left.
+* **It isn't learned again.** facts.db keeps a fingerprint of it: a
+  hash of each word that matters, never the words. A new fact that
+  matches (the same words, or them plus a couple more, "used to work at
+  the bakery") isn't saved, and nothing she writes afterwards (her
+  replies, summaries, notes, pages) keeps a sentence that carries it.
+* **What you say is never filtered.** If you bring it up yourself, it
+  stays in the conversation as you said it; she just won't save it. Say
+  "remember this" (or add it on the memory page) and the fingerprint is
+  lifted. The memory page also has a button to lift all of them.
+
+Matching is by meaning words, with names and small words left out:
+"Ryan works at the bakery" is *work* and *bakery*, and a sentence needs
+both. A one-word fact ("likes anime") only takes sentences about a
+person, so she can still talk about anime.
+
 `/facts` shows what's stored, and `memory-manager/` is the editor:
 
 <img width="1067" alt="The memory manager" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
@@ -81,14 +135,16 @@ read until you move them into agent.json.
 ```
 
 opens a local page (127.0.0.1:8792/memory/, and only 127.0.0.1) to view,
-search, add, edit, retire, restore and delete facts. It's safe to use
+search, add, edit, confirm, retire, restore and delete (forget) facts. It's safe to use
 while she's running: an edit is in her next prompt. Your preferences
 (what she calls you, nicknames, what to avoid) aren't here: they're
 `user_preferences` in agent.json, under **Who she is** on the settings
-page ([Companion](companion.md#who-she-is-agentjson)). Below the facts is
-**her notebook**: how she feels about each game she's played, her notes
-on past conversations and game sessions (game ones marked), and the
-lessons she's learned, each with a forget, retire or edit button. Facts
+page ([Companion](companion.md#who-she-is-agentjson)). The page has three
+tabs: **About you** (the facts), **Her notebook** (how she feels about
+each game she's played, her notes on past conversations and game
+sessions, game ones marked) and **Her lessons** (what she's learned, with
+retired ones below), each row with a forget, retire or edit button. The
+tab is in the address, so `/memory/#lessons` opens straight to it. Facts
 are about you; the notebook is about her (see [learning](learning.md)).
 
 ## Pages

@@ -118,7 +118,7 @@ Everything the README only touches on, one subject per page.
 - Says when she's unsure, measured from her own token probabilities
 - Checks every script she writes for syntax errors, without running it
 - Researches properly: reads the top pages in one go and keeps the parts that answer the question
-- Follow-through: when she says she'll check something and stops, she's made to actually do it
+- Follow-through: when she says she'll check something and stops, she's made to actually do it; when she says it's done or works and her tools say otherwise, she's sent back to do it or own up
 - An animated portrait that looks at your terminal and visibly thinks
 - Live on a [hologram fan](fans.md): streamed over WiFi to a Holoscope fan, or on any HDMI fan
 - Rotating debug log that records decisions, not just errors

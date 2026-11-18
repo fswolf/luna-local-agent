@@ -108,6 +108,7 @@ _HELP_SECTIONS = [
         ("/facts", "what she remembers, newest first"),
         ("/facts all", "the whole table, not just the newest"),
         ("/facts retired", "superseded facts - kept, hidden from her"),
+        ("/facts unsure", "facts she picked up once and isn't sure of"),
         "Facts are permanent and searched, and a new fact can retire",
         "the old one it contradicts (agent/facts.db).",
         ("/memory", "the memory editor in your browser"),

@@ -276,6 +276,19 @@ def add_message(role: str, content: str, tools=None):
             for call in tools
         ]
 
+    if role == "assistant":
+        # her words and her tool calls, never his: what he told her to forget
+        # she doesn't say back into the record (mind/forgetting.py)
+        try:
+            from mind import forgetting
+
+            tombs = forgetting.tombstones()
+            entry["content"] = forgetting.clean(content, tombs)
+            if entry.get("tools"):
+                entry["tools"] = forgetting.clean_calls(entry["tools"], tombs)
+        except Exception:
+            pass
+
     with _lock:
         _data.setdefault("messages", []).append(entry)
 
@@ -301,6 +314,13 @@ def record_tool_use(name, arguments, result, index=None):
         "arguments": _compact_arguments(arguments),
         "result": str(result)[:MAX_STORED_RESULT],
     }
+
+    try:
+        from mind import forgetting
+
+        call = forgetting.clean_calls([call])[0]
+    except Exception:
+        pass
 
     with _lock:
         messages = _data.get("messages", [])
@@ -411,6 +431,12 @@ def _fold(model, keep=None, chars=None):
         # The model call happens outside the lock - it's the slow part,
         # and holding a lock across it would stall every other turn.
         piece = _summarize_chunk(model, chunk)
+        try:
+            from mind import forgetting
+
+            piece = forgetting.clean(piece)
+        except Exception:
+            pass
         merged = f"{existing}\n{piece}".strip() if existing else piece
 
         if len(merged) > chars:

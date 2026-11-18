@@ -225,7 +225,9 @@ def lessons(retired=False):
 def add_lesson(text, from_ids=(), origin="dream"):
     """Returns the new id, or None when she already knows this one - in
     which case the old lesson gets the credit (a hit) instead."""
-    text = " ".join(str(text or "").split()).strip(" -•*")
+    from mind import forgetting
+
+    text = forgetting.clean(" ".join(str(text or "").split()).strip(" -•*"))
 
     if len(text) < 12 or len(text) > 300:
         return None
@@ -292,6 +294,11 @@ def credit(texts):
 # Episodes
 # ---------------------------------------------------------------------------
 def add_episode(started, ended, turns, summary):
+    from mind import forgetting
+
+    summary = forgetting.clean(summary)             # nothing he told her to forget
+    if not summary.strip():
+        return None
     return _run(lambda c: c.execute(
         "INSERT INTO episodes (started, ended, turns, summary) VALUES (?,?,?,?)",
         (started, ended, int(turns), summary.strip())).lastrowid)
