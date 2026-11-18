@@ -22,6 +22,16 @@ search built in, and the `kiwix` plugin points Luna at it.
    docker run -v /path/to/zims:/data -p 8080:8080 ghcr.io/kiwix/kiwix-serve '*.zim'
    ```
 
+   On **Unraid**, add a container by hand (Docker, Add Container, with
+   the advanced view on):
+
+   | Field | Value |
+   |---|---|
+   | Repository | `ghcr.io/kiwix/kiwix-serve` |
+   | Path | your share with the `.zim` files, mapped to `/data` |
+   | Port | 8080 to 8080 (or any free port on the left) |
+   | Post Arguments | `'*.zim'` |
+
    or on the same PC (`kiwix-tools` package on Linux):
 
    ```
@@ -29,9 +39,23 @@ search built in, and the `kiwix` plugin points Luna at it.
    ```
 
    Open `http://<that machine>:8080` in a browser: you should see your
-   books.
-3. **Point Luna at it** in the settings (Plugin: kiwix, `url`), then
-   `/kiwix on`. It's saved, so it comes back next start.
+   books. A new `.zim` dropped in the folder shows up after kiwix-serve
+   restarts.
+3. **Point Luna at it** in the settings (Plugin: kiwix, `url`, e.g.
+   `http://192.168.1.50:8080`), then switch it on: `/kiwix on`, or the
+   **kiwix plugin** switch at the top of the Offline library group in
+   the tools pane (Tab twice). It's saved, so it comes back next start.
+
+## Checking it works
+
+- `/kiwix` lists the books it found, by name and title.
+- `/kiwix boiling water` searches it yourself, with no model involved.
+- Ask her something only a book would know: "what does the library say
+  about purifying water?" Her reply should name the book it came from.
+
+If `/kiwix on` says it can't reach kiwix-serve, open the same address in
+a browser on the PC Luna runs on: a firewall on the server, or a wrong
+port, is the usual reason.
 
 ## What she can do
 
