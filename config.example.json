@@ -218,6 +218,13 @@
             "auto": false,
             "auto_daily": 5,
             "max_tokens": 600
+        },
+        "kiwix": {
+            "enabled": false,
+            "url": "http://localhost:8080",
+            "books": [],
+            "results": 5,
+            "max_chars": 6000
         }
     },
     "wake_word": {

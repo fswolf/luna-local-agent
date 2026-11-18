@@ -38,6 +38,7 @@ Everything the README only touches on, one subject per page.
 - [Textures](textures.md): new clothes, irises and skin for her 3D model from UV templates, through ComfyUI
 - [Gestures](gestures.md): how her body moves, and writing your own
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
+- [Offline library](library.md): Wikipedia and other reference books on your own disks through Kiwix, no internet needed
 - [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](plugins.md): how they work, writing your own, scheduled jobs and Discord
 - [Stream chat](chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
@@ -103,6 +104,7 @@ Everything the README only touches on, one subject per page.
 - Lives in a REALITI city of AI agents, walking, talking and remembering
 - Plays Game Boy games you own through an emulator, seeing the screen; Pokemon Red and Blue and The Final Fantasy Legend also come to her as text ([games](games.md#game-boy))
 - Runs your [smart home](home.md) through a Home Assistant on your own network, locks and garage doors always asking first
+- Looks things up in an [offline library](library.md) (Wikipedia and more, through Kiwix) when the internet is down or you'd rather keep it home
 - Searchable archive of every conversation, which pruning never deletes
 - Her reasoning kept per turn, with token confidence, review flags and a browser viewer
 - Adaptive thinking: when an answer comes out shaky, she asks herself again and goes with what most answers agree on

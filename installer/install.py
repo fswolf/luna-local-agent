@@ -716,7 +716,7 @@ def detect_vram():
 # it uses. Shared RAM is slow, so past a 9B Q4 she'd answer too slowly to talk
 # to: what an integrated card can offer is counted as at most this.
 SHARED_CAP_GB = 10
-DEDICATED_MIN_GB = 4      # an AMD card with less of its own memory is integrated
+APU_SLICE_GB = 1          # an AMD GPU with this little of its own is integrated, whatever kfd says
 
 
 def _read_int(path):
@@ -738,7 +738,24 @@ def _ram_bytes(meminfo="/proc/meminfo"):
     return 0
 
 
-def linux_graphics(drm="/sys/class/drm", meminfo="/proc/meminfo"):
+def _amd_apu(kfd="/sys/class/kfd/kfd/topology/nodes"):
+    """True when ROCm's topology shows a node with both CPU cores and GPU
+    compute units: an APU, the CPU and its graphics on one chip. A small
+    graphics card (2 GB) has its own memory and isn't one."""
+    import glob
+
+    for props in glob.glob(os.path.join(kfd, "*", "properties")):
+        try:
+            with open(props, encoding="utf-8") as f:
+                values = dict(line.split(None, 1) for line in f if len(line.split()) == 2)
+        except (OSError, ValueError):
+            continue
+        if int(values.get("cpu_cores_count", "0").strip() or 0) and int(values.get("simd_count", "0").strip() or 0):
+            return True
+    return False
+
+
+def linux_graphics(drm="/sys/class/drm", meminfo="/proc/meminfo", kfd="/sys/class/kfd/kfd/topology/nodes"):
     """(GB, what) for Linux: the biggest AMD card's own memory, else what
     integrated graphics (AMD or Intel) can borrow from RAM: half of it, no
     more than the card's shared window (mem_info_gtt_total), counted as at
@@ -746,6 +763,7 @@ def linux_graphics(drm="/sys/class/drm", meminfo="/proc/meminfo"):
     import glob
 
     dedicated, shared_amd, shared_intel = 0, 0, False
+    apu = _amd_apu(kfd)
 
     for dev in glob.glob(os.path.join(drm, "card*", "device")):
         if "-" in os.path.basename(os.path.dirname(dev)):
@@ -756,7 +774,9 @@ def linux_graphics(drm="/sys/class/drm", meminfo="/proc/meminfo"):
             driver = ""
         vram = _read_int(os.path.join(dev, "mem_info_vram_total"))
         if driver == "amdgpu" or vram:
-            if vram >= DEDICATED_MIN_GB << 30:
+            # integrated: a tiny slice of its own, on a machine whose chip is an APU
+            # (or with next to nothing of its own at all); a small card stays a card
+            if vram > APU_SLICE_GB << 30 and not (apu and vram < 4 << 30):
                 dedicated = max(dedicated, vram)
             else:
                 shared_amd = max(shared_amd, _read_int(os.path.join(dev, "mem_info_gtt_total")) or 1)

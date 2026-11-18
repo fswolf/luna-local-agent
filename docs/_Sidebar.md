@@ -28,6 +28,7 @@
 - [Gestures](gestures.md)
 - [Textures](textures.md)
 - [Home automation](home.md)
+- [Offline library](library.md)
 - [Sysadmin](sysadmin.md)
 - [Plugins](plugins.md)
 - [Stream chat](chat.md)

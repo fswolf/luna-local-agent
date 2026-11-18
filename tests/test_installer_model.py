@@ -155,7 +155,14 @@ class LinuxGraphics(unittest.TestCase):
                     f.write(str(int(gb * (1 << 30))))
 
     def read(self):
-        return install.linux_graphics(self.drm, self.meminfo)
+        return install.linux_graphics(self.drm, self.meminfo, os.path.join(self.tmp, "kfd"))
+
+    def kfd_node(self, cpu_cores, simds):
+        node = os.path.join(self.tmp, "kfd", str(len(os.listdir(os.path.join(self.tmp, "kfd")))
+                                                 if os.path.isdir(os.path.join(self.tmp, "kfd")) else 0))
+        os.makedirs(node)
+        with open(os.path.join(node, "properties"), "w") as f:
+            f.write(f"cpu_cores_count {cpu_cores}\nsimd_count {simds}\nmem_banks_count 1\n")
 
     def test_a_graphics_card(self):
         self.card("card1", "amdgpu", vram=20, gtt=16)
@@ -168,6 +175,18 @@ class LinuxGraphics(unittest.TestCase):
         self.assertEqual(gb, install.SHARED_CAP_GB)            # 15.5 shared, counted as 10: it's slow
         self.assertIn("AMD integrated graphics, sharing 15.5 of 32.0 GB", what)
         self.assertEqual(install.pick_model(gb)[0], "9b-q4")    # not the 4B any more
+
+    def test_a_small_card_stays_a_card(self):
+        self.card("card0", "amdgpu", vram=2, gtt=15)
+        self.kfd_node(16, 0)                                       # the CPU alone: no APU
+        self.kfd_node(0, 16)                                       # the card
+        self.assertEqual(self.read(), (2.0, "AMD"))
+
+    def test_an_apu_with_a_bigger_slice(self):
+        self.card("card0", "amdgpu", vram=2, gtt=15)
+        self.kfd_node(16, 24)                                      # CPU and GPU on one chip
+        gb, what = self.read()
+        self.assertTrue(what.startswith("AMD integrated graphics"), what)
 
     def test_amd_integrated_no_vram_file(self):
         self.card("card0", "amdgpu")

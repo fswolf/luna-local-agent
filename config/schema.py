@@ -480,6 +480,11 @@ SCHEMA = {
     "plugins.ask.max_tokens": ("int", "Longest answer from Claude, in tokens"),
 
     # --- Plugins: Home Assistant --------------------------------------------
+    "plugins.kiwix.enabled": ("bool", "Connect to the offline library (kiwix-serve) at startup"),
+    "plugins.kiwix.url": ("text", "Where kiwix-serve answers, like http://192.168.1.50:8080"),
+    "plugins.kiwix.books": ("list", "Book names to search (/kiwix lists them); empty searches every book"),
+    "plugins.kiwix.results": ("int", "Search results she gets, 1 to 20"),
+    "plugins.kiwix.max_chars": ("int", "Most of one library page she reads, in characters"),
     "plugins.home.enabled": ("bool", "Connect to Home Assistant at startup"),
     "plugins.home.url": ("text", "Home Assistant's address; must be on your own network"),
     "plugins.home.ask_all": ("bool", "Every smart home change asks first"),

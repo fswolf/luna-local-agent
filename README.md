@@ -8,6 +8,7 @@
 
 [![Tests](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml)
 [![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/fswolf)
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/wEqrYjPxAU)
 
 **A persistent-state agent manager, with heavy tooling, research and
 learning, built from several local models working as one. All on your
@@ -290,6 +291,14 @@ The installer asks before anything that touches your system, and can be run agai
 
 The same pages are on the [wiki](https://github.com/fswolf/luna-local-agent/wiki), and there's a
 friendlier tour of her at [luna.imbored.me](https://luna.imbored.me/).
+
+---
+
+# Community
+
+Questions, ideas, or want to show what you've built with her? Come say hi on
+[Discord](https://discord.gg/wEqrYjPxAU). Feature ideas are welcome there too;
+bugs still go in the [issues](https://github.com/fswolf/luna-local-agent/issues).
 
 ---
 
