@@ -47,6 +47,7 @@ class Turn:
     speaker: Optional[str] = None      # someone other than the owner talking (senses/people.py); None: the owner
     recording: Optional[bytes] = None  # what was said, as WAV, for a model that can hear (voice/hearing.py)
     attachment: Any = None             # one file sent with the message (core/attachments.py)
+    clock: bool = True                 # the time in her note; off for a game's turns (respond_to_job)
 
 
 _current = contextvars.ContextVar("luna_turn", default=None)

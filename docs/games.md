@@ -417,6 +417,7 @@ live monitor (`monitor.enabled`, on by default).
 /gameboy pause                         stop taking turns (the game stays where it is)
 /gameboy watch                         the screen and what she says, in your browser
 /gameboy off                           put it away (saved for next time)
+/gameboy fresh                         start from the cartridge's own save, not the snapshot
 ```
 
 She plays Game Boy and Game Boy Color games through PyBoy, an emulator
@@ -452,7 +453,11 @@ example to copy.
 
 **Turns.** Slower games suit her best. Each turn she reads the game,
 presses a few buttons with `gb_press` ("up 3", "down, a"), says what she
-did and why. With `"live"` on (the default) the game keeps running between
+did and why. When someone's talking, `gb_read_on` is her move instead: it
+presses A page after page and hands her the whole conversation, stopping
+at the next choice (a menu, yes/no, a name) or when the talking ends, so
+Oak's opening speech is a turn or two, not twenty. It needs a reader for
+the game (Pokemon and Final Fantasy Legend have one). With `"live"` on (the default) the game keeps running between
 her turns, the way a Game Boy in your hands would; turn it off and the game
 waits until her next turn instead. Notes she writes
 with `game_note` come back when she's in the same place again, and
@@ -464,7 +469,9 @@ with `game_note` come back when she's in the same place again, and
 **green screen** draws a black-and-white game in the original Game Boy's
 greens, and **full screen** (or a click on the game) fills the monitor.
 For OBS, add `/gameboy/#screen` as a browser source: the game and nothing
-else. With `"live"` off,
+else. A game saved before the sound was kept (before November 2026) stays
+silent; the page says so, and `/gameboy fresh` starts it again from the
+cartridge's own save, with sound (the old snapshot is kept as a slot). With `"live"` off,
 the page shows the screen after each of her moves instead. With
 `"window": true` the Game Boy's own screen opens in a window of its own
 (`"sound": true` for its music there), and the page still shows it live.

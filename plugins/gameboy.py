@@ -7,6 +7,7 @@
     /gameboy pause       stop taking turns (the game stays where it is)
     /gameboy watch       the screen and what she says, in your browser
     /gameboy off         put it away (saved, picked up next time)
+    /gameboy fresh       start from the cartridge's own save, not the emulator's snapshot
     /gameboy             status
 
 The emulator runs in games/gameboy/gb_server.py, an MCP server around PyBoy.
@@ -298,7 +299,29 @@ def command(text):
         return _set_playing(False)
     if word == "watch":
         return _open_watch()
-    return "gameboy: games | game <number, name or path> | on | off | play | pause | watch"
+    if word == "fresh":
+        return _fresh()
+    return "gameboy: games | game <number, name or path> | on | off | play | pause | watch | fresh"
+
+
+def _fresh():
+    """Start from the cartridge's own save instead of the emulator's snapshot.
+    The snapshot is kept as a slot (gb_load can still go back to it)."""
+    import time
+
+    was_on, model = _connected, _state.get("model")
+    if was_on:
+        stop()
+    old = os.path.join(_saves(), "autosave.state")
+    kept = ""
+    if os.path.exists(old):
+        kept = f"before-fresh-{time.strftime('%Y%m%d-%H%M')}"
+        os.replace(old, os.path.join(_saves(), kept + ".state"))
+    if not was_on:
+        return ("gameboy: the next /gameboy on starts from the cartridge's own save"
+                + (f" (the snapshot is kept as {kept})" if kept else ""))
+    ok, said = start(model)
+    return said + (f" Started fresh; the old snapshot is kept as {kept}." if ok and kept else "")
 
 
 def _pick(what):
@@ -361,7 +384,8 @@ def page(method, path, body):
         return 200, "application/json", json.dumps(
             {"title": _state["title"], "playing": _state["playing"], "turn": _state["steps"],
              "said": _state["said"], "notes": _state["notes"][-8:],
-             "live": bool(s["live"] or s["window"]), "music": bool(s["live"] and not s["window"])})
+             "live": bool(s["live"] or s["window"]), "music": bool(s["live"] and not s["window"]),
+             "music_note": _sound_note()})
     return 404, "text/plain; charset=utf-8", "not here"
 
 
@@ -371,6 +395,16 @@ try:
     livefeed.add_page(NAME, "game boy", page, visible=lambda: _connected)
 except Exception:
     pass
+
+
+def _sound_note():
+    """Why the music button has nothing to play, when the server said (gb_server's
+    sound-note.txt): a snapshot from before the sound was kept."""
+    try:
+        with open(os.path.join(_saves(), "sound-note.txt"), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 
 def _audio(after):
@@ -433,8 +467,9 @@ STEP_PROMPT = (
     "Your last moves and what came of them, oldest first:\n{notes}\n\n"
     "The game right now:\n-----\n{screen}\n-----\n{picture}\n"
     "Think about what you see, then make ONE move: a single gb_press with a few buttons, like "
-    "'a' to read on, 'up 3' to walk, 'down, a' to pick from a menu. Then stop - you'll see what "
-    "it did next turn. A is confirm and talk, B is back and cancel, START opens the menu. Don't "
+    "'up 3' to walk or 'down, a' to pick from a menu - or, when the screen is just someone talking, "
+    "gb_read_on, which reads the whole conversation through to the next choice in one go. Then "
+    "stop - you'll see what it did next turn. A is confirm and talk, B is back and cancel, START opens the menu. Don't "
     "repeat a move that changed nothing; try another way. Use gb_wait if the game is still "
     "busy (text scrolling, a battle animation). Save with gb_save before anything risky.\n"
     "When you learn something worth remembering - where a place is, a way through, who's where, "
@@ -492,11 +527,11 @@ ONE_MOVE = ("You've already made your move this turn - those buttons weren't pre
 def _one_move_per_turn():
     import tools
 
-    for name in [t for t in _state["tools"] if t.endswith(("gb_press", "gb_look", "gb_wait", "gb_load"))]:
+    for name in [t for t in _state["tools"] if t.endswith(("gb_press", "gb_read_on", "gb_look", "gb_wait", "gb_load"))]:
         entry = tools._REGISTRY.get(name)
         if not entry or getattr(entry["run"], "_wrapped", False):
             continue
-        inner, presses = entry["run"], name.endswith("gb_press")
+        inner, presses = entry["run"], name.endswith(("gb_press", "gb_read_on"))      # each is her one move
 
         def run(_inner=inner, _presses=presses, **kwargs):
             if _presses and _turn["active"]:
@@ -528,6 +563,11 @@ def _moves_made(exchanges):
 
     out = []
     for x in exchanges:
+        if str(x.get("name", "")).endswith("gb_read_on"):
+            result = _playlog._FRAMING.sub("", str(x.get("result", ""))).strip()
+            if ONE_MOVE not in result and not _ERROR.search(result):
+                out.append("read on -> " + (result.splitlines() or ["?"])[0][:150])
+            continue
         if not str(x.get("name", "")).endswith("gb_press"):
             continue
         result = _playlog._FRAMING.sub("", str(x.get("result", ""))).strip()

@@ -246,8 +246,13 @@ def respond_to_chat(prompt, model, source, who, said,
 
 
 def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=None,
-                   project_id=None, exchanges=None, time_limit=None):
+                   project_id=None, exchanges=None, time_limit=None, clock=False):
     """A scheduled job firing (plugins/cron.py).
+
+    clock: the time goes in her note - a scheduled job's (cron passes it),
+    not a game's. On a game turn a 9B read the clock in front of the turn
+    as the question, and opened with "07:26 on a Wednesday morning, my
+    dear" instead of playing.
 
     Waits its turn like chat does. Fresh context and nothing stored, so a
     job's tool output never lands in history. The turn is begun here and
@@ -298,7 +303,7 @@ def respond_to_job(prompt, model, job, tools_allowed, speak=True, max_rounds=Non
             # game's notes, for game_note.
             # exchanges: a list the caller keeps, filled with this turn's tool
             # calls - a game's record of what it did, whatever runs next.
-            with turnctx.begin(source=f"job:{job}", private=False, job=job,
+            with turnctx.begin(source=f"job:{job}", private=False, job=job, clock=bool(clock),
                                max_rounds=max_rounds, project_id=project_id,
                                exchanges=exchanges if exchanges is not None else []):
                 answer = ask(prompt, model, on_text=ui.extend_message,

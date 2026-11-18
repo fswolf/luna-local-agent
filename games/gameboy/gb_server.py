@@ -11,6 +11,8 @@ Tools:
     gb_wait(seconds)    let the game run (text scrolling, an animation), then gb_look
     gb_look()           what's going on: the game's state as text when there's a reader
                         for it (readers/), and the screen saved as screen.png
+    gb_read_on()        press A through a conversation until a choice comes up or it
+                        ends, and give back every page of it (games with a reader)
     gb_save(slot) / gb_load(slot)
 
 Three ways to run. Headless, the game only moves while a tool runs: nothing
@@ -53,6 +55,8 @@ AUTOSAVE_EVERY = 10             # presses
 LIVE_EVERY = 2                  # frames between live.png updates: 30 a second
 AUDIO_FRAMES = 15               # frames of sound per audio chunk: a quarter second
 AUDIO_KEEP = 16                 # chunks kept on disk, four seconds
+READ_PAGES = 12                 # gb_read_on: pages of a conversation at most
+READ_SECONDS = 40               # and seconds: Luna gives a tool call 60
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--rom", default="")
@@ -101,8 +105,10 @@ class Console:
         self.realtime = window or live
         self.live = self.realtime           # live.png, and the sound for the watch page
         self.stream = live and not window   # with a window, SDL plays the sound itself
-        self.pyboy = PyBoy(rom, window="SDL2" if window else "null", scale=scale,
-                           sound_emulated=bool((window and sound) or self.stream),
+        # Sound is always emulated, heard or not: a snapshot saved without it
+        # brings back a Game Boy that never makes sound again, even in an
+        # emulator that has it on (PyBoy keeps the saved "don't sample").
+        self.pyboy = PyBoy(rom, window="SDL2" if window else "null", scale=scale, sound_emulated=True,
                            sound_volume=60 if (sound or self.stream) else 0)
         self.pyboy.set_emulation_speed(1 if self.realtime else 0)
         self.frame = 0
@@ -119,14 +125,17 @@ class Console:
         self.presses = 0
         self.alive = True
         self.broken = ""
+        self.silent = ""
         if os.path.exists(self._slot("autosave")):
             try:
                 with open(self._slot("autosave"), "rb") as f:
                     self.pyboy.load_state(f)
             except Exception:
                 pass
+            self._check_sound()
         else:
             self._frames(60)          # past the first black frames
+        self._note_sound()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
@@ -140,6 +149,31 @@ class Console:
                 return
             if self.live:
                 self._live(picture)
+
+    def _check_sound(self):
+        """A snapshot from before sound was always on comes back silent for good.
+        Say so (sound-note.txt, for the watch page), rather than streaming nothing."""
+        if not self.stream:
+            return
+        try:
+            self.pyboy.tick(1, True)
+            if not len(self.pyboy.sound.ndarray):
+                self.silent = ("This save was made before the Game Boy kept its sound, so it stays "
+                               "silent. /gameboy fresh starts from the cartridge's own save, with sound.")
+                print("sound: " + self.silent, file=sys.stderr, flush=True)
+        except Exception:
+            pass
+
+    def _note_sound(self):
+        path = os.path.join(self.saves, "sound-note.txt")
+        try:
+            if self.silent:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(self.silent)
+            elif os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
 
     # -- live: what the watch page shows and plays ---------------------------
     def _live(self, picture):
@@ -229,6 +263,56 @@ class Console:
         if self.presses >= AUTOSAVE_EVERY:
             self.presses = 0
             self._save("autosave")
+
+    def _text_now(self):
+        try:
+            return self.reader.screen_text(self.pyboy.memory) if self.reader else ""
+        except Exception:
+            return ""
+
+    def _settle(self, seconds=3):
+        """Run until the words on screen stop changing (text prints a letter at a
+        time) or seconds pass; the words then."""
+        last, same = None, 0
+        for _ in range(int(seconds * 6)):
+            self._frames(10)
+            text = self._text_now()
+            same = same + 1 if text == last else 0
+            last = text
+            if same >= 3:
+                break
+        return last or ""
+
+    def read_on(self, max_pages=READ_PAGES):
+        """Press A through a conversation, a page at a time, until a choice is
+        waiting (the menu cursor), the text box goes, or max_pages. The pages read,
+        and why it stopped. One move for a whole speech, where a press a turn made
+        Oak's opening twenty turns long."""
+        pages, why = [], f"stopped after {max_pages} pages"
+        until = time.monotonic() + READ_SECONDS
+        text = self._settle()
+        for _ in range(max_pages):
+            if time.monotonic() > until:
+                why = "stopped for time - there's more"
+                break
+            if not text.strip():
+                why = "the text box closed"
+                break
+            if not pages or pages[-1] != text:
+                pages.append(text)
+            if ">" in text:
+                why = "a choice is waiting (the > is the cursor)"
+                break
+            self.press([("a", 1)])
+            new = self._settle()
+            if new == text:
+                self.press([("a", 1)])          # a page that hadn't finished printing: once more
+                new = self._settle()
+                if new == text:
+                    why = "the text stopped changing"
+                    break
+            text = new
+        return pages, why
 
     def wait(self, seconds):
         self._frames(int(60 * max(0.1, min(float(seconds), MAX_WAIT))))
@@ -359,6 +443,22 @@ def build():
         console.do(lambda: console.wait(seconds))
         out = _report(console)
         _log(f"> (wait {seconds}s)\n{out}")
+        return out
+
+    @mcp.tool()
+    @_guarded
+    def gb_read_on() -> str:
+        """Read through a conversation: press A page after page until a choice comes
+        up (a menu, yes/no, a name), the talking ends, or 12 pages. You get every
+        page. Use it when the screen is just text to read on; pick choices with gb_press."""
+        if _off(console):
+            return _off(console)
+        if not console.reader:
+            return "Error: this game has no reader, so its text can't be followed - press a and look instead"
+        pages, why = console.do(console.read_on, timeout=55)
+        read = "\n---\n".join(pages) if pages else "(no text on screen)"
+        out = f"Read {len(pages)} page{'s' if len(pages) != 1 else ''} ({why}):\n{read}\n---\n" + _report(console)
+        _log(f"> (read on)\n{out}")
         return out
 
     @mcp.tool()

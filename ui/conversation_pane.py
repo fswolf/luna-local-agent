@@ -8,7 +8,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.mouse_events import MouseEventType
 
 from .shared import _events, _lock, _refresh, conversation, state, view
-from .text import _width, _wrap_text
+from .text import _width, _wrap_text, for_terminal
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ def _conversation_lines():
         # run-on paragraph, since _wrap_text splits on all whitespace.
         wrapped = []
 
-        for paragraph in text.split("\n"):
+        for paragraph in for_terminal(text).split("\n"):
             wrapped.extend(_wrap_text(paragraph, limit))
 
         if index:

@@ -37,6 +37,8 @@
   button.on { color: var(--accent); border-color: var(--accent); }
   button[hidden] { display: none; }
 
+  .note { margin-bottom: 12px; color: #f0c674; font-size: 13px; }
+  .note[hidden] { display: none; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
   .said { font-size: 16px; min-height: 3em; }
   .dim { color: var(--dim); font-size: 13px; }
@@ -78,6 +80,7 @@
     </div>
   </div>
   <div class="side">
+    <div class="panel note" id="note" hidden></div>
     <div class="panel"><div class="dim" id="turn">waiting...</div><div class="said" id="said"></div></div>
     <div class="panel" style="margin-top:12px"><div class="dim">her last moves</div><ul id="notes"></ul></div>
   </div>
@@ -87,7 +90,7 @@ const $ = id => document.getElementById(id);
 const store = (k, v) => { try { return v === undefined ? localStorage.getItem(k) : localStorage.setItem(k, v); } catch (_) { return null; } };
 if (location.hash === '#screen') document.body.classList.add('only');     // OBS: /gameboy/#screen
 
-let live = false, on = false, lastFrame = 0;
+let live = false, on = false, lastFrame = 0, wanted = false;   // wanted: the music button is on
 
 // What she's doing.
 async function tick() {
@@ -101,6 +104,8 @@ async function tick() {
     $('notes').replaceChildren(...(s.notes || []).slice().reverse().map(n => Object.assign(document.createElement('li'), { textContent: n })));
     live = !!s.live;
     $('music').hidden = !s.music;
+    $('note').hidden = !(s.music_note && wanted);
+    $('note').textContent = s.music_note || '';
   } catch (_) { on = false; $('turn').textContent = 'the Game Boy is off'; }
   showMode();
 }
@@ -174,7 +179,7 @@ $('screen').onclick = big;
 
 // The game's sound, only when you ask for it (a browser won't play before a click anyway).
 // Quarter-second chunks of 24 kHz mono, queued a moment ahead so they play back to back.
-let audio = null, seq = 0, ahead = 0, polling = false, wanted = false;
+let audio = null, seq = 0, ahead = 0, polling = false;
 
 async function pull() {
   if (!wanted || polling) return;
@@ -209,7 +214,7 @@ function music(onOff) {
   if (audio) { audio.close(); audio = null; }     // nothing queued from before plays on later
   if (onOff) { audio = new AudioContext(); ahead = 0; }
 }
-$('music').onclick = () => music(!wanted);
+$('music').onclick = () => { music(!wanted); tick(); };
 </script>
 </body>
 </html>

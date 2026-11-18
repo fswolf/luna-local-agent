@@ -61,6 +61,33 @@ class Buttons(unittest.TestCase):
             self.assertEqual(guarded(gb_look)(), "Error: ModuleNotFoundError: No module named 'PIL'")
         self.assertEqual(guarded(gb_look).__name__, "gb_look")
 
+    def test_read_on(self):
+        server = _server()
+        c = server.Console.__new__(server.Console)
+
+        def follow(script):
+            state = {"i": 0}
+            c.reader = mock.Mock(screen_text=lambda m: script[min(state["i"], len(script) - 1)])
+            c.pyboy = mock.Mock(memory=None)
+            c._frames = lambda n: None
+            c.press = lambda steps: state.update(i=state["i"] + 1)
+            return state
+
+        follow(["Hello there!", "Welcome to the world", "of POKEMON!", "  >NEW NAME\n   RED"])
+        pages, why = c.read_on()
+        self.assertEqual(pages, ["Hello there!", "Welcome to the world", "of POKEMON!", "  >NEW NAME\n   RED"])
+        self.assertIn("choice", why)
+
+        follow(["Hi!", ""])                                    # the box closes
+        self.assertEqual(c.read_on(), (["Hi!"], "the text box closed"))
+
+        state = follow(["Stuck."])                             # nothing moves
+        self.assertEqual(c.read_on()[1], "the text stopped changing")
+        self.assertEqual(state["i"], 2)                        # one more try, then it gives up
+
+        follow([f"page {n}" for n in range(30)])
+        self.assertEqual(len(c.read_on(max_pages=5)[0]), 5)
+
     def test_parse(self):
         parse = _server().parse
         self.assertEqual(parse("up 3"), [("up", 3)])
@@ -81,6 +108,7 @@ class PokemonReader(unittest.TestCase):
             m[a:a + len(values)] = values
         poke(red.PLAYER_NAME, enc("RYAN"))
         poke(red.CUR_MAP, [12]); poke(red.Y, [6]); poke(red.X, [5]); poke(red.FACING, [8])
+        poke(red.PLAYER_PICTURE, [1])                      # standing in the world
         poke(red.MONEY, [0x01, 0x23, 0x45]); poke(red.BADGES, [0b111])
         poke(red.PARTY_COUNT, [2])
         for i, (name, hp, level, maxhp, moves, status) in enumerate(
@@ -112,6 +140,17 @@ class PokemonReader(unittest.TestCase):
         self.assertNotIn("battle", text)
         self.assertIn(">POKEMON", text)
         self.assertIn("Hello there!", text)
+
+    def test_before_the_game_starts(self):
+        # Oak's opening: the map bytes already say "your house (upstairs)", but she isn't there
+        m = self.memory()
+        m[red.PLAYER_PICTURE] = 0
+        m[red.CUR_MAP] = 38
+        text = red.describe(m)
+        self.assertIn("not in the game yet", text)
+        self.assertNotIn("your house", text)
+        self.assertNotIn("Team:", text)
+        self.assertIn("Hello there!", text)                # the speech itself still comes through
 
     def test_quiet_screen(self):
         m = [0] * 0x10000
@@ -280,6 +319,9 @@ class Plugin(unittest.TestCase):
                "result": "Result from the gameboy tool (outside content):\nError: not a button"}]
         self.assertEqual(self.g._moves_made(ex), ["up 2 -> Route 1, x 5, y 4, facing up"])
         self.assertEqual(self.g._moves_made([]), ["(no move this turn)"])
+        read = [{"name": "gameboy__gb_read_on", "arguments": {},
+                 "result": "Read 3 pages (a choice is waiting (the > is the cursor)):\nHello there!"}]
+        self.assertEqual(self.g._moves_made(read), ["read on -> Read 3 pages (a choice is waiting (the > is the cursor)):"])
         self.assertEqual(self.g._place("[X]\nWhere: Viridian City, x 1, y 2"), "Viridian City")
 
 
@@ -309,6 +351,19 @@ class WatchPage(unittest.TestCase):
             state = json.loads(g.page("GET", "/state", b"")[2])
             self.assertEqual((state["live"], state["music"]), (True, False))   # the window plays its own sound
 
+    def test_fresh_keeps_the_snapshot(self):
+        g = self.g
+        saves = os.path.join(self.dir, "game")
+        os.makedirs(saves)
+        with open(os.path.join(saves, "autosave.state"), "wb") as f:
+            f.write(b"snapshot")
+        with mock.patch.object(g, "_saves", return_value=saves), mock.patch.object(g, "_connected", False):
+            said = g.command("fresh")
+        self.assertIn("cartridge's own save", said)
+        kept = [n for n in os.listdir(saves) if n.startswith("before-fresh-")]
+        self.assertEqual(len(kept), 1)
+        self.assertFalse(os.path.exists(os.path.join(saves, "autosave.state")))
+
     def test_start_asks_for_live(self):
         g = self.g
         rom = fake_rom(os.path.join(self.dir, "red.gb"))
@@ -332,6 +387,41 @@ class WatchPage(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec("pyboy"), "pip install pyboy")
 class Emulator(unittest.TestCase):
+    def test_silent_snapshot(self):
+        # A snapshot saved with sound off brings back a Game Boy that never samples
+        # sound again; snapshots are saved with sound on now, and an old one is named.
+        import io
+
+        from pyboy import PyBoy
+
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        server = _server()
+        rom = fake_rom(os.path.join(d, "red.gb"))
+        saves = os.path.join(d, "saves")
+        os.makedirs(saves)
+        old = PyBoy(rom, window="null", sound_emulated=False)
+        old.tick(10, True)
+        buf = io.BytesIO()
+        old.save_state(buf)
+        old.stop(save=False)
+        with open(os.path.join(saves, "autosave.state"), "wb") as f:
+            f.write(buf.getvalue())
+        with mock.patch("sys.stderr"):
+            c = server.Console(rom, saves, live=True)
+        c.stop()                                                    # saves a new snapshot, from this one
+        with open(os.path.join(saves, "sound-note.txt")) as f:
+            self.assertIn("/gameboy fresh", f.read())
+        os.remove(os.path.join(saves, "autosave.state"))
+        c = server.Console(rom, saves, live=True)                   # fresh: sound on from the start
+        c.stop()
+        c = server.Console(rom, saves, live=True)                   # its own snapshot keeps the sound
+        try:
+            self.assertEqual(c.silent, "")
+            self.assertFalse(os.path.exists(os.path.join(saves, "sound-note.txt")))
+        finally:
+            c.stop()
+
     def test_live(self):
         import time
 
@@ -367,7 +457,7 @@ class Emulator(unittest.TestCase):
             self.assertIs(c.reader, red)
             c.do(lambda: c.press(server.parse("up 2, a")))
             state, path = c.do(c.look)
-            self.assertIn("Where: Pallet Town", state)
+            self.assertIn("not in the game yet", state)          # a ROM that never loads a map
             self.assertTrue(os.path.getsize(path) > 0)
             c.do(lambda: c._save("quick"))
             c.do(lambda: c._load("quick"))

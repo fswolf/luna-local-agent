@@ -206,7 +206,7 @@ def _fire(job):
 
     try:
         answer = assistant.respond_to_job(prompt, _model, job["name"], _tools(),
-                                          speak=job["speak"])
+                                          speak=job["speak"], clock=True)
         outcome = " ".join((answer or "(no reply)").split())[:120]
         logbook.info(NAME, "%s done: %s", job["name"], outcome)
         lines = [ln.strip() for ln in str(answer or "").splitlines() if ln.strip()]

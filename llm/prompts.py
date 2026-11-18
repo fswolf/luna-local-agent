@@ -321,7 +321,8 @@ def _pieces(query, timing, private):
     return {
         "user": people.user_line() if private else "",
         "profile": _profile(private),
-        "now": timeutil.describe_now(),
+        # a game's turn goes without: a 9B took the clock for the question
+        "now": ("Right now:\n" + timeutil.describe_now()) if turnctx.current().clock else "",
         "situation": situation_block,
         "timing": timing,
         "feelings": f"{mood.line(private)}{heavy.line(private)}{offers.line(private)}{away.line(private)}",
@@ -386,7 +387,6 @@ def _whole(p):
     return f"""
 {who_she_is()}
 {p['user']}{p['profile']}
-Right now:
 {p['now']}
 {p['situation']}
 Never calculate a date or a duration yourself - call get_datetime or
@@ -439,7 +439,7 @@ calculate a date or a duration yourself - call get_datetime or time_until instea
 {p['summary']}
 """
     live = "\n".join(s.strip("\n") for s in (
-        "Right now:\n" + p["now"], p["situation"], p["timing"], p["feelings"], p["gestures"],
+        p["now"], p["situation"], p["timing"], p["feelings"], p["gestures"],
         p["memory"], p["self"]) if s and s.strip())
 
     return system, f"{LIVE_OPEN}\n{live}\n{LIVE_CLOSE}\n"

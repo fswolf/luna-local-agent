@@ -31,6 +31,15 @@ def vwidth(s: str) -> int:
     return w if w is not None and w >= 0 else len(s)
 
 
+def for_terminal(text: str) -> str:
+    """Text as the conversation pane draws it. Emoji variation selectors
+    (U+FE0F, the invisible mark that makes ☀ into a two-cell ☀️) are
+    dropped: prompt_toolkit counts the pair as one cell, the terminal draws
+    two, and every line after it came out shifted, leaving stray letters
+    down the right edge."""
+    return text.replace("\ufe0f", "")
+
+
 def _wrap_text(text: str, width: int):
     """Word-wrap on visible width rather than character count."""
     words = text.split()

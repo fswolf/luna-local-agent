@@ -17,6 +17,7 @@ PLAYER_NAME = 0xD158
 PARTY_COUNT, PARTY_MONS, MON_SIZE, PARTY_NICKS = 0xD163, 0xD16B, 0x2C, 0xD2B5
 MONEY, BADGES = 0xD347, 0xD356
 CUR_MAP, Y, X = 0xD35E, 0xD361, 0xD362
+PLAYER_PICTURE = 0xC100           # the player's sprite picture (wSpriteStateData1); 0 until a map is loaded
 FACING = 0xC109                   # the player sprite: 0 down, 4 up, 8 left, 12 right
 IN_BATTLE = 0xD057                # 0 none, 1 wild, 2 trainer
 ENEMY_NICK, ENEMY_MON = 0xCFDA, 0xCFE5        # battle struct: HP +1, level +0x0E, max HP +0x0F
@@ -119,7 +120,20 @@ def _mon(m, base, nick):
             + (" FAINTED" if hp == 0 else "") + (f" - moves: {', '.join(moves)}" if moves else ""))
 
 
+def on_map(m):
+    """In the game proper. On the title screen, in Oak's opening speech and while
+    naming, no map is loaded yet: the player sprite is unset, and the map and
+    position bytes hold whatever was there (a new game's start, a stale save),
+    so reading them out sent her into a house she wasn't in yet."""
+    return m[PLAYER_PICTURE] != 0
+
+
 def describe(m):
+    if not on_map(m):
+        text = screen_text(m)
+        return ("Where: not in the game yet - the title screen, the opening or naming. There's no map, "
+                "team or position until you're standing in the world.\n"
+                "On screen:" + ("\n" + text if text else " no text"))
     lines = [f"Where: {place(m)}, x {m[X]}, y {m[Y]}, facing {FACINGS.get(m[FACING], '?')}"]
     badges = bin(m[BADGES]).count("1")
     lines.append(f"Player: {_text(m, PLAYER_NAME) or '?'}  ·  money ¥{_bcd(m, MONEY, 3)}  ·  badges {badges}/8")
