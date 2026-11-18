@@ -20,6 +20,9 @@ CUR_MAP, Y, X = 0xD35E, 0xD361, 0xD362
 PLAYER_PICTURE = 0xC100           # the player's sprite picture (wSpriteStateData1); 0 until a map is loaded
 FACING = 0xC109                   # the player sprite: 0 down, 4 up, 8 left, 12 right
 IN_BATTLE = 0xD057                # 0 none, 1 wild, 2 trainer
+MAP_HEIGHT, MAP_WIDTH = 0xD368, 0xD369        # the map, in blocks of 2x2 tiles (steps)
+WARP_COUNT, WARPS = 0xD3AE, 0xD3AF            # the map's doors and stairs: y, x, warp id, map, 4 bytes each
+LAST_MAP = 0xFF                               # a door back out to wherever you came from
 ENEMY_NICK, ENEMY_MON = 0xCFDA, 0xCFE5        # battle struct: HP +1, level +0x0E, max HP +0x0F
 BATTLE_NICK, BATTLE_MON = 0xD009, 0xD014
 
@@ -112,6 +115,26 @@ def place(m):
     return MAPS[n] if n < len(MAPS) and MAPS[n] else f"map {n}"
 
 
+def _steps(dx, dy):
+    """'6 right, 2 up' - how to get there from where she stands."""
+    parts = [f"{abs(dx)} {'right' if dx > 0 else 'left'}" if dx else "",
+             f"{abs(dy)} {'down' if dy > 0 else 'up'}" if dy else ""]
+    return ", ".join(p for p in parts if p) or "right where you are"
+
+
+def ways_out(m):
+    """The doors and stairs on this map, nearest first, with the way there.
+    Without them she knew her x and y and nothing about where the room led,
+    and walked circles in her bedroom believing she was at Oak's lab."""
+    x, y = m[X], m[Y]
+    out = []
+    for i in range(min(m[WARP_COUNT], 32)):
+        wy, wx, _warp, dest = (m[WARPS + i * 4 + k] for k in range(4))
+        to = "where you came in from" if dest == LAST_MAP else MAPS[dest] if dest < len(MAPS) and MAPS[dest] else f"map {dest}"
+        out.append((abs(wx - x) + abs(wy - y), f"to {to} at x {wx}, y {wy} ({_steps(wx - x, wy - y)})"))
+    return [text for _d, text in sorted(out)[:8]]
+
+
 def _mon(m, base, nick):
     hp, level, maxhp = _word(m, base + 1), m[base + 0x21], _word(m, base + 0x22)
     moves = [MOVES[i] for i in (m[base + 8 + k] for k in range(4)) if 0 < i < len(MOVES)]
@@ -134,7 +157,11 @@ def describe(m):
         return ("Where: not in the game yet - the title screen, the opening or naming. There's no map, "
                 "team or position until you're standing in the world.\n"
                 "On screen:" + ("\n" + text if text else " no text"))
-    lines = [f"Where: {place(m)}, x {m[X]}, y {m[Y]}, facing {FACINGS.get(m[FACING], '?')}"]
+    lines = [f"Where: {place(m)}, x {m[X]}, y {m[Y]}, facing {FACINGS.get(m[FACING], '?')}"
+             + (f" (the map is {m[MAP_WIDTH] * 2} steps wide, {m[MAP_HEIGHT] * 2} tall)" if m[MAP_WIDTH] else "")]
+    exits = ways_out(m)
+    if exits:
+        lines.append("Ways out (stand on stairs; walk out through a door): " + "; ".join(exits))
     badges = bin(m[BADGES]).count("1")
     lines.append(f"Player: {_text(m, PLAYER_NAME) or '?'}  ·  money ¥{_bcd(m, MONEY, 3)}  ·  badges {badges}/8")
 

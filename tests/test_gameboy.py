@@ -141,6 +141,20 @@ class PokemonReader(unittest.TestCase):
         self.assertIn(">POKEMON", text)
         self.assertIn("Hello there!", text)
 
+    def test_ways_out(self):
+        m = self.memory()
+        m[red.CUR_MAP], m[red.X], m[red.Y] = 38, 1, 3             # your house (upstairs)
+        m[red.MAP_WIDTH], m[red.MAP_HEIGHT] = 4, 4
+        m[red.WARP_COUNT] = 1
+        m[red.WARPS:red.WARPS + 4] = [1, 7, 2, 37]                 # the stairs, down to your house (downstairs)
+        text = red.describe(m)
+        self.assertIn("the map is 8 steps wide, 8 tall", text)
+        self.assertIn("to your house (downstairs) at x 7, y 1 (6 right, 2 up)", text)
+        m[red.WARP_COUNT] = 2
+        m[red.WARPS + 4:red.WARPS + 8] = [3, 1, 0, 0xFF]           # right under her, back outside
+        exits = red.ways_out(m)
+        self.assertEqual(exits[0], "to where you came in from at x 1, y 3 (right where you are)")
+
     def test_before_the_game_starts(self):
         # Oak's opening: the map bytes already say "your house (upstairs)", but she isn't there
         m = self.memory()

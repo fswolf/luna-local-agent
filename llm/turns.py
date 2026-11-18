@@ -235,8 +235,11 @@ def _ask(text, model, on_text=None, on_sentence=None,
         replayed = list(context)
 
     # Ahead of history, so it reads as the oldest thing in the window
-    # and anything real that follows takes precedence over it.
-    if session._tools_supported and not _has_tool_example(replayed):
+    # and anything real that follows takes precedence over it. Not on a
+    # game's turn (clock off): its worked example is "what time is it?",
+    # and a game turn starts with no history, so that question was the
+    # only conversation she saw - and she answered it, every turn.
+    if session._tools_supported and not _has_tool_example(replayed) and turnctx.current().clock:
         messages.extend(_demonstration())
 
     messages.extend(replayed)

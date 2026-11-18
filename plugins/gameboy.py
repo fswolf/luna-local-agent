@@ -489,7 +489,8 @@ STEP_PROMPT = (
     "what beat you - write it down with game_note, and update your plan. Read your notes before "
     "moving; don't repeat what they say failed.\n"
     "Only gb_press moves and only game_note keeps a note: writing them in your reply does nothing.\n"
-    "Then talk to the player watching, in your own voice, 2 to 4 sentences: what you see, what you "
+    "You're the one playing; the user is watching you. Then talk to them, in your own voice, 2 to 4 "
+    "sentences: what you see, what you "
     "make of it, why you chose this move, how you feel about it. Just talk - no button lists, no "
     "game text, no headings.)"
 )
@@ -592,7 +593,8 @@ def _moves_made(exchanges):
                 args = json.loads(args or "{}")
             except ValueError:
                 args = {}
-        where = next((ln[7:].strip() for ln in result.splitlines() if ln.startswith("Where: ")), "")
+        # "Where: not in the game yet - the title screen, ..." keeps only its first part
+        where = next((ln[7:].strip().split(" - ")[0] for ln in result.splitlines() if ln.startswith("Where: ")), "")
         said = where or next((ln.strip() for ln in result.splitlines()[1:] if ln.strip()), "")
         out.append(f"{args.get('buttons', '?')} -> {said[:150] or '(nothing new)'}")
     return out or ["(no move this turn)"]
@@ -628,7 +630,10 @@ def _step():
         picture = "This game comes to you as pictures: call gb_look first to see the screen, then decide.\n"
     else:
         picture = ""
-    guide = _game.guide_by_room(re.sub(r"[^a-z0-9]+", "-", game.lower()).strip("-"), here, s["guide"])
+    folder = re.sub(r"[^a-z0-9]+", "-", game.lower()).strip("-")
+    # the room she's in, and her guide's "Getting around" (how stairs and doors work) every turn
+    guide = (_game.guide_by_room(folder, "Getting around", s["guide"])
+             + _game.guide_by_room(folder, here, s["guide"]))
 
     _one_move_per_turn()
     _turn.update(active=True, moves=0)

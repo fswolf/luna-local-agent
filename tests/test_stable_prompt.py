@@ -160,6 +160,37 @@ class ATurn(_Live):
         self.assertIn(("user", "how's the coffee"), stored)          # what was said, nothing else
         self.assertFalse(any(prompts.LIVE_OPEN in text for _r, text in stored))
 
+    def test_a_game_turn_has_no_clock_anywhere(self):
+        # The worked example ("what time is it?") and the clock in the note were all
+        # a game turn's empty history held, and she answered the time every turn.
+        import llm
+        from llm import session
+        sent = []
+
+        def generate(payload, *a):
+            sent.append(payload)
+            return "Okay."
+
+        def play(clock):
+            sent.clear()
+            with mock.patch.object(config, "LLM_STABLE_PROMPT", True, create=True), \
+                    mock.patch.object(config, "ADAPTIVE_ENABLED", False, create=True), \
+                    mock.patch.object(config, "GROUNDING_ENABLED", False, create=True), \
+                    mock.patch.object(config, "FOLLOW_THROUGH", False, create=True), \
+                    mock.patch.object(session, "_tools_supported", True), \
+                    mock.patch("llm.turns._record_thoughts", lambda *a, **k: None), \
+                    mock.patch("llm.turns._generate", generate), \
+                    mock.patch("llm.turns._tool_rounds", lambda payload, *a: generate(payload)), \
+                    turnctx.begin(source="job:gameboy", private=False, job="gameboy", clock=clock):
+                llm.ask("(You're playing Pokemon...)", "fake", context=[], tools_allowed=[], remember=False,
+                        source="job:gameboy")
+            return " ".join(str(m.get("content")) for m in sent[0]["messages"])
+
+        game = play(False)
+        self.assertNotIn("what time is it", game)
+        self.assertNotIn("Right now:", game)
+        self.assertIn("what time is it", play(True))                 # a scheduled job keeps both
+
     def test_off_sends_the_message_bare(self):
         payload, _stored = self.turn(on=False)
         self.assertEqual(payload["messages"][-1]["content"], "how's the coffee")

@@ -443,7 +443,7 @@ small picture isn't; the picture is what she sees.
 
 | Game | How she sees it |
 |---|---|
-| Pokemon Red and Blue | As text: the map she's on and where, her money and badges, her team with levels, HP, status and moves, the battle, and the text on screen. Plus the picture of what each move did, when her model can see |
+| Pokemon Red and Blue | As text: the map she's on and where, its doors and stairs with the steps to each, her money and badges, her team with levels, HP, status and moves, the battle, and the text on screen. Plus the picture of what each move did, when her model can see |
 | The Final Fantasy Legend | As text: her party with race, HP, stats and weapons with their uses left, her gold and bag, the enemy groups and their HP in a battle, and the text on screen with the menu cursor. Places are map numbers, apart from the first town and the world around it. Plus the picture, when her model can see |
 | Anything else | The screen as a picture: she looks before each move, so it needs a model that can see |
 
@@ -463,7 +463,11 @@ the game (Pokemon and Final Fantasy Legend have one). With `"live"` on (the defa
 her turns, the way a Game Boy in your hands would; turn it off and the game
 waits until her next turn instead. Notes she writes
 with `game_note` come back when she's in the same place again, and
-`agent/knowledge/<game>/` works as her guide, like Zork's.
+`agent/knowledge/<game>/` works as her guide, like Zork's: a section
+headed with a place's name (`## your house (upstairs)`, `## Pallet Town`,
+as the reader names them) comes to her while she's there, and a section
+called `## Getting around` comes every turn. Pokemon Red/Blue's goes in
+`agent/knowledge/pokemon-red-blue/`.
 
 **Watching.** `/gameboy watch` opens a page with the game running live
 (30 frames a second), what she said and her last moves. Under the screen:

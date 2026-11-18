@@ -8,10 +8,12 @@
   :root { --bg: #120d1c; --panel: #1a1328; --line: #3a2d55; --text: #d9d4ec; --dim: #8880a8; --accent: #e07ac8;
           --live: #ff5c7a; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
-  main { max-width: 1100px; margin: 0 auto; padding: 18px; display: grid; gap: 18px;
-         grid-template-columns: minmax(0, 640px) minmax(0, 1fr); align-items: start; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
-  h1 { grid-column: 1 / -1; margin: 0; font-size: 18px; color: var(--accent); font-weight: 600; }
+  /* one column: the game on top, what she says under it, her moves beside that on a wide window */
+  main { max-width: 720px; margin: 0 auto; padding: 18px; display: grid; gap: 16px; }
+  h1 { margin: 0; font-size: 18px; color: var(--accent); font-weight: 600; }
+  .side { display: grid; gap: 12px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; }
+  .side .note { grid-column: 1 / -1; margin: 0; }
+  @media (max-width: 640px) { .side { grid-template-columns: 1fr; } }
 
   /* the handheld: a bezel round the screen, the screen itself drawn at whole-pixel sharpness */
   .shell { background: linear-gradient(160deg, #2a2140, #1d1630); border-radius: 18px 18px 46px 18px;
@@ -82,7 +84,7 @@
   <div class="side">
     <div class="panel note" id="note" hidden></div>
     <div class="panel"><div class="dim" id="turn">waiting...</div><div class="said" id="said"></div></div>
-    <div class="panel" style="margin-top:12px"><div class="dim">her last moves</div><ul id="notes"></ul></div>
+    <div class="panel"><div class="dim">her last moves</div><ul id="notes"></ul></div>
   </div>
 </main>
 <script>
