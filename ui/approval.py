@@ -15,6 +15,7 @@ from core import logbook, safe
 
 from .shared import _approval_lock, _lock, _refresh, state, view
 from .conversation_pane import WHEEL_LINES
+from .text import vwidth
 
 
 # ---------------------------------------------------------------------------
@@ -137,8 +138,66 @@ def _approval_header():
     return fragments
 
 
+def _body_width():
+    """Columns the body has to fill: the window's own once it's drawn,
+    else the float's width less its frame, padding and scrollbar."""
+    window = view.approval_window
+    if window is not None and window.render_info is not None:
+        return max(20, window.render_info.window_width - 2)
+    return max(20, _approval_size()[0] - 6)
+
+
+def _wrap(line, width):
+    """One body line as the lines it takes at this width: word-wrapped,
+    the continuation indented like the line itself so code and diffs
+    still read, and a word longer than the width (a URL) cut where it
+    must. A line that fits is left exactly as it is."""
+    if vwidth(line) <= width:
+        return [line]
+
+    indent = line[:len(line) - len(line.lstrip())]
+    if vwidth(indent) > width // 2:
+        indent = ""
+    room = max(10, width - vwidth(indent))
+    out, current = [], ""
+
+    for word in line.split(" "):
+        while vwidth(word) > room:                   # too long for any line: cut it
+            if current.strip():
+                out.append(current)
+                current = ""
+            cut = room
+            while cut > 1 and vwidth(word[:cut]) > room:
+                cut -= 1
+            out.append(word[:cut])
+            word = word[cut:]
+        candidate = f"{current} {word}" if current else word
+        if vwidth(candidate) > room and current.strip():
+            out.append(current)
+            current = word
+        else:
+            current = candidate
+    if current or not out:
+        out.append(current)
+
+    first = out[0] if out[0].startswith(indent) else indent + out[0].lstrip(" ")
+    return [first] + [indent + part.lstrip(" ") for part in out[1:]]
+
+
+def _wrapped_body():
+    """The body as it's drawn: [(style of its line, text)], long lines wrapped."""
+    request = view.approval
+
+    if request is None:
+        return []
+
+    width = _body_width()
+    return [(line, part) for line in request["body"] for part in _wrap(line, width)]
+
+
 def _approval_body():
-    """The content or diff, coloured the way a diff reads."""
+    """The content or diff, coloured the way a diff reads, long lines
+    wrapped to the window (an email's paragraph is one long line)."""
     request = view.approval
 
     if request is None:
@@ -146,7 +205,7 @@ def _approval_body():
 
     fragments = []
 
-    for line in request["body"]:
+    for line, part in _wrapped_body():
         if line.startswith(("+++", "---")):
             style = "class:footer"
         elif line.startswith("@@"):
@@ -158,13 +217,13 @@ def _approval_body():
         else:
             style = "class:text"
 
-        fragments.append((style, f" {line}\n"))
+        fragments.append((style, f" {part}\n"))
 
     return fragments or [("class:footer", " (nothing to show)\n")]
 
 
 def _approval_lines():
-    return len(view.approval["body"]) if view.approval else 0
+    return len(_wrapped_body()) if view.approval else 0
 
 
 def _approval_height():

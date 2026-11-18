@@ -267,7 +267,7 @@ def _can_send():
 
 
 def _why_send():
-    return _why() if not _available() else "sending is off - /set email.send true to allow it (it always asks)"
+    return _why() if not _available() else "sending is off - space here or /set email.send true (it always asks)"
 
 
 def _limit(n, default=8):
@@ -463,31 +463,33 @@ def _approve_send(lines, title):
                                 body=lines, timeout=config.FILES_APPROVAL_TIMEOUT))
 
 
+def _addresses(text):
+    return [a for _n, a in getaddresses([str(text or "")]) if "@" in a]
+
+
 @tool(
     "send_email",
     "Send an email as the user. They see the whole message and must approve it; "
     "if the result says denied, tell them and don't retry. To answer one, pass its "
-    "number as reply_to: the subject and threading are filled in.",
+    "number as reply_to: who it goes back to, the subject and threading are filled in.",
     {
-        "to": {"type": "string", "description": "Address(es), comma separated."},
-        "subject": {"type": "string", "description": "Ignored when replying."},
+        "to": {"type": "string", "description": "Address(es), comma separated. Replying: leave "
+                                                 "empty and it goes back to whoever sent it."},
+        "subject": {"type": "string", "description": "A short subject line. Ignored when replying."},
         "body": {"type": "string", "description": "The message, plain text."},
         "reply_to": {"type": "string", "description": "Optional: the number of the email being answered."},
     },
-    required=("to", "body"),
+    required=("body",),
     available=_can_send,
     why=_why_send,
 )
-def _send_email(to, body, subject="", reply_to=""):
+def _send_email(body, to="", subject="", reply_to=""):
     acct = account()
-    to = ", ".join(a for _n, a in getaddresses([str(to or "")]) if "@" in a)
-
-    if not to:
-        return "No valid address to send to."
+    to = ", ".join(_addresses(to))
+    ours = {a.lower() for a in _addresses(acct.get("from")) + _addresses(acct.get("user"))}
 
     msg = EmailMessage()
     msg["From"] = acct.get("from") or acct["user"]
-    msg["To"] = to
     subject = str(subject or "").strip()
 
     uid = re.sub(r"\D", "", str(reply_to or ""))
@@ -511,6 +513,18 @@ def _send_email(to, body, subject="", reply_to=""):
             if original["message-id"]:
                 msg["In-Reply-To"] = original["message-id"]
                 msg["References"] = original["message-id"]
+
+            # A reply goes back to whoever wrote it (their Reply-To if they
+            # set one). Given none, or only this mailbox's own address (the
+            # To line of the email she was answering), she was mailing herself.
+            sender = _addresses(original["reply-to"]) or _addresses(original["from"])
+            if sender and (not to or {a.lower() for a in _addresses(to)} <= ours):
+                to = ", ".join(sender)
+
+    if not to:
+        return "No valid address to send to."
+
+    msg["To"] = to
 
     msg["Subject"] = subject or "(no subject)"
     msg.set_content(str(body or ""))

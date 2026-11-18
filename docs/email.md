@@ -52,7 +52,8 @@ you, and nothing is moved or deleted.
 
 ## Sending
 
-Off by default. `/set email.send true` switches it on, and then:
+Off by default. Space on `send_email` in the tools pane (Tab twice), or
+`/set email.send true`, switches it on, and then:
 
 - **every message asks.** The approval window shows who it's to, the
   subject and the whole text. There's no allow-all for email.

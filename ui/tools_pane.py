@@ -188,6 +188,7 @@ def _tool_groups():
         groups = []
 
     groups = _with_plugin_switches(groups)
+    groups = _with_tool_plugin_switches(groups)
     groups = _with_ask_switches(groups)
     # the portrait's settings live in the settings pane (Tab three times), not here
     extra = [g for g in (_feature_group(), _thoughts_group(), _self_group()) if g]
@@ -248,6 +249,64 @@ def _with_ask_switches(groups):
     return out
 
 
+def _plugin_row(plugin):
+    """A plugin's own switch, as a row: space connects or disconnects it,
+    saved like /<name> on|off. Shows the saved setting, so one that's on but
+    couldn't connect still shows on and space switches it off."""
+    import config
+
+    name = plugin.name
+    running = _plugin_says(plugin, "running", False)
+    try:
+        saved = bool((config.plugin_settings(name) or {}).get("enabled"))
+    except Exception:
+        saved = False
+    ready = running or saved or _plugin_says(plugin, "available", False)
+    if running:
+        why = "connected"
+    elif saved:
+        why = "on, but not connected - space switches it off"
+    else:
+        why = _plugin_says(plugin, "why_unavailable", "unavailable") if not ready else f"space connects - /{name} on"
+    return (f"{name} plugin", running or saved, ready, why, 0, "plugin:" + name)
+
+
+def _with_tool_plugin_switches(groups):
+    """A plugin that brings tools of its own (no MCP server: kiwix, gameboy,
+    lovense...) gets its switch at the top of their group, like an MCP one,
+    so its tools shown as -- can be switched on where they're listed. ask
+    has its own rows (_with_ask_switches)."""
+    try:
+        import plugins
+        import tools
+    except Exception:
+        return groups
+
+    out = list(groups)
+
+    for name in plugins.names():
+        plugin = plugins.get(name)
+        if not plugin or name == "ask" or getattr(plugin.module, "SERVER", None):
+            continue
+        module = plugin.module.__name__
+        group = next((tools._EXTERNAL_GROUPS.get(tool) for tool, entry in tools._REGISTRY.items()
+                      if getattr(entry.get("run"), "__module__", "") == module
+                      and tool in tools._EXTERNAL_GROUPS), None)
+        if not group:
+            continue
+        try:
+            row = _plugin_row(plugin)
+        except Exception as e:
+            logbook.warn("ui", "%s plugin row failed: %s", name, e)
+            continue
+        for i, (glabel, members, live, total) in enumerate(out):
+            if glabel == group:
+                if not any(m[0] == row[0] for m in members):
+                    out[i] = (glabel, [row] + list(members), live, total)
+                break
+    return out
+
+
 def _with_plugin_switches(groups):
     """Each MCP plugin (home, vibecity, minecraft, zork) gets a switch at
     the top of its MCP group, and keeps the group while it's off - so
@@ -271,19 +330,7 @@ def _with_plugin_switches(groups):
         if not plugin or not getattr(plugin.module, "SERVER", None):
             continue
 
-        running = _plugin_says(plugin, "running", False)
-        try:
-            saved = bool((config.plugin_settings(plugin.name) or {}).get("enabled"))
-        except Exception:
-            saved = False
-        ready = running or saved or _plugin_says(plugin, "available", False)
-        if running:
-            why = "connected"
-        elif saved:
-            why = "on, but not connected - space switches it off"
-        else:
-            why = _plugin_says(plugin, "why_unavailable", "unavailable") if not ready else f"space connects - /{name} on"
-        row = (f"{name} plugin", running or saved, ready, why, 0, "plugin:" + name)
+        row = _plugin_row(plugin)
         label = f"MCP: {name}"
 
         for i, (glabel, members, live, total) in enumerate(out):
@@ -566,6 +613,60 @@ def _tool_move(step):
     _refresh()
 
 
+# Tools held back by a setting as well as the pane (sending email needs
+# email.send, reading pages web_search.fetch_pages...). Space on one shown
+# as -- switches that setting on with it, so it can be turned on where it's
+# listed instead of only with /set. Off switches the setting off too, once
+# no other tool still uses it. Every email send still asks first.
+_GATES = {
+    "send_email": "email.send",
+    "check_email": "email.enabled", "read_email": "email.enabled", "search_email": "email.enabled",
+    "read_page": "web_search.fetch_pages", "research": "web_search.fetch_pages",
+    "search_history": "history.transcript",
+    "introspect": "thoughts.enabled",
+    "note_lesson": "self.lessons", "reflect_now": "self.lessons",
+    "recall_episodes": "self.episodes",
+    "save_skill": "self.skills",
+    "start_project": "self.projects", "update_project": "self.projects", "project_notes": "self.projects",
+}
+
+
+def _gate_toggle(name, on, ready):
+    """Space on a gated tool. True when handled here."""
+    import config
+    import tools
+
+    gate = _GATES[name]
+    attr = config.SETTINGS[gate][0]
+    gated = bool(getattr(config, attr, False))
+
+    if ready and on:                                 # on: off, and the setting once nothing else uses it
+        tools.set_enabled(name, False)
+        others = [r[0] for r in _tool_rows() if r[0] != name and _GATES.get(r[0]) == gate and r[1] and r[2]]
+        if others:
+            add_message("system", f"{name}: off ({gate} stays on for {', '.join(others)})")
+        else:
+            config.save_setting(gate, "false")
+            add_message("system", f"{name}: off ({gate} false, saved)")
+        return True
+
+    if ready or gated:                               # off in the pane only, or blocked by something else
+        return False
+
+    config.save_setting(gate, "true")
+    tools.set_enabled(name, True)
+    row = next((r for r in _tool_rows() if r[0] == name), None)
+
+    if row and not row[2]:                           # still can't: the switch wasn't all that was missing
+        config.save_setting(gate, "false")
+        add_message("system", f"{name} can't be switched on - {row[3]}")
+        return True
+
+    note = " - every message still asks you first" if name == "send_email" else ""
+    add_message("system", f"{name}: on ({gate} true, saved){note}")
+    return True
+
+
 def _tool_toggle():
     """Flip the selected tool, unless its dependencies are missing."""
     rows = _tool_rows()
@@ -574,6 +675,16 @@ def _tool_toggle():
         return
 
     name, on, ready, why, _cost, setting = rows[view.tool_cursor]
+
+    if name in _GATES and not setting:
+        try:
+            if _gate_toggle(name, on, ready):
+                _refresh()
+                return
+        except Exception as e:
+            add_message("system", f"Couldn't change {name}: {e}")
+            _refresh()
+            return
 
     if not ready:
         add_message("system", f"{name} can't be switched on - {why}")

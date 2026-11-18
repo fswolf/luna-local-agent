@@ -121,6 +121,14 @@ space to switch it on or off. At the top, **Permissions** sets read,
 write and execute (allow, ask or off; see [Files](files.md)). The total at the top moves as you go, so
 you can see what you're buying back.
 
+A tool shown as `--` can't be offered right now, and the line beside it
+says why. When a setting is what holds it back (sending email needs
+`email.send`, reading pages `web_search.fetch_pages`, lessons
+`self.lessons`...), space switches that setting on with it, saved as
+`/set` would. A plugin that brings tools (the offline library, chess,
+jobs) has its own switch at the top of their group, so space there
+starts it.
+
 <img width="1210" alt="The tools pane: every tool grouped, its token cost, and on/off switches" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-tools.png" />
 
 Further down the pane, below the tools, the **Mood** group isn't tools: it's moods, her voice
