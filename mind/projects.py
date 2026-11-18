@@ -126,9 +126,9 @@ def get(project_id):
 def entries(project_id, limit=None):
     """Oldest first; the last `limit` when given."""
     rows = _run(lambda c: c.execute(
-        "SELECT at, kind, text FROM entries WHERE project_id=? ORDER BY id",
+        "SELECT id, at, kind, text FROM entries WHERE project_id=? ORDER BY id",
         (int(project_id),)).fetchall(), [])
-    rows = [{"at": a, "kind": k, "text": t} for a, k, t in rows]
+    rows = [{"id": i, "at": a, "kind": k, "text": t} for i, a, k, t in rows]
     return rows[-limit:] if limit else rows
 
 
@@ -186,6 +186,13 @@ def log(project_id, kind, text):
 def set_next(project_id, text):
     _run(lambda c: c.execute("UPDATE projects SET next=?, updated=? WHERE id=?",
                              (_clean(text), _now(), int(project_id))))
+
+
+def mark_wrong(entry_id):
+    """A note the game showed was wrong: kept (kind 'wrong', seen in
+    /projects) but never shown to her on a turn again."""
+    return _run(lambda c: c.execute("UPDATE entries SET kind='wrong' WHERE id=?",
+                                    (int(entry_id),)).rowcount, 0) > 0
 
 
 def set_status(project_id, status):
@@ -309,6 +316,23 @@ def new_game(game, goal=""):
     return game_project(game, goal)
 
 
+# A game that can tell a wrong note from a right one registers how for its
+# project while its turn runs: {"check": fn(text, now) -> why it's wrong or "",
+# "stamp": fn(text) -> the text with where she is in front}. game_note uses it.
+_checkers = {}
+
+
+def set_checker(project_id, checker):
+    if checker:
+        _checkers[int(project_id)] = checker
+    else:
+        _checkers.pop(int(project_id), None)
+
+
+def checker(project_id):
+    return _checkers.get(int(project_id)) if project_id is not None else None
+
+
 HERE_NOTES = 8      # older notes about the place she's in, on top of the recent ones
 
 
@@ -316,18 +340,38 @@ def _mentions(text, place):
     return bool(re.search(rf"(?<!\w){re.escape(place)}(?!\w)", text, re.IGNORECASE))
 
 
-def game_block(project_id, recent=15, here=""):
+def game_block(project_id, recent=15, here="", check=None):
     """What a game turn shows her: the goal, her recent notes, the plan.
     here: where she is (a room's name). Older notes that mention it come
     back too, so a note written forty moves ago is there again when she
-    returns to that room, not lost off the end of the list."""
+    returns to that room, not lost off the end of the list.
+    check(text, plan) -> why it's wrong, or "": a note the game shows is
+    wrong is marked so and left out for good; a wrong plan is cleared."""
     project = get(project_id)
 
     if not project:
         return "(no notes yet)"
 
     lines = [f"{project['title']}" + (f" - goal: {project['goal']}" if project["goal"] else "")]
-    notes = [e for e in entries(project_id) if e["kind"] != "next"]
+    notes, dropped = [], 0
+
+    for e in entries(project_id):
+        if e["kind"] in ("next", "wrong"):
+            continue
+        if check and check(e["text"], False):
+            mark_wrong(e["id"])
+            dropped += 1
+            continue
+        notes.append(e)
+
+    if check and project["next"] and check(project["next"], True):
+        set_next(project_id, "")
+        project["next"] = ""
+        dropped += 1
+
+    if dropped:
+        lines.append(f"   ({dropped} of your notes put a door or stairs where the game shows none - "
+                     "taken out; the Ways out line is right)")
     older = notes[:-recent] if len(notes) > recent else []
     about = [e for e in older if here and _mentions(e["text"], here)][-HERE_NOTES:]
 

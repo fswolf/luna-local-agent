@@ -538,6 +538,16 @@ first time she plays.
   notes about the place she's in. A note from forty moves ago about the
   Troll Room shows up again when she walks back into the Troll Room,
   even though it has dropped off her latest notes.
+- On the Game Boy, her notes are checked against the game. A note or
+  plan that puts a door or stairs where the game's "Ways out" line shows
+  none is turned back when she writes it, with the real ways out. An
+  older one is marked `wrong` (still in `/projects`) and stops being
+  shown to her, and a wrong plan is cleared. Notes she writes there
+  start with the place she was in, `[your house (upstairs)] ...`, so
+  each is only checked against its own map. Her turn also tells her the
+  game is right whenever her notes and it disagree. This came from a
+  run where her own note "the lab door is at x=1, y=3" kept her pressing
+  A at her bedroom wall for 27 turns.
 
 **After she stops playing**, the session is written up in her own
 notes like a conversation, with how she feels about the game looking

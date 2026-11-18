@@ -68,6 +68,36 @@ class WalkAway(unittest.TestCase):
         self.assertEqual(sum(1 for s in said if s), 1)
 
 
+    def test_three_insults_in_a_row_walk_her_out_and_each_is_logged(self):
+        # Ryan's test: four insults and she never left. The reading is logged now.
+        from mind.mood import appraise, exchange
+        answer = mock.MagicMock()
+        answer.json.return_value = {"choices": [{"message": {"content": "0 - - hurt 0 normal"}}]}
+        with mock.patch("requests.post", return_value=answer), \
+                mock.patch("mind.mood.walkaway._withdraw") as withdraw, \
+                mock.patch.object(appraise.logbook, "info") as log:
+            for said in ("god you're useless", "you're worthless", "fucking worthless"):
+                exchange._apply(said, "*ears flatten*", "m")
+        self.assertEqual(withdraw.call_count, 1)
+        lines = [c.args[1] % c.args[2:] for c in log.call_args_list]
+        self.assertTrue(any("'0 - - hurt 0 normal' -> warmth of message 0, her warmth -1" in x for x in lines), lines)
+
+    def test_the_reading_asks_about_insults_whatever_she_answered(self):
+        from mind.mood import appraise
+        self.assertIn("insults, belittles or attacks her", appraise._APPRAISE_PROMPT)
+        self.assertIn("however she answered", appraise._APPRAISE_PROMPT)
+        self.assertIn("apology", appraise._APPRAISE_PROMPT)        # sorry read "0 = =" and she stayed away
+
+    def test_an_apology_while_away_brings_her_back(self):
+        from mind.mood import appraise, exchange, walkaway
+        self.mood._away.update(until=9e12, said=True)
+        with mock.patch.object(appraise, "_appraise", return_value=(2, 0, 1, None, 0)), \
+                mock.patch.object(exchange, "_make_up") as made_up:
+            self.assertTrue(walkaway.heard_while_away("sorry luna, I didn't mean it", "m"))
+        self.assertFalse(self.mood._away["until"])
+        made_up.assert_called_once()
+
+
 class Conversation(unittest.TestCase):
     def setUp(self):
         import ui

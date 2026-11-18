@@ -204,6 +204,10 @@ Paused projects: #2 build a Zork primer
   the log, `/projects done|pause|resume <n>` changes the status,
   `/projects drop <n>` hides one and `/projects restore <n>` brings it
   back. `/projects dropped` lists the hidden ones.
+- **Fixing a wrong note:** `/projects show <n>` numbers each note.
+  `/projects wrong <note>` marks one wrong (kept, never shown to her on a
+  game turn again), and `/projects unplan <n>` clears her plan so she
+  makes a new one.
 
 Stored in `agent/projects.db` (gitignored). At most six active at once.
 

@@ -257,7 +257,9 @@ call reads what you said and what she answered and returns one line:
 
 - **how warm your message was**, 0-3, the warmth rating below
 - **energy**, `-` `=` `+`: did that wear on her or liven her up
-- **warmth**, `-` `=` `+`: `-` only for real hostility, never bluntness
+- **warmth**, `-` `=` `+`: `-` when your message insults or belittles her
+  (name-calling, "worthless"), however she answered and even as a joke or
+  a test; never for bluntness or swearing at something else
 - **a feeling** from the `feelings` list in the moods file, or none
 
 The feeling shows on her face for a few seconds (and plays its gesture,
@@ -401,7 +403,10 @@ she's a tool first, `/set mood.walk_away false` turns it off.
 - **What counts:** the exchange reading's own "hostile" mark, which it
   gives for being hurtful to her, not for bluntness or swearing.
   `walk_away_after` of those (3) in a row tips it. A warm exchange
-  clears the count, and half an hour without another wipes it.
+  clears the count, and half an hour without another wipes it. Every
+  reading goes to the log (`[mood] read the exchange: '0 - - hurt 0
+  normal' -> ...`), with "hostile 2 of 3" as the count climbs, so a test
+  that doesn't walk her out shows why.
 - **Leaving:** the next time you speak to her she says one short line
   from `walk_away.lines` in `agent/moods.json`. After that, nothing: no
   reply, and no model call for it. On the portrait she
@@ -415,7 +420,8 @@ she's a tool first, `/set mood.walk_away false` turns it off.
   `walk_away.prompt` in place of her usual mood line, so a reminder
   comes out curt and sulky ("It's nine. Meds.") rather than sweet.
 - **Coming back:** after `walk_away_minutes` (10), or sooner if what
-  you say reads as making up. Then she answers that message. Either way
+  you say reads as making up (an apology or something kind). Then she
+  answers that message. Either way
   she's cool with you for a while and warms back up on her own.
   `/mood reset` brings her back at once.
 

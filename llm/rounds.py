@@ -261,7 +261,7 @@ def _why_empty():
         )
 
     if not _last_raw.get("deltas"):
-        return "LM Studio streamed nothing at all - is the model still loaded?"
+        return f"{config.llm_backend_label()} streamed nothing at all - is the model still loaded?"
 
     return "the model returned no usable text"
 

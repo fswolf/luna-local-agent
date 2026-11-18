@@ -7,12 +7,19 @@ way out is the stairs in the top right corner (x 7, y 1): walk right along the
 top of the room and step onto them to go downstairs. The PC on the left stores
 items; you don't need it yet.
 
+This is your own house, not Professor Oak's. His lab is a separate building
+outside, in Pallet Town: go downstairs, then out the front door.
+
 ## your house (downstairs)
 
 Mom is at the table: talk to her any time to heal your Pokemon for free. The
 stairs up are in the top right. The way out is the door at the bottom of the
 room (x 2 or 3, y 7): walk down onto the mat and keep pressing down to step
 outside into Pallet Town.
+
+Professor Oak's lab is NOT upstairs: upstairs is only your bedroom. Once
+you're down here, don't go back up the stairs. Leave by the door at the bottom
+and find the lab in Pallet Town.
 
 ## Pallet Town
 

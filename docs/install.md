@@ -376,6 +376,16 @@ everything else, these lines in `llama/server.env` free the most:
 A smaller quant of the chat model (Q4 instead of Q6 or Q8) saves the
 most of all.
 
+### If the server dies mid-reply
+
+If llama-server dies while she's talking, the reply stops where it was,
+followed by "llama.cpp stopped answering mid-reply ... her reply was cut
+off there". The live monitor marks it **cut off**, and the half reply
+isn't kept in her history. On AMD, a GPU reset (a `ring ... timeout` in
+`dmesg`) wipes VRAM and takes llama-server down with it. After that,
+every message says "llama.cpp unreachable ... nothing is listening
+there" until you start it again with `llama/start.sh`.
+
 ---
 
 # Running the Kokoro Server

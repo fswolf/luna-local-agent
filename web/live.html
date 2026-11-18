@@ -175,6 +175,14 @@ const handlers = {
              document.createTextNode(ev.step === "start" ? ` — ${ev.reason}` : ev.outcome));
     turn.appendChild(r); box = null; boxKind = ""; follow(w);
   },
+  cut(ev) {      // the server stopped mid-answer (her reply, or a second look's quiet one)
+    const w = nearBottom();
+    if (!turn) return;
+    document.querySelectorAll(".cursor").forEach(c => c.classList.remove("cursor"));
+    const r = el("div", "rethink");
+    r.append(el("b", null, "cut off: "), document.createTextNode(`the model server stopped mid-answer (${ev.why})`));
+    turn.appendChild(r); box = null; boxKind = ""; follow(w);
+  },
   done(ev) {
     document.querySelectorAll(".cursor").forEach(c => c.classList.remove("cursor"));
     if (turn) turn.appendChild(el("div", "end", `${ev.seconds}s` + (ev.conf != null ? ` · ${Math.round(ev.conf * 100)}% sure` : "")));

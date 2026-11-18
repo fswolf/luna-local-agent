@@ -72,7 +72,7 @@ Slash commands:
 | `/good`, `/fix <reply>` | Keep her last reply, or your better version, as an example for her patches ([patches.md](patches.md)); `/examples` shows the count and the page |
 | `/facts` | What she remembers: `/facts all`, `/facts retired` |
 | `/skills` | Recipes she's saved: `/skills show`, `forget`, `restore <n>` |
-| `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>` |
+| `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>`, `wrong <note>`, `unplan <n>` |
 | `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder, what's in her hands, clothes that are off) |
 | `/outfit` | Her clothes on a human model: `dressed`, `underwear`, `off <piece>`, `on <piece>`; alone, what she's wearing |
 | `/portrait sounds` | The sounds some gestures make: `on`, `off`, or a volume like `50%` |

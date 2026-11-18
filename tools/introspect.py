@@ -713,15 +713,30 @@ def _game_note(found="", tried="", decided="", next=""):
 
     from mind import projects
 
-    wrote = []
+    ck = projects.checker(pid)
+    wrote, refused = [], []
+
+    def ok(text):
+        """The note as it's kept (stamped with where she is), or None when the game shows it's wrong."""
+        text = str(text).strip()
+        if ck:
+            bad = ck["check"](text, True)
+            if bad:
+                refused.append(bad)
+                return None
+            return ck["stamp"](text)
+        return text
 
     for kind, text in (("found", found), ("tried", tried), ("decided", decided)):
-        if str(text or "").strip():
+        if str(text or "").strip() and (text := ok(text)):
             projects.log(pid, kind, text)
             wrote.append(kind)
 
-    if str(next or "").strip():
+    if str(next or "").strip() and (next := ok(next)):
         projects.set_next(pid, next)
         wrote.append("plan")
 
+    if refused:
+        return ((f"Noted ({', '.join(wrote)}). " if wrote else "") + "Not saved - "
+                + "; ".join(dict.fromkeys(refused)) + ". Go by the Ways out line, not a guess (a note about another place: name that place in it).")
     return f"Noted ({', '.join(wrote)})." if wrote else "Nothing to note - say what you found, tried or decided."

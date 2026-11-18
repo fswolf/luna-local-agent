@@ -79,6 +79,9 @@ def _count_hostility(rating, warmth):
 
         if leaving:
             S.away_state.update(until=now + minutes * 60, said=False, hostile=0)
+        elif warmth < 0:
+            logbook.info("mood", "hostile %d of %d before she walks away", S.away_state["hostile"],
+                         safe.whole(getattr(config, "MOOD_WALK_AWAY_AFTER", 3), 3, lo=1, hi=1000))
 
     if leaving:
         _withdraw(minutes)

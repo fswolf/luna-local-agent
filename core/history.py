@@ -373,7 +373,7 @@ def _ask_model(model, prompt):
     if not isinstance(data, dict) or "choices" not in data:
         detail = data.get("error", data) if isinstance(data, dict) else data
 
-        raise RuntimeError(f"LM Studio error during summarization: {detail}")
+        raise RuntimeError(f"{config.llm_backend_label()} error during summarization: {detail}")
 
     return data["choices"][0]["message"]["content"].strip()
 

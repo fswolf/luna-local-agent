@@ -43,13 +43,13 @@ def _chat_completion(payload, narrator=None):
         lmstudio.mark_failed(e)
         logbook.error("llm", "request failed: %s", e)
 
-        raise RuntimeError(f"LM Studio unreachable at {LM_URL}: {e}") from e
+        raise RuntimeError(_unreachable(e)) from e
 
     try:
         data = response.json()
     except ValueError:
         raise RuntimeError(
-            f"LM Studio returned a non-JSON response (HTTP {response.status_code}): "
+            f"{config.llm_backend_label()} returned a non-JSON response (HTTP {response.status_code}): "
             f"{response.text[:300]}"
         )
 
@@ -496,6 +496,28 @@ def _explain_refusal(status, body, payload):
     return f"{name} error (HTTP {status}): {detail}.{hint}"
 
 
+def _unreachable(e):
+    """The server can't be reached: which one, where, and what to check.
+    "Connection refused" means nothing is listening there at all - the
+    server isn't running, or it died (a GPU reset takes llama-server with it)."""
+    name = config.llm_backend_label()
+    llama = getattr(config, "LLM_BACKEND", "") == "llama"
+    refused = "refused" in str(e).lower()
+    fix = ("" if not refused else
+           " - nothing is listening there: start llama-server again (llama/start.sh)" if llama else
+           " - nothing is listening there: start LM Studio's server")
+    return f"{name} unreachable at {LM_URL}{fix}. ({e})"
+
+
+def _stopped(why):
+    lmstudio.mark_failed(why)
+    logbook.error("llm", "stream dropped mid-reply: %s", why)
+    livefeed.emit("cut", why=str(why)[:160])
+    return RuntimeError(
+        f"{config.llm_backend_label()} stopped answering mid-reply ({why}) - her reply was cut off "
+        "there. Check that the server is still running and the model loaded, then say it again.")
+
+
 def _stream_deltas(payload):
     """Yield delta dicts from an OpenAI-style SSE response.
 
@@ -514,7 +536,7 @@ def _stream_deltas(payload):
         lmstudio.mark_failed(e)
         logbook.error("llm", "stream failed to open: %s", e)
 
-        raise RuntimeError(f"LM Studio unreachable at {LM_URL}: {e}") from e
+        raise RuntimeError(_unreachable(e)) from e
 
     with response:
         if response.status_code != 200:
@@ -525,6 +547,7 @@ def _stream_deltas(payload):
             raise RuntimeError(_explain_refusal(response.status_code, body, payload))
 
         lines = response.iter_lines()
+        finished = False      # [DONE] or a finish_reason: the reply really ended
 
         while True:
             # The server can drop mid-reply (crashed, model unloaded, a
@@ -534,20 +557,25 @@ def _stream_deltas(payload):
             try:
                 raw = next(lines)
             except StopIteration:
-                return
+                # A server that dies cleanly (llama-server after a GPU
+                # reset) just closes the stream: no error, no [DONE]. That
+                # read as a finished reply, cut off mid-word ("I should
+                # have have"), and the next turn was the first to fail.
+                if finished:
+                    return
+                raise _stopped("the stream ended before the reply did") from None
             except requests.exceptions.RequestException as e:
-                lmstudio.mark_failed(e)
-                logbook.error("llm", "stream dropped mid-reply: %s", e)
-
-                raise RuntimeError(
-                    f"{config.llm_backend_label()} stopped answering mid-reply ({e}). "
-                    "Check that the model is still loaded, then say it again."
-                ) from e
+                raise _stopped(e) from e
 
             line = (
                 raw.decode("utf-8", errors="replace")
                 if isinstance(raw, bytes) else raw
             )
+
+            # llama-server reports a failure partway through as an
+            # "error:" event (or a data chunk holding only an error).
+            if line.startswith("error:"):
+                raise _stopped(line[6:].strip()[:300] or "the server reported an error")
 
             if not line or not line.startswith("data:"):
                 continue
@@ -565,7 +593,14 @@ def _stream_deltas(payload):
             if not isinstance(chunk, dict):
                 continue
 
+            if chunk.get("error") and not chunk.get("choices"):
+                err = chunk["error"]
+                raise _stopped(str(err.get("message", err) if isinstance(err, dict) else err)[:300])
+
             choices = chunk.get("choices") or []
+
+            if choices and choices[0].get("finish_reason"):
+                finished = True
 
             if choices:
                 lmstudio.mark_worked()

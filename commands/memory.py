@@ -224,7 +224,14 @@ def handle(text):
         from mind import projects
 
         words = text.split()
-        verbs = ("show", "done", "pause", "resume", "drop", "restore")
+        verbs = ("show", "done", "pause", "resume", "drop", "restore", "unplan")
+
+        # a note of hers that's wrong ("the lab is upstairs"): kept, marked, never shown to her again
+        if len(words) == 3 and words[1] == "wrong" and words[2].lstrip("#").isdigit():
+            ok = projects.mark_wrong(int(words[2].lstrip("#")))
+            ui.add_message("system", f"Note {words[2]} marked wrong - she won't see it on a game turn again."
+                           if ok else f"No note {words[2]}.")
+            return True
 
         if len(words) == 3 and words[1] in verbs and words[2].lstrip("#").isdigit():
             n = _id(words[2])
@@ -238,11 +245,16 @@ def handle(text):
                 log = projects.entries(n)
                 ui.add_message("system", "\n".join(
                     [projects.render(p, recent=0)]
-                    + [f"  {e['at'][:16].replace('T', ' ')}  {e['kind']}: {e['text']}" for e in log[-30:]]
-                    + ([] if log else ["  (nothing recorded yet)"])))
+                    + [f"  [{e['id']}] {e['at'][:16].replace('T', ' ')}  {e['kind']}: {e['text']}" for e in log[-30:]]
+                    + ([] if log else ["  (nothing recorded yet)"])
+                    + (["  /projects wrong <note> hides a wrong note from her; /projects unplan "
+                        f"{n} clears her plan."] if log or p["next"] else [])))
                 return True
 
-            if words[1] == "drop":
+            if words[1] == "unplan":
+                projects.set_next(n, "")
+                ok, done = True, "has no plan now - she makes a new one on her next turn"
+            elif words[1] == "drop":
                 ok, done = projects.retire(n), "dropped (/projects restore brings it back)"
             elif words[1] == "restore":
                 ok, done = projects.restore(n), "restored"
@@ -270,7 +282,8 @@ def handle(text):
             [f"Projects ({len(rows)}):"]
             + [f"{p['id']:>3}. [{p['status']}] {p['title']}"
                + (f"  - next: {p['next']}" if p["next"] and p["status"] != "done" else "") for p in rows]
-            + ["/projects show <n> for the log; done|pause|resume|drop <n> to steer."]))
+            + ["/projects show <n> for the log; done|pause|resume|drop|unplan <n> to steer; "
+               "wrong <note> hides a wrong note."]))
         return True
 
     if text == "/knowledge" or text.startswith("/knowledge "):

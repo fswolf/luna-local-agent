@@ -59,7 +59,7 @@ import sys
 
 import config
 
-from plugins import _game
+from plugins import _game, _notecheck
 
 NAME = "gameboy"
 SUMMARY = "she plays Game Boy games (Pokemon Red/Blue and Final Fantasy Legend read as text)"
@@ -85,7 +85,7 @@ def moves_per_turn():
         return DEFAULTS["moves"]
 
 _state = {"model": None, "tools": [], "notes": [], "steps": 0, "playing": False, "busy": False,
-          "error": "", "title": "", "said": ""}
+          "error": "", "title": "", "said": "", "screen": ""}   # screen: the game's last answer, for checking her notes
 _connected = False
 
 
@@ -473,10 +473,12 @@ def _set_playing(on):
 # ---------------------------------------------------------------------------
 STEP_PROMPT = (
     "(You're playing {game} on a Game Boy, with your Game Boy tools.{goal}\n"
-    "Your notes on this playthrough (yours - kept between sessions):\n{project}\n\n"
+    "Your notes on this playthrough (yours - kept between sessions). They're your own guesses and can be "
+    "wrong: where they disagree with the game below, the game is right.\n{project}\n\n"
     "{guide}"
     "Your last moves and what came of them, oldest first:\n{notes}\n\n"
-    "The game right now:\n-----\n{screen}\n-----\n{picture}\n"
+    "The game right now - this is the truth, and beats your notes and the guide:\n"
+    "-----\n{screen}\n-----\n{picture}\n"
     "Think about what you see, then make up to {moves} moves. A move is one gb_press with a few "
     "buttons - walk several tiles at once, like 'up 4' or 'left 3, up 2', or 'down, a' to pick from "
     "a menu - or, when the screen is just someone talking, gb_read_on, which reads the whole "
@@ -553,6 +555,8 @@ def _one_move_per_turn():
                     return ONE_MOVE
                 _turn["moves"] += 1
             reply = _inner(**kwargs)
+            if "\nWhere: " in "\n" + str(reply) and not _ERROR.search(str(reply)):
+                _state["screen"] = str(reply)     # where she is now, for checking a note she writes
             if _ERROR.search(str(reply)):
                 if _presses and _turn["active"]:
                     _turn["moves"] -= 1          # nothing was pressed: her move is still hers
@@ -605,6 +609,17 @@ def _place(screen):
     return m.group(1).strip() if m else ""
 
 
+def _note_checker():
+    """How game_note and her notes on a turn are checked against the game: a
+    note that puts a door or stairs where the Ways out line shows none."""
+    places = [p for p in getattr(_reader(), "MAPS", ()) if p]
+
+    def check(text, now):
+        return _notecheck.problem(text, _state["screen"], now=now, places=places)
+
+    return {"check": check, "stamp": lambda text: _notecheck.stamp(text, _state["screen"])}
+
+
 def _step():
     from core import assistant
     from mind import projects
@@ -618,7 +633,9 @@ def _step():
     pid = projects.game_project(game, goal)
 
     screen = _call("gb_look") or "(the screen didn't answer)"
+    _state["screen"] = screen
     here = _place(screen)
+    checker = _note_checker()
     # A picture can only come with a tool's answer (the way look_at_screen's
     # does). With a reader she plays from the text and sees the picture of what
     # her move did before she talks about it; without one she looks first.
@@ -638,10 +655,12 @@ def _step():
     _one_move_per_turn()
     _turn.update(active=True, moves=0)
     exchanges = []
+    project = projects.game_block(pid, here=here, check=checker["check"])
+    projects.set_checker(pid, checker)
     try:
         answer = assistant.respond_to_job(
             STEP_PROMPT.format(game=game, goal=f" Your goal: {goal}." if goal else "",
-                               project=projects.game_block(pid, here=here), guide=guide, notes=notes,
+                               project=project, guide=guide, notes=notes,
                                screen=screen, picture=picture, moves=moves_per_turn()),
             _state["model"], NAME, allowed, speak=bool(s["speak"]), project_id=pid,
             # her moves, a note and the reply; a look first when there's no reader
@@ -650,6 +669,7 @@ def _step():
             time_limit=_game.turn_limit(s["turn_seconds"], DEFAULTS["turn_seconds"])) or ""
     finally:
         _turn["active"] = False
+        projects.set_checker(pid, None)
 
     _state["notes"] = (_state["notes"] + _moves_made(exchanges))[-30:]
     _state["steps"] += 1

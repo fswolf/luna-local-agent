@@ -205,6 +205,56 @@ class Streaming(unittest.TestCase):
         self.assertIn("mid-reply", str(caught.exception))
         failed.assert_called()
 
+    def _stream(self, *raw):
+        response = mock.MagicMock(status_code=200)
+        response.__enter__.return_value = response
+        response.iter_lines.return_value = iter(raw)
+        got = []
+        with mock.patch.object(streaming.requests, "post", return_value=response), \
+                mock.patch.object(streaming.lmstudio, "mark_failed") as failed:
+            try:
+                for delta in streaming._stream_deltas({}):
+                    got.append(delta)
+            except RuntimeError as e:
+                return got, str(e), failed.called
+        return got, None, failed.called
+
+    def test_a_stream_that_just_stops_is_cut_off(self):
+        # llama-server after a GPU reset: the connection closes, no error, no [DONE]
+        got, err, failed = self._stream(b'data: {"choices": [{"delta": {"content": "I should have"}}]}')
+        self.assertEqual(got, [{"content": "I should have"}])
+        self.assertIn("mid-reply", err)
+        self.assertIn("cut off", err)
+        self.assertTrue(failed)
+
+    def test_a_finished_stream_is_fine(self):
+        for end in ([b'data: [DONE]'],
+                    [b'data: {"choices": [{"delta": {}, "finish_reason": "stop"}]}']):
+            got, err, _ = self._stream(b'data: {"choices": [{"delta": {"content": "Hi"}}]}', *end)
+            self.assertIsNone(err, end)
+
+    def test_an_error_event_mid_stream(self):
+        got, err, _ = self._stream(b'data: {"choices": [{"delta": {"content": "Hi"}}]}',
+                                   b'error: {"message": "vk::DeviceLostError"}')
+        self.assertIn("DeviceLost", err)
+        got, err, _ = self._stream(b'data: {"choices": [{"delta": {"content": "Hi"}}]}',
+                                   b'data: {"error": {"message": "out of memory"}}')
+        self.assertIn("out of memory", err)
+
+    def test_unreachable_names_the_server_and_the_fix(self):
+        refused = requests.exceptions.ConnectionError("[Errno 111] Connection refused")
+        with mock.patch.object(streaming.requests, "post", side_effect=refused), \
+                mock.patch.object(streaming.lmstudio, "mark_failed"):
+            for backend, name, fix in (("llama", "llama.cpp", "llama/start.sh"), ("lmstudio", "LM Studio", "LM Studio's server")):
+                import config.server as server
+                with mock.patch.object(streaming.config, "LLM_BACKEND", backend, create=True), \
+                        mock.patch.object(server, "LLM_BACKEND", backend):
+                    with self.assertRaises(RuntimeError) as caught:
+                        list(streaming._stream_deltas({}))
+                msg = str(caught.exception)
+                self.assertTrue(msg.startswith(f"{name} unreachable"), msg)
+                self.assertIn(fix, msg)
+
     def test_odd_logprobs_dont_fail_the_turn(self):
         tokens = []
         streaming._note_tokens(tokens, {"content": "a", "_logprobs": {"content": [

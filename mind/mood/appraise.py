@@ -57,10 +57,13 @@ _APPRAISE_PROMPT = (
     "Answer with one line of six fields separated by spaces, nothing else:\n"
     "1. how warm or affectionate the USER's message is toward her: 0 neutral, businesslike "
     "or blunt (swearing is not unfriendly by itself), 1 polite warmth (thanks, a friendly "
-    "greeting), 2 clear affection or praise of her, 3 strong affection\n"
+    "greeting, saying sorry), 2 clear affection or praise of her, or a heartfelt apology to her, "
+    "3 strong affection\n"
     "2. how the exchange leaves her energy: - (draining), = (no change), + (lively, fun)\n"
-    "3. how it leaves her warmth toward {them}: - (only if the user was clearly hostile or hurtful "
-    "to her), =, +\n"
+    "3. how it leaves her warmth toward {them}: - if the USER's message insults, belittles or "
+    "attacks her (name-calling, calling her worthless or stupid, telling her to get lost), however "
+    "she answered and even if it might be a joke or a test; = otherwise; + if it was kind or "
+    "an apology\n"
     "4. the one feeling she shows right now, from: none {feelings}\n"
     "5. how flirtatious or intimate the USER's message is: 0 not at all, 1 flirting or "
     "suggestive, 2 openly intimate or sexual\n"
@@ -110,7 +113,13 @@ def _appraise(said, answer, model):
         except Exception:
             pass
 
-    return _parse_appraisal(reply, feelings)
+    read = _parse_appraisal(reply, feelings)
+    # One line a turn, so "she didn't react" can be told apart from "the
+    # reading never saw it": the model's own answer, and what it became.
+    line = " ".join(re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL).split())
+    logbook.info("mood", "read the exchange: %r -> warmth of message %d, her warmth %+d",
+                 line[:80], read[0], read[2])
+    return read
 
 
 def _parse_heaviness(reply):
