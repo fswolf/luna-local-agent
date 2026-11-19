@@ -23,6 +23,7 @@ class Running(unittest.TestCase):
         self.saved = (ui.view.app, ui.view.loop, ui.view.on_submit)
         self.thread = threading.Thread(target=headless.run_web, kwargs={
             "on_submit": lambda text, attachment=None: self.got.append((text, threading.current_thread())),
+            "on_hotkey": lambda: self.got.append(("HOME", threading.current_thread())),
             "open_window": False}, daemon=True)
         with mock.patch("builtins.print"):
             self.thread.start()
@@ -44,6 +45,14 @@ class Running(unittest.TestCase):
             time.sleep(0.02)
         self.assertEqual(self.got[0][0], "hello")
         self.assertIs(self.got[0][1], self.thread)
+
+    def test_the_mic_button_presses_home_on_her_loop(self):
+        self.assertIsNone(chat_web.talk())
+        for _ in range(100):
+            if self.got:
+                break
+            time.sleep(0.02)
+        self.assertEqual(self.got[0], ("HOME", self.thread))
 
     def test_a_tool_can_still_ask_and_the_page_answers(self):
         answer = {}

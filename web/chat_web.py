@@ -13,7 +13,8 @@ in the page too, and either side can answer it.
     GET  /chat/state       the conversation from where the page is up to; waits
                            up to WAIT seconds for something to change (v=)
     POST /chat/say         {"text"} or a form with "text" and one "file"
-    POST /chat/stop        stop her, the same as HOME
+    POST /chat/talk        the mic button: HOME (talk, done, or stop her)
+    POST /chat/stop        stop her (and anything physical), like ai-voice-ctl stop
     POST /chat/answer      {"id", "answer": "yes" | "no" | "all"}
 """
 import json
@@ -107,7 +108,62 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
     return {"v": now_version, "e": now_epoch, "reset": reset, "from": start,
             "msgs": [[speaker, text] for speaker, text in convo[start:]], "total": total,
             "streaming": streaming, "busy": interrupts.busy(), "status": status, "name": name,
-            "mood": mood, "rows": rows, "ask": ui.pending_approval()}
+            "mood": mood, "rows": rows, "ask": ui.pending_approval(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
+            "can_talk": bool(ui.view.on_hotkey)}
+
+
+def _mic():
+    """The mic open for you (voice/ptt.py), for the mic button. Read only if
+    push to talk is loaded: importing it would load the audio stack."""
+    import sys
+
+    ptt = sys.modules.get("voice.ptt")
+    try:
+        return bool(ptt and ptt.listening())
+    except Exception:
+        return False
+
+
+def stop():
+    """The Stop button: what ai-voice-ctl's stop does (voice/ptt.py stop):
+    she goes quiet, stops thinking, and anything physical stops with her.
+    Without push to talk loaded, the same by hand."""
+    import sys
+
+    ptt = sys.modules.get("voice.ptt")
+    if ptt is not None:
+        ptt.stop()
+        return
+    import ui
+    from core import interrupts
+
+    ui.set_status("Stopped")
+    interrupts.home()
+    try:
+        import plugins
+
+        plugins.panic()
+    except Exception:
+        pass
+
+
+def talk():
+    """The mic button: what HOME does (start talking, done, or stop her),
+    run on her main loop like a key. Returns an error, or None."""
+    import ui
+
+    hotkey = ui.view.on_hotkey
+    if not hotkey:
+        return "push to talk isn't set up in this Luna"
+    loop = ui.view.loop
+    if loop is not None:
+        try:
+            loop.call_soon_threadsafe(hotkey)
+            return None
+        except RuntimeError:
+            pass
+    hotkey()
+    return None
 
 
 def _rows(st):
@@ -238,10 +294,11 @@ def handle(method, sub, body, request=None):
                                 head=bool(query.get("head"))))
     if method == "POST" and sub == "/say":
         return _say(body, headers)
+    if method == "POST" and sub == "/talk":
+        error = talk()
+        return _json(503, {"error": error}) if error else _json(200, {"ok": True})
     if method == "POST" and sub == "/stop":
-        from core import interrupts
-
-        interrupts.home()
+        stop()
         return _json(200, {"ok": True})
     if method == "POST" and sub == "/answer":
         return _answer(body)

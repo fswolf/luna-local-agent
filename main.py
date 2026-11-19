@@ -327,7 +327,7 @@ import commands  # noqa: E402
 
 commands.setup(MODEL, socket_path)
 if "--web" in sys.argv[1:]:
-    ui.run_web(on_submit=handle_input)      # no screen: the chat page is her window (ui/headless.py)
+    ui.run_web(on_submit=handle_input, on_hotkey=lambda: ptt.toggle(MODEL))   # no screen: the chat page is her window
 else:
     ui.run(on_submit=handle_input, on_hotkey=lambda: ptt.toggle(MODEL))
 

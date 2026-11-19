@@ -207,12 +207,41 @@ class Server(unittest.TestCase):
         self.assertIs(got["a"], True)
         self.assertIsNone(ui.pending_approval())
 
-    def test_stop_is_home(self):
-        from core import interrupts
+    def test_the_mic_button_is_home(self):
+        pressed = []
+        with mock.patch.object(ui.view, "on_hotkey", lambda: pressed.append(1)), mock.patch.object(ui.view, "loop", None):
+            self.assertEqual(self.ask("POST", "/chat/talk")[0], 200)
+        self.assertEqual(pressed, [1])
+        with mock.patch.object(ui.view, "on_hotkey", None):
+            self.assertEqual(self.ask("POST", "/chat/talk")[0], 503)
+            self.assertIs(chat_web.state(None, 0, None)["can_talk"], False)
 
-        with mock.patch.object(interrupts, "home") as home:
+    def test_the_mic_lights_while_she_listens(self):
+        import sys
+        import types
+
+        fake = types.SimpleNamespace(listening=lambda: True)
+        with mock.patch.dict(sys.modules, {"voice.ptt": fake}):
+            self.assertIs(chat_web.state(None, 0, None)["mic"], True)
+        with mock.patch.dict(sys.modules, {"voice.ptt": None}):
+            self.assertIs(chat_web.state(None, 0, None)["mic"], False)
+
+    def test_stop_stops_her_and_her_toys(self):
+        import sys
+        import types
+
+        from core import interrupts
+        import plugins
+
+        with mock.patch.dict(sys.modules, {"voice.ptt": None}), mock.patch.object(interrupts, "home") as home, \
+                mock.patch.object(plugins, "panic") as panic:
             self.assertEqual(self.ask("POST", "/chat/stop")[0], 200)
         home.assert_called_once_with()
+        panic.assert_called_once_with()
+        fake = types.SimpleNamespace(stop=mock.Mock())
+        with mock.patch.dict(sys.modules, {"voice.ptt": fake}):
+            self.assertEqual(self.ask("POST", "/chat/stop")[0], 200)
+        fake.stop.assert_called_once_with()
 
 
 class Command(unittest.TestCase):

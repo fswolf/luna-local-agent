@@ -7,6 +7,8 @@
 > "Reply to Sam and say Thursday works."
 ```
 
+<img width="760" alt="Luna asked to check email in her web UI: two check_email lines in small yellow boxes on the right, the call and what came back, then her summary of the inbox, blurred here, and her sign-off" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/tool-calls-email.png" />
+
 Luna reads your inbox over IMAP and sends over SMTP, the standard
 protocols nearly every provider speaks: Gmail, Outlook, iCloud, Yahoo,
 Fastmail or your own server. Nothing extra to install.

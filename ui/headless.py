@@ -37,11 +37,13 @@ class _StandIn:
             loop.call_soon_threadsafe(loop.stop)
 
 
-def run_web(on_submit, open_window=True):
-    """Run until /quit, Ctrl+C or the chat window closing."""
+def run_web(on_submit, on_hotkey=None, open_window=True):
+    """Run until /quit, Ctrl+C or the chat window closing. on_hotkey: what
+    HOME does (push to talk), for the chat page's mic button."""
     import config
 
     view.on_submit = on_submit
+    view.on_hotkey = on_hotkey
     if not getattr(config, "MONITOR_ENABLED", True):
         print("--web needs the live monitor, which serves the chat page: set monitor.enabled "
               "to true in config.json.", file=sys.stderr)

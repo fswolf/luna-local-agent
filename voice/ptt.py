@@ -28,6 +28,12 @@ _hands_free = False
 _loop_thread = None
 
 
+def listening():
+    """Is the mic open for you right now: a turn recording, or hands-free on.
+    The chat page's mic button lights up while it is."""
+    return bool(_hands_free) or interrupts.recording()
+
+
 def mode():
     return _mode
 

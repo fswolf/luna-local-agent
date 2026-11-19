@@ -46,7 +46,15 @@ text-decoration:none;font-size:15px}
 #luna-head .lh-info td{padding:2px 0;vertical-align:top;border:0;background:none}
 #luna-head .lh-info td:first-child{color:#a49bc0;padding-right:14px;white-space:nowrap}
 #luna-head .lh-info td:last-child{overflow-wrap:anywhere}
-@media print{#luna-head{display:none}}`;
+#luna-ctx{position:fixed;z-index:9999;min-width:180px;background:#1a1328;border:1px solid #3a2d55;border-radius:10px;
+box-shadow:0 10px 28px #0009;padding:5px 0;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;display:none}
+#luna-ctx.on{display:block}
+#luna-ctx button{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:24px;width:100%;padding:7px 14px;
+color:#ece6f7;cursor:pointer}
+#luna-ctx button:hover:not([disabled]){background:#2a2040}
+#luna-ctx button[disabled]{color:#5d5378;cursor:default}
+#luna-ctx kbd{font:12px system-ui,sans-serif;color:#a49bc0}
+@media print{#luna-head,#luna-ctx{display:none}}`;
   const ICONS = {
     Chat: '<path d="M4 5h16v11H9l-5 4z"/>',
     Portrait: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
@@ -158,6 +166,73 @@ text-decoration:none;font-size:15px}
     $('.lh-online span').textContent = yes ? 'Online' : 'Offline';
   }
   window.lunaHead = {update, reachable, fed: false};
+
+  // --- right click: copy, paste, select all, in her colours ------------------
+  // Shift + right click still gives the browser's own menu.
+  const ctx = document.createElement('div');
+  ctx.id = 'luna-ctx';
+  const mac = /Mac/.test(navigator.platform);
+  const key = k => (mac ? '⌘' : 'Ctrl+') + k;
+  ctx.innerHTML = `<button data-do=link>Copy link</button><button data-do=copy>Copy<kbd>${key('C')}</kbd></button>
+    <button data-do=paste>Paste<kbd>${key('V')}</kbd></button>
+    <button data-do=all>Select all<kbd>${key('A')}</kbd></button>`;
+  // last in the body, once the page is all there (now, the body is only this script and the header)
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', () => document.body.appendChild(ctx));
+  else document.body.appendChild(ctx);
+  let field = null, link = null;      // the text box or the link right-clicked, if any
+  const editable = el => el && (el.isContentEditable ||
+    (el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && /^(text|search|url|tel|password)$/i.test(el.type)));
+  const picked = () => field && !field.isContentEditable
+    ? field.value.slice(field.selectionStart, field.selectionEnd) : String(getSelection());
+  const hide = () => ctx.classList.remove('on');
+  addEventListener('contextmenu', ev => {
+    if (ev.shiftKey) return;
+    ev.preventDefault();
+    field = editable(ev.target) ? ev.target : null;
+    link = ev.target.closest && ev.target.closest('a[href]');
+    ctx.querySelector('[data-do=link]').style.display = link ? '' : 'none';
+    ctx.querySelector('[data-do=copy]').disabled = !picked();
+    ctx.querySelector('[data-do=paste]').disabled = !field || field.readOnly || field.disabled || !navigator.clipboard;
+    ctx.classList.add('on');
+    const w = ctx.offsetWidth, h = ctx.offsetHeight;
+    ctx.style.left = Math.min(ev.clientX, innerWidth - w - 4) + 'px';
+    ctx.style.top = Math.min(ev.clientY, innerHeight - h - 4) + 'px';
+  });
+  addEventListener('mousedown', ev => { if (!ctx.contains(ev.target)) hide(); }, true);
+  addEventListener('keydown', ev => { if (ev.key === 'Escape') hide(); });
+  addEventListener('blur', hide);
+  addEventListener('scroll', hide, true);
+  ctx.addEventListener('mousedown', ev => ev.preventDefault());   // keep the selection and the caret where they are
+  ctx.addEventListener('click', async ev => {
+    const b = ev.target.closest('button');
+    if (!b || b.disabled) return;
+    hide();
+    if (b.dataset.do === 'copy' || b.dataset.do === 'link') {
+      const text = b.dataset.do === 'link' ? link.href : picked();
+      try { await navigator.clipboard.writeText(text); } catch (e) { document.execCommand('copy'); }
+    } else if (b.dataset.do === 'paste') {
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch (e) { return; }   // the browser said no
+      field.focus();
+      // insertText keeps Ctrl+Z working and fires input, so the chat box grows
+      if (!document.execCommand('insertText', false, text) && !field.isContentEditable) {
+        field.setRangeText(text, field.selectionStart, field.selectionEnd, 'end');
+        field.dispatchEvent(new Event('input', {bubbles: true}));
+      }
+    } else if (field) {
+      field.focus();
+      field.isContentEditable ? document.execCommand('selectAll') : field.select();
+    } else {
+      // the page's own content, never her header: the conversation in the chat,
+      // a page's main part, else everything after the header
+      const area = document.querySelector('#list') || document.querySelector('main');
+      const range = document.createRange();
+      if (area) range.selectNodeContents(area);
+      else { range.setStartAfter(head); range.setEndBefore(ctx); }      // the menu is last in the body
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+    }
+  });
 
   // anywhere but the chat: keep up by itself, waiting for a change each time
   addEventListener('DOMContentLoaded', async () => {

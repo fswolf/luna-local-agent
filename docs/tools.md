@@ -4,6 +4,13 @@ The model calls tools for itself instead of relying on keyword triggers,
 so it decides when a question needs looking up and can chain steps:
 check the time, then schedule something.
 
+<img width="900" alt="Luna asked to check email in her web UI: two check_email lines in small yellow boxes on the right, the call and what came back, then her summary of the inbox, blurred here, and her sign-off" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/tool-calls-email.png" />
+
+Every call shows as it happens: in the terminal as a `sys` line, and in the
+[web UI](controls.md#chatting-in-the-browser) as a small yellow box on the
+right, the tool and what came back, before her answer (the inbox itself is
+blurred here). Click a long one to read all of it.
+
 | Tool | What it does |
 |------|--------------|
 | `get_datetime` | Date, time, weekday and timezone, so it stops guessing |

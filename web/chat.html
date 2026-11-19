@@ -47,7 +47,15 @@ font-size:19px;cursor:pointer;display:grid;place-items:center;padding:0}
 #send:disabled{opacity:.4;cursor:default}
 .box{flex:1;min-width:0;display:flex;flex-direction:column;background:#0e0a16;border:1px solid var(--line);border-radius:22px}
 .box:focus-within{border-color:var(--accent)}
-#text{width:100%;font:inherit;color:var(--text);background:none;border:0;resize:none;padding:10px 16px;max-height:40vh;outline:none}
+.line{display:flex;align-items:flex-end}
+#mic{flex:none;width:34px;height:34px;margin:4px 6px 4px 0;border-radius:50%;border:0;background:none;color:var(--dim);
+cursor:pointer;display:grid;place-items:center;padding:0;transition:color .15s,background .15s,box-shadow .15s}
+#mic svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#mic:hover{color:var(--text);background:#2a2040}
+#mic[hidden]{display:none}
+#mic.on{color:#14081c;background:var(--accent);box-shadow:0 0 0 6px #ff87d733;animation:hear 1.4s ease-in-out infinite}
+@keyframes hear{50%{box-shadow:0 0 0 10px #ff87d722}}
+#text{flex:1;min-width:0;font:inherit;color:var(--text);background:none;border:0;resize:none;padding:10px 16px;max-height:40vh;outline:none}
 #chip{display:none;align-items:center;gap:8px;margin:8px 10px 0;padding:4px 6px 4px 10px;background:var(--panel);border:1px solid var(--line);
 border-radius:12px;font-size:13px;color:var(--dim);align-self:flex-start;max-width:calc(100% - 20px)}
 #chip.on{display:flex}
@@ -68,7 +76,9 @@ body.drag #log{outline:2px dashed var(--accent);outline-offset:-8px}
     <input type=file id=file>
     <div class=box>
       <div id=chip><span id=chipname></span><button id=unclip title="remove">×</button></div>
-      <textarea id=text rows=1 placeholder="Say something" autocomplete=off></textarea>
+      <div class=line><textarea id=text rows=1 placeholder="Say something" autocomplete=off></textarea>
+      <button id=mic title="talk to her (the same as HOME)"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/></svg></button></div>
     </div>
     <button class=round id=send title="send (Enter)">➤</button>
   </div>
@@ -142,6 +152,14 @@ function apply(s) {
   });
   document.title = (s.name || 'Luna') + ' · chat';
   lunaHead.update(s);
+  const mic = $('#mic');
+  mic.hidden = !s.can_talk;          // no push to talk in this Luna: no button that can't work
+  mic.classList.toggle('on', !!s.mic);
+  // the same as HOME in each voice mode (voice/ptt.py)
+  mic.title = s.voice_mode === 'open'
+    ? (s.mic ? 'hands-free is on - click to turn it off' : 'turn hands-free on (the same as HOME)')
+    : s.mic ? (s.voice_mode === 'manual' ? 'listening - click when you\'re done' : 'listening - she stops when you go quiet')
+    : 'talk to her (the same as HOME)';
   buttons();
 }
 
@@ -224,6 +242,7 @@ async function go() {
   buttons(); text.focus();
 }
 send.onclick = go;
+$('#mic').onclick = () => post('talk');
 text.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); go(); }
 });

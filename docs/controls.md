@@ -33,7 +33,11 @@ you type in either shows up in both, her reply streams into both, and the page
 starts with the conversation as it stands.
 
 - Enter sends, Shift+Enter starts a new line. A /command works here too.
-- While she's answering, the send button turns into Stop (the same as HOME).
+- The mic in the text box is HOME: click it and talk, through the mic she
+  already uses on this PC. It lights up while she's listening; in manual mode
+  click it again when you're done, and while she's answering it stops her.
+  Her answer is spoken through your speakers as usual.
+- While she's answering, the send button turns into Stop.
 - The paperclip sends one picture (jpg, png, webp, up to 10 MB) or one text,
   Markdown or PDF file with your message. Pasting a picture or dropping a file
   on the page works too. A picture needs a model that can see.
@@ -52,7 +56,10 @@ starts with the conversation as it stands.
   the chat, handy when a tool is waiting for you), and Online, top right,
   opens what she's running on: status, mood, voice, memory, speech and
   model. It turns red and says Offline when the page can't reach her.
-- Alt+Left goes back, as in any browser.
+- Alt+Left goes back, as in any browser. Right click gives Copy, Paste and
+  Select all (all of the conversation, or all of the text box); Shift+right
+  click gives the browser's own menu. The first Paste may ask to allow the
+  clipboard, and Firefox shows a small Paste button to confirm it.
 
 Like her other pages it only answers on this computer (127.0.0.1).
 
