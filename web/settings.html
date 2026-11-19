@@ -9,7 +9,7 @@
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 header{position:sticky;top:0;z-index:5;background:#0e0a16f2;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 20px 12px}
-.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:980px;margin:0 auto}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:940px;margin:0 auto}   /* main is 980 with 20px sides */
 h1{font-size:17px;margin:0;color:var(--pink);letter-spacing:.3px}
 h1 small{color:var(--dim);font-weight:400;font-size:13px;margin-left:6px}
 .search{flex:1;min-width:200px}
@@ -124,14 +124,13 @@ section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;m
 </style></head>
 <body>
 <header><div class="top">
-<h1>Luna <small>settings</small></h1>
 <div class="search"><input id="q" type="search" placeholder="Search all settings: name or what it does" autocomplete="off"></div>
 <div class="seg"><button id="vb" class="on">Everyday</button><button id="va">All</button><button id="vc" title="Only what you've set in config.json">Changed</button></div>
 <select class="jump" id="jump" title="Jump to a section" hidden></select>
 </div></header>
 <main>
 <div id="presetbox"><div class="presets" id="presets"></div>
-<div class="ptitle">Model size <span>sets how much fits in each prompt; pick the one closest to your model and its context window</span></div>
+<div class="ptitle">Model size <span id="sizehint">sets how much fits in each prompt; pick the one closest to your model and its context window</span></div>
 <div class="presets" id="sizes"></div></div>
 <section id="agentbox" class="closed" data-group="agent"><h2><div>Who she is <em style="color:var(--dim)">agent/agent.json</em></div> <span>edit</span></h2>
 <div class="rows">
@@ -200,8 +199,17 @@ function presets() {
     `<div class="preset${p.active ? " on" : ""}"><b>${esc(p.label)}${p.active ? "<em>in use</em>" : ""}</b><p>${esc(p.about)}</p>
      <button data-preset="${esc(p.name)}" title="${esc(Object.entries(p.values).map(([k, v]) => k + " = " + v).join("\n"))}">Use ${esc(p.label)} · ${p.count} settings</button></div>`;
   // how she behaves, then model size: separate rows, one of each can be in use
-  $("#presets").innerHTML = data.presets.filter(p => p.kind !== "size").map(card).join("");
-  $("#sizes").innerHTML = data.presets.filter(p => p.kind === "size").map(card).join("");
+  // none of a row's presets matches what's set: say so, rather than nothing in use
+  const custom = what =>
+    `<div class="preset on"><b>Custom<em>in use</em></b><p>Your own ${what}, not one of these presets: the
+     Changed tab shows what you've set.</p><button data-changed>Show changed</button></div>`;
+  const rows = [[p => p.kind !== "size", "#presets", "settings"], [p => p.kind === "size", "#sizes", "size settings"]];
+  for (const [mine, where, what] of rows) {
+    const list = data.presets.filter(mine);
+    $(where).innerHTML = list.map(card).join("") + (list.some(p => p.active) ? "" : custom(what));
+  }
+  document.querySelectorAll("[data-changed]").forEach(b => b.onclick = () => $("#vc").click());
+  sizeHint();
 }
 
 function control(s) {
@@ -282,6 +290,19 @@ function stationBox() {
     <div class="add"><input id="stname" placeholder="kitchen" maxlength="30"><button id="stpair">Add a phone or tablet</button></div>${qr}${list}</div>`;
 }
 
+// Model size, said against the window her model server reports (data.scale)
+function sizeHint() {
+  const w = (data.scale || {}).window, el = $("#sizehint");
+  if (!el) return;
+  if (!w) { el.textContent = "sets how much fits in each prompt; the model server didn't say how big its window is"; return; }
+  const k = Math.round(w / 1024), fit = w < 24576 ? "small" : w < 49152 ? "medium" : "large";
+  const label = (data.presets.find(p => p.name === fit) || {}).label || fit;
+  const now = data.presets.find(p => p.kind === "size" && p.active);
+  el.textContent = `sets how much fits in each prompt. Your model server gives her ${k}k: ${label} fits` +
+    (!now ? "" : now.name === fit ? " (in use)" : ["small", "medium", "large"].indexOf(now.name) < ["small", "medium", "large"].indexOf(fit)
+      ? ` (${now.label} leaves room unused)` : ` (${now.label} may not fit)`) + ".";
+}
+
 // History sized to the window: the sum behind it, under the History settings
 function scaleBox() {
   const s = data.scale || {};
@@ -308,6 +329,7 @@ async function scaleRefresh() {
   try { data.scale = await (await fetch("api/scale", {cache: "no-store"})).json(); } catch (e) { return; }
   const box = document.querySelector(".scalebox");
   if (box) box.outerHTML = scaleBox();
+  sizeHint();
 }
 
 function render() {

@@ -348,6 +348,59 @@ def python():
     return sys.executable
 
 
+def monitor_url():
+    try:
+        port = int((settings().get("monitor") or {}).get("port", 8792))
+    except (TypeError, ValueError):
+        port = 8792
+    return f"http://127.0.0.1:{port}"
+
+
+def detach(args):
+    """--web: start her again in a session of her own, with her output in a
+    log, and come straight back, so this terminal can close. Closing her
+    window (or /quit on the page) quits her; --here keeps her on this terminal.
+    Already running: open her window instead of a second Luna."""
+    if _answers(monitor_url() + "/chat/state"):
+        sys.path.insert(0, ROOT)
+        from web import portrait_window
+
+        cmd = portrait_window.command(monitor_url() + "/chat/", 900, 980, profile="luna-chat")
+        if cmd:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             stdin=subprocess.DEVNULL, **_own_session())
+        else:
+            portrait_window.quiet_open(monitor_url() + "/chat/")
+        print("She's already running - opened her window.")
+        return 0
+    log = os.path.join(log_dir(), "web.log")
+    with open(log, "a", encoding="utf-8") as out:
+        out.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} ./start.sh {' '.join(args)} ===\n")
+        out.flush()
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), *args], cwd=ROOT,
+                         env=dict(os.environ, LUNA_DETACHED="1"), stdin=subprocess.DEVNULL,
+                         stdout=out, stderr=subprocess.STDOUT, **_own_session())
+    print("Luna's starting on her own - her window opens in a moment, and this terminal can close.")
+    print(f"Closing her window quits her (so does /quit there). Her output: {log}")
+    return 0
+
+
+def _answers(url):
+    """Her chat page is up (a 200, not just something on the port)."""
+    try:
+        with urllib.request.urlopen(url, timeout=1.5) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def _own_session():
+    """Popen arguments for a process that outlives this terminal."""
+    if WIN:
+        return {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
 def main():
     args = sys.argv[1:]
     if seed_config():
@@ -360,7 +413,11 @@ def main():
         print()
         sys.exit(0 if check(py) else 1)
 
-    ensure_packages(py)
+    detached = bool(os.environ.get("LUNA_DETACHED"))
+    if not detached:
+        ensure_packages(py)              # may ask, so before she goes off on her own
+    if "--web" in args and "--here" not in args and not detached:
+        sys.exit(detach(args))
     s = state()
     llama = start_llama(s)
     voice = None

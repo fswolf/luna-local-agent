@@ -89,5 +89,41 @@ class Settings(unittest.TestCase):
         self.assertFalse(launch._here("http://192.168.0.98:8899"))
 
 
+class Web(unittest.TestCase):
+    """--web: she goes off on her own so the terminal can close."""
+
+    def test_she_starts_in_a_session_of_her_own(self):
+        with tempfile.TemporaryDirectory() as logs, mock.patch.object(launch, "log_dir", return_value=logs), \
+                mock.patch.object(launch, "_answers", return_value=False), \
+                mock.patch.object(launch.subprocess, "Popen") as popen, mock.patch("builtins.print"):
+            self.assertEqual(launch.detach(["--web"]), 0)
+        args, kw = popen.call_args
+        self.assertEqual(args[0][-1], "--web")
+        self.assertEqual(kw["env"]["LUNA_DETACHED"], "1")
+        self.assertIs(kw["stdin"], launch.subprocess.DEVNULL)
+        self.assertTrue(kw.get("start_new_session") or kw.get("creationflags"))
+
+    def test_already_running_opens_her_window(self):
+        from web import portrait_window
+
+        with mock.patch.object(launch, "_answers", return_value=True), \
+                mock.patch.object(portrait_window, "command", return_value=["chromium", "--app=x"]), \
+                mock.patch.object(launch.subprocess, "Popen") as popen, mock.patch("builtins.print") as said:
+            launch.detach(["--web"])
+        self.assertEqual(popen.call_args[0][0], ["chromium", "--app=x"])
+        self.assertIn("already running", said.call_args[0][0])
+
+    def test_here_and_the_detached_one_stay(self):
+        for args, env in ((["launch.py", "--web", "--here"], {}), (["launch.py", "--web"], {"LUNA_DETACHED": "1"})):
+            with mock.patch.object(sys, "argv", args), mock.patch.dict(os.environ, env), \
+                    mock.patch.object(launch, "seed_config", return_value=False), \
+                    mock.patch.object(launch, "ensure_packages"), \
+                    mock.patch.object(launch, "detach") as detach, \
+                    mock.patch.object(launch, "state", side_effect=SystemExit(7)):
+                with self.assertRaises(SystemExit):
+                    launch.main()
+            detach.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

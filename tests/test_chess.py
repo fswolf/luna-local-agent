@@ -164,10 +164,14 @@ class LivePage(unittest.TestCase):
     def test_registered_and_linked_only_while_on(self):
         from web import livefeed
         self.assertIn("chess", livefeed.PAGES)
-        with mock.patch.object(cg, "_on", False):
-            self.assertNotIn("/chess/", livefeed.with_switcher("<body></body>", "live"))
-        with mock.patch.object(cg, "_on", True):
-            self.assertIn('href="/chess/"', livefeed.with_switcher("<body></body>", "live"))
+        from web import chat_web
+
+        # her menu (web/head.js) lists it only while chess is on
+        with mock.patch.object(livefeed, "url", return_value="http://127.0.0.1:8792"):
+            with mock.patch.object(cg, "_on", False):
+                self.assertNotIn("/chess/", [href for _l, href, *_ in chat_web._nav()])
+            with mock.patch.object(cg, "_on", True):
+                self.assertIn("/chess/", [href for _l, href, *_ in chat_web._nav()])
 
 
 if __name__ == "__main__":

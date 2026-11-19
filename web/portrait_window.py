@@ -132,6 +132,32 @@ def command(url, w, h, profile="luna-portrait"):
     return None
 
 
+def open_app(url, w, h, profile):
+    """A page in a window of its own (command(); portrait.browser, when set,
+    picks the browser): the process, or None when it went to a browser tab."""
+    import subprocess
+
+    import config
+
+    try:
+        if getattr(config, "PORTRAIT_BROWSER", ""):
+            from core.machine import split_command
+
+            cmd = split_command(config.PORTRAIT_BROWSER.format(url=url, w=w, h=h))
+        else:
+            cmd = command(url, w, h, profile=profile)
+    except (OSError, ValueError, KeyError):
+        cmd = None
+    if cmd:
+        try:
+            return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    stdin=subprocess.DEVNULL, start_new_session=True)
+        except OSError:
+            pass
+    quiet_open(url)
+    return None
+
+
 def quiet_open(url):
     """webbrowser.open, but with the browser's output thrown away: started
     from Luna's process it would otherwise print over her screen."""

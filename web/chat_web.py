@@ -8,6 +8,7 @@ and her answer streams into both. A tool's question (ui.ask_approval) shows
 in the page too, and either side can answer it.
 
     GET  /chat/            the page
+    GET  /chat/head.js     her header, put on every page by livefeed.with_switcher
     GET  /chat/logo.png    her emblem, for the menu button
     GET  /chat/state       the conversation from where the page is up to; waits
                            up to WAIT seconds for something to change (v=)
@@ -28,6 +29,7 @@ MAX_TYPED = 20000    # characters in one message
 MAX_BODY = 11 * 1024 * 1024   # a 10 MB picture and the form around it
 
 _HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat.html")
+_HEAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "head.js")      # her header on every page
 _LOGO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "luna-logo.png")   # from the station app's emblem
 
 
@@ -43,6 +45,21 @@ def url():
     return f"{livefeed.url()}/{NAME}/"
 
 
+WINDOW = (900, 980)   # the --web window, in pixels
+WINDOWS = {"/portrait": "open or close her portrait window", "/pose": "pose studio, in a window of its own",
+           "/monitor": "the live monitor, in a window of its own"}
+
+
+def open_window():
+    """The chat page in a window of its own with no address bar, the way
+    /portrait opens hers (web/portrait_window.py; portrait.browser, when set,
+    picks the browser for both). The process, or None when it went to an
+    ordinary browser tab instead."""
+    from web import portrait_window
+
+    return portrait_window.open_app(url(), *WINDOW, profile="luna-chat")
+
+
 def _json(code, obj):
     return code, "application/json", json.dumps(obj)
 
@@ -54,11 +71,12 @@ def _int(query, key, default):
         return default
 
 
-def state(version=None, have=0, epoch=None, wait=WAIT):
+def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
     """What the page needs to catch up. have: how many messages it holds
     (counted from the start of the conversation); epoch: the /clear it has
     seen. Sends from a little before the end of what it has, since the open
-    reply grows and a tool's line lands just above it."""
+    reply grows and a tool's line lands just above it. head: only what her
+    header shows (web/head.js on the other pages), no messages."""
     import ui
     from core import interrupts
     from ui.shared import _lock
@@ -76,6 +94,8 @@ def state(version=None, have=0, epoch=None, wait=WAIT):
         status, name, mood = ui.state["status"], ui.state["agent_name"], ui.state["mood"]
         rows = _rows(ui.state)
 
+    if head:
+        return {"v": now_version, "status": status, "name": name, "mood": mood, "rows": rows}
     total = len(convo)
     # have > total is the open reply dropped empty (ui.end_message): no reset
     reset = epoch != now_epoch or have < 0
@@ -166,11 +186,12 @@ def _answer(body):
 
 
 def _nav():
-    """[label, address, command] for every page, in the launcher's order
-    (ui/launcher.py), so the terminal's Tab pane and this row agree."""
+    """[label, address, command, title] for every page, in the launcher's
+    order (ui/launcher.py), so the terminal's Tab pane and her menu agree.
+    Chat first; a command only where the page opens a window of its own."""
     from ui import launcher
 
-    out = []
+    out = [["Chat", "/chat/", "", ""]]
     for label, _what, command, address in launcher.entries():
         if command == "/chat":
             continue
@@ -178,7 +199,9 @@ def _nav():
             continue        # the OBS address is for OBS, not a link
         path = urllib.parse.urlsplit(address).path if address else ""
         query = urllib.parse.urlsplit(address).query if address else ""
-        out.append([label, path + (f"?{query}" if query else ""), command if command == "/portrait" else ""])
+        # these open windows of their own, so the page sends the command
+        out.append([label, path + (f"?{query}" if query else ""), command if command in WINDOWS else "",
+                    WINDOWS.get(command, "")])
     return out
 
 
@@ -191,7 +214,7 @@ def page():
         files = attachments.info()
     except Exception:
         files = {}
-    boot = {"nav": _nav(), "files": files, "max": MAX_TYPED}
+    boot = {"files": files, "max": MAX_TYPED}
     # </ inside a script would end it early
     return html.replace("__BOOT__", json.dumps(boot).replace("</", "<\\/"))
 
@@ -202,12 +225,17 @@ def handle(method, sub, body, request=None):
     headers = request.get("headers")
     if method == "GET" and sub in ("", "/"):
         return 200, "text/html; charset=utf-8", page()
+    if method == "GET" and sub == "/head.js":
+        with open(_HEAD, encoding="utf-8") as f:
+            js = f.read().replace("__NAV__", json.dumps(_nav()).replace("</", "<\\/"))
+        return 200, "text/javascript; charset=utf-8", js
     if method == "GET" and sub == "/logo.png":
         with open(_LOGO, "rb") as f:
             return 200, "image/png", f.read()
     if method == "GET" and sub == "/state":
         version = _int(query, "v", None)
-        return _json(200, state(version, _int(query, "n", 0), _int(query, "e", None)))
+        return _json(200, state(version, _int(query, "n", 0), _int(query, "e", None),
+                                head=bool(query.get("head"))))
     if method == "POST" and sub == "/say":
         return _say(body, headers)
     if method == "POST" and sub == "/stop":

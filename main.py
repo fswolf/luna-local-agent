@@ -326,6 +326,9 @@ firstrun.maybe_start()          # a fresh install: her name for you, pronouns, a
 import commands  # noqa: E402
 
 commands.setup(MODEL, socket_path)
-ui.run(on_submit=handle_input, on_hotkey=lambda: ptt.toggle(MODEL))
+if "--web" in sys.argv[1:]:
+    ui.run_web(on_submit=handle_input)      # no screen: the chat page is her window (ui/headless.py)
+else:
+    ui.run(on_submit=handle_input, on_hotkey=lambda: ptt.toggle(MODEL))
 
 shutdown()

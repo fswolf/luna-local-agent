@@ -125,17 +125,30 @@ class Server(unittest.TestCase):
         c.close()
         return out
 
-    def test_the_page_and_its_nav(self):
+    def test_the_page_and_her_header(self):
         code, body = self.ask("GET", "/chat/")
         self.assertEqual(code, 200)
         page = body.decode()
         self.assertNotIn("__BOOT__", page)
-        boot = json.loads(page.split("const BOOT = ", 1)[1].split(";\n", 1)[0])
-        labels = [label for label, _href, _cmd in boot["nav"]]
+        self.assertIn('<script src="/chat/head.js"></script>', page)    # the same header as every page
+        code, body = self.ask("GET", "/chat/head.js")
+        self.assertEqual(code, 200)
+        js = body.decode()
+        self.assertNotIn("__NAV__", js)
+        nav = json.loads(js.split("const NAV = ", 1)[1].split(";\n", 1)[0])
+        labels = [label for label, *_ in nav]
+        self.assertEqual(labels[0], "Chat")
+        self.assertEqual(labels.count("Chat"), 1)
         self.assertIn("Settings", labels)
-        self.assertIn("Memory", labels)
-        self.assertNotIn("Chat", labels)
-        self.assertEqual([c for label, _h, c in boot["nav"] if label == "Portrait"], ["/portrait"])
+        commands = {label: command for label, _href, command, _title in nav}
+        self.assertEqual((commands["Portrait"], commands["Pose studio"], commands["Settings"]), ("/portrait", "/pose", ""))
+
+    def test_header_only_state(self):
+        ui.add_message("user", "hi")
+        code, body = self.ask("GET", "/chat/state?head=1")
+        s = json.loads(body)
+        self.assertNotIn("msgs", s)
+        self.assertEqual([k for k, _v in s["rows"]][:2], ["Status", "Mood"])
 
     def test_her_logo(self):
         code, body = self.ask("GET", "/chat/logo.png")
@@ -206,27 +219,46 @@ class Command(unittest.TestCase):
     def test_slash_chat_opens_the_page(self):
         import config
         from commands import portrait
-        from web import portrait_window
 
         with mock.patch.object(config, "MONITOR_ENABLED", True), \
-                mock.patch.object(portrait_window, "quiet_open") as opened, \
+                mock.patch.object(chat_web, "open_window") as opened, \
                 mock.patch.object(ui, "add_message"):
             self.assertTrue(portrait.handle("/chat"))
-        self.assertTrue(opened.call_args[0][0].endswith("/chat/"))
+        opened.assert_called_once_with()
         with mock.patch.object(config, "MONITOR_ENABLED", False), \
-                mock.patch.object(portrait_window, "quiet_open") as opened, \
+                mock.patch.object(chat_web, "open_window") as opened, \
                 mock.patch.object(ui, "add_message") as said:
             self.assertTrue(portrait.handle("/chat"))
         opened.assert_not_called()
         self.assertIn("monitor.enabled", said.call_args[0][1])
 
 
+class Pose(unittest.TestCase):
+    def test_pose_opens_its_own_window(self):
+        import config
+        from commands import portrait
+        from web import portrait_window
+
+        with mock.patch.object(config, "MONITOR_ENABLED", True), \
+                mock.patch.object(portrait_window, "open_app") as opened, mock.patch.object(ui, "add_message"):
+            self.assertTrue(portrait.handle("/pose"))
+        url, w, h = opened.call_args[0]
+        self.assertTrue(url.endswith("/portrait/?debug=1"))
+        self.assertEqual(opened.call_args.kwargs["profile"], "luna-studio")
+
+
 class Switcher(unittest.TestCase):
-    def test_chat_comes_first_once(self):
+    def test_every_page_gets_her_header(self):
         chat_web.register()
-        nav = livefeed.with_switcher("<body></body>", "live")
-        self.assertEqual(nav.count('href="/chat/"'), 1)
-        self.assertLess(nav.index("/chat/"), nav.index("/portrait/"))
+        page = livefeed.with_switcher("<html><body class=x><p>hi</p></body></html>", "live")
+        self.assertIn('<body class=x><script src="/chat/head.js"></script><p>', page)
+        self.assertNotIn("luna-nav", page)
+
+    def test_without_the_chat_page_the_old_pill(self):
+        with mock.patch.dict(livefeed.PAGES, clear=True):
+            page = livefeed.with_switcher("<body></body>", "live")
+        self.assertIn("luna-nav", page)
+        self.assertNotIn("head.js", page)
 
 
 if __name__ == "__main__":

@@ -23,8 +23,11 @@ opens it. `/help` opens the help page straight away.
 
 ## Chatting in the browser
 
-With Luna running, type /chat (or pick Chat in the Tab pane), or open
-`http://127.0.0.1:8792/chat/` yourself. It's the same conversation as the terminal, not a second one: what
+<img width="1210" alt="Luna's chat window with her menu open: Chat, Portrait, Pose studio, Settings, Live monitor, Thoughts, Memory, Help and Examples, beside her portrait reading in her room" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/web-ui-menu.jpg" />
+
+With Luna running, type /chat (or pick Chat in the Tab pane): it opens in a
+window of its own, like her portrait. Or open `http://127.0.0.1:8792/chat/`
+in any browser. It's the same conversation as the terminal, not a second one: what
 you type in either shows up in both, her reply streams into both, and the page
 starts with the conversation as it stands.
 
@@ -40,6 +43,11 @@ starts with the conversation as it stands.
   window, the same as /portrait.
 
 Like her other pages it only answers on this computer (127.0.0.1).
+
+To use only this page, with no terminal screen at all, start her with
+`./start.sh --web`: the page opens in a window of its own, without an
+address bar, the terminal can close, and closing the window quits her ([install](install.md) has the
+rest).
 
 ## Selecting text
 

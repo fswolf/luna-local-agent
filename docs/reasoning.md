@@ -505,7 +505,9 @@ llama-server. It sits in its own *Self* group in the tools pane.
 /monitor                       # or "live ↗" in the viewer
 ```
 
-opens `http://127.0.0.1:8792`, served by Luna herself while she runs.
+opens `http://127.0.0.1:8792` in a window of its own, like her portrait
+(Live monitor in her menu does the same), served by Luna herself while she
+runs.
 
 <img width="1380" alt="The live view: her reply streaming in, coloured by confidence, with the second look and the review flags underneath" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/live-view.png" />
 
@@ -523,8 +525,9 @@ Nothing on it is stored; the thought log is the record.
 
 **One server for all of it.** The monitor's server also serves the
 portrait (`/portrait/`), her thoughts (`/thoughts/`) and her memory
-editor (`/memory/`). That's one port and one process, with a small
-switcher in the corner of each page to hop between them. The thought
+editor (`/memory/`). That's one port and one process, with her header
+across the top of each page: her logo opens every page, and Online shows
+what she's running on. The thought
 viewer and the memory manager are still their own programs in their own
 folders, and they're only mounted here. `thought-viewer/start.sh` and
 `memory-manager/start.sh` open the page on Luna's server if she's

@@ -117,6 +117,16 @@ on Windows yet.)
 it out of git removes the old copy - `update.sh` and `update.cmd` put
 yours straight back from the backup they just made.
 
+**Without the terminal:** `./start.sh --web` (`start.cmd --web` on Windows)
+starts her with no terminal screen. Her [chat page](controls.md#chatting-in-the-browser)
+opens in a window of its own with no address bar, the way her portrait
+does, and everything happens there: talking, /commands, a tool asking
+first. She runs on her own, so the terminal you started her from can
+close; her output goes to `~/.cache/ai-voice/web.log`. Closing her window
+quits her, and so does /quit. Running it again while she's up just opens
+her window. `--web --here` keeps her on the terminal instead (Ctrl+C quits).
+Plain `./start.sh` is the terminal screen, as before.
+
 **Checking:** `./start.sh --check` says in plain words what's missing
 and how to fix it: Python packages, the model server, the voice server.
 `./start.sh` runs the package part on every start, and offers to install

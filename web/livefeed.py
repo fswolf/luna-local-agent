@@ -682,7 +682,16 @@ _SWITCHER_ORDER = ("examples", "settings", "help")
 
 
 def with_switcher(html, here):
-    """A small pill bottom-right linking the pages this server serves."""
+    """Her header at the top of every page this server serves (web/head.js,
+    from the chat page's module: her logo and every page, her name and mood,
+    what she's doing, Online). Without the chat page, a small pill
+    bottom-right linking the pages instead."""
+    if "chat" in PAGES:
+        i = html.find("<body")
+        if i < 0:
+            return html
+        j = html.find(">", i)
+        return html[:j + 1] + '<script src="/chat/head.js"></script>' + html[j + 1:]
     links = [("portrait/", "portrait"), ("", "live"), ("thoughts/", "thoughts"), ("memory/", "memory")]
     if "chat" in PAGES:
         links.insert(0, ("chat/", "chat"))

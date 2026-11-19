@@ -1,4 +1,4 @@
-"""Her portrait: /chat, /monitor, /holo, /outfit, /lights, /portrait and its subcommands.
+"""Her portrait: /chat, /pose, /monitor, /holo, /outfit, /lights, /portrait and its subcommands.
 
 Part of the commands package; see commands/__init__.py.
 """
@@ -19,7 +19,7 @@ def handle(text):
             return True
 
 
-        portrait_window.quiet_open(livefeed.url())
+        portrait_window.open_app(livefeed.url() + "/", 1200, 900, profile="luna-monitor")   # a window of its own
         ui.add_message("system", f"Live monitor: {livefeed.url()}")
         return True
 
@@ -28,8 +28,20 @@ def handle(text):
             ui.add_message("system", "The chat page is served by the live monitor, which is off - set "
                            "monitor.enabled to true in config.json and restart.")
             return True
-        portrait_window.quiet_open(livefeed.url() + "/chat/")
-        ui.add_message("system", f"Chat: {livefeed.url()}/chat/")
+        from web import chat_web
+
+        chat_web.open_window()      # a window of its own like the portrait's, else a browser tab
+        ui.add_message("system", f"Chat: {chat_web.url()}")
+        return True
+
+    if text == "/pose":
+        if not config.MONITOR_ENABLED:
+            ui.add_message("system", "Pose studio is served by the live monitor, which is off - set "
+                           "monitor.enabled to true in config.json and restart.")
+            return True
+        url = livefeed.url() + "/portrait/?debug=1"
+        portrait_window.open_app(url, 1600, 960, profile="luna-studio")   # the studio's own window size
+        ui.add_message("system", f"Pose studio: {url}")
         return True
 
     if text in ("/holo", "/holo on", "/holo off"):

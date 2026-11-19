@@ -267,8 +267,8 @@ Everything is in the panel:
 - a button for every gesture, expression and reaction
 
 `h` hides the panel. Picking a model there only previews it; Luna keeps
-the one she uses. With Luna running,
-`http://127.0.0.1:8792/portrait/?debug=1` has the same panel.
+the one she uses. With Luna running, /pose opens
+`http://127.0.0.1:8792/portrait/?debug=1` in a window of its own, with the same panel.
 
 ## Switching models
 

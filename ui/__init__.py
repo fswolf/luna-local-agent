@@ -26,6 +26,7 @@ The package, one job per file:
   tools_pane.py         the tools pane: switches, groups, permissions
   approval.py           the permission popup (ask_approval)
   app.py                the application itself: style, keys, run(), stop()
+  headless.py           no screen (./start.sh --web): the chat page is her window
 
 A submodule never takes the name of something ui exports: importing
 ui.conversation (a module) would replace ui.conversation (the list).
@@ -39,3 +40,4 @@ from .messages import (  # noqa: F401
 from .approval import approving, ask_approval, pending as pending_approval  # noqa: F401
 from .approval import _answer_approval as answer_approval  # noqa: F401
 from .app import run, scroll_report, stop, submit_soon  # noqa: F401
+from .headless import run_web  # noqa: F401

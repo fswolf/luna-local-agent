@@ -20,7 +20,7 @@ _FIXED = (
     ("Chat", "talk to her in the browser: the same conversation as here", "/chat", "chat/"),
     ("Portrait", "her animated portrait in a window of its own (again closes it)", "/portrait", "portrait/"),
     ("Portrait for OBS", "the see-through address for a browser source", "/portrait obs", "portrait/?bg=transparent"),
-    ("Pose studio", "the debug viewer: make and try gestures, touches and moods", "open:", "portrait/?debug=1"),
+    ("Pose studio", "the debug viewer: make and try gestures, touches and moods", "/pose", "portrait/?debug=1"),
     ("Settings", "every setting, with switches, sliders, search and presets", "/settings", "settings/"),
     ("Live monitor", "watch her think: stages, tokens, tools, mood", "/monitor", ""),
     ("Thoughts", "her reasoning, turn by turn", "/thoughts", "thoughts/"),

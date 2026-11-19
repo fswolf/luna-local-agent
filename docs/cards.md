@@ -11,7 +11,7 @@ someone and their Luna can wear it too.
 ## Where to find them
 
 On the debug viewer, in the control panel's **Cards** tab. Open the viewer with
-`./studio.sh`, or with Luna running at `http://127.0.0.1:8792/portrait/?debug=1`
+`./studio.sh`, or with Luna running type /pose (it's `http://127.0.0.1:8792/portrait/?debug=1`)
 (the browser tab says "Studio"). The control panel is on the left, the
 [pose studio](portrait.md#the-pose-studio-making-gestures-without-code) on the
 right.
