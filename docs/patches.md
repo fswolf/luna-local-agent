@@ -28,7 +28,7 @@ Each is its own patch, so one can be tested and rolled back without touching the
 3. With a few hundred approved, stop Luna and the model server, check with
    `training/train.sh gesture --check`, then run `training/train.sh gesture` (or `habit`).
    Leave it running; overnight is a good time.
-4. Restart `llama/start.sh`. The new patch loads by itself, for the model it was made for.
+4. Restart `server/llama/start.sh`. The new patch loads by itself, for the model it was made for.
 5. Try it with `/patches`, at half strength first if you like.
 
 ## Collecting examples
@@ -66,7 +66,7 @@ Newest first, each with what you said, her reply, and your version if you fixed 
 ## Training a patch
 
 By hand, when there are enough approved examples. Training needs the whole graphics
-card, so stop Luna, `llama/start.sh` and LM Studio first. The script won't start while
+card, so stop Luna, `server/llama/start.sh` and LM Studio first. The script won't start while
 her model servers or LM Studio still hold a model (`FORCE=1` to try anyway).
 
 ```
@@ -83,7 +83,7 @@ What it does:
    PyTorch for ROCm, in podman or docker), so nothing is installed on your system.
 3. Trains, in the container, with your graphics card passed through. It prints how many
    examples it used, how many it left out and why, and the loss as it goes.
-4. Turns the result into a GGUF patch in `llama/patches/`, with a `.json` beside it
+4. Turns the result into a GGUF patch in `server/llama/patches/`, with a `.json` beside it
    saying which model it was made for, how many examples, and when.
 
 A patch is named for what it is: `gesture-<model>-<date>-n<examples>.gguf`. A second
@@ -97,7 +97,7 @@ In `training/train.env`. Any of them can also be given on the command line, like
 | Setting | Default | What it does |
 |---|---|---|
 | `BASE` | (none, required) | The full-size (safetensors) version of the exact model she runs, not the GGUF. A Hugging Face id or a folder |
-| `FOR_MODEL` | the model `llama/start.sh` last started | The GGUF the patch is for, by file name |
+| `FOR_MODEL` | the model `server/llama/start.sh` last started | The GGUF the patch is for, by file name |
 | `RANK` | 16 | How much the patch can change. Small, so she picks up the habit without forgetting other things |
 | `EPOCHS` | 2 | Passes over the examples |
 | `LR` | 1e-4 | Learning rate: low and gentle |
@@ -116,8 +116,8 @@ thinking.
 
 ## Using a patch
 
-Restart `llama/start.sh`. It loads every patch made for the model it's starting and
-leaves the others out, saying which and why. `PATCHES` in `llama/server.env`: `auto`
+Restart `server/llama/start.sh`. It loads every patch made for the model it's starting and
+leaves the others out, saying which and why. `PATCHES` in `server/llama/server.env`: `auto`
 (the default), `off`, or the names to load.
 
 ```
@@ -145,15 +145,15 @@ they carry over to every model you use.
 | Examples | `agent/dataset/examples.jsonl` | Never: they hold her whole prompt, your facts included |
 | Exports for training | `agent/dataset/export/` | Never |
 | Training runs | `agent/dataset/runs/<name>/` | Never |
-| Patches | `llama/patches/` | Never: built from your examples, for your model |
-| Settings | `training/train.env`, `PATCHES` in `llama/server.env` | Yes |
+| Patches | `server/llama/patches/` | Never: built from your examples, for your model |
+| Settings | `training/train.env`, `PATCHES` in `server/llama/server.env` | Yes |
 
 ## Limits and known gaps
 
 - **Not yet run on a real card.** The scripts, the export, the masking and the loading
   are tested, but no full training run has been done. It's Linux only, on an AMD card
   through ROCm for now.
-- **Luna's own model server only.** Patches are loaded by `llama/start.sh` (llama.cpp's
+- **Luna's own model server only.** Patches are loaded by `server/llama/start.sh` (llama.cpp's
   server). LM Studio and other servers don't load them; `/patches` can only change the
   strength on llama.cpp's server.
 - **AMD cards.** ROCm support for the RX 6000 series is listed as limited, and 4-bit

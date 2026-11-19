@@ -127,3 +127,53 @@ class Web(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OldLlamaFolder(unittest.TestCase):
+    """llama/ moved to server/llama/: what's yours there moves across once."""
+
+    def make(self, d):
+        old, new = os.path.join(d, "llama"), os.path.join(d, "server", "llama")
+        os.makedirs(os.path.join(old, "llama.cpp", "build-vulkan", "bin"))
+        os.makedirs(os.path.join(old, "models"))
+        os.makedirs(new)
+        open(os.path.join(old, "llama.cpp", "build-vulkan", "bin", "llama-server"), "w").close()
+        os.symlink("llama.cpp/build-vulkan/bin", os.path.join(old, "bin"))
+        for f, text in ((".api_key", "secret"), ("models/x.gguf", ""), ("start.sh", "same")):
+            with open(os.path.join(old, f), "w") as fh:
+                fh.write(text)
+        with open(os.path.join(new, "start.sh"), "w") as fh:
+            fh.write("same")
+        return old, new
+
+    def test_moves_yours_and_drops_identical_scripts(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch("builtins.print"):
+            old, new = self.make(d)
+            moved = launch.move_old_llama(old, new)
+            self.assertEqual(moved, [".api_key", "bin", "llama.cpp", "models"])
+            self.assertTrue(os.path.exists(os.path.join(new, "bin", "llama-server")))   # the link still finds the build
+            self.assertFalse(os.path.exists(old))
+
+    def test_a_changed_script_stays(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch("builtins.print") as said:
+            old, new = self.make(d)
+            with open(os.path.join(old, "start.sh"), "w") as fh:
+                fh.write("my edits")
+            launch.move_old_llama(old, new)
+            self.assertTrue(os.path.exists(os.path.join(old, "start.sh")))
+            self.assertIn("stayed", said.call_args[0][0])
+
+    def test_key_found_in_the_old_place_until_moved(self):
+        from config import server
+
+        with tempfile.TemporaryDirectory() as d:
+            old = os.path.join(d, "old_key")
+            with open(old, "w") as fh:
+                fh.write("# made by start.sh\nsecret\n")
+            with mock.patch.object(server, "LLAMA_KEY_FILE", os.path.join(d, "missing")), \
+                    mock.patch.object(server, "_OLD_LLAMA_KEY_FILE", old):
+                self.assertEqual(server._llama_key(), "secret")
+
+    def test_nothing_to_do(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(launch.move_old_llama(os.path.join(d, "llama"), os.path.join(d, "x")), [])

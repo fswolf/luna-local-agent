@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build llama.cpp's server into llama/bin, from source, for this GPU.
+# Build llama.cpp's server into server/llama/bin, from source, for this GPU.
 #
-#   llama/install.sh            Vulkan on Linux (the easy one on AMD),
+#   server/llama/install.sh            Vulkan on Linux (the easy one on AMD),
 #                               Metal on a Mac
-#   llama/install.sh rocm       ROCm/HIP, for the AMD card(s) rocminfo finds
+#   server/llama/install.sh rocm       ROCm/HIP, for the AMD card(s) rocminfo finds
 #                               (GPU_TARGETS=gfx1100 to pick by hand)
-#   llama/install.sh metal      Apple GPU (any Apple-silicon Mac)
-#   llama/install.sh update     pull the latest llama.cpp and rebuild
+#   server/llama/install.sh metal      Apple GPU (any Apple-silicon Mac)
+#   server/llama/install.sh update     pull the latest llama.cpp and rebuild
 #
 # Both can be built side by side; bin/ points at whichever ran last, so
 # switching back is just running the other one again (it's cached).
@@ -93,7 +93,7 @@ case "$KIND" in
                         | grep -o 'gfx[0-9a-f]\+' | grep -v '^gfx000$' | sort -u | paste -sd ';' -)"
         fi
         [ -n "$TARGETS" ] || { PKGS=""; stop "Couldn't tell which AMD GPU this is (rocminfo found none).
-Name it yourself, e.g.:  GPU_TARGETS=gfx1100 llama/install.sh rocm
+Name it yourself, e.g.:  GPU_TARGETS=gfx1100 server/llama/install.sh rocm
 (gfx1100 is the RX 7900 series, gfx1030 the RX 6800/6900 series)"; }
         echo "building for: $TARGETS"
         FLAGS=(-DGGML_HIP=ON "-DGPU_TARGETS=$TARGETS")
@@ -106,7 +106,7 @@ Name it yourself, e.g.:  GPU_TARGETS=gfx1100 llama/install.sh rocm
         FLAGS=(-DGGML_METAL=ON)
         ;;
     *)
-        echo "usage: llama/install.sh [vulkan|rocm|metal|update]" >&2
+        echo "usage: server/llama/install.sh [vulkan|rocm|metal|update]" >&2
         exit 1
         ;;
 esac
@@ -127,14 +127,14 @@ ln -sfn "$BUILD/bin" bin
 
 # read-acts: the introspection lab's layer reader (lab/read.py).
 # Only the lab needs it, so a failure here never stops the install.
-if [ -f ../lab/reader/build.sh ]; then
-    bash ../lab/reader/build.sh || echo "read-acts didn't build - only lab/read.py needs it"
+if [ -f ../../lab/reader/build.sh ]; then
+    bash ../../lab/reader/build.sh || echo "read-acts didn't build - only lab/read.py needs it"
 fi
 
 echo
-echo "Built for $KIND: llama/bin/llama-server"
-echo "Next: put a model in llama/models (or point MODEL= in llama/server.env at"
-echo "one LM Studio downloaded). ./start.sh starts it with Luna; llama/start.sh"
+echo "Built for $KIND: server/llama/bin/llama-server"
+echo "Next: put a model in server/llama/models (or point MODEL= in server/llama/server.env at"
+echo "one LM Studio downloaded). ./start.sh starts it with Luna; server/llama/start.sh"
 echo "runs it on its own."
 if [ -n "$MAC" ] && [ "${BASH_VERSINFO[0]}" -lt 4 ] && ! command -v brew >/dev/null; then
     echo "start.sh needs a newer bash than the Mac's own: brew install bash"

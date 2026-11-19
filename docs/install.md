@@ -67,7 +67,7 @@ system:
    rather than cost her a size. On a card under 16 GB the chat server
    also gets a smaller batch (`UBATCH=512`), which shrinks the scratch
    space llama.cpp sets aside on the card. You can pick another model from the list. With llama.cpp it downloads the model
-   into `llama/models` and points `llama/server.local.env` at it; with
+   into `server/llama/models` and points `server/llama/server.local.env` at it; with
    LM Studio it fetches it through LM Studio's own `lms` command, or
    tells you what to search for. All Apache-2.0, with tool calling.
 
@@ -136,7 +136,7 @@ anything new before she starts instead of stopping with an error.
 Luna's check:
   ✓ Python packages
   ✗ no model server answering (llama.cpp :8080 or LM Studio :1234)
-      → open LM Studio's Local Server, or build llama.cpp: bash llama/install.sh
+      → open LM Studio's Local Server, or build llama.cpp: bash server/llama/install.sh
   ✓ her voice server is installed - ./start.sh starts it
 ```
 
@@ -194,28 +194,33 @@ opens up what LM Studio keeps inside: token probabilities, control
 vectors, LoRA adapters, saved KV-cache slots. Luna works with either and
 picks by herself at startup, llama-server first if both are up.
 
+Everything for it lives in `server/llama/`, beside her other server pieces
+(`server/music/`). Before November 2026 it was `llama/` at the top of the
+folder. If yours is still there, Luna moves your build, models, key and
+settings across the next time she starts.
+
 ```bash
-llama/install.sh          # build it - Vulkan on Linux ("rocm" for ROCm/HIP), Metal on a Mac
+server/llama/install.sh          # build it - Vulkan on Linux ("rocm" for ROCm/HIP), Metal on a Mac
 ./start.sh                # starts llama.cpp too, then Luna; the header says "· llama.cpp"
 ```
 
 Once llama.cpp is built, `./start.sh` starts it for you when no model
 server is answering, waits for the model to load, and stops it again
-when Luna exits. Its output goes to `llama/server.log`. A server you
-started yourself (`llama/start.sh` in its own terminal, or LM Studio)
+when Luna exits. Its output goes to `server/llama/server.log`. A server you
+started yourself (`server/llama/start.sh` in its own terminal, or LM Studio)
 is used as it is and left running. To never auto-start it, set
 `"autostart": false` (or `"backend": "lmstudio"`) in the `llm` block of
 `config.json`.
 
-`install.sh` clones llama.cpp into `llama/llama.cpp/` and builds only
+`install.sh` clones llama.cpp into `server/llama/llama.cpp/` and builds only
 `llama-server` and `llama-bench`, for this card. If a build tool or the
 Vulkan headers are missing it prints the install line for your system
 (dnf, apt, pacman or zypper) and stops, before the build starts. It
 doesn't run sudo itself; the installer offers to install them first
 when you pick llama.cpp there. A ROCm build is for the cards `rocminfo`
-finds; `GPU_TARGETS=gfx1100 llama/install.sh rocm` names one by hand.
+finds; `GPU_TARGETS=gfx1100 server/llama/install.sh rocm` names one by hand.
 Vulkan and ROCm builds can sit side by side; `bin/`
-points at whichever was built last. Run `llama/bin/llama-bench -m
+points at whichever was built last. Run `server/llama/bin/llama-bench -m
 <model>` under each to see which is faster on your GPU.
 `install.sh update` pulls the latest llama.cpp and rebuilds.
 
@@ -225,22 +230,22 @@ runs the model on its GPU with no setup beyond the tools:
 ```bash
 xcode-select --install         # Apple's compiler
 brew install cmake bash        # Homebrew: https://brew.sh
-llama/install.sh
+server/llama/install.sh
 ```
 
 The newer bash is for `start.sh`: macOS still ships bash 3.2, and
 `start.sh` switches to Homebrew's by itself. The GPU shares the Mac's
 memory, so the model plus macOS has to fit in RAM.
 
-On a Mac, `llama/start.sh` reads `llama/server.mac.env` instead of
+On a Mac, `server/llama/start.sh` reads `server/llama/server.mac.env` instead of
 `server.env`: lighter settings (one slot, smaller batches, the reranker
 off) so the model leaves room for macOS and its audio. On any machine,
-put your own overrides in `llama/server.local.env`, which is read last
+put your own overrides in `server/llama/server.local.env`, which is read last
 and never committed. That's the place for `MODEL=` with your model's
 full path; the default pattern matches one particular model and won't
 find yours. `LLAMA_ENV=<file>` picks a settings file by hand.
 
-`start.sh` reads `llama/server.env`, which holds the same load settings
+`start.sh` reads `server/llama/server.env`, which holds the same load settings
 as LM Studio's model page: context 16384, every layer on the GPU, 9
 threads, batch 4096/2048, 4 parallel slots sharing one KV cache, 32
 context checkpoints. Edit it there.
@@ -277,14 +282,14 @@ Two more keys in the same block, both optional:
 | Key | |
 |-----|--|
 | `model` | The model id to ask for, like `"qwen3.8-27b"`. Leave it out and she uses whatever the server has loaded. Set it on a server that holds several models (LM Studio with JIT loading, Ollama, vLLM); if that model isn't there, she shows offline instead of quietly using another |
-| `api_key` | For a server that wants a key (LM Studio with authentication, vLLM `--api-key`, a hosted OpenAI-compatible endpoint). Better kept outside the repo in `~/.config/ai-voice/llm.json` as `{"api_key": "..."}`. Not needed for llama.cpp: `llama/.api_key` is used automatically |
+| `api_key` | For a server that wants a key (LM Studio with authentication, vLLM `--api-key`, a hosted OpenAI-compatible endpoint). Better kept outside the repo in `~/.config/ai-voice/llm.json` as `{"api_key": "..."}`. Not needed for llama.cpp: `server/llama/.api_key` is used automatically |
 
 **The model on another machine.** Put that machine's address in the
 URLs above (`http://192.168.1.50:8080/...`), then on the model machine:
 
-* llama.cpp: set `HOST="0.0.0.0"` in `llama/server.env` (the default
-  only answers that machine itself), and copy its `llama/.api_key` into
-  `llama/.api_key` on Luna's machine. Without the key, `auto` quietly
+* llama.cpp: set `HOST="0.0.0.0"` in `server/llama/server.env` (the default
+  only answers that machine itself), and copy its `server/llama/.api_key` into
+  `server/llama/.api_key` on Luna's machine. Without the key, `auto` quietly
   falls back to LM Studio.
 * LM Studio: turn on **Serve on Local Network** in the Developer tab.
 * Open the port in its firewall (1234, 8080, 8081 for embeddings and
@@ -309,13 +314,13 @@ it can't, `look_at_screen` is left out of her tools and the tools pane
 says why, instead of a turn failing.
 
 **The key.** The first time `start.sh` runs it makes a random key in
-`llama/.api_key` (gitignored, readable only by you) and starts the
+`server/llama/.api_key` (gitignored, readable only by you) and starts the
 server with it, with CORS limited to localhost. Luna reads the same
 file and sends it with every request; LM Studio never sees it. Without
 it, any web page open in your browser could reach a server on
 localhost, and this one can write files (saved slots) and keep the GPU
 busy. llama-server's own web page at :8080 will ask for the key too:
-paste the contents of `llama/.api_key`.
+paste the contents of `server/llama/.api_key`.
 
 **Token confidence.** On llama-server every turn also records the
 probability of each token she produced, and the top alternatives
@@ -325,9 +330,9 @@ off with `/set thoughts.token_probs false`.
 
 ### Recalling facts by meaning
 
-`llama/start.sh` also starts a small embedding model on
+`server/llama/start.sh` also starts a small embedding model on
 127.0.0.1:8081, beside the chat server, whenever it finds one. Its
-output goes to `llama/embed.log`, and Ctrl+C stops both.
+output goes to `server/llama/embed.log`, and Ctrl+C stops both.
 
 With more facts than fit in a prompt, she normally picks the ones that
 share words with what you said. With the embedding server running she
@@ -337,11 +342,11 @@ newest few facts still always travel, and a fact has to clear a
 similarity floor (`llm.embed_min_score`, 0.35) to come along at all.
 
 The model is Qwen3-Embedding-0.6B. Either download it into
-`llama/models`:
+`server/llama/models`:
 
 ```bash
-mkdir -p ~/luna-ai/llama/models
-curl -L -o ~/luna-ai/llama/models/Qwen3-Embedding-0.6B-Q8_0.gguf \
+mkdir -p ~/luna-ai/server/llama/models
+curl -L -o ~/luna-ai/server/llama/models/Qwen3-Embedding-0.6B-Q8_0.gguf \
   https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf
 ```
 
@@ -366,12 +371,12 @@ facts match than there's room for. The similarity floor still decides
 what counts as a match.
 
 ```bash
-curl -L -o ~/luna-ai/llama/models/qwen3-reranker-0.6b-q8_0.gguf \
+curl -L -o ~/luna-ai/server/llama/models/qwen3-reranker-0.6b-q8_0.gguf \
   https://huggingface.co/ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/resolve/main/qwen3-reranker-0.6b-q8_0.gguf
 ```
 
 or `installer/install.py --extras reranker`. `start.sh` then runs it on
-127.0.0.1:8082, logging to `llama/rerank.log`. It costs about 0.6 GB on
+127.0.0.1:8082, logging to `server/llama/rerank.log`. It costs about 0.6 GB on
 disk and under 1 GB of VRAM. `RERANK` in `server.env` works like
 `EMBED`: `auto` (start it if the model is found), `off` (never, even if
 it is) or `on` (refuse to start without it). Without it, recall works
@@ -380,7 +385,7 @@ exactly as before.
 ### Short on memory?
 
 On a 16 GB machine, especially a Mac where the model shares memory with
-everything else, these lines in `llama/server.env` free the most:
+everything else, these lines in `server/llama/server.env` free the most:
 
 | Setting | Saves | What you give up |
 |---------|-------|------------------|
@@ -403,7 +408,7 @@ off there". The live monitor marks it **cut off**, and the half reply
 isn't kept in her history. On AMD, a GPU reset (a `ring ... timeout` in
 `dmesg`) wipes VRAM and takes llama-server down with it. After that,
 every message says "llama.cpp unreachable ... nothing is listening
-there" until you start it again with `llama/start.sh`.
+there" until you start it again with `server/llama/start.sh`.
 
 ---
 

@@ -128,7 +128,7 @@ near its top is skipped. See [Games](games.md#her-memory-of-a-game).
 
 ## Meaning, and words
 
-With the embedding server running (`llama/start.sh` starts it), she
+With the embedding server running (`server/llama/start.sh` starts it), she
 searches by meaning: "where's my media server" finds the Jellyfin note
 without sharing a word with it. With the reranker running as well, the
 best matches get a second, closer read.

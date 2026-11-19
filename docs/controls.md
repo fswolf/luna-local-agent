@@ -112,6 +112,7 @@ Slash commands:
 | `/presence` | Webcam presence: `/presence on`, `off`, or status |
 | `/coffee` | Her morning coffee ([portrait.md](portrait.md#gestures)): `/coffee` pours one now, `/coffee sip`, `/coffee off` |
 | `/read` | She reads a book ([portrait.md](portrait.md#gestures)); it happens on its own when you're quiet. `/read` now, `/read off`, `/read page`, `/read look` |
+| `/music` | What she heard playing: style, tempo ([music.md](music.md)). `/music now` listens again. Needs `music.url` |
 | `/plushie` | She hugs Mochi, her moon-cat plushie ([portrait.md](portrait.md#gestures)); it happens on its own when she's feeling low. `/plushie` now, `/plushie off`, `/plushie squeeze` |
 | `/doze` | She pulls her blanket round her and dozes off ([portrait.md](portrait.md#gestures)); it happens on its own late at night. `/doze` now, `/doze off` wakes her |
 | `/people` | People she knows ([people.md](people.md)): `/people enroll face\|voice <name>`, `/people forget <name> [face\|voice]`, `/people cancel` |

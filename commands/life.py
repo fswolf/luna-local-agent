@@ -1,4 +1,4 @@
-"""Her own life: /mood, /coffee, /read, /doze, /plushie, /situation.
+"""Her own life: /mood, /coffee, /read, /doze, /plushie, /music, /situation.
 
 Part of the commands package; see commands/__init__.py.
 """
@@ -145,6 +145,25 @@ def handle(text):
             ui.add_message("system", f"She sets {plushie.NAME} down." if plushie.finish() else "She isn't holding him.")
         elif word in ("squeeze", "hug"):
             ui.add_message("system", "A squeeze." if plushie.squeeze() else "She isn't holding him - /plushie first.")
+        return True
+
+    if text == "/music" or text.startswith("/music "):
+        from life import music
+
+        word = text[len("/music"):].strip().lower()
+        if not config.MUSIC_URL:
+            ui.add_message("system", "Her music listening is off: set music.url to the listening service "
+                                     "(server/music/install.sh), e.g. /set music.url http://192.168.0.186:8795")
+        elif word in ("now", "listen"):
+            ui.add_message("system", "Listening...")
+
+            def go():
+                s = music.listen_now()
+                ui.add_message("system", music.describe() or ("She heard: " + str(s) if s else
+                               "Couldn't listen (is something playing, and is the service up?)"))
+            threading.Thread(target=go, daemon=True, name="music-now").start()
+        else:
+            ui.add_message("system", music.describe() or "Nothing she's listened to is playing. /music now to listen.")
         return True
 
     if text == "/situation":

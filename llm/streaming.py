@@ -471,7 +471,7 @@ def _explain_refusal(status, body, payload):
     window = lmstudio.context_length()
     llama = getattr(config, "LLM_BACKEND", "") == "llama"
     name = config.llm_backend_label()
-    raise_ctx = "raise CTX in llama/server.env" if llama else "raise the context length in LM Studio"
+    raise_ctx = "raise CTX in server/llama/server.env" if llama else "raise the context length in LM Studio"
     server_log = "the llama-server terminal" if llama else "LM Studio's server log"
     hint = ""
 
@@ -504,7 +504,7 @@ def _unreachable(e):
     llama = getattr(config, "LLM_BACKEND", "") == "llama"
     refused = "refused" in str(e).lower()
     fix = ("" if not refused else
-           " - nothing is listening there: start llama-server again (llama/start.sh)" if llama else
+           " - nothing is listening there: start llama-server again (server/llama/start.sh)" if llama else
            " - nothing is listening there: start LM Studio's server")
     return f"{name} unreachable at {LM_URL}{fix}. ({e})"
 

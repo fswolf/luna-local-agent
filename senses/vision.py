@@ -60,7 +60,7 @@ def why_unavailable():
     if _model_is_blind():
         if getattr(config, "LLM_BACKEND", "") == "llama":
             return ("llama-server has no vision adapter - put the model's mmproj "
-                    "GGUF next to it (or set MMPROJ in llama/server.env) and restart it")
+                    "GGUF next to it (or set MMPROJ in server/llama/server.env) and restart it")
 
         return "the loaded model can't see images - load a vision model in LM Studio"
 

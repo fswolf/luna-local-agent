@@ -1,10 +1,10 @@
-"""Her trained patches, in llama/patches/ (docs/patches.md).
+"""Her trained patches, in server/llama/patches/ (docs/patches.md).
 
 Each patch is <name>.gguf with <name>.json beside it, written by
 training/train.sh: {"kind", "for", "base", "examples", "trained", ...}.
 "for" is the GGUF it was trained for, by file name. A patch only fits that
-model, so llama/start.sh loads only the ones whose "for" is the model it's
-starting (and writes that model's name to llama/patches/.current_model).
+model, so server/llama/start.sh loads only the ones whose "for" is the model it's
+starting (and writes that model's name to server/llama/patches/.current_model).
 Change the model and the old patches simply stay out until one is trained
 for the new one.
 
@@ -17,11 +17,11 @@ import urllib.request
 
 import config
 
-FOLDER = os.path.join(config.BASE_DIR, "llama", "patches")
+FOLDER = os.path.join(config.BASE_DIR, "server", "llama", "patches")
 
 
 def current_model():
-    """The GGUF llama/start.sh last started, by file name (no .gguf), or ''."""
+    """The GGUF server/llama/start.sh last started, by file name (no .gguf), or ''."""
     try:
         with open(os.path.join(FOLDER, ".current_model"), encoding="utf-8") as f:
             return f.read().strip()

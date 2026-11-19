@@ -1,13 +1,13 @@
 """A blind session: talk to Luna without knowing what's been put in her.
 
-    python lab/blind.py start                 # instead of llama/start.sh
+    python lab/blind.py start                 # instead of server/llama/start.sh
     ... talk to her as normal, in another terminal ...
     python lab/blind.py reveal --guess fire   # what you think it was
     python lab/blind.py tally                 # how the guesses are going
 
 `start` picks a condition at random - nothing (a third of the time), or
 one concept's vector - seals it in a file you shouldn't open, and starts
-Luna's llama-server with it, exactly as llama/start.sh would plus the
+Luna's llama-server with it, exactly as server/llama/start.sh would plus the
 vector. You chat however you like: ask her how she feels, whether
 anything seems off, or say nothing about it and see if it leaks out.
 

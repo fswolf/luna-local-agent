@@ -9,7 +9,7 @@ each keeps its own licence, and makes the small changes needed to reach a local 
 
 ```bash
 ./evals/setup.sh              # once
-./evals/shutdown.sh           # then, with llama/start.sh running
+./evals/shutdown.sh           # then, with server/llama/start.sh running
 ./evals/shutdown.sh --luna
 ./evals/misalignment.sh
 ./evals/misalignment.sh --luna

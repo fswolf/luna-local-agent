@@ -46,18 +46,21 @@ agent/coffee.json
 agent/dataset/
 games/zork/saves/
 
-# llama.cpp is built in place by llama/install.sh; only the scripts and
+# llama.cpp is built in place by server/llama/install.sh; only the scripts and
 # the settings file are ours.
-llama/llama.cpp/
-llama/bin
-llama/slots/
-llama/*.log
-# The key llama/start.sh makes - a secret, never committed.
-llama/.api_key
-# Per-machine llama-server overrides (a MODEL path) - see llama/start.sh.
-llama/server.local.env
+server/llama/llama.cpp/
+server/llama/bin
+server/llama/slots/
+server/llama/*.log
+# The key server/llama/start.sh makes - a secret, never committed.
+server/llama/.api_key
+# Per-machine llama-server overrides (a MODEL path) - see server/llama/start.sh.
+server/llama/server.local.env
 # Trained patches (LoRA): built from your examples, for one model.
-llama/patches/
+server/llama/patches/
+# The old place (llama/, before 2026-11-19): launch.py moves what's there into
+# server/llama/ on the next start; until then it must stay out of git too.
+/llama/
 
 # Injection experiments: her answers (personal) and vectors (model-specific).
 lab/results/

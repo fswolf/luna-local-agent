@@ -308,6 +308,11 @@ SETTINGS = {
     "self.pages_in_prompt":       ("SELF_PAGES_IN_PROMPT",         True),
     "self.profiles":              ("SELF_PROFILES",                True),
     "situation.enabled":          ("SITUATION_ENABLED",            True),
+    "music.url":                  ("MUSIC_URL",                    True),
+    "music.after":                ("MUSIC_AFTER",                  True),
+    "music.seconds":              ("MUSIC_SECONDS",                True),
+    "music.dance":                ("MUSIC_DANCE",                  True),
+    "music.rave":                 ("MUSIC_RAVE",                   True),
 
     "portrait.model":             ("PORTRAIT_MODEL",               True),
     "portrait.browser":           ("PORTRAIT_BROWSER",             True),

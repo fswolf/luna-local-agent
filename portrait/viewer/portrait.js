@@ -409,6 +409,9 @@ function handle(ev) {
     case 'note':       // a reminder (life/stickynotes.py): she writes it on a sticky note, or holds it up
       noteEvent(ev);
       break;
+    case 'music':      // what's playing, from her ears (life/music.py): dance, bob, rave
+      musicEvent(ev);
+      break;
     case 'doze':       // late and quiet: she's dozed off (life/dozing.py), or you woke her
       doze.on = !!ev.on;
       if (doze.on) { doze.nodNext = clock.elapsedTime + rand(12, 25); doze.zNext = clock.elapsedTime + rand(3, 6); }
@@ -576,7 +579,7 @@ function busyHands(name) {
   return !name.startsWith(own) && movesArms(name);
 }
 
-function gesture(name, publicOnly = false) {
+function gesture(name, publicOnly = false, speed = 1) {
   if (!moves) return false;
   if (GESTURES[name] && GESTURES[name].view != null) {
     const deg = +GESTURES[name].view || 0;
@@ -592,7 +595,7 @@ function gesture(name, publicOnly = false) {
   // halfway out of her top: a giggle or a wave from her reply waits, it would pull her arms away
   if (!takes.length && undressPlaying() && movesArms(name)) return false;
   if (name === 'wave' && !moves.hasClip('wave')) name = Math.random() < 0.7 ? 'wave' : 'wave_left';
-  if (moves.play(name, publicOnly)) {
+  if (moves.play(name, publicOnly, speed)) {
     idle.next = clock.elapsedTime + rand(20, 40);
     const g = GESTURES[name.replace(/_left$/, '')];
     if (g && g.sound) playSound(g.sound, lengthOf(g)); else stopSound();
@@ -835,6 +838,69 @@ function heldPose(g) {
 // A sticky note: written when you ask for a reminder (mode 'write'), held up
 // beside her face when it comes due ('show'), the reminder's words on it. Not
 // while her hands are full (her coffee, book or plushie) or she's asleep.
+// ---------------------------------------------------------------------------
+// Music (life/music.py): energetic music and she dances to it, matched to its
+// tempo, with breaks where she just bobs her head on the beat; a calm song,
+// only the bob. Rave styles sometimes bring out the rave set, which goes again
+// when the music stops. Only while she's idle, awake, not cross or in the lewd
+// row, and her hands are free (the glow sticks don't count).
+// ---------------------------------------------------------------------------
+const music = { on: false, bpm: 0, beatAt: 0, energetic: false, rave: false, next: 0, run: 0, raved: false, raveTried: false };
+const DANCES = ['dance', 'peace_dance'];
+function musicBeat(now = Date.now() / 1000) {       // 0..1 through the current beat, or -1 with no beat
+  if (!music.on || !music.bpm || !music.beatAt) return -1;
+  const p = 60 / music.bpm, x = ((now - music.beatAt) / p) % 1;
+  return x < 0 ? x + 1 : x;
+}
+function musicFree() {                              // can she move to it right now?
+  if (!music.on || doze.on || mind.hold || mind.stage !== 'idle') return false;
+  if (mind.row === 'lewd' || mind.row === 'grudge' || warmthBand() === 'cool') return false;
+  return !props?.names().some(n => props.held(n) && !props.PROPS[n].free);
+}
+function musicEvent(ev) {
+  const was = music.on;
+  Object.assign(music, { on: !!ev.on && ev.kind !== 'speech', bpm: +ev.bpm || 0, beatAt: +ev.beat_at || 0,
+                         energetic: !!ev.energetic, rave: !!ev.rave, danceOff: ev.dance === false });
+  props?.setBeat?.(music.on ? music.bpm : 0, music.beatAt);
+  if (music.on && !was) { music.next = clock.elapsedTime + rand(1.5, 4); music.run = 0; }
+  music.raveOk = ev.rave_ok !== false;
+  if (ev.song !== music.song) { music.song = ev.song; music.raveTried = false; }   // a new song: a new chance
+  // the music stopped, or the next song isn't a rave one: the set goes
+  if (music.raved && (!music.on || !music.rave)) {
+    music.raved = false;
+    propEvent({ name: 'pacifier', on: false });
+    propEvent({ name: 'glowstick_pink', on: false });
+  }
+}
+// called from idleMoves: dance in runs of a few, with short breaks of bobbing
+function musicDance(now) {
+  if (!music.energetic || music.danceOff || !musicFree() || moves.busy() || now < music.next) return false;
+  const name = DANCES[Math.floor(Math.random() * DANCES.length)], g = GESTURES[name];
+  let speed = g?.bpm ? music.bpm / g.bpm : 1;
+  while (speed > 1.35) speed /= 2;
+  while (speed && speed < 0.7) speed *= 2;
+  // the rave set: decided once a song, as she starts to dance (60% for rave styles)
+  if (!music.raveTried) {
+    music.raveTried = true;
+    if (music.rave && music.raveOk && !music.raved && Math.random() < 0.6) {
+      music.raved = true;
+      propEvent({ name: 'pacifier', on: true });
+      propEvent({ name: 'glowstick_pink', on: true });
+    }
+  }
+  if (!gesture(name, false, speed || 1)) return false;
+  music.run++;
+  const left = (lengthOf(g) || 8) / (speed || 1);
+  music.next = now + left + (music.run % 3 === 0 ? rand(6, 14) : rand(0.3, 1.5));   // every few, a breather
+  return true;
+}
+// the head nod on the beat while music plays and she isn't dancing
+function musicBob() {
+  if (!musicFree() || moves?.busy()) return 0;
+  const b = musicBeat();
+  return b < 0 ? 0 : 0.035 * Math.pow(1 - b, 3);
+}
+
 let noteToken = 0;
 function noteEvent(ev) {
   if (!props || !moves || doze.on) return;
@@ -896,6 +962,7 @@ function idlePool() {
 
 function idleMoves(now, talking) {
   if (doze.on) return;             // asleep: nothing on her own
+  if (music.on && musicDance(now)) return;
   // Holding a pose: nothing else on her own, and back into it as soon as
   // anything that interrupted it has finished.
   if (moves && mind.hold && (moves.names.includes(mind.hold) || moves.hasClip(mind.hold))) {
@@ -1189,8 +1256,9 @@ function animate() {
                      + doze.v * 0.3 + doze.nod, L.thinking ? 2.5 : 4, dt);
     headRot.z = damp(headRot.z, tilt.v + Math.sin(now * 0.45) * 0.02 + doze.v * 0.14, 3, dt);
     const head = bone('head'), neck = bone('neck');
-    if (head) head.rotation.set(fx * headRot.x * 0.6, headRot.y * 0.6, fx * headRot.z * 0.6);
-    if (neck) neck.rotation.set(fx * headRot.x * 0.4, headRot.y * 0.4, fx * headRot.z * 0.4);
+    const nod = headRot.x + (music.on && !music.danceOff ? musicBob() : 0);   // a nod on every beat
+    if (head) head.rotation.set(fx * nod * 0.6, headRot.y * 0.6, fx * headRot.z * 0.6);
+    if (neck) neck.rotation.set(fx * nod * 0.4, headRot.y * 0.4, fx * headRot.z * 0.4);
 
     // Breathing: in quicker than out, each breath a little different, the
     // shoulders lifting with it so it reads on a skinned model.

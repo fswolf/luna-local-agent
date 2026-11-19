@@ -362,7 +362,7 @@ def system_packages():
 
 def executables():
     """Mark the repo's scripts runnable. A zip download, or a checkout made
-    without them, leaves llama/install.sh and the rest at 644."""
+    without them, leaves server/llama/install.sh and the rest at 644."""
     if WIN:
         return
     skip = {".git", ".venv", "venv", "node_modules", "llama.cpp", "__pycache__"}
@@ -593,9 +593,9 @@ def backend(state):
             kind = "rocm" if detect_gpu()[0] == "rocm" else "vulkan"
             build_packages(kind)
         print(f"  building llama.cpp ({kind}) - this takes a few minutes")
-        good = run(["bash", os.path.join(ROOT, "llama", "install.sh"), kind])
-        note("model server", good, "llama.cpp built - put a model in llama/models; ./start.sh starts it with her"
-             if good else "llama.cpp build failed - see above, then run llama/install.sh again")
+        good = run(["bash", os.path.join(ROOT, "server", "llama", "install.sh"), kind])
+        note("model server", good, "llama.cpp built - put a model in server/llama/models; ./start.sh starts it with her"
+             if good else "llama.cpp build failed - see above, then run server/llama/install.sh again")
     else:
         note("model server", False, "skipped")
 
@@ -837,8 +837,8 @@ def _model_by_key(key):
 
 
 def _write_local_env(values):
-    """llama/server.local.env: this machine's model, read after server.env."""
-    path = os.path.join(ROOT, "llama", "server.local.env")
+    """server/llama/server.local.env: this machine's model, read after server.env."""
+    path = os.path.join(ROOT, "server", "llama", "server.local.env")
     lines = ["# Written by the installer for this machine (not committed). Edit freely."]
     lines += [f'{k}="{v}"' if isinstance(v, str) else f"{k}={v}" for k, v in values.items()]
     with open(path, "w", encoding="utf-8") as f:
@@ -865,7 +865,7 @@ def model(state):
     if done:
         done = variant(done, uncensored)
     if choice == "auto" and done:
-        here = os.path.exists(os.path.join(ROOT, "llama", "models", done[3]))
+        here = os.path.exists(os.path.join(ROOT, "server", "llama", "models", done[3]))
         if state.get("backend") != "llama" or here:
             state["flavour"] = "uncensored" if uncensored else "standard"
             ok(f"{done[1]} (set up last time; --model <size> picks another)")
@@ -902,18 +902,18 @@ def model(state):
         key, label, repo, file, size, mmproj, _least, ctx, lms_name = variant(_model_by_key(key), uncensored)
 
     if state.get("backend") == "llama":
-        dest_dir = os.path.join(ROOT, "llama", "models")
+        dest_dir = os.path.join(ROOT, "server", "llama", "models")
         dest = os.path.join(dest_dir, file)
-        got = os.path.exists(dest) or (ask(f"Download {label} ({size} GB) into llama/models?")
+        got = os.path.exists(dest) or (ask(f"Download {label} ({size} GB) into server/llama/models?")
                                        and download(HF.format(repo=repo, file=file), dest))
         if got and mmproj and not os.path.exists(os.path.join(dest_dir, mmproj)):
             download(HF.format(repo=repo, file=mmproj), os.path.join(dest_dir, mmproj))
         if not got:
-            note("model", False, "not downloaded - put a GGUF in llama/models")
+            note("model", False, "not downloaded - put a GGUF in server/llama/models")
             return
-        local = os.path.join(ROOT, "llama", "server.local.env")
-        if os.path.exists(local) and not ask("llama/server.local.env exists - point it at this model?", default=False):
-            note("model", True, f"{label} in llama/models (server.local.env left as it was)")
+        local = os.path.join(ROOT, "server", "llama", "server.local.env")
+        if os.path.exists(local) and not ask("server/llama/server.local.env exists - point it at this model?", default=False):
+            note("model", True, f"{label} in server/llama/models (server.local.env left as it was)")
             return
         mm = os.path.join(dest_dir, mmproj) if mmproj and os.path.exists(os.path.join(dest_dir, mmproj)) else "off"
         values = {"MODEL": dest, "MMPROJ": mm, "CTX": ctx, "ALIAS": ""}
@@ -925,7 +925,7 @@ def model(state):
             values.update(BATCH=2048, UBATCH=512)
         _write_local_env(values)
         state["model"] = key
-        note("model", True, f"{label}, set in llama/server.local.env")
+        note("model", True, f"{label}, set in server/llama/server.local.env")
         return
 
     # LM Studio: its own command line can fetch it
@@ -959,18 +959,18 @@ def extras_files(extras):
                  "To keep a copy: bash portrait/viewer/vendor/get_cubism_core.sh")
     if "embeddings" in extras:
         step("Embedding model")
-        dest = os.path.join(ROOT, "llama", "models", os.path.basename(EMBED_URL))
+        dest = os.path.join(ROOT, "server", "llama", "models", os.path.basename(EMBED_URL))
         if os.path.exists(dest):
             ok("already here")
         elif ask("Download the 600 MB embedding model?"):
-            note("embedding model", download(EMBED_URL, dest), "used by llama/start.sh")
+            note("embedding model", download(EMBED_URL, dest), "used by server/llama/start.sh")
     if "reranker" in extras:
         step("Reranker model")
-        dest = os.path.join(ROOT, "llama", "models", os.path.basename(RERANK_URL))
+        dest = os.path.join(ROOT, "server", "llama", "models", os.path.basename(RERANK_URL))
         if os.path.exists(dest):
             ok("already here")
         elif ask("Download the 640 MB reranker model?"):
-            note("reranker model", download(RERANK_URL, dest), "used by llama/start.sh (RERANK in server.env)")
+            note("reranker model", download(RERANK_URL, dest), "used by server/llama/start.sh (RERANK in server.env)")
 
 
 # ---------------------------------------------------------------------------
@@ -1092,9 +1092,9 @@ def health(state):
 
     lm = http_ok("http://localhost:1234/v1/models")
     ll = http_ok("http://127.0.0.1:8080/health")
-    built = os.path.exists(os.path.join(ROOT, "llama", "bin", "llama-server"))
+    built = os.path.exists(os.path.join(ROOT, "server", "llama", "bin", "llama-server"))
     idle = ("none running yet - ./start.sh starts llama.cpp with her" if built
-            else "none running yet - build llama.cpp with llama/install.sh first" if state.get("backend") == "llama"
+            else "none running yet - build llama.cpp with server/llama/install.sh first" if state.get("backend") == "llama"
             else "none running yet - start LM Studio's server")
     (ok if lm or ll else warn)("model server: " + ("llama.cpp :8080" if ll else "LM Studio :1234" if lm else idle))
     v = state.get("voice", {})

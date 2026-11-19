@@ -1,0 +1,173 @@
+"""Her ears for music (life/music.py, server/music/listen.py). The player,
+the recording and the service are faked; the service's own helpers are
+tested when numpy is there (Essentia isn't needed for these)."""
+import io
+import os
+import sys
+import unittest
+import wave
+from unittest import mock
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from tests.offline import FAKE  # noqa: E402,F401  (first: no real servers)
+
+import config  # noqa: E402
+from life import music  # noqa: E402
+
+ANSWER = {"kind": "music", "styles": [["Electronic---Dub Techno", 0.62], ["Electronic---Techno", 0.4], ["Electronic---Ambient", 0.05]],
+          "bpm": 64.0, "beats": [0.4, 0.87], "beat_conf": 3.2, "loud": -14.0, "bass": 0.5, "secs": 8, "model": True}
+
+
+class Summary(unittest.TestCase):
+    def test_reads_the_answer(self):
+        s = music.summary(ANSWER, started=1000.0)
+        self.assertEqual(s["style"], "dub techno")
+        self.assertEqual(s["styles"], ["dub techno", "techno"])
+        self.assertEqual(s["bpm"], 128)                       # 64 is really 128
+        self.assertEqual(s["beat_at"], 1000.4)
+        self.assertTrue(s["rave"] and s["energetic"])
+
+    def test_calm_and_talk(self):
+        calm = dict(ANSWER, styles=[["Electronic---Ambient", 0.7]], bpm=80, loud=-25)
+        s = music.summary(calm, 0)
+        self.assertFalse(s["rave"] or s["energetic"])
+        talk = music.summary(dict(ANSWER, kind="speech"), 0)
+        self.assertFalse(talk["energetic"])
+
+    def test_beat_period_from_the_beats(self):
+        beats = [0.5 + i * 0.4688 for i in range(16)]          # 128.0 BPM
+        s = music.summary(dict(ANSWER, beats=beats, bpm=129.0), 0)
+        self.assertEqual(s["bpm"], 129)
+        self.assertAlmostEqual(s["beat_bpm"], 128.0, places=1)  # the pulse keeps the beats' own time
+        self.assertEqual(music.period([], 120), 0.5)
+
+    def test_tempo(self):
+        self.assertEqual([music.tempo(b) for b in (64, 128, 200, 0)], [128, 128, 100, 0])
+
+
+class Track(unittest.TestCase):
+    def setUp(self):
+        self.events = []
+        self.now_playing = (True, "spotify|Artist|Song", "Artist - Song")
+        music._state.update(track=None, title="", since=0.0, asked=False, answer=None, playing=False, cache={}, sent=None)
+        self.p = [mock.patch.object(music, "_emit", lambda k, **d: self.events.append((k, d))),
+                  mock.patch.object(music, "player", lambda: self.now_playing),
+                  mock.patch.object(music, "_talking", lambda: False),
+                  mock.patch.object(music, "record", lambda s: b"\0\0" * 1600),
+                  mock.patch.object(music, "ask", lambda wav: ANSWER),
+                  mock.patch.object(music.threading, "Thread", lambda target, **k: mock.Mock(start=target)),
+                  mock.patch.object(config, "MUSIC_URL", "http://server:8795", create=True),
+                  mock.patch.object(config, "MUSIC_AFTER", 10, create=True)]
+        for p in self.p:
+            p.start()
+
+    def tearDown(self):
+        for p in self.p:
+            p.stop()
+
+    def music_events(self):
+        return [d for k, d in self.events if k == "music"]
+
+    def test_listens_once_ten_seconds_in(self):
+        music.tick(now=100)
+        music.tick(now=105)
+        self.assertIsNone(music._state["answer"])
+        music.tick(now=111)
+        self.assertEqual(music._state["answer"]["style"], "dub techno")
+        on = self.music_events()[-1]
+        self.assertTrue(on["on"] and on["rave"] and on["bpm"] == 128)
+        self.assertIn("dub techno", music.describe())
+        self.assertIn("Artist - Song", music.describe())
+        n = len(self.events)
+        music.tick(now=130)                                   # no second look, no repeat event
+        self.assertEqual(len(self.events), n)
+
+    def test_pause_and_next_track(self):
+        music.tick(now=0)
+        music.tick(now=11)
+        self.now_playing = (False, "spotify|Artist|Song", "Artist - Song")
+        music.tick(now=20)
+        self.assertEqual(self.music_events()[-1], {"on": False})
+        self.assertEqual(music.describe(), "")
+        self.now_playing = (True, "spotify|Artist|Song", "Artist - Song")
+        music.tick(now=30)                                    # back on: the style it had, but the beat is lost
+        self.assertTrue(self.music_events()[-1]["on"])
+        self.assertIsNone(self.music_events()[-1]["beat_at"])
+        music.tick(now=41)                                    # so it listens again to find the beat
+        self.assertIsNotNone(self.music_events()[-1]["beat_at"])
+        self.now_playing = (True, "spotify|Other|Tune", "Other - Tune")
+        music.tick(now=40)
+        self.assertEqual(self.music_events()[-1], {"on": False})
+        self.assertIsNone(music._state["answer"])
+
+    def test_waits_while_she_talks(self):
+        with mock.patch.object(music, "_talking", lambda: True):
+            music.tick(now=0)
+            music.tick(now=20)
+        self.assertIsNone(music._state["answer"])
+        music.tick(now=21)
+        self.assertIsNotNone(music._state["answer"])
+
+    def test_counts_only_playing_time(self):
+        self.now_playing = (False, "spotify|Artist|Song", "Artist - Song")
+        music.tick(now=0)
+        music.tick(now=30)                                    # paused all along
+        self.now_playing = (True, "spotify|Artist|Song", "Artist - Song")
+        music.tick(now=31)
+        self.assertIsNone(music._state["answer"])
+        music.tick(now=42)
+        self.assertIsNotNone(music._state["answer"])
+
+    def test_one_listen_at_a_time(self):
+        self.assertTrue(music._listening.acquire(blocking=False))
+        try:
+            self.assertIsNone(music.listen_now())
+        finally:
+            music._listening.release()
+
+    def test_off_without_url(self):
+        with mock.patch.object(config, "MUSIC_URL", "", create=True):
+            self.assertFalse(music.enabled())
+
+    def test_wav(self):
+        with wave.open(io.BytesIO(music.as_wav(b"\0\0" * 160))) as w:
+            self.assertEqual((w.getframerate(), w.getnchannels(), w.getnframes()), (16000, 1, 160))
+
+
+try:
+    import numpy  # noqa: F401
+    HERE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "server", "music")
+    sys.path.insert(0, HERE)
+    import listen  # noqa: E402
+except ImportError:
+    listen = None
+
+
+@unittest.skipIf(listen is None, "numpy isn't installed")
+class Service(unittest.TestCase):
+    def test_kind(self):
+        labels = ["Non-Music---Spoken Word", "Electronic---Techno"]
+        self.assertEqual(listen.kind_of([], [0.8, 0.1], labels, 1.0), "speech")
+        self.assertEqual(listen.kind_of([], [0.05, 0.9], labels, 3.0), "music")
+        self.assertEqual(listen.kind_of([], [0.2, 0.3], labels, 1.0), "mixed")
+        self.assertEqual(listen.kind_of(None, None, None, 3.5), "music")
+
+    def test_reads_wav_and_bass(self):
+        import numpy as np
+
+        t = np.arange(16000) / 16000
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(2); w.setsampwidth(2); w.setframerate(16000)
+            s = (np.sin(2 * np.pi * 60 * t) * 0.5 * 32767).astype("<i2")
+            w.writeframes(np.stack([s, s], axis=1).tobytes())
+        x, rate = listen.read_wav(buf.getvalue())
+        self.assertEqual((rate, len(x)), (16000, 16000))
+        loud, bass = listen.color(x, rate)
+        self.assertGreater(bass, 0.9)
+        self.assertLess(loud, -5)
+
+
+if __name__ == "__main__":
+    unittest.main()

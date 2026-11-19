@@ -63,7 +63,7 @@ The embedding model and reranker want about 1.5 GB more beside it;
 ## Context
 
 - The installer sets **16k** on most models and **8k** on the smallest
-  ones (`CTX` in `llama/server.env` for llama.cpp, or the context length
+  ones (`CTX` in `server/llama/server.env` for llama.cpp, or the context length
   slider in LM Studio).
 - **16k is the practical minimum** for everyday use. Her system prompt,
   memory and tool list take a good share of it before you say anything.
@@ -80,8 +80,8 @@ uses whatever is loaded. With several loaded, set `llm.model` in
 `config.json` to the one you want.
 
 **llama.cpp:** put the GGUF's full path in `MODEL=` in
-`llama/server.local.env` (your own overrides, read after
-`llama/server.env`). Vision is off by default (`MMPROJ=off`); if the
+`server/llama/server.local.env` (your own overrides, read after
+`server/llama/server.env`). Vision is off by default (`MMPROJ=off`); if the
 model can see and you want her eyes, put its mmproj file in `MMPROJ=`,
 or leave it empty and it's looked for next to the model.
 An omni model's mmproj (Qwen3-Omni, Qwen2.5-Omni, Gemma 4 E2B/E4B) gives

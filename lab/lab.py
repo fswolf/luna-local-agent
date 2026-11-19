@@ -17,7 +17,7 @@ import time
 import requests
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LLAMA = os.path.join(ROOT, "llama")
+LLAMA = os.path.join(ROOT, "server", "llama")
 HERE = os.path.dirname(os.path.abspath(__file__))
 VECTORS = os.path.join(HERE, "vectors")
 RESULTS = os.path.join(HERE, "results")
@@ -76,7 +76,7 @@ def model_path():
 
     if len(found) != 1:
         sys.exit(f"Need exactly one model matching {pattern}, found {len(found)} - "
-                 "set MODEL= in llama/server.env.")
+                 "set MODEL= in server/llama/server.env.")
 
     return found[0]
 
@@ -85,7 +85,7 @@ def binary(name):
     path = os.path.join(LLAMA, "bin", name)
 
     if not os.access(path, os.X_OK):
-        sys.exit(f"{name} isn't built - run llama/install.sh (it builds it now).")
+        sys.exit(f"{name} isn't built - run server/llama/install.sh (it builds it now).")
 
     return path
 

@@ -1,6 +1,6 @@
 """Training her patches: the export (training/export.py), the patches on disk
-and the model check (training/patches.py, llama/start.sh), and /patches.
-Everything in temporary folders; agent/dataset/ and llama/patches/ untouched.
+and the model check (training/patches.py, server/llama/start.sh), and /patches.
+Everything in temporary folders; agent/dataset/ and server/llama/patches/ untouched.
 """
 import json
 import os
@@ -150,10 +150,10 @@ class Masking(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("bash"), "no bash")
 class StartScript(unittest.TestCase):
-    """llama/start.sh's patch block, on its own."""
+    """server/llama/start.sh's patch block, on its own."""
 
     def test_loads_only_patches_for_the_model_it_starts(self):
-        text = read(os.path.join(HERE, "llama", "start.sh"))
+        text = read(os.path.join(HERE, "server", "llama", "start.sh"))
         block = text[text.index("# Her patches: the ones made for this model"):]
         block = block[:block.index("\nfi\n") + 4]
         tmp = tempfile.mkdtemp()

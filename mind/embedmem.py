@@ -6,7 +6,7 @@ shared. An embedding model turns each fact and the turn into a vector,
 and facts that *mean* something close to what was said rank highest,
 shared words or not.
 
-It is entirely optional. llama/start.sh starts a small embedding model
+It is entirely optional. server/llama/start.sh starts a small embedding model
 on :8081; when that isn't answering, available() says so and longterm
 quietly uses the word matching it always did. Nothing here ever makes
 a turn fail.

@@ -191,6 +191,7 @@ _HELP_SECTIONS = [
         ("/offers", "what she has noticed on her own to offer you; /offers on, off, unmute, now"),
         ("/read", "she reads a book (it happens on its own when you're quiet); /read off, page, look"),
         ("/doze", "she dozes off under her blanket (it happens on its own late at night); /doze off wakes her"),
+        ("/music", "what she hears playing (style, tempo); /music now listens again (needs music.url)"),
         ("/plushie", "she hugs Mochi, her moon-cat plushie (on its own when she's feeling low); /plushie off, squeeze"),
         ("/people", "who she knows: enroll face|voice <name>, forget <name>, check (a face check now), guest <name> (name who she just met), keep <name>"),
         ("/allow", "is allow-all on for file changes? /allow off ends it"),

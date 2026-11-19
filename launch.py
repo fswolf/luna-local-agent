@@ -4,7 +4,7 @@
 
 Any arguments are passed on to main.py. Before her:
 
-- the model server: llama/start.sh, when llama.cpp is built here and
+- the model server: server/llama/start.sh, when llama.cpp is built here and
   neither it nor LM Studio is answering. It picks server.env, or
   server.mac.env on a Mac, by itself. Off with "llm": {"autostart":
   false}, or llm.backend "lmstudio".
@@ -58,11 +58,46 @@ def log_dir():
     return path
 
 
-LLAMA_DIR = os.path.join(ROOT, "llama")
+LLAMA_DIR = os.path.join(ROOT, "server", "llama")
 
 
 CONFIG = os.path.join(ROOT, "config.json")
 EXAMPLE = os.path.join(ROOT, "config.example.json")
+
+
+def move_old_llama(old=None, new=None):
+    """The model server's folder moved from llama/ to server/llama/ (2026-11-19).
+    git moves its scripts; what's yours there (the llama.cpp build, the bin
+    link, models, logs, the key, server.local.env, patches) is moved across
+    once, here. Nothing already in server/llama/ is overwritten. Returns what
+    was moved."""
+    import filecmp
+    import shutil
+
+    old = old or os.path.join(ROOT, "llama")
+    new = new or LLAMA_DIR
+    if not os.path.isdir(old) or os.path.islink(old):
+        return []
+    os.makedirs(new, exist_ok=True)
+    moved = []
+    for name in sorted(os.listdir(old)):
+        src, dst = os.path.join(old, name), os.path.join(new, name)
+        if os.path.lexists(dst):
+            # the same script git (or a copy) already put in server/llama/: the old one can go
+            if os.path.isfile(src) and not os.path.islink(src) and os.path.isfile(dst) and filecmp.cmp(src, dst, shallow=False):
+                os.remove(src)
+            continue
+        try:
+            shutil.move(src, dst)         # the bin link is relative, so it still points at the build
+            moved.append(name)
+        except OSError as e:
+            print(f"Couldn't move llama/{name} to server/llama/: {e}")
+    try:
+        os.rmdir(old)                     # only when nothing's left
+    except OSError:
+        if moved:
+            print("Some files stayed in llama/ (server/llama/ has a different copy of each): look them over, then delete llama/.")
+    return moved
 
 
 def seed_config():
@@ -118,7 +153,7 @@ def model_up():
 
 
 def start_llama(s):
-    """llama/start.sh in the background (its embedding and reranker
+    """server/llama/start.sh in the background (its embedding and reranker
     servers too), in its own process group so one signal stops all of
     them. Returns the process, or None if it wasn't ours to start."""
     llm = llm_settings()
@@ -136,7 +171,7 @@ def start_llama(s):
     print("Starting her model (llama.cpp)", end="", flush=True)
     for _ in range(600):           # a big model from a slow disk can take a few minutes
         if proc.poll() is not None:
-            print(f" it stopped - last lines of llama/server.log:")
+            print(f" it stopped - last lines of server/llama/server.log:")
             try:
                 with open(log_path, encoding="utf-8", errors="replace") as f:
                     print("  " + "\n  ".join(f.read().splitlines()[-8:]))
@@ -149,12 +184,12 @@ def start_llama(s):
         time.sleep(0.5)
         if _ % 4 == 0:
             print(".", end="", flush=True)
-    print(" still loading - see llama/server.log.")
+    print(" still loading - see server/llama/server.log.")
     return proc
 
 
 def stop_group(proc):
-    """Stop a process and everything it started (llama/start.sh's side servers)."""
+    """Stop a process and everything it started (server/llama/start.sh's side servers)."""
     if not proc or proc.poll() is not None:
         return
     try:
@@ -308,7 +343,7 @@ def check(py):
         line(True, "no model server running yet - ./start.sh starts llama.cpp for her")
     else:
         line(False, "no model server answering (llama.cpp :8080 or LM Studio :1234)",
-             "open LM Studio's Local Server, or build llama.cpp: bash llama/install.sh")
+             "open LM Studio's Local Server, or build llama.cpp: bash server/llama/install.sh")
 
     v = state().get("voice", {})
     url = tts_url()
@@ -403,6 +438,9 @@ def _own_session():
 
 def main():
     args = sys.argv[1:]
+    moved = move_old_llama()
+    if moved:
+        print("Moved your model server files from llama/ to server/llama/: " + ", ".join(moved))
     if seed_config():
         print("Made config.json from config.example.json - your settings live there, outside git.")
     py = python()
@@ -428,7 +466,7 @@ def main():
 
     warnings = []
     if not model_up():
-        warnings.append("No model server - open LM Studio's Local Server, or run llama/start.sh.")
+        warnings.append("No model server - open LM Studio's Local Server, or run server/llama/start.sh.")
     if not eleven() and not (v.get("mode") == "managed" and _here(url)) and v.get("mode") != "none" \
             and not up(url + "/health"):
         warnings.append(f"No voice server at {url} - she'll start text-only.")

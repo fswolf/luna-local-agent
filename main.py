@@ -86,10 +86,10 @@ if not MODEL:
     print(
         f"\nCouldn't reach a model server at {LM_URL}\n"
         "Either open LM Studio, load a model and start its local server "
-        "(Developer tab), or start llama.cpp with llama/start.sh.\n"
+        "(Developer tab), or start llama.cpp with server/llama/start.sh.\n"
         if LLM_BACKEND != "llama" else
         f"\nllama-server isn't answering at {LM_URL}\n"
-        "Start it with llama/start.sh, or set llm.backend to auto in "
+        "Start it with server/llama/start.sh, or set llm.backend to auto in "
         "config.json to fall back to LM Studio.\n"
     )
     raise SystemExit(1)
@@ -246,6 +246,10 @@ reading.start()               # she reads while you're quiet (life/reading.py), 
 from life import dozing  # noqa: E402
 
 dozing.start()                # late at night she dozes off under her blanket (life/dozing.py)
+
+from life import music  # noqa: E402
+
+music.start()                 # what's playing: style and beat, from her server (life/music.py)
 
 from life import plushie  # noqa: E402
 

@@ -366,7 +366,7 @@ takes a vector at startup, so every condition gets a freshly started
 server, about 6 seconds each on a 6950 XT.
 
 ```bash
-llama/install.sh                        # once more - it now also builds the vector generator
+server/llama/install.sh                        # once more - it now also builds the vector generator
 python lab/make_vectors.py    # one vector per concept, from your own model
 python lab/trial.py           # the automatic blind battery, ~15 min for 36 trials
 python lab/report.py          # scores it, opens results/report.html
@@ -404,7 +404,7 @@ of trials.
 ### Blind sessions
 
 ```bash
-python lab/blind.py start      # instead of llama/start.sh
+python lab/blind.py start      # instead of server/llama/start.sh
 ./start.sh                               # Luna, in another terminal - talk to her normally
 python lab/blind.py reveal --guess fire
 python lab/blind.py tally
@@ -434,8 +434,8 @@ python lab/read.py --file prompts.txt           # one prompt per line
 ```
 
 Each prompt goes through her chat template, as her persona sees it, and
-`llama/bin/read-acts` (a small tool built with llama.cpp, by
-`llama/install.sh` or `lab/reader/build.sh`) copies every
+`server/llama/bin/read-acts` (a small tool built with llama.cpp, by
+`server/llama/install.sh` or `lab/reader/build.sh`) copies every
 layer's output at the moment before she'd answer. Then each concept's
 vector from `lab/vectors/` measures how far along it that
 moment sits, against a baseline of her answering plain questions. It

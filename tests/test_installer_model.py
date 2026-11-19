@@ -1,5 +1,5 @@
 """The installer's model pick (installer/install.py): the biggest model that
-fits the machine, written where llama/start.sh will find it.
+fits the machine, written where server/llama/start.sh will find it.
 
     python -m unittest discover tests        (from the repo folder)
 """
@@ -44,10 +44,10 @@ class Pick(unittest.TestCase):
     def test_a_tight_card_gets_a_smaller_batch_and_cpu_recall(self):
         tmp = tempfile.mkdtemp()
         try:
-            os.makedirs(os.path.join(tmp, "llama", "models"))
+            os.makedirs(os.path.join(tmp, "server", "llama", "models"))
             m = install.variant(install._model_by_key("9b-q6"))
             for f in (m[3], m[5]):
-                open(os.path.join(tmp, "llama", "models", f), "w").close()
+                open(os.path.join(tmp, "server", "llama", "models", f), "w").close()
             state = {"backend": "llama", "extras": ["embeddings", "reranker"], "voice": {"device": "cuda"}}
             args = mock.Mock(model="auto", standard=False, yes=True)
             with mock.patch.object(install, "ROOT", tmp), mock.patch.object(install, "ARGS", args), \
@@ -55,7 +55,7 @@ class Pick(unittest.TestCase):
                     mock.patch.object(install, "detect_vram", return_value=(12.0, "test")):
                 install.model(state)
             download.assert_not_called()
-            with open(os.path.join(tmp, "llama", "server.local.env"), encoding="utf-8") as f:
+            with open(os.path.join(tmp, "server", "llama", "server.local.env"), encoding="utf-8") as f:
                 text = f.read()
             self.assertIn(m[3], text)
             for line in ("EMBED_NGL=0", "RERANK_NGL=0", "UBATCH=512"):
@@ -95,9 +95,9 @@ class Pick(unittest.TestCase):
         # set up before the uncensored choice existed: a model, no flavour
         tmp = tempfile.mkdtemp()
         try:
-            os.makedirs(os.path.join(tmp, "llama", "models"))
+            os.makedirs(os.path.join(tmp, "server", "llama", "models"))
             m = install._model_by_key("9b")
-            open(os.path.join(tmp, "llama", "models", m[3]), "w").close()      # Qwen's own file is there
+            open(os.path.join(tmp, "server", "llama", "models", m[3]), "w").close()      # Qwen's own file is there
             state = {"model": "9b", "backend": "llama"}
             args = mock.Mock(model="auto", standard=False, yes=True)
             with mock.patch.object(install, "ROOT", tmp), mock.patch.object(install, "ARGS", args), \
@@ -112,7 +112,7 @@ class Pick(unittest.TestCase):
     def test_local_env_is_written_for_start_sh(self):
         tmp = tempfile.mkdtemp()
         try:
-            os.makedirs(os.path.join(tmp, "llama"))
+            os.makedirs(os.path.join(tmp, "server", "llama"))
             with mock.patch.object(install, "ROOT", tmp):
                 path = install._write_local_env({"MODEL": "/m/a b.gguf", "MMPROJ": "off", "CTX": 16384})
             with open(path) as f:

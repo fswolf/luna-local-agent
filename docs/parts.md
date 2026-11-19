@@ -18,8 +18,8 @@ and what happens if you leave it out. Details and downloads are in
 
 ## Turning parts off, or moving them
 
-All in `llama/server.env` (or your own `llama/server.local.env`), read
-when `llama/start.sh` starts:
+All in `server/llama/server.env` (or your own `server/llama/server.local.env`), read
+when `server/llama/start.sh` starts:
 
 | To | Set |
 |---|---|
@@ -29,7 +29,7 @@ when `llama/start.sh` starts:
 | run the embedding model on the CPU | `EMBED_NGL=0` |
 | run the reranker on the CPU | `RERANK_NGL=0` |
 
-On a Mac, `start.sh` reads `llama/server.mac.env` instead, which already
+On a Mac, `start.sh` reads `server/llama/server.mac.env` instead, which already
 leaves the embedding model and the reranker off to save shared memory.
 
 **Not using `start.sh`?** With LM Studio or a model server of your own

@@ -143,7 +143,7 @@ def split_path(path):
 # tests/test_portrait_serve.py checks the two stay in step.
 PORTRAIT_KINDS = frozenset((
     "background", "chat", "done", "doze", "emote", "feeling", "flags", "frame", "gaze", "gesture",
-    "gesture_mode", "holo", "lights", "match_light", "mood", "note", "outfit", "prop", "reload",
+    "gesture_mode", "holo", "lights", "match_light", "mood", "music", "note", "outfit", "prop", "reload",
     "sounds", "stage", "tok", "tool", "turn", "voice",
 ))
 

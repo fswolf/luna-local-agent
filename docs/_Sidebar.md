@@ -25,6 +25,7 @@
 - [Portrait](portrait.md)
 - [Cards](cards.md)
 - [Hologram fans](fans.md)
+- [Music](music.md)
 - [Gestures](gestures.md)
 - [Textures](textures.md)
 - [Home automation](home.md)

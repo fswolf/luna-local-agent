@@ -9,7 +9,7 @@ measure, layer by layer, how strongly each concept is present.
     python lab/read.py --check                 # do the vectors read back what made them?
 
 Stop Luna's llama-server first, like the other experiments: this loads
-the model itself (llama/bin/read-acts - llama/install.sh builds it, or
+the model itself (server/llama/bin/read-acts - server/llama/install.sh builds it, or
 lab/reader/build.sh on its own). Nothing is generated and
 nothing about the model changes; it only reads.
 

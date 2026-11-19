@@ -349,7 +349,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
                 if getattr(config, "LLM_BACKEND", "") == "llama":
                     fix = ("llama-server was started without the model's vision "
                            "adapter - put its mmproj GGUF next to the model (or "
-                           "set MMPROJ in llama/server.env) and restart it")
+                           "set MMPROJ in server/llama/server.env) and restart it")
                 else:
                     fix = "load a vision model in LM Studio"
 

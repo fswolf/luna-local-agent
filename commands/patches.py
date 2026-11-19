@@ -81,13 +81,13 @@ def handle(text):
             ui.add_message("system", "/patches  or  /patches <name or id> <strength 0-1>")
             return True
         model, found, live = patches.current_model(), patches.local(), patches.loaded()
-        lines = [f"Her patches (llama/patches/) - model: {model or 'not started by llama/start.sh yet'}"]
+        lines = [f"Her patches (server/llama/patches/) - model: {model or 'not started by server/llama/start.sh yet'}"]
         if not found:
             lines.append("  none trained yet: training/train.sh gesture|habit (docs/patches.md)")
         for p in found:
             on = next((r for r in live or [] if r["path"].endswith(p["name"] + ".gguf")), None)
             state = (f"loaded, id {on['id']}, strength {on['scale']:g}" if on else
-                     "fits, not loaded (restart llama/start.sh)" if p["fits"] else f"left out: made for {p['for'] or 'unknown'}")
+                     "fits, not loaded (restart server/llama/start.sh)" if p["fits"] else f"left out: made for {p['for'] or 'unknown'}")
             lines.append(f"  {p['name']}  [{p['kind']}, {p['examples'] or '?'} examples]  {state}")
         if live is None:
             lines.append("  (llama-server isn't answering, so what's loaded is unknown)")

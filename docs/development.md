@@ -73,7 +73,7 @@ ai-voice/
 ├── main.py           # startup and the main loop; typed /commands go to commands/
 ├── commands/         # every /command, one module per area (app, reminders, settings,
 │                     #   voice, life, portrait, memory, people, patches, plugins); handle(text)
-├── llama/            # llama.cpp's own server - install.sh, start.sh, server.env
+├── server/llama/            # llama.cpp's own server - install.sh, start.sh, server.env
 ├── portrait/         # her animated portrait
 │   ├── viewer/       #   the page: index.html, boot.js, portrait.js (VRM), live2d.js, gestures.js,
 │   │                 #   face_layers.js (blush, tears, brows), debug_panel.js (?debug=1), studio.js,

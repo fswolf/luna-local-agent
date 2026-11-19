@@ -245,7 +245,7 @@ class Streaming(unittest.TestCase):
         refused = requests.exceptions.ConnectionError("[Errno 111] Connection refused")
         with mock.patch.object(streaming.requests, "post", side_effect=refused), \
                 mock.patch.object(streaming.lmstudio, "mark_failed"):
-            for backend, name, fix in (("llama", "llama.cpp", "llama/start.sh"), ("lmstudio", "LM Studio", "LM Studio's server")):
+            for backend, name, fix in (("llama", "llama.cpp", "server/llama/start.sh"), ("lmstudio", "LM Studio", "LM Studio's server")):
                 import config.server as server
                 with mock.patch.object(streaming.config, "LLM_BACKEND", backend, create=True), \
                         mock.patch.object(server, "LLM_BACKEND", backend):

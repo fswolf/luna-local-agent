@@ -35,6 +35,7 @@ Everything the README only touches on, one subject per page.
 - [Portrait](portrait.md): Live2D and VRM, looking and thinking
 - [Cards](cards.md): her look as a picture, to switch looks or share one
 - [Hologram fans](fans.md): Luna live on an HDMI or Holoscope WiFi fan
+- [Music](music.md): she hears what kind of music is playing and dances to it
 - [Textures](textures.md): new clothes, irises and skin for her 3D model from UV templates, through ComfyUI
 - [Gestures](gestures.md): how her body moves, and writing your own
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices

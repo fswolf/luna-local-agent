@@ -215,7 +215,8 @@ export function createGestures(THREE, vrm, view = () => 0) {
     playing() { return active.filter(a => !a.out).map(a => a.name); },
     state() { return active.map(a => ({ name: a.name, t: +a.t.toFixed(2), out: a.out })); },
     // publicOnly: from chat, so a clip marked private never plays
-    play(name, publicOnly = false) {
+    // speed: a keyed gesture played faster or slower (a dance matched to the music's tempo)
+    play(name, publicOnly = false, speed = 1) {
       if (publicOnly && PRIVATE.includes(name)) return false;
       const vs = (clips[name] || []).filter(v => !publicOnly || !v.opts.private);
       let g = GESTURES[name], next = [];
@@ -225,7 +226,7 @@ export function createGestures(THREE, vrm, view = () => 0) {
       if (!vs.length && !g) return false;
       for (const a of active) if (!a.out) a.out = a.t;          // let the old one go
       if (vs.length) active.push(startClip(name, vs[Math.floor(Math.random() * vs.length)]));
-      else active.push({ g, name, t: 0, ct: 0, out: 0, ch: channels(g), next, turn: turnFor(g) });
+      else active.push({ g, name, t: 0, ct: 0, out: 0, ch: channels(g), next, turn: turnFor(g), rate: +speed || 1 });
       return true;
     },
     stop() { for (const a of active) if (!a.out) a.out = a.t; },
@@ -312,7 +313,7 @@ export function createGestures(THREE, vrm, view = () => 0) {
       // oldest first, so the newest one lands on top while the old fades
       for (let i = 0; i < active.length; i++) {
         const a = active[i], g = a.g;
-        a.t += dt;
+        a.t += a.kind === 'clip' ? dt : dt * (a.rate || 1);
         const [fi, fo] = g.fade || [0.3, 0.4];
         const end = a.out ? a.out + fo : g.dur;
         if (a.t >= end) { a.gone = true; continue; }

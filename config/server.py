@@ -11,7 +11,7 @@ from .base import BASE_DIR, LM_URL, flag, setting
 # -------------------------
 # Which model server
 # -------------------------
-# LM Studio, or llama.cpp's own llama-server (llama/start.sh), checked
+# LM Studio, or llama.cpp's own llama-server (server/llama/start.sh), checked
 # once at startup. Both speak the same OpenAI-style API, so everything
 # that talks to the model just uses LM_URL; what differs is what each
 # can do beyond it - llama-server exposes token probabilities, control
@@ -46,24 +46,27 @@ def _root(url):
     return url.split("/v1/")[0]
 
 
-# llama/start.sh makes a random key the first time it runs and starts
+# server/llama/start.sh makes a random key the first time it runs and starts
 # the server with it. Every request has to carry it, because a server
 # on localhost is reachable by any web page open in the browser - and
 # this one can write files (saved slots) and burn the GPU. LM Studio
 # never sees it.
-LLAMA_KEY_FILE = os.path.join(BASE_DIR, "llama", ".api_key")
+LLAMA_KEY_FILE = os.path.join(BASE_DIR, "server", "llama", ".api_key")
+# where it was before server/llama/ (launch.py moves it; main.py run on its own doesn't)
+_OLD_LLAMA_KEY_FILE = os.path.join(BASE_DIR, "llama", ".api_key")
 
 
 def _llama_key():
-    try:
-        with open(LLAMA_KEY_FILE, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+    for path in (LLAMA_KEY_FILE, _OLD_LLAMA_KEY_FILE):
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
 
-                if line and not line.startswith("#"):
-                    return line
-    except OSError:
-        pass
+                    if line and not line.startswith("#"):
+                        return line
+        except OSError:
+            pass
 
     return ""
 
@@ -108,7 +111,7 @@ LLM_BACKEND, LM_URL = _pick_backend()
 # An API key for a model server that wants one (LM Studio with auth, vLLM
 # --api-key, any OpenAI-compatible endpoint): llm.api_key in config.json,
 # or better, outside the repo in ~/.config/ai-voice/llm.json as
-# {"api_key": "..."}. llama/start.sh's own key is used for llama-server.
+# {"api_key": "..."}. server/llama/start.sh's own key is used for llama-server.
 def _llm_key():
     try:
         with open(os.path.expanduser("~/.config/ai-voice/llm.json"), encoding="utf-8") as f:
@@ -130,7 +133,7 @@ elif LLM_API_KEY:
 else:
     LLM_HEADERS = {}
 
-# The embedding server (started by llama/start.sh) for recalling facts by meaning.
+# The embedding server (started by server/llama/start.sh) for recalling facts by meaning.
 # Optional: nothing needs it, and fact recall falls back to matching
 # words whenever it isn't answering.
 EMBED_URL = str(_llm_cfg.get("embed_url", "http://127.0.0.1:8081/v1/embeddings"))
@@ -145,12 +148,25 @@ EMBED_QUERY_PREFIX = str(_llm_cfg.get(
 # How alike a fact must be to travel on meaning alone. Cosine, 0-1.
 EMBED_MIN_SCORE = float(_llm_cfg.get("embed_min_score", 0.35))
 
-# The reranker (also from llama/start.sh, :8082) re-orders the
+# The reranker (also from server/llama/start.sh, :8082) re-orders the
 # embedding's best matches by reading each one beside what was said.
 # Optional too: when it isn't answering the embedding order stands.
 # rerank_candidates is how many of the embedding's matches it reads.
 RERANK_URL = str(_llm_cfg.get("rerank_url", "http://127.0.0.1:8082/v1/rerank"))
 RERANK_CANDIDATES = int(_llm_cfg.get("rerank_candidates", 24))
+
+# Her ears for music (life/music.py): the listening service on her server
+# (server/music/listen.py, set up with server/music/install.sh). Off while url
+# is empty. `after` seconds into a new track she records `seconds` of what's
+# playing and asks it; `dance` lets the portrait dance to energetic music and
+# `rave` brings out the rave set now and then for rave styles.
+#   "music": { "url": "http://192.168.0.186:8795", "after": 10, "seconds": 8, "dance": true, "rave": true }
+_music_cfg = dict(setting("music", {}) or {})
+MUSIC_URL = str(_music_cfg.get("url", "") or "").strip()
+MUSIC_AFTER = max(0.0, float(_music_cfg.get("after", 10)))
+MUSIC_SECONDS = min(20.0, max(3.0, float(_music_cfg.get("seconds", 8))))
+MUSIC_DANCE = flag(_music_cfg.get("dance", True))
+MUSIC_RAVE = flag(_music_cfg.get("rave", True))
 
 
 def llm_backend_label():

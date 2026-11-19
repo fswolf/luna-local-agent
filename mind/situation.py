@@ -87,6 +87,14 @@ def _window():
 
 def _music():
     try:
+        from life import music
+
+        heard = music.describe()           # her own ears (music.url): style and tempo too
+        if heard:
+            return heard
+    except Exception:
+        pass
+    try:
         from senses import desktop
 
         if not desktop.media_available():

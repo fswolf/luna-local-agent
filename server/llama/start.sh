@@ -3,12 +3,12 @@
 # are there, the small embedding and reranker servers beside it. Luna
 # finds all of them by herself.
 #
-#   llama/start.sh                 all of them (each side server only if its model is found)
-#   llama/start.sh --verbose       anything extra goes to the chat server
+#   server/llama/start.sh                 all of them (each side server only if its model is found)
+#   server/llama/start.sh --verbose       anything extra goes to the chat server
 #
 # Chat on :8080 in this terminal; embeddings on :8081 and the reranker
-# on :8082 in the background, logging to llama/embed.log and
-# llama/rerank.log. Ctrl+C stops them all. Settings: server.env
+# on :8082 in the background, logging to server/llama/embed.log and
+# server/llama/rerank.log. Ctrl+C stops them all. Settings: server.env
 # (server.mac.env on macOS), then server.local.env if present.
 set -uo pipefail
 
@@ -34,12 +34,12 @@ fi
 source "./$SERVER_ENV"
 # shellcheck disable=SC1091
 [ -f server.local.env ] && source ./server.local.env
-echo "settings: llama/$SERVER_ENV$([ -f server.local.env ] && echo ' + server.local.env')"
+echo "settings: server/llama/$SERVER_ENV$([ -f server.local.env ] && echo ' + server.local.env')"
 
 BIN=./bin/llama-server
-[ -x "$BIN" ] || { echo "llama-server isn't built yet - run llama/install.sh first." >&2; exit 1; }
+[ -x "$BIN" ] || { echo "llama-server isn't built yet - run server/llama/install.sh first." >&2; exit 1; }
 
-# find_model PATTERN -> the one GGUF matching it in llama/models or LM
+# find_model PATTERN -> the one GGUF matching it in server/llama/models or LM
 # Studio's model folders (normal install, old cache, Flatpak). Prints
 # why on stderr and fails if there's none, or more than one to choose
 # between. mmproj files are vision adapters, never models.
@@ -54,12 +54,12 @@ find_model() {
     )
 
     if [ "${#found[@]}" -eq 0 ]; then
-        echo "No GGUF matching $pattern in llama/models or LM Studio's model folders." >&2
+        echo "No GGUF matching $pattern in server/llama/models or LM Studio's model folders." >&2
         return 1
     fi
 
     if [ "${#found[@]}" -gt 1 ]; then
-        echo "More than one file matches $pattern - set the path in llama/server.env:" >&2
+        echo "More than one file matches $pattern - set the path in server/llama/server.env:" >&2
         printf '  %s\n' "${found[@]}" >&2
         return 1
     fi
@@ -71,7 +71,7 @@ serving() { curl -fsS --max-time 1 "http://$HOST:$1/health" >/dev/null 2>&1; }
 
 # --- the chat model -------------------------------------------------------
 [ -n "$MODEL" ] || MODEL="$(find_model "$MODEL_MATCH")" || {
-    echo "Set MODEL= in llama/server.env to the file's full path." >&2; exit 1; }
+    echo "Set MODEL= in server/llama/server.env to the file's full path." >&2; exit 1; }
 [ -f "$MODEL" ] || { echo "Model file not found: $MODEL" >&2; exit 1; }
 [ -n "$ALIAS" ] || ALIAS="$(basename "$MODEL" .gguf)"
 
@@ -91,7 +91,7 @@ elif [ -z "$MMPROJ" ]; then
                                -maxdepth 5 -iname "${MMPROJ_MATCH}.gguf" -iname "*mmproj*" 2>/dev/null | sort)
     fi
     if [ "${#mm[@]}" -gt 1 ]; then
-        echo "More than one mmproj found - set MMPROJ= in llama/server.env:" >&2
+        echo "More than one mmproj found - set MMPROJ= in server/llama/server.env:" >&2
         printf '  %s\n' "${mm[@]}" >&2
         exit 1
     fi
@@ -115,7 +115,7 @@ fi
 # and keep the GPU busy. CORS is limited to localhost on top of it.
 if [ ! -s .api_key ]; then
     ( umask 077; head -c 32 /dev/urandom | base64 | tr -d '/+=\n' > .api_key )
-    echo "Made llama/.api_key - Luna picks it up on her next start." >&2
+    echo "Made server/llama/.api_key - Luna picks it up on her next start." >&2
 fi
 chmod 600 .api_key
 mkdir -p slots
@@ -179,7 +179,7 @@ side_server() {
         ${cache_ram[@]:+"${cache_ram[@]}" 0} \
         "$@" > "$log" 2>&1 &
     side_pids+=($!)
-    echo "$label: $(basename "$model" .gguf) on http://$HOST:$port (log: llama/$log)"
+    echo "$label: $(basename "$model" .gguf) on http://$HOST:$port (log: server/llama/$log)"
 }
 
 # One fact is a sentence; the whole input must fit one batch, so the

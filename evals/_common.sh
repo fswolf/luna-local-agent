@@ -19,7 +19,7 @@ PY
 
 llm_up() {
     curl -sf -m 5 "$(llm_url)/models" >/dev/null || {
-        echo "No model at $(llm_url) - start Luna's llama-server first (llama/start.sh), or set EVAL_URL."
+        echo "No model at $(llm_url) - start Luna's llama-server first (server/llama/start.sh), or set EVAL_URL."
         exit 1
     }
 }

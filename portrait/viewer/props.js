@@ -151,6 +151,12 @@ export function createProps({ THREE, GLTFLoader, vrm, fx }) {
   // trail: a ribbon through where its two ends were over the last moment,
   // fading out, drawn additively so swings leave streaks of light.
   const TRAIL = 24, TRAIL_S = 0.28;                  // at most this many samples, none older than TRAIL_S seconds
+  const beat = { bpm: 0, at: 0 };                    // the music's beat (setBeat): the sticks pulse on it
+  function pulse() {
+    if (!beat.bpm || !beat.at) return 0;
+    const p = 60 / beat.bpm, x = (((Date.now() / 1000 - beat.at) / p) % 1 + 1) % 1;
+    return Math.exp(-x * 7);                         // a flash on the beat, fading before the next
+  }
   const LIGHT = 0.025;                               // her MToon shading takes a point light strongly: keep it a tint
   let haloTex = null;
   function halo() {
@@ -162,12 +168,12 @@ export function createProps({ THREE, GLTFLoader, vrm, fx }) {
     return (haloTex = new THREE.CanvasTexture(c));
   }
   function addGlow(one, colour) {
-    const col = new THREE.Color(colour);
+    const col = new THREE.Color(colour), halos = [];
     for (const y of [-0.045, 0, 0.045]) {             // three soft blobs along the stick
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: halo(), color: col, blending: THREE.AdditiveBlending,
         transparent: true, depthWrite: false, opacity: 0.55 }));
       s.position.y = y; s.scale.setScalar(0.07); s.renderOrder = 6;
-      one.obj.add(s);
+      one.obj.add(s); halos.push(s);
     }
     const light = new THREE.PointLight(col, LIGHT, 0.22, 2);
     one.obj.add(light);
@@ -181,7 +187,7 @@ export function createProps({ THREE, GLTFLoader, vrm, fx }) {
       transparent: true, depthWrite: false, side: THREE.DoubleSide }));
     ribbon.frustumCulled = false; ribbon.renderOrder = 6;
     (vrm.scene.parent || vrm.scene).add(ribbon);
-    one.glow = { col, light, ribbon, pts: [], a: new THREE.Vector3(), b: new THREE.Vector3() };
+    one.glow = { col, light, ribbon, halos, pts: [], a: new THREE.Vector3(), b: new THREE.Vector3() };
   }
   function trail(one, on) {
     const g = one.glow;
@@ -338,7 +344,9 @@ export function createProps({ THREE, GLTFLoader, vrm, fx }) {
         one.obj.scale.setScalar(Math.max(0.001, one.scale) * (PROPS[name]?.scale || 1));
         one.obj.visible = one.scale > 0.01;
         if (one.glow) {
-          one.glow.light.intensity = LIGHT * one.scale;
+          const k = pulse();
+          one.glow.light.intensity = LIGHT * one.scale * (1 + 1.5 * k);
+          for (const s of one.glow.halos) { s.material.opacity = 0.45 + 0.4 * k; s.scale.setScalar(0.07 * (1 + 0.35 * k)); }
           trail(one, one.obj.visible && one.scale > 0.5);
         }
         if (!one.target && one.scale <= 0.001) {
@@ -349,6 +357,7 @@ export function createProps({ THREE, GLTFLoader, vrm, fx }) {
       }
     },
     names() { return Object.keys(PROPS); },
+    setBeat(bpm, at) { beat.bpm = +bpm || 0; beat.at = +at || 0; },
     noteText,
   };
 }
