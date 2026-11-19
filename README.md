@@ -104,7 +104,7 @@ stay at bust while the fan shows all of her. An HDMI fan just shows the
 portrait page. Which fans work and what to buy:
 [hologram fans](docs/fans.md).
 
-## Her own window, or the terminal
+## Web UI or the terminal
 
 <img width="1210" alt="Luna's web window: the chat on the left, with her replies in the middle, your messages on the left and her notes in small yellow boxes on the right, beside her portrait reading a book in her room" src="assets/web-ui.jpg" />
 
