@@ -4,6 +4,7 @@ ask_approval() is safe from any thread and blocks until answered.
 
 Part of the ui package (it was one ui.py); see ui/__init__.py.
 """
+import itertools
 import threading
 import time
 
@@ -28,6 +29,9 @@ from .text import vwidth
 # place the model's turn waits on you rather than the other way round -
 # and the reason it can be trusted with a write tool at all.
 # ---------------------------------------------------------------------------
+_numbers = itertools.count(1)    # each question's own number, for the chat page to answer by
+
+
 def ask_approval(title, body, note="", timeout=120, allow_all=None):
     """Show the request and wait. Returns True only on an explicit yes.
 
@@ -50,6 +54,7 @@ def ask_approval(title, body, note="", timeout=120, allow_all=None):
     with _approval_lock:
         answered = threading.Event()
         request = {
+            "id": next(_numbers),
             "title": title,
             "note": note,
             "body": [str(line) for line in body],
@@ -97,15 +102,29 @@ def approving():
     return view.approval is not None
 
 
-def _answer_approval(yes):
+def _answer_approval(yes, which=None):
+    """Answer the open question. which: the number it was shown with (the
+    chat page), so an answer meant for one that already closed can't land on
+    the next."""
     with _lock:
         request = view.approval
 
-    if request is None:
-        return
+    if request is None or (which is not None and request.get("id") != which):
+        return False
 
     request["answer"] = yes if yes == "all" else bool(yes)
     request["event"].set()
+    return True
+
+
+def pending():
+    """The open question for the chat page, or None."""
+    request = view.approval
+    if request is None:
+        return None
+    return {"id": request.get("id"), "title": request["title"], "note": request["note"],
+            "body": list(request["body"]), "allow_all": request.get("allow_all") or "",
+            "left": safe.whole(request["deadline"] - time.monotonic(), 0, lo=0)}
 
 
 def _approval_title():

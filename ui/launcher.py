@@ -17,6 +17,7 @@ from .text import vwidth
 
 # (label, what it is, command, address). The address is filled in from livefeed.
 _FIXED = (
+    ("Chat", "talk to her in the browser: the same conversation as here", "/chat", "chat/"),
     ("Portrait", "her animated portrait in a window of its own (again closes it)", "/portrait", "portrait/"),
     ("Portrait for OBS", "the see-through address for a browser source", "/portrait obs", "portrait/?bg=transparent"),
     ("Pose studio", "the debug viewer: make and try gestures, touches and moods", "open:", "portrait/?debug=1"),

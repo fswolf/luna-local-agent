@@ -45,11 +45,12 @@ ai-voice/
 │   ├── livefeed.py   #   the server and event stream for the monitor and the portrait (python -m web.livefeed)
 │   ├── portrait_config.py, gesture_files.py, gaze.py  # what the portrait loads, gesture files, where she looks
 │   ├── settings_web.py, help_web.py  # /settings/ and /help/
+│   ├── chat_web.py   #   /chat/: the conversation in a browser (chat.html)
 │   ├── dataset_web.py  #   /examples/: examples for her patches (training/dataset.py)
 │   ├── portrait_window.py  # /portrait's window of its own (no address bar)
 │   ├── holofan.py    #   hologram fans (python -m web.holofan sim)
 │   ├── station.py, satellites.py  # relay stations in other rooms, ESPHome satellites
-│   └── live.html, settings.html, station.html  # the pages themselves
+│   └── live.html, chat.html, settings.html, station.html  # the pages themselves
 ├── config/           # every setting, one namespace (config.X); one file per area:
 │   ├── __init__.py   #   the namespace itself, plus /set (current, save_setting) and plugin_settings
 │   ├── base.py       #   where things are read from, and her persona

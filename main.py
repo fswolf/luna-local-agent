@@ -271,18 +271,20 @@ facecheck.warm()
 # -------------------------
 # Turn handling
 # -------------------------
-def _process(text, stop):
+def _process(text, stop, attachment=None):
     """One typed turn. Runs on a worker so the TUI stays responsive
     while the model thinks and Luna speaks. `stop` was opened when you
     pressed Enter (interrupts), so a HOME pressed while it waits for the
-    last reply to finish still cancels it."""
+    last reply to finish still cancels it. attachment: one file sent
+    with it from the chat page (core/attachments.py)."""
     try:
         with interrupts.using(stop):        # closed however this ends
             from senses import people
 
             speaker = people.typed_speaker()     # you, unless the face check sees someone else
-            ui.add_message("user", f"[{speaker}] {text}" if speaker else text)
-            assistant.respond(text, MODEL, source="typed", speaker=speaker)
+            shown = f"{text} {attachment.marker()}" if attachment else text
+            ui.add_message("user", f"[{speaker}] {shown}" if speaker else shown)
+            assistant.respond(text, MODEL, source="typed", speaker=speaker, attachment=attachment)
         ui.set_status("Idle")
         mood.note_turn()
     except Exception as e:
@@ -297,8 +299,13 @@ def _process(text, stop):
 
 
 
-def handle_input(text):
-    """Called on the UI thread - dispatch fast, never block here."""
+def handle_input(text, attachment=None):
+    """Called on the UI thread - dispatch fast, never block here. A file
+    (the chat page) makes it a turn, never a command."""
+    if attachment is not None:
+        threading.Thread(target=_process, args=(text, interrupts.open("typed"), attachment), daemon=True).start()
+        return
+
     if text in ("/quit", "/exit"):
         ui.stop()
         return

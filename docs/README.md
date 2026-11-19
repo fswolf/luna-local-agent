@@ -50,6 +50,10 @@ Everything the README only touches on, one subject per page.
 
 ## See inside her
 
+<img width="1210" alt="The chat page: her replies in bubbles, a tool's line, and a tool asking first with Allow and Deny" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/chat-page.png" />
+
+[Chat](controls.md#chatting-in-the-browser) at 127.0.0.1:8792/chat/: the same conversation as the terminal, in a browser, with a link to every other page.
+
 <img width="1210" alt="The live view: her reply streaming in, each word shaded by how sure she was" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/live-view.png" />
 
 [Live](reasoning.md#watching-live-monitor) at 127.0.0.1:8792: the turn as it happens, newest on top, coloured by confidence.

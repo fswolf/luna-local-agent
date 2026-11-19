@@ -114,6 +114,7 @@ _HELP_SECTIONS = [
         ("/memory", "the memory editor in your browser"),
         "",
         ("/thoughts", "her reasoning, turn by turn, in the browser"),
+        ("/chat", "talk to her in the browser - the same conversation as here"),
         ("/monitor", "watch her think live - stages, tokens, tools, mood"),
         ("/portrait", "her animated portrait in its own window (again closes it)"),
         ("/portrait models", "list the models in portrait/models; /portrait use <n> switches"),

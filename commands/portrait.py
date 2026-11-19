@@ -1,4 +1,4 @@
-"""Her portrait: /monitor, /holo, /outfit, /lights, /portrait and its subcommands.
+"""Her portrait: /chat, /monitor, /holo, /outfit, /lights, /portrait and its subcommands.
 
 Part of the commands package; see commands/__init__.py.
 """
@@ -21,6 +21,15 @@ def handle(text):
 
         portrait_window.quiet_open(livefeed.url())
         ui.add_message("system", f"Live monitor: {livefeed.url()}")
+        return True
+
+    if text == "/chat":
+        if not config.MONITOR_ENABLED:
+            ui.add_message("system", "The chat page is served by the live monitor, which is off - set "
+                           "monitor.enabled to true in config.json and restart.")
+            return True
+        portrait_window.quiet_open(livefeed.url() + "/chat/")
+        ui.add_message("system", f"Chat: {livefeed.url()}/chat/")
         return True
 
     if text in ("/holo", "/holo on", "/holo off"):

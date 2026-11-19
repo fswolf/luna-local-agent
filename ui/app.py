@@ -622,7 +622,8 @@ def run(on_submit, on_hotkey=None):
         import config
 
         config.STARTED_UI[0] = True
-        asyncio.get_running_loop().set_exception_handler(_loop_error)
+        view.loop = asyncio.get_running_loop()
+        view.loop.set_exception_handler(_loop_error)
 
     saved = _stderr_to_file()
     try:
@@ -648,6 +649,31 @@ def submit(text):
         word = text.split()[0] if text.split() else text
         logbook.exception("ui", "%s failed", word[:40])
         add_message("system", f"{word[:40]} failed: {type(e).__name__}: {e} (details: /log)")
+
+
+def submit_soon(text, attachment=None):
+    """submit() from another thread (the chat page): run on the screen's own
+    loop, the same as Enter, so a /command there behaves as typed here.
+    attachment: one file (core/attachments.py), which makes it a turn."""
+    def go():
+        if attachment is None:
+            submit(text)
+        elif view.on_submit:
+            try:
+                view.on_submit(text, attachment=attachment)
+            except Exception as e:
+                from core import logbook
+
+                logbook.exception("ui", "sending a file failed")
+                add_message("system", f"sending that file failed: {type(e).__name__}: {e} (details: /log)")
+    loop = view.loop
+    if loop is not None and view.app is not None:
+        try:
+            loop.call_soon_threadsafe(go)
+            return
+        except RuntimeError:
+            pass        # the loop has closed: shutting down
+    go()
 
 
 def _loop_error(loop, context):

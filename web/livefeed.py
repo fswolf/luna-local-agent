@@ -268,14 +268,27 @@ class _Handler(BaseHTTPRequestHandler):
                 return True
             if not path.startswith(prefix + "/"):
                 continue
+            opts = PAGE_OPTS.get(name, {})
+            cap = opts.get("max_body", 65536)
             body = b""
             if method == "POST":
+                if self._length(cap + 1) > cap:
+                    # cut short it would be a broken form: say so instead (and
+                    # hang up after, since the unread body is still coming)
+                    self.close_connection = True
+                    self._json(413, {"error": "that's too big to send", "code": "too_big"})
+                    return True
                 try:
-                    body = self.rfile.read(self._length(65536))
+                    body = self.rfile.read(self._length(cap))
                 except OSError:
                     body = b""
             try:
-                code, kind, out = handler(method, path[len(prefix):], body)
+                if opts.get("request"):
+                    request = {"query": self.path.split("?", 1)[1] if "?" in self.path else "",
+                               "headers": self.headers}
+                    code, kind, out = handler(method, path[len(prefix):], body, request)
+                else:
+                    code, kind, out = handler(method, path[len(prefix):], body)
             except Exception as e:
                 logbook.exception("monitor", "the %s page failed: %s", name, e)
                 code, kind, out = 500, "text/plain; charset=utf-8", f"the {name} page failed: {e}"
@@ -630,10 +643,14 @@ class _Handler(BaseHTTPRequestHandler):
 # body); path is what follows /<name>. visible() decides whether the
 # switcher links it.
 PAGES = {}
+PAGE_OPTS = {}      # name -> {"max_body": bytes, "request": True}
 
 
-def add_page(name, label, handler, visible=lambda: True):
+def add_page(name, label, handler, visible=lambda: True, max_body=65536, request=False):
+    """request=True: the handler is also given {"query", "headers"} - the
+    query string and the request's headers (a file upload's boundary)."""
     PAGES[name] = (label, handler, visible)
+    PAGE_OPTS[name] = {"max_body": max_body, "request": request}
 
 
 MOUNTS = {"thoughts": ("thought-viewer", "viewer.py", "her thoughts"),
@@ -667,10 +684,12 @@ _SWITCHER_ORDER = ("examples", "settings", "help")
 def with_switcher(html, here):
     """A small pill bottom-right linking the pages this server serves."""
     links = [("portrait/", "portrait"), ("", "live"), ("thoughts/", "thoughts"), ("memory/", "memory")]
+    if "chat" in PAGES:
+        links.insert(0, ("chat/", "chat"))
     extra = []
     for name, (label, _handler, visible) in list(PAGES.items()):
         try:
-            if visible():
+            if name != "chat" and visible():
                 extra.append((name + "/", label))
         except Exception:
             pass
@@ -715,6 +734,13 @@ def start():
         settings_web.register()          # /settings/: every setting, in a browser
     except Exception as e:
         logbook.warn("monitor", "settings page unavailable: %s", e)
+
+    try:
+        from web import chat_web
+
+        chat_web.register()              # /chat/: talk to her in a browser, the same conversation
+    except Exception as e:
+        logbook.warn("monitor", "chat page unavailable: %s", e)
 
     try:
         from web import help_web

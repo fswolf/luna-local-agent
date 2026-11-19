@@ -1,0 +1,233 @@
+"""The browser chat (web/chat_web.py): it mirrors the terminal's conversation,
+sends through the same door as Enter, and answers a tool's question."""
+import http.client
+import json
+import os
+import sys
+import threading
+import time
+import unittest
+from http.server import ThreadingHTTPServer
+from unittest import mock
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import tests.offline  # noqa: F401,E402
+
+import ui  # noqa: E402
+from web import chat_web, livefeed  # noqa: E402
+
+
+class Mirror(unittest.TestCase):
+    """state(): what a page gets, given what it already has."""
+
+    def setUp(self):
+        ui.clear()
+
+    def tearDown(self):
+        ui.end_message()
+        ui.clear()
+
+    def test_a_new_page_gets_the_conversation(self):
+        ui.add_message("user", "hi")
+        ui.add_message("luna", "hey you")
+        s = chat_web.state(None, 0, None)
+        self.assertTrue(s["reset"])
+        self.assertEqual(s["from"], 0)
+        self.assertEqual(s["msgs"], [["user", "hi"], ["luna", "hey you"]])
+
+    def test_a_long_one_starts_near_the_end(self):
+        for i in range(chat_web.KEEP + 20):
+            ui.add_message("system", str(i))
+        s = chat_web.state(None, 0, None)
+        self.assertEqual(s["from"], 20)
+        self.assertEqual(len(s["msgs"]), chat_web.KEEP)
+
+    def test_a_streaming_reply_and_a_tool_line_above_it(self):
+        ui.add_message("user", "look it up")
+        ui.begin_message("luna")
+        ui.extend_message("Let me")
+        first = chat_web.state(None, 0, None)
+        have = first["from"] + len(first["msgs"])
+        ui.add_message("system", "tool: search")      # lands above the open reply
+        ui.extend_message(" check.")
+        s = chat_web.state(first["v"], have, first["e"], wait=0)
+        self.assertFalse(s["reset"])
+        whole = first["msgs"][:s["from"] - first["from"]] + s["msgs"]
+        self.assertEqual(whole, [["user", "look it up"], ["system", "tool: search"], ["luna", "Let me check."]])
+
+    def test_clear_starts_the_page_over(self):
+        ui.add_message("user", "one")
+        s = chat_web.state(None, 0, None)
+        ui.clear()
+        ui.add_message("user", "two")
+        s = chat_web.state(s["v"], 1, s["e"], wait=0)
+        self.assertTrue(s["reset"])
+        self.assertEqual(s["msgs"], [["user", "two"]])
+
+    def test_an_empty_reply_dropped_is_not_a_reset(self):
+        ui.add_message("user", "hi")
+        ui.begin_message("luna")
+        s = chat_web.state(None, 0, None)
+        ui.end_message()                  # nothing came: the empty bubble goes
+        s = chat_web.state(s["v"], 2, s["e"], wait=0)
+        self.assertFalse(s["reset"])
+        self.assertEqual(s["from"] + len(s["msgs"]), 1)
+
+    def test_it_waits_for_a_change_and_wakes_on_one(self):
+        s = chat_web.state(None, 0, None)
+        threading.Timer(0.2, ui.add_message, ("user", "now")).start()
+        started = time.monotonic()
+        later = chat_web.state(s["v"], 0, s["e"], wait=5)
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertEqual(later["msgs"][-1], ["user", "now"])
+
+    def test_nothing_new_returns_after_the_wait(self):
+        s = chat_web.state(None, 0, None)
+        started = time.monotonic()
+        chat_web.state(s["v"], 0, s["e"], wait=0.2)
+        self.assertGreaterEqual(time.monotonic() - started, 0.15)
+
+
+class Server(unittest.TestCase):
+    """The page's requests, through the live monitor."""
+
+    def setUp(self):
+        chat_web.register()
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), livefeed._Handler)
+        self.port = self.server.server_address[1]
+        self.patch = mock.patch.object(livefeed, "port", return_value=self.port)
+        self.patch.start()
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.sent = []
+        self.submit = mock.patch.object(ui, "submit_soon", lambda text, att=None: self.sent.append((text, att)))
+        self.submit.start()
+        self.handler = mock.patch.object(ui.view, "on_submit", lambda *a, **k: None)
+        self.handler.start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.patch.stop()
+        self.submit.stop()
+        self.handler.stop()
+
+    def ask(self, method, path, body=b"", kind="application/json", origin=None):
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        headers = {"Host": f"127.0.0.1:{self.port}"}
+        if body or method == "POST":
+            headers["Content-Type"] = kind
+        if origin:
+            headers["Origin"] = origin
+        c.request(method, path, body=body, headers=headers)
+        r = c.getresponse()
+        out = r.status, r.read()
+        c.close()
+        return out
+
+    def test_the_page_and_its_nav(self):
+        code, body = self.ask("GET", "/chat/")
+        self.assertEqual(code, 200)
+        page = body.decode()
+        self.assertNotIn("__BOOT__", page)
+        boot = json.loads(page.split("const BOOT = ", 1)[1].split(";\n", 1)[0])
+        labels = [label for label, _href, _cmd in boot["nav"]]
+        self.assertIn("Settings", labels)
+        self.assertIn("Memory", labels)
+        self.assertNotIn("Chat", labels)
+        self.assertEqual([c for label, _h, c in boot["nav"] if label == "Portrait"], ["/portrait"])
+
+    def test_her_logo(self):
+        code, body = self.ask("GET", "/chat/logo.png")
+        self.assertEqual(code, 200)
+        self.assertTrue(body.startswith(b"\x89PNG"))
+
+    def test_typed_words_go_in_as_typed(self):
+        code, _ = self.ask("POST", "/chat/say", json.dumps({"text": "  /help "}).encode())
+        self.assertEqual(code, 200)
+        self.assertEqual(self.sent, [("/help", None)])
+
+    def test_empty_long_and_foreign(self):
+        self.assertEqual(self.ask("POST", "/chat/say", b'{"text":"  "}')[0], 400)
+        self.assertEqual(self.ask("POST", "/chat/say", json.dumps({"text": "x" * (chat_web.MAX_TYPED + 1)}).encode())[0], 413)
+        self.assertEqual(self.ask("POST", "/chat/say", b"text=hi", kind="application/x-www-form-urlencoded")[0], 415)
+        self.assertEqual(self.ask("POST", "/chat/say", b'{"text":"hi"}', origin="http://evil.example")[0], 403)
+        self.assertEqual(self.sent, [])
+
+    def test_a_file_with_the_words(self):
+        boundary = "XyZ"
+        form = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"text\"\r\n\r\nread this\r\n"
+                f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"notes.txt\"\r\n"
+                f"Content-Type: text/plain\r\n\r\nthe cat is called Biscuit\r\n--{boundary}--\r\n").encode()
+        code, body = self.ask("POST", "/chat/say", form, kind=f"multipart/form-data; boundary={boundary}")
+        self.assertEqual(code, 200, body)
+        text, attachment = self.sent[0]
+        self.assertEqual(text, "read this")
+        self.assertEqual(attachment.name, "notes.txt")
+        self.assertIn("Biscuit", attachment.text)
+
+    def test_too_big_is_said_not_cut(self):
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        c.putrequest("POST", "/chat/say", skip_host=True)
+        c.putheader("Host", f"127.0.0.1:{self.port}")
+        c.putheader("Content-Type", "multipart/form-data; boundary=x")
+        c.putheader("Content-Length", str(chat_web.MAX_BODY + 1))
+        c.endheaders()
+        self.assertEqual(c.getresponse().status, 413)
+        c.close()
+
+    def test_answering_a_tool_question(self):
+        got = {}
+        with mock.patch.object(ui.view, "app", object()):
+            t = threading.Thread(target=lambda: got.setdefault("a", ui.ask_approval("Write a file", ["notes.md"], timeout=10)))
+            t.start()
+            for _ in range(100):
+                if ui.pending_approval():
+                    break
+                time.sleep(0.02)
+            q = ui.pending_approval()
+            self.assertEqual(q["title"], "Write a file")
+            self.assertEqual(self.ask("POST", "/chat/answer", json.dumps({"id": q["id"] + 1, "answer": "yes"}).encode())[0], 409)
+            self.assertEqual(self.ask("POST", "/chat/answer", json.dumps({"id": q["id"], "answer": "maybe"}).encode())[0], 400)
+            self.assertEqual(self.ask("POST", "/chat/answer", json.dumps({"id": q["id"], "answer": "yes"}).encode())[0], 200)
+            t.join(5)
+        self.assertIs(got["a"], True)
+        self.assertIsNone(ui.pending_approval())
+
+    def test_stop_is_home(self):
+        from core import interrupts
+
+        with mock.patch.object(interrupts, "home") as home:
+            self.assertEqual(self.ask("POST", "/chat/stop")[0], 200)
+        home.assert_called_once_with()
+
+
+class Command(unittest.TestCase):
+    def test_slash_chat_opens_the_page(self):
+        import config
+        from commands import portrait
+        from web import portrait_window
+
+        with mock.patch.object(config, "MONITOR_ENABLED", True), \
+                mock.patch.object(portrait_window, "quiet_open") as opened, \
+                mock.patch.object(ui, "add_message"):
+            self.assertTrue(portrait.handle("/chat"))
+        self.assertTrue(opened.call_args[0][0].endswith("/chat/"))
+        with mock.patch.object(config, "MONITOR_ENABLED", False), \
+                mock.patch.object(portrait_window, "quiet_open") as opened, \
+                mock.patch.object(ui, "add_message") as said:
+            self.assertTrue(portrait.handle("/chat"))
+        opened.assert_not_called()
+        self.assertIn("monitor.enabled", said.call_args[0][1])
+
+
+class Switcher(unittest.TestCase):
+    def test_chat_comes_first_once(self):
+        chat_web.register()
+        nav = livefeed.with_switcher("<body></body>", "live")
+        self.assertEqual(nav.count('href="/chat/"'), 1)
+        self.assertLess(nav.index("/chat/"), nav.index("/portrait/"))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -73,7 +73,13 @@ view = SimpleNamespace(
     # full of log lines and error messages than scrolling does, especially
     # when PgUp/PgDn/End already scroll.
     mouse=False,
+    loop=None,            # the screen's asyncio loop once it runs (submit_soon)
+    version=0,            # bumped on every change: the chat page waits on it
+    epoch=0,              # bumped by /clear: the chat page starts over
 )
+
+# Woken on every change, for the chat page (web/chat_web.py) to wait on.
+changes = threading.Condition()
 
 _approval_lock = threading.Lock()  # one question at a time
 
@@ -85,6 +91,9 @@ _events = {"conv_wheel": 0, "other_mouse": 0,
 
 def _refresh():
     """Repaint. Safe from any thread; a no-op before the app runs."""
+    with changes:
+        view.version += 1
+        changes.notify_all()
     if view.app is not None:
         try:
             view.app.invalidate()

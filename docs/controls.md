@@ -21,6 +21,26 @@ opens it. `/help` opens the help page straight away.
 
 <img width="1210" alt="The pages pane: her portrait, the OBS address, settings, the live monitor, thoughts, memory and help, each opening in your browser" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-pages.png" />
 
+## Chatting in the browser
+
+With Luna running, type /chat (or pick Chat in the Tab pane), or open
+`http://127.0.0.1:8792/chat/` yourself. It's the same conversation as the terminal, not a second one: what
+you type in either shows up in both, her reply streams into both, and the page
+starts with the conversation as it stands.
+
+- Enter sends, Shift+Enter starts a new line. A /command works here too.
+- While she's answering, the send button turns into Stop (the same as HOME).
+- The paperclip sends one picture (jpg, png, webp, up to 10 MB) or one text,
+  Markdown or PDF file with your message. Pasting a picture or dropping a file
+  on the page works too. A picture needs a model that can see.
+- When a tool asks first (writing a file, running a command), the question
+  shows in the page with Allow and Deny. Answering it in either place answers
+  it in both.
+- The row along the top opens every other page. Portrait opens or closes her
+  window, the same as /portrait.
+
+Like her other pages it only answers on this computer (127.0.0.1).
+
 ## Selecting text
 
 Mouse capture is **off** by default, so you can select and copy from the

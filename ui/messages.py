@@ -144,6 +144,7 @@ def clear():
 
     with _lock:
         conversation.clear()
+        view.epoch += 1
         view.streaming = None
         view.scrollback = 0
     _refresh()

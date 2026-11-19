@@ -1,0 +1,338 @@
+<!doctype html><html lang=en><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<meta name=theme-color content="#120d1c"><title>Luna · chat</title><style>
+:root{--bg:#120d1c;--panel:#1a1328;--line:#3a2d55;--text:#ece6f7;--dim:#a49bc0;--accent:#ff87d7;--you:#3a2357;--her:#1f1830;
+--ok:#7be0a8;--warn:#ffcf6b}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+#luna-nav{display:none!important}
+header{flex:none;border-bottom:1px solid var(--line);background:var(--panel)}
+.top{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px;position:relative}
+.top b{color:var(--accent);font-size:19px}
+#menu{flex:none;width:34px;height:34px;border-radius:50%;border:0;padding:0;cursor:pointer;background:#fff;
+box-shadow:0 0 0 2px transparent;transition:box-shadow .15s}
+#menu img{width:100%;height:100%;display:block;border-radius:50%}
+#menu:hover,#menu[aria-expanded=true]{box-shadow:0 0 0 2px var(--accent)}
+#pages{position:absolute;top:50px;left:16px;z-index:10;min-width:250px;max-height:calc(100dvh - 80px);overflow-y:auto;max-width:min(420px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);
+border-radius:14px;box-shadow:0 12px 32px #0009;padding:6px 0;display:none}
+#pages.on{display:block}
+#pages .head{padding:8px 18px 10px;border-bottom:1px solid var(--line);margin-bottom:6px}
+#pages .head b{display:block;font-size:18px}
+#pages a,#pages button{display:flex;align-items:center;gap:14px;width:100%;padding:10px 18px;color:var(--text);text-decoration:none;
+font:15px system-ui,sans-serif;background:none;border:0;cursor:pointer;text-align:left}
+#pages a:hover,#pages button:hover{background:#2a2040}
+#pages svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--dim);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#pages .on{color:var(--accent)}#pages .on svg{stroke:var(--accent)}
+#status{color:var(--text);font-size:12.5px;background:#2a2040;border:1px solid var(--line);border-radius:999px;padding:2px 10px;
+white-space:nowrap}#status:empty{display:none}
+#live{position:absolute;left:40px;top:33px;width:11px;height:11px;border-radius:50%;background:var(--ok);border:2px solid var(--panel);
+pointer-events:none}
+.away #live{background:#ff8fa3}
+#moodbox{margin-left:auto;color:var(--dim);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
+#moodbox b{color:var(--accent);font-weight:500;font-size:13px}
+#pages table{border-collapse:collapse;margin-top:6px;font-size:12.5px;width:100%}
+#pages td{padding:1px 0;vertical-align:top}#pages td:first-child{color:var(--dim);padding-right:12px;white-space:nowrap}
+#pages td:last-child{overflow-wrap:anywhere;max-width:280px}
+#log{flex:1;overflow-y:auto;overscroll-behavior:contain}
+#list{max-width:860px;margin:0 auto;padding:16px 16px 8px;display:flex;flex-direction:column;gap:8px}
+.hint{color:var(--dim);text-align:center;margin:30vh 10px 0}
+.msg{max-width:78%;padding:9px 13px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}
+.you{align-self:flex-start;background:var(--you);border-bottom-left-radius:5px}
+.her{align-self:center;background:var(--her);border:1px solid var(--line)}
+.her em{color:#d9b8ff}
+.guest{align-self:flex-start;background:#16202a;border:1px solid #2b4050;border-bottom-left-radius:5px}
+.who{display:block;font-size:12px;color:var(--dim);margin-bottom:2px}
+.sys{align-self:flex-end;max-width:62%;color:#e9d9a6;background:#272012;border:1px solid #5a4a22;border-radius:12px;
+border-bottom-right-radius:4px;padding:6px 11px;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+white-space:pre-wrap;overflow-wrap:anywhere;cursor:default}
+.sys span{display:block}
+.sys.long{cursor:pointer}.sys.long span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.sys.open{cursor:pointer}
+.typing{align-self:center;background:var(--her);border:1px solid var(--line);border-radius:16px;
+padding:12px 15px;display:none;gap:5px}
+.typing.on{display:flex}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--dim);animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.ask{align-self:stretch;background:var(--panel);border:1px solid var(--warn);border-radius:14px;padding:12px 14px}
+.ask b{color:var(--warn)}
+.ask .note{color:var(--dim);font-size:14px}
+.ask pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:40vh;overflow:auto;background:#0e0a16;border:1px solid var(--line);
+border-radius:8px;padding:8px;font-size:12.5px;color:var(--dim);margin:8px 0}
+.ask .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ask .left{margin-left:auto;color:var(--dim);font-size:13px}
+.btn{border:0;border-radius:12px;padding:8px 16px;font:600 14px system-ui,sans-serif;cursor:pointer;background:var(--accent);color:#14081c}
+.btn.no{background:#2a2040;color:var(--text);border:1px solid var(--line)}
+footer{flex:none;border-top:1px solid var(--line);background:var(--panel)}
+#bar{max-width:860px;margin:0 auto;padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
+#file{display:none}
+.round{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:#0e0a16;color:var(--dim);
+font-size:19px;cursor:pointer;display:grid;place-items:center;padding:0}
+.round:hover{color:var(--text);border-color:var(--accent)}
+#send{background:var(--accent);color:#14081c;border:0}
+#send.stop{background:#2a2040;color:var(--text);border:1px solid #ff5fb0}
+#send:disabled{opacity:.4;cursor:default}
+.box{flex:1;min-width:0;display:flex;flex-direction:column;background:#0e0a16;border:1px solid var(--line);border-radius:22px}
+.box:focus-within{border-color:var(--accent)}
+#text{width:100%;font:inherit;color:var(--text);background:none;border:0;resize:none;padding:10px 16px;max-height:40vh;outline:none}
+#chip{display:none;align-items:center;gap:8px;margin:8px 10px 0;padding:4px 6px 4px 10px;background:var(--panel);border:1px solid var(--line);
+border-radius:12px;font-size:13px;color:var(--dim);align-self:flex-start;max-width:calc(100% - 20px)}
+#chip.on{display:flex}
+#chip img{height:42px;border-radius:6px}
+#chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#chip button{background:none;border:0;color:var(--dim);cursor:pointer;font-size:16px}
+#err{max-width:860px;margin:0 auto;padding:0 16px;color:#ff8fa3;font-size:13px;min-height:0}
+#down{position:fixed;right:20px;bottom:86px;display:none;width:38px;height:38px}
+body.drag #log{outline:2px dashed var(--accent);outline-offset:-8px}
+</style></head><body>
+<header>
+  <div class=top>
+    <button id=menu title="her pages" aria-haspopup=true aria-expanded=false><img src="logo.png" alt="Luna"></button>
+    <i id=live title="connected"></i><b id=name>Luna</b><span id=status></span>
+    <span id=moodbox title="her mood right now">mood <b id=mood></b></span>
+    <div id=pages role=menu><div class=head><b id=menuname>Luna</b><table id=rows></table></div></div>
+  </div>
+</header>
+<div id=log><div id=list><div class=hint>Say something. This is the same conversation as the terminal.</div>
+<div class=typing id=typing><i></i><i></i><i></i></div></div></div>
+<button class="round" id=down title="newest">↓</button>
+<footer>
+  <div id=err></div>
+  <div id=bar>
+    <button class=round id=clip title="attach a picture or a file">📎</button>
+    <input type=file id=file>
+    <div class=box>
+      <div id=chip><span id=chipname></span><button id=unclip title="remove">×</button></div>
+      <textarea id=text rows=1 placeholder="Say something" autocomplete=off></textarea>
+    </div>
+    <button class=round id=send title="send (Enter)">➤</button>
+  </div>
+</footer>
+<script>
+const BOOT = __BOOT__;
+const $ = s => document.querySelector(s);
+const log = $('#log'), list = $('#list'), typing = $('#typing'), text = $('#text'), send = $('#send'), down = $('#down');
+let offline = false, base = 0, msgs = [], els = [], v = null, e = null, busy = false, streaming = null, attached = null, askId = null, askEl = null;
+
+// --- her pages, behind her logo, in the launcher's order --------------------
+const ICONS = {
+  Chat: '<path d="M4 5h16v11H9l-5 4z"/>',
+  Portrait: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+  'Pose studio': '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>',
+  Settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  'Live monitor': '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+  Thoughts: '<path d="M7 16a4 4 0 0 1-.5-8A5 5 0 0 1 16 6.5a4 4 0 0 1 1 9.5z"/><circle cx="8" cy="20" r="1.2"/>',
+  Memory: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+  Help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/>',
+};
+const other = '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>';
+const pages = $('#pages'), menu = $('#menu');
+function item(label, el) {
+  el.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[label] || other}</svg>`;
+  el.append(label); el.setAttribute('role', 'menuitem');
+  pages.appendChild(el);
+  return el;
+}
+item('Chat', Object.assign(document.createElement('a'), {href: '/chat/', className: 'on'}));
+for (const [label, href, command] of BOOT.nav) {
+  if (command) {        // the portrait opens in its own window, the same as /portrait
+    const b = item(label, document.createElement('button'));
+    b.title = 'open or close her portrait window';
+    b.onclick = () => { post('say', {text: command}); open_(false); };
+  } else item(label, Object.assign(document.createElement('a'), {href}));
+}
+function open_(on) { pages.classList.toggle('on', on); menu.setAttribute('aria-expanded', on); }
+menu.onclick = ev => { ev.stopPropagation(); open_(!pages.classList.contains('on')); };
+addEventListener('click', ev => { if (!pages.contains(ev.target)) open_(false); });
+addEventListener('keydown', ev => { if (ev.key === 'Escape') open_(false); });
+
+// --- drawing --------------------------------------------------------------
+const atBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+function show(fn) {
+  const stick = atBottom();
+  fn();
+  if (stick) log.scrollTop = log.scrollHeight;
+  down.style.display = atBottom() ? 'none' : 'block';
+}
+log.addEventListener('scroll', () => { down.style.display = atBottom() ? 'none' : 'block'; });
+down.onclick = () => { log.scrollTop = log.scrollHeight; };
+
+function esc(s) { return s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
+// her *actions* in italics; everything else exactly as written
+function styled(s) { return esc(s).replace(/(^|[\s(])\*([^*\n]{1,200})\*(?=$|[\s.,!?;:)])/g, '$1<em>*$2*</em>'); }
+
+function draw(el, speaker, words) {
+  el.onclick = null;
+  if (speaker === 'user') {
+    el.className = 'msg you'; el.textContent = words;
+  } else if (speaker === 'system') {
+    el.className = 'sys'; el.replaceChildren(Object.assign(document.createElement('span'), {textContent: words}));
+    if (words.split('\n').length > 2 || words.length > 240) el.classList.add('long');
+    el.onclick = () => { if (getSelection().toString()) return; if (el.classList.contains('long') || el.classList.contains('open')) { el.classList.toggle('open'); el.classList.toggle('long'); } };
+  } else if (speaker.startsWith('chat:')) {
+    el.className = 'msg guest'; el.innerHTML = `<span class=who>${esc(speaker.slice(5))}</span>${esc(words)}`;
+  } else {
+    el.className = 'msg her'; el.innerHTML = styled(words);
+  }
+}
+
+function apply(s) {
+  if (s.reset || s.from < base) {
+    for (const el of els) el.remove();
+    els = []; msgs = []; base = s.from;
+  }
+  const keep = Math.max(0, s.from - base);
+  show(() => {
+    // redraw only what changed: a tool line you opened stays open, and text
+    // you're selecting in an earlier message isn't swapped out under you
+    s.msgs.forEach(([speaker, words], i) => {
+      const at = keep + i, old = msgs[at];
+      if (old && old[0] === speaker && old[1] === words) return;
+      let el = els[at];
+      if (!el) { el = document.createElement('div'); list.insertBefore(el, typing); els[at] = el; }
+      draw(el, speaker, words);
+      msgs[at] = [speaker, words];
+    });
+    for (const el of els.splice(keep + s.msgs.length)) el.remove();
+    msgs.length = els.length;
+    const hint = list.querySelector('.hint');
+    if (hint && msgs.length) hint.remove();
+    busy = s.busy; streaming = s.streaming;
+    // dots from your message until her first words (not while she's speaking a finished reply)
+    const last = [...msgs].reverse().find(([who, words]) => who !== 'system' && words);
+    typing.classList.toggle('on', busy && !s.ask && !!last && last[0] === 'user');
+    asking(s.ask);
+  });
+  $('#name').textContent = $('#menuname').textContent = s.name || 'Luna';
+  document.title = (s.name || 'Luna') + ' · chat';
+  $('#status').textContent = s.status && s.status !== 'Idle' ? s.status : '';
+  $('#mood').textContent = s.mood || '';
+  $('#moodbox').style.visibility = s.mood ? '' : 'hidden';
+  $('#rows').replaceChildren(...(s.rows || []).map(([k, val]) => {
+    const tr = document.createElement('tr');
+    tr.append(Object.assign(document.createElement('td'), {textContent: k}), Object.assign(document.createElement('td'), {textContent: val}));
+    return tr;
+  }));
+  buttons();
+}
+
+// --- a tool asking first --------------------------------------------------
+function asking(q) {
+  if (!q) { if (askEl) askEl.remove(); askEl = null; askId = null; return; }
+  if (askId !== q.id) {
+    if (askEl) askEl.remove();
+    askId = q.id;
+    askEl = document.createElement('div'); askEl.className = 'ask';
+    askEl.innerHTML = `<b></b><div class=note></div><pre></pre><div class=row>
+      <button class=btn data-a=yes>Allow</button>${q.allow_all ? '<button class="btn no" data-a=all></button>' : ''}
+      <button class="btn no" data-a=no>Deny</button><span class=left></span></div>`;
+    askEl.querySelector('b').textContent = q.title;
+    askEl.querySelector('.note').textContent = q.note || '';
+    askEl.querySelector('pre').textContent = q.body.join('\n');
+    if (!q.body.length) askEl.querySelector('pre').remove();
+    const all = askEl.querySelector('[data-a=all]');
+    if (all) all.textContent = 'Allow ' + q.allow_all;
+    for (const b of askEl.querySelectorAll('[data-a]'))
+      b.onclick = () => { for (const x of askEl.querySelectorAll('button')) x.disabled = true; post('answer', {id: q.id, answer: b.dataset.a}); };
+    list.appendChild(askEl);
+    log.scrollTop = log.scrollHeight;
+  }
+  askEl.querySelector('.left').textContent = q.left + 's';
+}
+
+// --- keeping up -----------------------------------------------------------
+async function follow() {
+  for (;;) {
+    try {
+      const q = v === null ? `n=${base + msgs.length}` : `v=${v}&n=${base + msgs.length}&e=${e}`;
+      const r = await fetch('state?' + q, {cache: 'no-store'});
+      if (!r.ok) throw new Error(r.status);
+      const s = await r.json();
+      v = s.v; e = s.e;
+      apply(s);
+      if (offline) { offline = false; $('#err').textContent = ''; }
+      document.body.classList.remove('away'); $('#live').title = 'connected';
+    } catch (err) {
+      offline = true; document.body.classList.add('away'); $('#live').title = "can't reach her"; $('#err').textContent = "can't reach Luna - is she running?";
+      await new Promise(res => setTimeout(res, 2000));
+    }
+  }
+}
+
+// --- sending --------------------------------------------------------------
+async function post(path, body, form) {
+  try {
+    const r = await fetch(path, form ? {method: 'POST', body: form}
+      : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})});
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) { $('#err').textContent = out.error || ('error ' + r.status); return false; }
+    $('#err').textContent = '';
+    return true;
+  } catch (err) { $('#err').textContent = "can't reach Luna - is she running?"; return false; }
+}
+
+function buttons() {
+  const typed = text.value.trim() || attached;
+  const stopping = busy && !typed;
+  send.classList.toggle('stop', stopping);
+  send.textContent = stopping ? '■' : '➤';
+  send.title = stopping ? 'stop her' : 'send (Enter)';
+}
+
+async function go() {
+  if (send.classList.contains('stop')) { post('stop'); return; }
+  const words = text.value.trim();
+  if (!words && !attached) return;
+  if (words.length > BOOT.max) { $('#err').textContent = `keep it under ${BOOT.max} characters`; return; }
+  send.disabled = true;
+  let ok;
+  if (attached) {
+    const form = new FormData(); form.append('text', words); form.append('file', attached, attached.name || 'pasted.png');
+    ok = await post('say', null, form);
+  } else ok = await post('say', {text: words});
+  send.disabled = false;
+  if (ok) { text.value = ''; unattach(); grow(); log.scrollTop = log.scrollHeight; }
+  buttons(); text.focus();
+}
+send.onclick = go;
+text.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); go(); }
+});
+function grow() { text.style.height = 'auto'; text.style.height = Math.min(text.scrollHeight, innerHeight * .4) + 'px'; }
+text.addEventListener('input', () => { grow(); buttons(); });
+
+// --- one file a message ---------------------------------------------------
+const files = BOOT.files || {}, images = (files.images || {}).types || [], docs = (files.documents || {}).types || [];
+$('#file').accept = [...images, ...docs, '.md', '.txt'].join(',');
+$('#clip').onclick = () => $('#file').click();
+$('#file').onchange = () => { if ($('#file').files[0]) attach($('#file').files[0]); $('#file').value = ''; };
+$('#unclip').onclick = unattach;
+function attach(f) {
+  const img = images.includes(f.type), cap = img ? (files.images || {}).max_bytes : (files.documents || {}).max_bytes;
+  if (img && (files.images || {}).can_see === false) { $('#err').textContent = "her model can't see pictures right now"; return; }
+  if (cap && f.size > cap) { $('#err').textContent = `that's too big (up to ${Math.round(cap / 1048576)} MB)`; return; }
+  attached = f;
+  const chip = $('#chip'); chip.querySelector('img')?.remove();
+  if (img) { const i = document.createElement('img'); i.src = URL.createObjectURL(f); chip.prepend(i); }
+  $('#chipname').textContent = f.name || 'pasted picture';
+  chip.classList.add('on'); $('#err').textContent = ''; buttons(); text.focus();
+}
+function unattach() { attached = null; $('#chip').classList.remove('on'); $('#chip').querySelector('img')?.remove(); buttons(); }
+text.addEventListener('paste', ev => {
+  const f = [...(ev.clipboardData?.files || [])][0];
+  if (f) { ev.preventDefault(); attach(f); }
+});
+let drags = 0;
+addEventListener('dragenter', ev => { if (ev.dataTransfer?.types?.includes('Files')) { drags++; document.body.classList.add('drag'); } });
+addEventListener('dragleave', () => { if (--drags <= 0) { drags = 0; document.body.classList.remove('drag'); } });
+addEventListener('dragover', ev => ev.preventDefault());
+addEventListener('drop', ev => {
+  ev.preventDefault(); drags = 0; document.body.classList.remove('drag');
+  const f = ev.dataTransfer?.files?.[0]; if (f) attach(f);
+});
+
+follow();
+text.focus();
+</script>
+</body></html>
