@@ -12,18 +12,19 @@
 | Esc | Close a pane or popup and go back to the conversation; in the conversation it does nothing |
 | Ctrl+Q | Quit (Ctrl+C too) |
 
-**Pages** (Tab once) opens her pages in your browser: the portrait, the
-OBS address, the pose studio (the debug viewer, for making and trying
+**Pages** (Tab once) opens her pages: the chat, the portrait, the OBS
+address, the pose studio (the debug viewer, for making and trying
 gestures), settings, the live monitor, her thoughts, her memory, the
 help (every command and key, searchable) and any page a plugin adds, like
-the chess board. Up/down or the wheel picks one; Enter, space or a click
+the chess board. The chat, the portrait, the pose studio and the live
+monitor open in windows of their own; the rest in your browser. Up/down or the wheel picks one; Enter, space or a click
 opens it. `/help` opens the help page straight away.
 
 <img width="1210" alt="The pages pane: her portrait, the OBS address, settings, the live monitor, thoughts, memory and help, each opening in your browser" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/ui-pages.png" />
 
 ## Chatting in the browser
 
-<img width="1210" alt="Luna's chat window with her menu open: Chat, Portrait, Pose studio, Settings, Live monitor, Thoughts, Memory, Help and Examples, beside her portrait reading in her room" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/web-ui-menu.jpg" />
+<img width="1210" alt="Luna's chat window with her menu open beside her portrait reading in her room" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/web-ui-menu.jpg" />
 
 With Luna running, type /chat (or pick Chat in the Tab pane): it opens in a
 window of its own, like her portrait. Or open `http://127.0.0.1:8792/chat/`
@@ -39,15 +40,28 @@ starts with the conversation as it stands.
 - When a tool asks first (writing a file, running a command), the question
   shows in the page with Allow and Deny. Answering it in either place answers
   it in both.
-- The row along the top opens every other page. Portrait opens or closes her
-  window, the same as /portrait.
+- Your messages are on the left, hers in the middle, and her own notes (a
+  tool she ran, a vote, a summary of last time) in small yellow boxes on the
+  right; click a long one to open it.
+- Her header is the same on every one of her pages. Her logo opens the menu:
+  Chat, Portrait, Pose studio and Live monitor (the last three in windows of
+  their own, the same as /portrait, /pose and /monitor), then Settings,
+  Thoughts, Memory, Examples and any plugin's page, Help, and Exit (click it
+  twice: it quits her, the same as /quit). Her name and mood sit beside the
+  logo, what she's doing is in the middle (on another page it links back to
+  the chat, handy when a tool is waiting for you), and Online, top right,
+  opens what she's running on: status, mood, voice, memory, speech and
+  model. It turns red and says Offline when the page can't reach her.
+- Alt+Left goes back, as in any browser.
 
 Like her other pages it only answers on this computer (127.0.0.1).
 
 To use only this page, with no terminal screen at all, start her with
-`./start.sh --web`: the page opens in a window of its own, without an
-address bar, the terminal can close, and closing the window quits her ([install](install.md) has the
-rest).
+`./start_web.sh` (`start_web.cmd` on Windows; the same as `./start.sh --web`):
+the page opens in a window of its own, without an address bar, the terminal
+can close, and closing the window quits her ([install](install.md) has the
+rest). Plain `./start.sh` is the terminal, and both stay: the terminal is the
+one for a server or an SSH session.
 
 ## Selecting text
 
@@ -125,8 +139,11 @@ Slash commands:
 | `/discord approval ...` | `auto`, `discord` or `desk`: who approves Discord's commands and file changes |
 | `/cron` | Scheduled jobs, and when each last ran |
 | `/mcp` | MCP servers: connected or not, and their tools |
+| `/chat` | Her chat page in a window of its own: the same conversation as here |
 | `/portrait` | Her animated portrait; `/portrait obs` for an OBS source |
-| `/thoughts`, `/memory`, `/monitor` | The browser pages: her reasoning, her memory, the live view |
+| `/pose` | The pose studio in a window of its own |
+| `/monitor` | The live view in a window of its own |
+| `/thoughts`, `/memory` | The browser pages: her reasoning, her memory |
 | `/help` | Points at Tab, and says which mode you're in |
 | `/keys` | Hotkey + socket diagnostics |
 | `/clear` | Wipe the conversation and saved history |

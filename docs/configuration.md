@@ -124,6 +124,11 @@ so a small model isn't crowded and a big one isn't held back:
 | Medium model | Around 24B, or a small model with a 32k window |
 | Large model | 70B and up with a 64k+ window |
 
+A preset shows **in use** while every value it sets still holds, whether you
+picked it or your settings just match it; when none in a row does, that row
+shows **Custom**, with a button to the Changed tab. The Model size line says
+how big a window your model server reports and which size fits it.
+
 They set the history kept word for word, how many facts, lessons and
 past-conversation notes go in a prompt, how many tool groups go along
 each turn (Large sends every tool), how many gestures she's offered, and

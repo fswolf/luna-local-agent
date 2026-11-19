@@ -117,8 +117,8 @@ on Windows yet.)
 it out of git removes the old copy - `update.sh` and `update.cmd` put
 yours straight back from the backup they just made.
 
-**Without the terminal:** `./start.sh --web` (`start.cmd --web` on Windows)
-starts her with no terminal screen. Her [chat page](controls.md#chatting-in-the-browser)
+**Without the terminal:** `./start_web.sh` (`start_web.cmd` on Windows), the
+same as `./start.sh --web`, starts her with no terminal screen. Her [chat page](controls.md#chatting-in-the-browser)
 opens in a window of its own with no address bar, the way her portrait
 does, and everything happens there: talking, /commands, a tool asking
 first. She runs on her own, so the terminal you started her from can

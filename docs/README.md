@@ -52,7 +52,7 @@ Everything the README only touches on, one subject per page.
 
 <img width="1210" alt="Luna's web window: the chat on the left, with her replies in the middle, your messages on the left and her notes in small yellow boxes on the right, beside her portrait reading a book in her room" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/web-ui.jpg" />
 
-[Chat](controls.md#chatting-in-the-browser): `./start.sh --web` for a window of her own with no terminal, or /chat beside the terminal. The same conversation either way, with every other page behind her logo.
+[Web UI](controls.md#chatting-in-the-browser): `./start_web.sh` for a window of her own with no terminal, or /chat beside the terminal. The same conversation either way, and the same header on every page: her logo opens the menu, Online what she's running on.
 
 <img width="1210" alt="The live view: her reply streaming in, each word shaded by how sure she was" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/live-view.png" />
 

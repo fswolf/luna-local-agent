@@ -5,6 +5,7 @@ ai-voice/
 │
 ├── installer/        # install.sh, install.ps1, install.py, uninstall.py, requirements.txt
 ├── launch.py         # what start.sh / start.cmd / luna / luna.cmd run: voice server, then Luna
+│                     #   (start_web.sh / start_web.cmd: the same with --web, in a session of her own)
 ├── ai-voice-ctl.py
 ├── config.json
 ├── core/             # the core loop:
@@ -45,12 +46,12 @@ ai-voice/
 │   ├── livefeed.py   #   the server and event stream for the monitor and the portrait (python -m web.livefeed)
 │   ├── portrait_config.py, gesture_files.py, gaze.py  # what the portrait loads, gesture files, where she looks
 │   ├── settings_web.py, help_web.py  # /settings/ and /help/
-│   ├── chat_web.py   #   /chat/: the conversation in a browser (chat.html)
+│   ├── chat_web.py   #   /chat/: the conversation in a browser (chat.html), and her header (head.js, luna-logo.png)
 │   ├── dataset_web.py  #   /examples/: examples for her patches (training/dataset.py)
-│   ├── portrait_window.py  # /portrait's window of its own (no address bar)
+│   ├── portrait_window.py  # windows of their own (no address bar): portrait, chat, pose studio, live monitor
 │   ├── holofan.py    #   hologram fans (python -m web.holofan sim)
 │   ├── station.py, satellites.py  # relay stations in other rooms, ESPHome satellites
-│   └── live.html, chat.html, settings.html, station.html  # the pages themselves
+│   └── live.html, chat.html, head.js, settings.html, station.html  # the pages themselves
 ├── config/           # every setting, one namespace (config.X); one file per area:
 │   ├── __init__.py   #   the namespace itself, plus /set (current, save_setting) and plugin_settings
 │   ├── base.py       #   where things are read from, and her persona
@@ -126,12 +127,13 @@ ai-voice/
 │   ├── messages.py   #   what the rest of Luna calls: add_message, set_status...
 │   ├── text.py       #   widths, wrapping, frames
 │   ├── conversation_pane.py # the conversation pane and the status bar
-│   ├── launcher.py   #   the pages pane: opens portrait, settings, memory... in the browser
+│   ├── launcher.py   #   the pages pane: opens chat, portrait, settings, memory...
 │   ├── help.py       #   what the help says (the /help/ page, help_web.py)
 │   ├── tools_pane.py #   the tools pane
 │   ├── settings_pane.py # the settings pane: the everyday settings, `a` for all
 │   ├── approval.py   #   the permission popup (ask_approval)
-│   └── app.py        #   style, keys, run(), stop()
+│   ├── app.py        #   style, keys, run(), stop(), submit_soon() for the chat page
+│   └── headless.py   #   no screen (./start_web.sh): the chat page is her window
 │
 ├── agent/
 │   ├── agent.json

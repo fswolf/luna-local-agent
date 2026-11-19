@@ -83,7 +83,7 @@ What she does:
 - **Easy to set up:** the installer picks a model that fits your graphics card, she asks your name the first time she starts, and every setting is on one page in your browser, with presets: Assistant, Companion, Streamer, and Small, Medium or Large to fit your model ([details](docs/configuration.md#the-settings-page))
 - **Knows her own manual:** ask her how to do something and she looks it up and tells you the exact command
 - Linux first, also on macOS and Windows
-- Full-screen terminal interface, or a window of her own with no terminal at all (`./start.sh --web`)
+- Full-screen terminal interface, or a web UI in a window of her own with no terminal at all (`./start_web.sh`)
 
 Everything runs locally. No cloud APIs required.
 
@@ -108,10 +108,12 @@ portrait page. Which fans work and what to buy:
 
 <img width="1210" alt="Luna's web window: the chat on the left, with her replies in the middle, your messages on the left and her notes in small yellow boxes on the right, beside her portrait reading a book in her room" src="assets/web-ui.jpg" />
 
-`./start.sh --web` starts her with no terminal at all: the chat opens in
+`./start_web.sh` (or `./start.sh --web`) starts her with no terminal at all: the chat opens in
 a window of its own beside her portrait, and the terminal you started her
-from can close. Her logo opens every page (settings, memory, thoughts,
-pose studio), Online shows what she's running on, and a file or a picture
+from can close. Every one of her pages has the same header: her logo opens
+the menu (portrait, pose studio and the live monitor in windows of their
+own, then settings, thoughts, memory, help, and Exit), Online shows what
+she's running on, and the middle says what she's doing. A file or a picture
 goes in with the paperclip. Closing the window quits her
 ([details](docs/controls.md#chatting-in-the-browser)).
 
