@@ -1,5 +1,14 @@
 # Install
 
+**What Luna needs:** a model server that speaks the OpenAI API: llama.cpp,
+LM Studio, Ollama, vLLM or anything like them, on this PC or another machine
+on your network. Luna connects to its address and does the rest. The
+installer can get you started with llama.cpp or LM Studio on this machine,
+and below is how I run mine and what's been tested. Running and fixing the
+server itself (drivers, your graphics card, its settings) belongs to that
+server's own project and docs, not this one. If `curl http://<address>/v1/models`
+answers, Luna can use it.
+
 ```bash
 git clone https://github.com/fswolf/luna-local-agent.git ~/luna-ai
 cd ~/luna-ai
