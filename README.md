@@ -39,6 +39,8 @@ grew from there.
 
 <img width="1210" alt="How Luna's models work together. The chat model is her mind, in the middle, and the only one required. Whisper (her hearing, on the CPU) and the vision adapter (her eyes) feed what you say and show into it. Kokoro speaks her replies. Every turn, the embedding model and the reranker find the facts, notes and tools that fit. Only when you ask, she can put one short question to a bigger cloud model: Claude, Grok or ChatGPT. Leave the optional parts out and she does without." src="assets/luna-models.png" />
 
+<img width="1210" alt="How Luna's memory works on each turn. Your message comes in at the top. In the middle is this turn: everything she knows while she answers, put together fresh each time, and only what fits goes along. Always along, on the left: who you are, the conversation so far and her open projects. Found by meaning, on the right: the facts that fit (read again by the reranker), her pages, notes on past sessions and lessons that fit, and passages from your own notes. Afterwards, underneath: she saves facts on purpose with when they were true (a change retires the old one, forget scrubs it everywhere), writes notes on a conversation when it goes quiet, and while idle learns lessons from her own mistakes, rewrites pages and merges duplicate facts. Her memory stays on your PC in plain SQLite files." src="assets/luna-memory.png" />
+
 ```bash
 git clone https://github.com/fswolf/luna-local-agent.git ~/luna-ai
 ```

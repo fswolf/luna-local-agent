@@ -408,8 +408,8 @@ def on_user_text(text):
         stop_all_devices()
 
 
-def panic():
-    if _state["connected"] and _toys.stop_on_interrupt(NAME):
+def panic(always=False):
+    if _state["connected"] and (always or _toys.stop_on_interrupt(NAME)):
         stop_all_devices()
 
 

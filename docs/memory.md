@@ -1,5 +1,7 @@
 # Memory
 
+<img width="1210" alt="How Luna's memory works on each turn. Your message comes in at the top. In the middle is this turn: everything she knows while she answers, put together fresh each time, and only what fits goes along. Always along, on the left: who you are, the conversation so far and her open projects. Found by meaning, on the right: the facts that fit (read again by the reranker), her pages, notes on past sessions and lessons that fit, and passages from your own notes. Afterwards, underneath: she saves facts on purpose with when they were true (a change retires the old one, forget scrubs it everywhere), writes notes on a conversation when it goes quiet, and while idle learns lessons from her own mistakes, rewrites pages and merges duplicate facts. Her memory stays on your PC in plain SQLite files." src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/luna-memory.png" />
+
 Facts are written deliberately by the model, not scraped from every
 turn, and they live in `agent/facts.db`, with a page to edit them by
 hand.

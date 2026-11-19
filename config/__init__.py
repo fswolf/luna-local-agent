@@ -185,6 +185,8 @@ SETTINGS = {
     "mood.voice":                 ("MOOD_VOICE",                   True),
     "mood.affection":             ("MOOD_AFFECTION",               True),
     "mood.intensity":             ("MOOD_INTENSITY",               True),
+    "mood.hurt":                  ("MOOD_HURT",                    True),
+    "mood.forgive":               ("MOOD_FORGIVE",                 True),
     "mood.prompt":                ("MOOD_PROMPT",                  True),
     "mood.face":                  ("MOOD_FACE",                    True),
     "mood.gestures":              ("MOOD_GESTURES",                True),

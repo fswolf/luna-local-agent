@@ -30,6 +30,13 @@ MOOD_AFFECTION = flag(_mood_cfg.get("affection", True))
 # How far her moods swing and how strongly they show: 0 = almost flat
 # (the ship's computer end), 1 = as designed, 2 = very visibly emotional.
 MOOD_INTENSITY = max(0.0, min(2.0, float(_mood_cfg.get("intensity", 1.0))))
+# The two directions, apart. hurt: how hard a hostile message lands (2 =
+# twice the old drop, so two insults take her from very warm to cold and
+# angry). forgive: how fast she warms back up from below her resting
+# warmth, by drift and by kind words alike (0.5 = half as fast as before;
+# above her resting warmth, kind words count in full).
+MOOD_HURT = max(0.0, min(4.0, float(_mood_cfg.get("hurt", 2.0))))
+MOOD_FORGIVE = max(0.05, min(1.0, float(_mood_cfg.get("forgive", 0.5))))
 # Where the mood shows. voice (above) is one; these are the others.
 MOOD_PROMPT = flag(_mood_cfg.get("prompt", True))      # the line in her system prompt
 MOOD_FACE = flag(_mood_cfg.get("face", True))          # the portrait's face and quick feelings

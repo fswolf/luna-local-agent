@@ -144,14 +144,15 @@ lewd row. Roughly 5 to 10 minutes of real flirting from warm gets
 there; repeating yourself counts for less each time.
 
 It's quick to kill: one hostile message wipes desire to 0 and takes a
-real bite out of warmth (about two "I love you"s' worth), and desire
+big bite out of warmth (at the default `mood.hurt` of 2, more than two
+"I love you"s are worth), and desire
 is also gone whenever warmth drops below warm. Below very warm, she's
 told that if you push for sex or intimate roleplay she isn't in the
 mood, and to say so in her own words with a hint of what would change
 that.
 
-**Grudge** is below cool. Real hostility while she's already cool
-starts it, for `grudge.minutes` (20); another insult restarts the
+**Grudge** is below cool. Real hostility that leaves her cool starts
+it (with the default `mood.hurt`, usually the second insult), for `grudge.minutes` (20); another insult restarts the
 clock. While it runs her warmth can't climb out of cool - not by
 drift, not by small kindnesses - and she's told she's holding a
 grudge: short and prickly, grumbling at requests, free to refuse
@@ -190,9 +191,12 @@ back where she was. Pomf, IRC and Discord don't hold anything back.
 ```
 
 The weights (how much a flirty message, an insult or a turn is worth)
-are the `DESIRE_*` and `HOSTILE_HIT` numbers at the top of the
-top of `mind/mood/exchange.py` (the question itself is in
-`mind/mood/appraise.py`).
+are the `DESIRE_*` and `HOSTILE_HIT` numbers at the top of
+`mind/mood/exchange.py` (the question itself is in
+`mind/mood/appraise.py`). To tune them without code: `mood.hurt` (how
+hard an insult lands, default 2) and `mood.forgive` (how fast she warms
+back up from below her resting warmth, default 0.5), in
+[Companion](companion.md).
 
 ## The moods file
 
@@ -412,7 +416,8 @@ she's a tool first, `/set mood.walk_away false` turns it off.
   reply, and no model call for it. On the portrait she
   crosses her arms and turns her head away (`walk_away.hold`, the
   `sulk` gesture) with `walk_away.face`, and holds it, no idle moves,
-  until she's back; then she turns back round.
+  until she's back; then she turns back round. Any connected toy stops
+  the moment she leaves, even with `stop_on_interrupt` off.
 - **While she's away:** stream chat and jobs (games included) get
   nothing. Discord gets "(She isn't talking right now.)" so it doesn't
   look broken. Stop words still stop toys, since they never go

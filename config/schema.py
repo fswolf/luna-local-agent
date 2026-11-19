@@ -133,6 +133,8 @@ SCHEMA = {
     "mood.intensity": ("float", "How far her moods swing and show: 0 almost flat, 1 as designed, 2 very emotional"),
     "mood.warmth": ("float", "The warmth she settles back to when nothing is pushing it, 0-1"),
     "mood.recovery": ("float", "How fast moods fade each turn, 0-1: 0 never fades, 1 lasts only one turn"),
+    "mood.hurt": ("float", "How hard an insult lands, 0-4: 1 the old gentle drop, 2 two insults make her angry"),
+    "mood.forgive": ("float", "How fast she warms back up after being hurt, 0.05-1: 1 quickly, 0.5 takes a while"),
     "mood.voice": ("bool", "Let her mood tint her voice a little (a sleepy Luna slightly slower and lower)"),
     "mood.affection": ("bool", "Notice when you're kind to her (one small extra model call after each turn)"),
     "mood.prompt": ("bool", "Tell her about her mood in her instructions"),

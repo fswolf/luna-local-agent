@@ -60,13 +60,22 @@ def _apply(said, answer, model):
         S.last_rating = rating
         S.last_feeling = feeling
 
-    if scaled:
-        drift._nudge(energy=scaled * 0.45, warmth=scaled, why=f"you were warm with her ({rating})")
+    with _lock:
+        cold = S.warmth < drift._warmth_baseline()
 
-    # The exchange itself: small, and a cold one smaller than a warm one
-    # - she bounces back from a rough moment on her own anyway.
+    if scaled:
+        # Below her resting warmth (hurt, sulking) a kind word counts for
+        # less: winning her back takes a while (mood.forgive).
+        warm = scaled * (drift._forgive() if cold else 1.0)
+        drift._nudge(energy=scaled * 0.45, warmth=warm, why=f"you were warm with her ({rating})")
+
+    # The exchange itself: small. A cold one is scaled by mood.hurt (it
+    # lands harder than a warm one does), a warm one while she's below her
+    # resting warmth by mood.forgive (it takes a while to win her back).
     if energy or warmth:
-        drift._nudge(energy=0.06 * energy, warmth=0.05 * warmth if warmth > 0 else 0.08 * warmth,
+        drift._nudge(energy=0.06 * energy,
+                     warmth=(0.05 * warmth * (drift._forgive() if cold else 1.0)) if warmth > 0
+                     else 0.08 * warmth * drift._hurt(),
                why="that " + ("livened her up" if energy > 0 else "wore on her" if energy < 0
                               else "warmed her" if warmth > 0 else "stung a bit"))
 
@@ -86,7 +95,7 @@ def _layers(rating, warmth, flirt):
         # that leaves her cool, a grudge (another insult restarts it).
         with _lock:
             S.desire = 0.0
-        drift._nudge(warmth=-HOSTILE_HIT, why="that was hostile")
+        drift._nudge(warmth=-HOSTILE_HIT * drift._hurt(), why="that was hostile")
 
         with _lock:
             cool = S.warmth < moods()["warmth"]["edges"][0]

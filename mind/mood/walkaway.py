@@ -94,6 +94,7 @@ def _withdraw(minutes):
         S.desire = 0.0
 
     logbook.info("mood", "walked away for %.0f min", minutes)
+    _stop_toys()
     drift._nudge(why="walked away")
 
     # Come back on the minute, not whenever something next asks: the
@@ -101,6 +102,18 @@ def _withdraw(minutes):
     timer = threading.Timer(minutes * 60 + 1, away)
     timer.daemon = True
     timer.start()
+
+
+def _stop_toys():
+    """She's gone, so nothing of hers keeps running: every connected device
+    stops now, even with stop_on_interrupt off. Before, a toy she'd started
+    ran on to its own time limit (max_seconds) after she'd walked out."""
+    try:
+        import plugins
+
+        plugins.panic(always=True)
+    except Exception:
+        logbook.exception("mood", "stopping the toys when she walked away")
 
 
 def _back(why):

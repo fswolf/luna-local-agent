@@ -147,6 +147,8 @@ without going through her:
   `"stop_words": [...]`.
 - **interrupting her** (HOME, or `ai-voice-ctl.py stop`). Turn that off
   with `"stop_on_interrupt": false`.
+- **her walking away** (see [Moods](moods.md#walking-away)): everything
+  stops the moment she leaves, even with `"stop_on_interrupt": false`.
 - `/lovense stop`, `/lovense off`, or quitting Luna.
 
 **In a roleplay.** While it's on and you're talking to her yourself, her
@@ -308,8 +310,8 @@ checked before any hardware arrives. A good first test:
 ### Stopping, roleplay and who can use it
 
 These work as for [Lovense](#lovense): a stop word in your message,
-interrupting her, `/buttplug stop`, `/buttplug off` and quitting Luna
-all stop every device (`stop_words` and `stop_on_interrupt` work the
+interrupting her, her walking away, `/buttplug stop`, `/buttplug off`
+and quitting Luna all stop every device (`stop_words` and `stop_on_interrupt` work the
 same); her prompt lists what's connected and what each device can do;
 only your own turns can start one, never a turn that has read outside
 content or a scheduled job, and stopping is never blocked.

@@ -52,6 +52,25 @@ def _warmth_baseline():
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
+def _forgive():
+    """mood.forgive: how fast warmth climbs back from below her resting point.
+    Eased off as intensity drops: at 0 (the flat end) she isn't one to hold
+    on to anything, so she comes back at the full speed she always did."""
+    try:
+        f = max(0.05, min(1.0, float(getattr(config, "MOOD_FORGIVE", 0.5))))
+    except (TypeError, ValueError):
+        f = 0.5
+    return f + (1.0 - f) * (1.0 - min(1.0, _intensity()))
+
+
+def _hurt():
+    """mood.hurt: how hard a hostile message lands."""
+    try:
+        return max(0.0, min(4.0, float(getattr(config, "MOOD_HURT", 2.0))))
+    except (TypeError, ValueError):
+        return 2.0
+
+
 def _nudge(energy=0.0, warmth=0.0, why=""):
 
     if not config.MOOD_ENABLED:
@@ -106,14 +125,17 @@ def note_turn():
         target = _clamp((_energy_baseline() - drag + lift) * min(1.0, k))
         S.energy += (target - S.energy) * pull
 
-        # Warmth drifts home asymmetrically. Coming back UP from a cold
-        # patch is fast, because an assistant you have to coax out of a
-        # sulk is a worse assistant. Coming back DOWN from warmth you
-        # earned is slow, because otherwise the pull eats every kind
+        # Warmth drifts home asymmetrically. Coming back DOWN from warmth
+        # you earned is slow, because otherwise the pull eats every kind
         # word on the turn after it lands - which is exactly what it was
         # doing: +0.045 of affection against -0.045 of drift, net zero.
+        # Coming back UP from a cold patch goes at mood.forgive (0.5 of
+        # the step by default). It used to be the full step, so a hurt
+        # Luna was over it in a couple of turns (Ryan: "the other gains
+        # too quickly"); her tasks never wait on it, a grudge only colours
+        # how she talks.
         home = min(_warmth_baseline(), _ceiling()) if _grudging() else _warmth_baseline()
-        S.warmth += (home - S.warmth) * (pull * 0.4 if S.warmth > home else pull)
+        S.warmth += (home - S.warmth) * (pull * 0.4 if S.warmth > home else pull * _forgive())
 
         # Desire fades on its own: a little every turn, and halves for
         # every twenty minutes you were gone.

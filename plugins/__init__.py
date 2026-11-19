@@ -23,7 +23,8 @@ A plugin is a module with a NAME and whichever of these it needs:
                            ("a toy is connected"); private is False for
                            stream chat and Discord without memory
     on_user_text(text)     sees each of your messages before she does
-    panic()                you interrupted her (HOME): stop anything physical
+    panic(always=False)    you interrupted her (HOME): stop anything physical;
+                           always=True (she walked away) ignores stop_on_interrupt
     on_camera_open(device) she's about to open the webcam (a picture, the
                            face check, presence starting); keep it quick
     on_camera_close(device) she's done with it, even when the picture failed
@@ -200,11 +201,19 @@ def camera_close(device):
     _camera("_on_camera_close", device)
 
 
-def panic():
-    """You interrupted her. Anything physical stops."""
+def panic(always=False):
+    """You interrupted her. Anything physical stops. always: stop even where
+    a plugin's settings say an interrupt shouldn't (she walked away: nothing
+    of hers keeps running once she's gone)."""
     for plugin, hook in _each_running("_panic"):
         try:
-            hook()
+            if always:
+                try:
+                    hook(always=True)
+                except TypeError:       # an older plugin's panic() takes nothing
+                    hook()
+            else:
+                hook()
         except Exception as e:
             logbook.warn("plugins", "%s panic failed: %s", plugin.name, e)
 

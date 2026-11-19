@@ -204,10 +204,20 @@ drops toward 0 the resting point slides toward plain calm (0.1).
 Every turn both dials move a step toward where she rests. The step is
 `mood.recovery` (**0.25**): a quarter of the way.
 
-Warmth drifts **asymmetrically**: coming back **up** from a cold patch
-takes the full step, coming back **down** from warmth you earned takes
-only **0.4** of it. Otherwise the drift ate every kind word the turn
-after it landed.
+Warmth drifts **asymmetrically**: coming back **down** from warmth you
+earned takes only **0.4** of the step, or the drift ate every kind word
+the turn after it landed. Coming back **up** from below her resting
+warmth takes `mood.forgive` of it (**0.5**), and while she's down there
+kind words count at that rate too: a hurt Luna takes a while to win
+back. Above her resting warmth, kind words count in full. An apology
+still ends a grudge on the spot, and time away still heals at the old
+rate.
+
+Hostility lands hard: `mood.hurt` (**2**) doubles what a hostile message
+takes off her warmth, so the first insult cools her, the second makes
+her angry (a grudge, sulky to furious by her energy) and the third
+walks her out. Both ease off as `mood.intensity` drops toward 0, where
+she holds on to nothing.
 
 ### The free signals
 
@@ -796,6 +806,8 @@ engine as everything else, so what you see is what she does. Details in
 | `mood.intensity` | 1 | 0 almost flat (rests calm, nothing moves her), 1 as designed, 2 very visibly emotional |
 | `mood.warmth` | 0.45 | Where warmth rests |
 | `mood.recovery` | 0.25 | How hard each turn pulls her home (0 = moods never fade, 1 = nothing lasts a turn) |
+| `mood.hurt` | 2 | How hard an insult lands, 0 to 4. 1 is the old gentle slide; at 2 the second insult makes her angry |
+| `mood.forgive` | 0.5 | How fast she warms back up from below her resting warmth, 0.05 to 1. 1 is the old quick bounce back |
 | `mood.prompt` | true | The mood line in her system prompt |
 | `mood.voice` | true | The speed and pitch tint |
 | `mood.face` | true | Her face and quick feelings on the portrait |
