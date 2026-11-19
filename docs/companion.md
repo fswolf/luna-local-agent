@@ -663,6 +663,7 @@ studio's tab.
 | She does it herself | `*slips her top off*`, `*kicks off her shoes*`, `*pulls her shirt back on*`, `*gets dressed*` in her reply |
 | She picks a tag (tags mode) | `[top_off]`, `[undress]`, `[top_on]`, `[dress]` |
 | `/outfit` | `/outfit underwear`, `/outfit dressed`, `/outfit off tie`, `/outfit on top`; on its own it says what she's wearing |
+| `/blanket` | `/blanket on`, `/blanket off`, or `/blanket` to swap: a plaid blanket round her shoulders that moves with her |
 
 How the conversation changes them is `portrait.clothes`, set with
 `/portrait clothes <mode>` or the **clothes** row in the settings pane.

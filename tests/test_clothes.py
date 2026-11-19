@@ -76,6 +76,31 @@ class Command(unittest.TestCase):
             self.assertTrue(portrait.handle("/outfit sideways"))
             emit.assert_not_called()
 
+    def test_rave_set(self):
+        from commands import portrait
+
+        with mock.patch("web.livefeed.emit") as emit, mock.patch("ui.add_message"), \
+                mock.patch.dict(portrait._rave, on=False):
+            self.assertTrue(portrait.handle("/rave"))
+            emit.assert_any_call("prop", name="pacifier", on=True)
+            emit.assert_any_call("prop", name="glowstick_pink", on=True)
+            self.assertTrue(portrait.handle("/rave"))
+            emit.assert_called_with("prop", name="glowstick_pink", on=False)
+
+    def test_blanket_on_off_and_toggle(self):
+        from commands import portrait
+
+        with mock.patch("web.livefeed.emit") as emit, mock.patch("ui.add_message"), \
+                mock.patch.dict(portrait._blanket, on=False):
+            self.assertTrue(portrait.handle("/blanket on"))
+            emit.assert_called_with("prop", name="blanket", on=True)
+            self.assertTrue(portrait.handle("/blanket"))
+            emit.assert_called_with("prop", name="blanket", on=False)
+            self.assertTrue(portrait.handle("/blanket"))
+            emit.assert_called_with("prop", name="blanket", on=True)
+            self.assertTrue(portrait.handle("/blanket off"))
+            emit.assert_called_with("prop", name="blanket", on=False)
+
 
 class Endpoint(unittest.TestCase):
     def setUp(self):

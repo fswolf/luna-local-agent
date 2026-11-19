@@ -1,4 +1,4 @@
-"""Her own life: /mood, /coffee, /read, /situation.
+"""Her own life: /mood, /coffee, /read, /doze, /plushie, /situation.
 
 Part of the commands package; see commands/__init__.py.
 """
@@ -8,6 +8,8 @@ from life import coffee
 import config
 from core import logbook
 from mind import mood
+from life import dozing
+from life import plushie
 from life import reading
 import ui
 
@@ -123,6 +125,26 @@ def handle(text):
             ui.add_message("system", "She turns a page." if reading.page(lookup=False) else "She isn't reading - /read first.")
         elif word in ("look", "up"):
             ui.add_message("system", "She looks up at you." if reading.page(lookup=True) else "She isn't reading - /read first.")
+        return True
+
+    if text == "/doze" or text.startswith("/doze "):
+        word = text[len("/doze"):].strip().lower()
+        if word in ("", "on", "now"):
+            ui.add_message("system", "She pulls her blanket round her and dozes off." if dozing.begin()
+                           else "She's already asleep.")
+        elif word in ("off", "wake", "up"):
+            ui.add_message("system", "She wakes up." if dozing.wake() else "She isn't asleep.")
+        return True
+
+    if text == "/plushie" or text.startswith("/plushie "):
+        word = text[len("/plushie"):].strip().lower()
+        if word in ("", "on", "now"):
+            ui.add_message("system", f"She picks up {plushie.NAME} and holds him close." if plushie.begin()
+                           else f"She already has {plushie.NAME}.")
+        elif word in ("off", "down", "done"):
+            ui.add_message("system", f"She sets {plushie.NAME} down." if plushie.finish() else "She isn't holding him.")
+        elif word in ("squeeze", "hug"):
+            ui.add_message("system", "A squeeze." if plushie.squeeze() else "She isn't holding him - /plushie first.")
         return True
 
     if text == "/situation":

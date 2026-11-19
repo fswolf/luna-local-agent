@@ -406,6 +406,13 @@ function handle(ev) {
     case 'prop':       // her morning coffee (coffee.py): pick the mug up, put it down
       propEvent(ev);
       break;
+    case 'note':       // a reminder (life/stickynotes.py): she writes it on a sticky note, or holds it up
+      noteEvent(ev);
+      break;
+    case 'doze':       // late and quiet: she's dozed off (life/dozing.py), or you woke her
+      doze.on = !!ev.on;
+      if (doze.on) { doze.nodNext = clock.elapsedTime + rand(12, 25); doze.zNext = clock.elapsedTime + rand(3, 6); }
+      break;
     case 'emote':      // a compliment landed (moods.json "compliment")
       emote(ev.name);
       break;
@@ -448,6 +455,25 @@ function handle(ev) {
 // mood that they still mean something
 // ---------------------------------------------------------------------------
 let emoteNext = 0, emoteLast = -99;
+// Dozing (the 'doze' event): v eases to 1 as she drifts off (slowly) and back
+// to 0 when you wake her (quickly). Asleep: eyes shut, head down and to one
+// side, slow deep breaths, a nod now and then, and a zzz every few seconds.
+const doze = { on: false, v: 0, nod: 0, nodT: -1, nodNext: 0, zNext: 0 };
+function dozeUpdate(now, dt) {
+  doze.v = damp(doze.v, doze.on ? 1 : 0, doze.on ? 0.35 : 5, dt);
+  if (doze.v < 0.001) { doze.v = 0; doze.nod = 0; doze.nodT = -1; return; }
+  // a nod: the head sinks further over a couple of seconds, then bobs back up
+  if (doze.on && doze.v > 0.9 && doze.nodT < 0 && now >= doze.nodNext) doze.nodT = 0;
+  if (doze.nodT >= 0) {
+    const t = doze.nodT += dt;
+    doze.nod = t < 2.4 ? 0.13 * (t / 2.4) ** 2 : t < 2.7 ? 0.13 - 0.2 * (t - 2.4) / 0.3 : -0.07 * Math.max(0, 1 - (t - 2.7) / 1.2);
+    if (t > 3.9) { doze.nodT = -1; doze.nod = 0; doze.nodNext = now + rand(20, 45); }
+  }
+  if (doze.on && doze.v > 0.85 && now >= doze.zNext && !emotes.busy()) {
+    emotes.show('zzz');
+    doze.zNext = now + rand(4.5, 7.5);
+  }
+}
 function emote(name) {
   if (!name || emotes.busy() || clock.elapsedTime - emoteLast < 30) return;
   emoteLast = clock.elapsedTime;
@@ -545,7 +571,7 @@ function movesArms(name, depth = 0) {
 }
 function busyHands(name) {
   const held = props?.names().find(n => props.held(n));
-  if (!held) return false;
+  if (!held || props.PROPS[held]?.free) return false;    // glow sticks: dance away
   const own = (props.PROPS[held]?.pickup || held + '_pickup').split('_')[0] + '_';
   return !name.startsWith(own) && movesArms(name);
 }
@@ -806,13 +832,34 @@ function heldPose(g) {
   const last = g.keys[g.keys.length - 1][1];
   return Object.fromEntries(Object.entries(last).filter(([b]) => !b.startsWith('+') || b === '+neck' || b === '+head'));
 }
+// A sticky note: written when you ask for a reminder (mode 'write'), held up
+// beside her face when it comes due ('show'), the reminder's words on it. Not
+// while her hands are full (her coffee, book or plushie) or she's asleep.
+let noteToken = 0;
+function noteEvent(ev) {
+  if (!props || !moves || doze.on) return;
+  if (props.names().some(n => n !== 'note' && props.held(n))) return;
+  const name = ev.mode === 'show' ? 'note_show' : 'note_write', g = GESTURES[name];
+  if (!g) return;
+  props.noteText(ev.text || '');
+  if (g.place) props.set('note', g.place);           // each gesture holds it its own way
+  if (!gesture(name)) return;
+  const token = ++noteToken;                         // a newer note owns the prop from here on
+  setTimeout(() => token === noteToken && props.show('note'), (+g.prop_at || 0) * 1000);
+  setTimeout(() => token === noteToken && props.hide('note'), (+g.prop_off || g.dur) * 1000);
+}
+
 function propEvent(ev) {
   const p = props?.PROPS[ev.name];
   if (!p || !moves) return;
+  if (p.wear || p.bone) {   // something she wears (the blanket, the pacifier): on and off, her hands stay free
+    if (ev.on) props.show(ev.name); else props.hide(ev.name);
+    return;
+  }
   if (ev.on) {
     if (props.held(ev.name)) return;
     // one thing in her hands at a time: whatever she's holding goes down first
-    const other = props.names().find(n => n !== ev.name && props.held(n));
+    const other = props.names().find(n => n !== ev.name && n !== p.pair && props.held(n));
     if (other) {
       const putName = props.PROPS[other].putdown || other + '_putdown', put = GESTURES[putName];
       if (!moves.playing().includes(putName)) propEvent({ name: other, on: false });   // (already going down: just wait)
@@ -820,14 +867,14 @@ function propEvent(ev) {
       return;
     }
     const g = GESTURES[p.pickup || ev.name + '_pickup'];
-    if (!g) { props.show(ev.name); return; }
+    if (!g) { props.show(ev.name); if (p.pair) props.show(p.pair); return; }
     gesture(p.pickup || ev.name + '_pickup');
     setTimeout(() => props.show(ev.name), (+g.prop_at || 0) * 1000);
     setTimeout(() => moves.hold(heldPose(g)), Math.max(0, g.dur - (g.fade?.[1] ?? 0.4)) * 1000);
   } else {
     if (!props.held(ev.name)) return;
     const g = GESTURES[p.putdown || ev.name + '_putdown'];
-    if (!g) { props.hide(ev.name); moves.hold(null); return; }
+    if (!g) { props.hide(ev.name); if (p.pair) props.hide(p.pair); moves.hold(null); return; }
     gesture(p.putdown || ev.name + '_putdown');
     setTimeout(() => moves.hold(null), (g.fade?.[0] ?? 0.3) * 1000 + 50);   // once the gesture has her arm
     setTimeout(() => props.hide(ev.name), (+g.prop_at || 0) * 1000);
@@ -848,6 +895,7 @@ function idlePool() {
 }
 
 function idleMoves(now, talking) {
+  if (doze.on) return;             // asleep: nothing on her own
   // Holding a pose: nothing else on her own, and back into it as soon as
   // anything that interrupted it has finished.
   if (moves && mind.hold && (moves.names.includes(mind.hold) || moves.hasClip(mind.hold))) {
@@ -1124,31 +1172,34 @@ function animate() {
 
     const talking = updateMouth(dt);
     updateMood(dt, talking > 0.05);
+    dozeUpdate(now, dt);
     lids.now = damp(lids.now, mind.stage === 'waking' ? 0 : Math.min(0.7, lidsTarget(now)), 2.5, dt);
-    setExpr('blink', mind.stage === 'waking' ? 0 : Math.max(lids.now, blinkValue(now, dt)));
+    setExpr('blink', mind.stage === 'waking' ? 0 : Math.max(lids.now, doze.v, blinkValue(now, dt)));
 
     // Head: follows the gaze part of the way, breathes, nods with her voice.
     tilt.v = damp(tilt.v, tilt.target + L.tilt * LOOK_TILT, 3, dt);
     const sway = Math.sin(now * 0.7) * 0.025 + Math.sin(now * 0.31 + 1) * 0.02;
     const rate = L.thinking ? 2.5 : 3.5;
-    headRot.y = damp(headRot.y, (gaze.x * L.headGain + L.wander.x * LOOK_X) * 0.9 + sway, rate, dt);
+    const awake = 1 - doze.v;      // asleep, the head stops following her eyes
+    headRot.y = damp(headRot.y, ((gaze.x * L.headGain + L.wander.x * LOOK_X) * 0.9 + sway) * awake + doze.v * 0.08, rate, dt);
     headRot.x = damp(headRot.x, -(gaze.y * L.headGain + L.wander.y * LOOK_Y) * 0.7
                      + (mind.stage === 'listening' ? 0.06 : 0)
                      + moodNow.sad * 0.12 + moodNow.angry * 0.05
-                     + talking * 0.05 * Math.sin(now * 9), L.thinking ? 2.5 : 4, dt);
-    headRot.z = damp(headRot.z, tilt.v + Math.sin(now * 0.45) * 0.02, 3, dt);
+                     + talking * 0.05 * Math.sin(now * 9)
+                     + doze.v * 0.3 + doze.nod, L.thinking ? 2.5 : 4, dt);
+    headRot.z = damp(headRot.z, tilt.v + Math.sin(now * 0.45) * 0.02 + doze.v * 0.14, 3, dt);
     const head = bone('head'), neck = bone('neck');
     if (head) head.rotation.set(fx * headRot.x * 0.6, headRot.y * 0.6, fx * headRot.z * 0.6);
     if (neck) neck.rotation.set(fx * headRot.x * 0.4, headRot.y * 0.4, fx * headRot.z * 0.4);
 
     // Breathing: in quicker than out, each breath a little different, the
     // shoulders lifting with it so it reads on a skinned model.
-    breathing.phase += Math.PI * 2 * (talking > 0.05 ? 0.3 : mind.stage === 'thinking' ? 0.28 : 0.22) * breathing.jitter * dt;
+    breathing.phase += Math.PI * 2 * (talking > 0.05 ? 0.3 : mind.stage === 'thinking' ? 0.28 : 0.22) * breathing.jitter * (1 - 0.35 * doze.v) * dt;
     if (breathing.phase > Math.PI * 2) { breathing.phase -= Math.PI * 2; breathing.jitter = 0.85 + Math.random() * 0.3; }
     const k = breathing.phase / (Math.PI * 2);
     const breath = k < 0.4 ? (1 - Math.cos(Math.PI * k / 0.4)) / 2 : (1 + Math.cos(Math.PI * (k - 0.4) / 0.6)) / 2;
     const chest = bone('upperChest') || bone('chest');
-    if (chest) chest.rotation.set(-fx * breath * 0.035, 0, 0);
+    if (chest) chest.rotation.set(-fx * breath * (0.035 + 0.02 * doze.v), 0, 0);   // asleep: slower, deeper
     const ls = bone('leftShoulder'), rs = bone('rightShoulder');
     if (ls) ls.rotation.set(0, 0, fx * breath * 0.05);
     if (rs) rs.rotation.set(0, 0, -fx * breath * 0.05);
@@ -1664,7 +1715,7 @@ try {
   setLights(cfg.lights);
   // the debug page's frame picker: bust / face / full without reloading (the studio keeps going)
   const setFrame = f => { if (['bust', 'face', 'full'].includes(f)) { framing = f; frame(); } };
-  window.portrait = { setFrame, get fan() { return fan?.status(); }, handle, twitch, fakeVoice, blink, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
+  window.portrait = { setFrame, get fan() { return fan?.status(); }, handle, twitch, fakeVoice, blink, doze, mind, gesture, emote, emotes, mouthShut, blush, tears, drool, orbit, get moves() { return moves; }, get vrm() { return vrm; }, get holo() { return holo; },
                       touchAt: (x, y) => toucher.at(vrm, x, y), touch, spank, get props() { return props; }, get outfits() { return outfits; },
                       get lights() { return lights; }, setLights };
   if (cfg.fan?.cast && !params.has('nocast'))

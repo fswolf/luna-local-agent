@@ -1,6 +1,7 @@
 // Emotes: little things that pop up beside her head - hearts when she's
 // touched, a sweat drop when she's embarrassed, an anger mark when she's
-// cross, a question mark when she's curious or puzzled. They're overlays,
+// cross, a question mark when she's curious or puzzled, a little zzz when
+// she's dozed off (life/dozing.py). They're overlays,
 // never part of the model, and always drawn in front of her.
 //
 // Each emote is drawn in code unless there's a sprite sheet for it:
@@ -9,7 +10,8 @@
 //   {"frames": 8, "fps": 12, "size": 0.05, "count": 3, "motion": "float"}
 // size: metres beside her head. count: how many in one burst.
 // motion: float (drift up and fade), slide (slip down), throb (pulse in
-// place), bob (pop up and bob). A new name defaults to float.
+// place), bob (pop up and bob), drift (rise slowly, growing). A new name
+// defaults to float.
 
 // Where they sit (x out from the head, y up, metres as the camera sees
 // her) and how they move. Sprite sheets use the same, by motion.
@@ -18,6 +20,7 @@ const MOTION = {
   slide: { x: 0.075, y: 0.075, life: 2.4, count: 1 }, // sweat drop, on her temple
   throb: { x: 0.08, y: 0.14, life: 2.4, count: 1 },   // anger mark, at the top of her head
   bob:   { x: 0.12, y: 0.19, life: 2.8, count: 1 },   // question mark, above her ear
+  drift: { x: 0.16, y: 0.15, life: 4.2, count: 1 },   // zzz, rising off her head as she sleeps
 };
 
 const outline = (g, s, path, fill) => {
@@ -82,6 +85,21 @@ const DRAWN = {
     };
     for (let i = 0; i < 4; i++) arm(i * Math.PI / 2, '#fff4f8', s * 0.2);
     for (let i = 0; i < 4; i++) arm(i * Math.PI / 2, '#e8243c', s * 0.11);
+  } },
+
+  // zzz: three z's, small to big, going up and away
+  zzz: { motion: 'drift', size: 0.085, draw(g, s) {
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    for (const [x, y, k] of [[0.24, 0.78, 0.26], [0.48, 0.52, 0.34], [0.76, 0.22, 0.44]]) {
+      g.font = `900 ${Math.round(s * k)}px system-ui, sans-serif`;
+      g.lineWidth = s * k * 0.16;
+      g.strokeStyle = '#fff4f8';
+      g.strokeText('z', s * x, s * y);
+      g.fillStyle = '#9b8cff';
+      g.fillText('z', s * x, s * y);
+    }
   } },
 
   question: { motion: 'bob', size: 0.065, draw(g, s) {
@@ -190,6 +208,9 @@ export function createEmotes(THREE, scene) {
       case 'bob':     // pops up, then bobs and tilts in place
         return { dx: 0, dy: 0.02 * Math.min(1, a / 0.3) + Math.sin(a * 3.2) * 0.006, size: grow,
                  rot: Math.sin(a * 2.4 + e.phase) * 0.15, op: Math.min(1, a / 0.12, fade) };
+      case 'drift':   // asleep: rises slowly off her head, growing as it goes
+        return { dx: 0.02 * t, dy: 0.05 * t, size: 0.75 + 0.35 * t, rot: Math.sin(a * 1.5 + e.phase) * 0.08,
+                 op: Math.min(1, a / 0.8, (e.life - a) / 1.2) };
       default:        // float: up and away, swaying
         return { dx: Math.sin(a * 3 + e.phase) * e.sway, dy: e.rise * t, size: grow,
                  rot: Math.sin(a * 2.2 + e.phase) * 0.18, op: Math.min(1, a / 0.15, (e.life - a) / 0.9) };

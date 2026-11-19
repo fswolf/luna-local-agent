@@ -8,6 +8,10 @@ from web import portrait_window
 import ui
 
 
+_blanket = {"on": False}      # what /blanket last did, so /blanket alone toggles it
+_rave = {"on": False}         # the same for /rave
+
+
 def handle(text):
     """True when text was one of these commands (and it ran)."""
     if text == "/monitor":
@@ -50,6 +54,23 @@ def handle(text):
         config.save_setting("portrait.hologram.enabled", "true" if word == "on" else "false")
         livefeed.emit("holo", on=word == "on")
         ui.add_message("system", f"Portrait hologram {word} (saved; an open portrait switches now).")
+        return True
+
+    if text in ("/blanket", "/blanket on", "/blanket off"):
+        # her blanket round her shoulders (portrait/props/blanket.glb, worn: props.js)
+        word = text.split()[1] if " " in text else ("off" if _blanket["on"] else "on")
+        _blanket["on"] = word == "on"
+        livefeed.emit("prop", name="blanket", on=_blanket["on"])
+        ui.add_message("system", "Blanket round her shoulders." if _blanket["on"] else "Blanket off.")
+        return True
+
+    if text in ("/rave", "/rave on", "/rave off"):
+        # the rave set: a pacifier and a glow stick in each hand (portrait/props, props.js)
+        word = text.split()[1] if " " in text else ("off" if _rave["on"] else "on")
+        _rave["on"] = word == "on"
+        livefeed.emit("prop", name="pacifier", on=_rave["on"])
+        livefeed.emit("prop", name="glowstick_pink", on=_rave["on"])
+        ui.add_message("system", "Rave set on: pacifier and glow sticks." if _rave["on"] else "Rave set off.")
         return True
 
     if text == "/outfit" or text.startswith("/outfit "):

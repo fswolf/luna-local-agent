@@ -133,6 +133,15 @@ def _reading():
         return False
 
 
+def _plushie():
+    try:
+        from life import plushie
+
+        return plushie.holding()
+    except Exception:
+        return False
+
+
 def _emit(kind, **data):
     try:
         from web import livefeed
@@ -154,6 +163,12 @@ def begin(now=None, by_hand=True):
     with _lock:
         if _state["on"]:
             return False
+    try:                                               # one thing in her hands: Mochi goes down first
+        from life import plushie
+
+        plushie.finish()
+    except Exception:
+        pass
     if _reading():                                     # /coffee while she reads: the book goes down first
         from life import reading
 
@@ -224,7 +239,7 @@ def tick(now=None):
         return
 
     if (enabled() and morning() and _watching() and not had_today() and _someone_here() and not _busy() and not _lewd()
-            and not _reading() and not _walked_away()):
+            and not _reading() and not _walked_away() and not _plushie()):
         begin(now, by_hand=False)
 
 

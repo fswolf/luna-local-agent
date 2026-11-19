@@ -110,6 +110,28 @@ _reading_cfg = dict(_portrait_cfg.get("reading", {}) or {})
 PORTRAIT_READING = flag(_reading_cfg.get("enabled", True))
 PORTRAIT_READING_AFTER = max(1.0, float(_reading_cfg.get("after", 10)))
 PORTRAIT_READING_MINUTES = max(1.0, float(_reading_cfg.get("minutes", 60)))
+# Late at night (from `from` to `to` o'clock), when nobody has talked to her
+# for `after` minutes, she pulls her blanket round her and dozes off
+# (life/dozing.py) until you're back, or for `minutes` at most.
+#   "dozing": { "enabled": true, "from": 22, "to": 6, "after": 20, "minutes": 90 }
+_dozing_cfg = dict(_portrait_cfg.get("dozing", {}) or {})
+PORTRAIT_DOZING = flag(_dozing_cfg.get("enabled", True))
+PORTRAIT_DOZING_FROM = int(_dozing_cfg.get("from", 22))
+PORTRAIT_DOZING_TO = int(_dozing_cfg.get("to", 6))
+PORTRAIT_DOZING_AFTER = max(1.0, float(_dozing_cfg.get("after", 20)))
+PORTRAIT_DOZING_MINUTES = max(1.0, float(_dozing_cfg.get("minutes", 90)))
+# Sticky notes (life/stickynotes.py): she writes a reminder down when she sets
+# it and holds the note up when it comes due.
+PORTRAIT_STICKY_NOTES = flag(_portrait_cfg.get("sticky_notes", True))
+# Her plushie (life/plushie.py): when her mood has been one of `moods` for
+# `after` seconds she hugs Mochi, her moon-cat plush, and sets him down once
+# she feels better (or after `minutes`).
+#   "plushie": { "enabled": true, "moods": ["sad", "hurt", "sulky"], "after": 60, "minutes": 30 }
+_plushie_cfg = dict(_portrait_cfg.get("plushie", {}) or {})
+PORTRAIT_PLUSHIE = flag(_plushie_cfg.get("enabled", True))
+PORTRAIT_PLUSHIE_MOODS = [str(m) for m in (_plushie_cfg.get("moods") or ["sad", "hurt", "sulky"])]
+PORTRAIT_PLUSHIE_AFTER = max(0.0, float(_plushie_cfg.get("after", 60)))
+PORTRAIT_PLUSHIE_MINUTES = max(1.0, float(_plushie_cfg.get("minutes", 30)))
 PORTRAIT_SOUND_VOLUME = max(0.0, min(1.0, float(_portrait_cfg.get("sound_volume", 0.8))))
 # Hologram fans (web/holofan.py, docs/fans.md). An HDMI fan just shows
 # /portrait/?fan=1. A WiFi fan run by the Holoscope app (P56, PD42...) gets

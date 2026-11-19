@@ -243,6 +243,14 @@ from life import reading  # noqa: E402
 
 reading.start()               # she reads while you're quiet (life/reading.py), on the portrait
 
+from life import dozing  # noqa: E402
+
+dozing.start()                # late at night she dozes off under her blanket (life/dozing.py)
+
+from life import plushie  # noqa: E402
+
+plushie.start()               # she hugs her plushie when she's feeling low (life/plushie.py)
+
 # Relay stations (web/station.py): an old phone or tablet in another room,
 # when switched on in the settings
 from web import station  # noqa: E402

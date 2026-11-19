@@ -142,8 +142,8 @@ def split_path(path):
 # Every kind portrait.js and live2d.js act on (their handle() switch);
 # tests/test_portrait_serve.py checks the two stay in step.
 PORTRAIT_KINDS = frozenset((
-    "background", "chat", "done", "emote", "feeling", "flags", "frame", "gaze", "gesture",
-    "gesture_mode", "holo", "lights", "match_light", "mood", "outfit", "prop", "reload",
+    "background", "chat", "done", "doze", "emote", "feeling", "flags", "frame", "gaze", "gesture",
+    "gesture_mode", "holo", "lights", "match_light", "mood", "note", "outfit", "prop", "reload",
     "sounds", "stage", "tok", "tool", "turn", "voice",
 ))
 

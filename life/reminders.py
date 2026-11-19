@@ -337,7 +337,19 @@ def add(text, due, repeat, kind="reminder"):
     save()
     _wake.set()
 
+    if kind == "reminder":
+        _sticky("wrote", text)          # she writes it down on a sticky note (portrait)
+
     return reminder
+
+
+def _sticky(what, arg):
+    try:
+        from life import stickynotes
+
+        getattr(stickynotes, what)(arg)
+    except Exception:
+        pass
 
 
 def _extract_reminder(model, text):
@@ -666,6 +678,7 @@ def _deliver(model, texts, missed=False):
     with interrupts.using(kind="reminder") as stop:
         ui.set_status("Reminder due...")
         answer = llm.ask(trigger, model, source="reminder")
+        _sticky("show", texts)          # she holds the note up as she says it (portrait)
         ui.add_message(AGENT_NAME.lower(), answer)
         _note_away("reminder", f"a reminder went off: {body}")
 

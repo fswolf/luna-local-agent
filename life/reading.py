@@ -115,6 +115,15 @@ def _coffee():
         return False
 
 
+def _plushie():
+    try:
+        from life import plushie
+
+        return plushie.holding()
+    except Exception:
+        return False
+
+
 def _emit(kind, **data):
     try:
         from web import livefeed
@@ -130,6 +139,12 @@ def begin(now=None, by_hand=True):
     with _lock:
         if _state["on"]:
             return False
+    try:                                               # one thing in her hands: Mochi goes down first
+        from life import plushie
+
+        plushie.finish()
+    except Exception:
+        pass
     if _coffee():                                      # /read with her coffee in hand: the mug goes down first
         from life import coffee
 
@@ -212,7 +227,7 @@ def tick(now=None):
     quiet_from = now - idle
     fresh = _state["spent"] is None or quiet_from > _state["spent"] + 1   # not the stretch she already read through
     if (enabled() and idle >= after and fresh and _watching() and not _busy() and not _not_now()
-            and not _coffee()):
+            and not _coffee() and not _plushie()):
         begin(now, by_hand=False)
 
 

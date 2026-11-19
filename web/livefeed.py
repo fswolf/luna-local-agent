@@ -76,7 +76,7 @@ _lock = threading.Lock()
 # The last of each of these, replayed to a page that opens mid-session,
 # so it shows where things stand instead of a blank screen until the
 # next turn.
-_SNAPSHOT_KINDS = ("stage", "mood", "context", "server", "turn", "gaze", "holo", "prop")
+_SNAPSHOT_KINDS = ("stage", "mood", "context", "server", "turn", "gaze", "holo", "prop", "doze")
 _snapshot = {}
 
 

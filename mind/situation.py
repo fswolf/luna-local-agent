@@ -170,9 +170,11 @@ def _reminders():
 
 
 def _hands():
-    """What she's holding on her portrait: her coffee (life/coffee.py) or a book (life/reading.py)."""
+    """What she's holding or doing on her portrait: her coffee (life/coffee.py), a book
+    (life/reading.py), her plushie (life/plushie.py), or she's dozed off under her
+    blanket (life/dozing.py)."""
     out = []
-    for mod in ("coffee", "reading"):
+    for mod in ("coffee", "reading", "plushie", "dozing"):
         try:
             line = importlib.import_module("life." + mod).describe()
         except Exception:
