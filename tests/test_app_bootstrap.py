@@ -78,6 +78,40 @@ class Steps(unittest.TestCase):
                          ["the Luna app starts her - nothing to add"])
 
 
+class SameAsTheInstaller(unittest.TestCase):
+    def test_every_step_the_page_lists_is_one_the_installer_has(self):
+        """The page's list is a copy of the installer's step titles: renaming
+        one there must rename it here, or it never lights up."""
+        import re
+
+        with open(os.path.join(b.ROOT, "installer", "install.py"), encoding="utf-8") as f:
+            titles = set(re.findall(r'step\("([^"]+)"\)', f.read()))
+        self.assertEqual([t for t in b.STEPS if t not in titles], [])
+
+    def test_its_args_are_ones_the_installer_takes(self):
+        with open(os.path.join(b.ROOT, "installer", "install.py"), encoding="utf-8") as f:
+            source = f.read()
+        for arg in b.INSTALL_ARGS:
+            if arg.startswith("--"):
+                self.assertIn(f'"{arg}"', source)
+
+    def test_what_it_makes_goes_in_the_install_record(self):
+        root = tempfile.mkdtemp()
+        with open(os.path.join(root, "install.json"), "w") as f:
+            json.dump({"venv": "/v"}, f)
+        with mock.patch.object(b, "ROOT", root):
+            b.remember("desktop", "/apps/luna.desktop")
+        with open(os.path.join(root, "install.json")) as f:
+            self.assertEqual(json.load(f), {"venv": "/v", "desktop": "/apps/luna.desktop"})
+
+    def test_uninstall_knows_the_apps_folder(self):
+        sys.path.insert(0, os.path.join(b.ROOT, "installer"))
+        import uninstall
+
+        with mock.patch.dict(os.environ, {"XDG_DATA_HOME": _tmp, "LOCALAPPDATA": _tmp}):
+            self.assertEqual(os.path.normcase(uninstall.app_dir()).lower(), os.path.normcase(b.data_dir()).lower())
+
+
 class Retry(unittest.TestCase):
     def test_once_and_only_after_failing(self):
         b.P.reset()

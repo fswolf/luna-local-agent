@@ -78,29 +78,9 @@ class Luna:
         self.refresh()
 
     def open_chat(self):
-        """Her chat in a window of its own (the same as ./start_web.sh when she's running)."""
-        sys.path.insert(0, ROOT)
-        url = self.url + "/chat/"
-        try:
-            from web import portrait_window
-
-            cmd = portrait_window.command(url, 900, 980, profile="luna-chat")
-        except Exception:
-            cmd = None
-        if cmd:
-            import subprocess
-
-            try:
-                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 stdin=subprocess.DEVNULL,
-                                 **({"creationflags": 0x08000000} if os.name == "nt"     # CREATE_NO_WINDOW
-                                    else {"start_new_session": True}))
-                return
-            except OSError:
-                pass
-        import webbrowser
-
-        webbrowser.open(url)
+        """Her chat in a window of its own: she opens it, the way /chat and
+        her own start do (web/chat_web.open_window, portrait.browser and all)."""
+        self.act("chat")
 
 
 def items(luna):

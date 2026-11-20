@@ -23,4 +23,5 @@ pillow>=10; sys_platform != "linux"              # pystray's icon
 #   openwakeword       "hey Luna" instead of a key press
 #   mcp                tools from MCP servers
 #   pillow             portrait tools (Live2D import, textures), the Game Boy's screen
+#                      (always there on Windows and macOS: the tray icon needs it)
 #   websocket-client   the pomf.tv chat plugin

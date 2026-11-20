@@ -103,6 +103,22 @@ passes on one, `/skip` on all of it. Your name and pronouns go into
 `agent/agent.json`'s `user` block, where you can change them later, and
 she doesn't ask again.
 
+**The Luna app (no installer to run):** `app/luna.sh` (Linux and macOS),
+`app/Luna.command` (double-click on a Mac: right-click > Open the first
+time) or `app/Luna.cmd` (Windows) sets everything up by itself and starts
+her. The first run downloads [uv](https://github.com/astral-sh/uv) and a
+private Python 3.12 into Luna's own folder (`~/.local/share/luna`,
+`~/Library/Application Support/Luna` or `%LOCALAPPDATA%\Luna`), then shows a
+setup window that ticks through the installer's steps without asking
+anything: no admin password, nothing installed system-wide. System packages
+it can't install without one (PortAudio, espeak-ng) are listed there with
+the command and a Copy button; she starts without them, typing only. When
+it's done the window closes, her chat opens, and she's in your app menu
+(Linux) or Start menu (Windows). Later starts go straight to her; an update
+that changes her packages shows the setup window again. `--setup` runs it
+again on purpose. Her model server is still yours to start, as above. The
+Windows and macOS launchers haven't been tested yet.
+
 **Updating:** `./update.sh` gets the latest version. It saves a copy of
 your `config.json` in `agent/backups/` first, pulls the update while
 keeping any changes you made, installs any Python packages the update
@@ -128,7 +144,8 @@ the portrait, settings, her voice on or off, push to talk, Stop and Quit.
 With the tray there, closing her window leaves her running in it, like any
 app with a tray icon; without one (GNOME needs the AppIndicator extension),
 closing her window quits her. /quit always does. `monitor.tray` false turns
-the icon off. Running it again while she's up just opens her window. `--web --here` keeps her on the terminal instead (Ctrl+C quits).
+the icon off; the icon's own log is `~/.cache/ai-voice/tray.log`. Running it
+again while she's up just opens her window. `--web --here` keeps her on the terminal instead (Ctrl+C quits).
 Plain `./start.sh` is the terminal screen, as before.
 
 **Checking:** `./start.sh --check` says in plain words what's missing

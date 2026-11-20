@@ -5,7 +5,9 @@ Everything else stays as it is. The conversation, the status and a tool's
 question still live in ui.shared, and the chat page (web/chat_web.py) shows
 them and answers them. What the screen did is done here by a small stand-in:
 a loop on the main thread that runs what's typed in the page, the same way
-Enter does in the terminal.
+Enter does in the terminal. Beside her window, her icon in the system tray
+(app/tray.py, monitor.tray): with it showing, closing the window leaves her
+running there.
 
 Part of the ui package; see ui/__init__.py.
 """

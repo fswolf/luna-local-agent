@@ -166,6 +166,9 @@ class Server(unittest.TestCase):
         self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"quit"}')[0], 200)
         self.assertEqual(self.sent, [("/portrait", None), ("/quit", None)])
         self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"rm -rf"}')[0], 400)
+        with mock.patch.object(chat_web, "open_window") as opened:
+            self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"chat"}')[0], 200)
+        opened.assert_called_once_with()
         self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"quit"}', origin="http://evil.example")[0], 403)
         from web import settings_web
         with mock.patch.object(settings_web, "change", return_value=(True, "saved", None)) as change, \

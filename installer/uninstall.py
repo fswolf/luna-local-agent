@@ -4,8 +4,9 @@
 
 Removes the launchers it made (the 'luna' command, the app-launcher
 entry, the Start menu shortcut, luna.cmd / Luna.command), and - after
-asking - the virtual environments it created inside this folder and the
-kokoro-reader it cloned. Never touched: agent/ (memory, mood, lessons),
+asking - the virtual environments it created inside this folder, the
+kokoro-reader it cloned, and the Luna app's own folder (app/luna.sh and
+the rest: uv, its Python and her packages). Never touched: agent/ (memory, mood, lessons),
 history/, reminders/, config.json, your models. Delete the folder
 yourself if you want those gone too.
 """
@@ -15,6 +16,7 @@ import shutil
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WIN = os.name == "nt"
 STATE = os.path.join(ROOT, "install.json")
 YES = "--yes" in sys.argv or "-y" in sys.argv
 
@@ -39,6 +41,15 @@ def gone(path, what):
         print(f"  couldn't remove {path}: {e}")
 
 
+def app_dir():
+    """The Luna app's folder (app/bootstrap.py data_dir), whether or not it's there."""
+    if WIN:
+        return os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser(r"~\AppData\Local"), "Luna")
+    if sys.platform == "darwin":
+        return os.path.expanduser("~/Library/Application Support/Luna")
+    return os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "luna")
+
+
 def main():
     try:
         with open(STATE, encoding="utf-8") as f:
@@ -55,6 +66,9 @@ def main():
     gone(os.path.join(ROOT, "Luna.command"), "launcher")
 
     v = s.get("venv")
+    app = app_dir()
+    if v and os.path.realpath(v).startswith(os.path.realpath(app) + os.sep):
+        v = None                   # the app's own: it goes with the app's folder, below
     if v and os.path.realpath(v).startswith(ROOT + os.sep):
         if ask(f"Remove Luna's Python environment ({v}, a few GB)?", True):
             gone(v, "environment")
@@ -65,6 +79,10 @@ def main():
     if k and os.path.isdir(k) and s.get("voice", {}).get("mode") == "managed":
         if ask(f"Remove kokoro-reader ({k})? Other apps may use it.", False):
             gone(k, "kokoro-reader")
+
+    if os.path.isdir(app) and ask(f"Remove the Luna app's folder ({app}: uv, its Python and her "
+                                  "packages, a few GB)?", True):
+        gone(app, "the Luna app's folder")
 
     gone(STATE, "install record")
     print("Done. Your memory, history and settings are still in", ROOT)

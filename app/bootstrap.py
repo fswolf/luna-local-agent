@@ -301,6 +301,19 @@ def start_luna(py):
                             stderr=subprocess.DEVNULL, **flags)
 
 
+def remember(key, value):
+    """Note something the setup made in install.json, the installer's record,
+    so installer/uninstall.py can take it away again."""
+    path = os.path.join(ROOT, "install.json")
+    state = load(path)
+    state[key] = value
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+    except OSError:
+        pass
+
+
 def menu_entry():
     """Luna in the app menu (Linux) or the Start menu (Windows), once she's
     set up, so the launcher needn't be found again."""
@@ -315,6 +328,8 @@ def menu_entry():
                   + (f'$s.IconLocation="{icon}";' if os.path.exists(icon) else "") + "$s.Save()")
             subprocess.run(["powershell", "-NoProfile", "-Command", ps], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW, timeout=30)
+            if os.path.exists(menu):
+                remember("shortcut", menu)
         elif not MAC:
             apps = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"),
                                 "applications")
@@ -324,6 +339,7 @@ def menu_entry():
                         f"Exec=\"{os.path.join(HERE, 'luna.sh')}\"\nPath={ROOT}\n"
                         f"Icon={os.path.join(ROOT, 'web', 'luna-logo.png')}\n"
                         "Terminal=false\nCategories=Utility;Chat;\nStartupNotify=false\n")
+            remember("desktop", os.path.join(apps, "luna.desktop"))
     except (OSError, subprocess.SubprocessError):
         pass
 

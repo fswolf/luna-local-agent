@@ -66,8 +66,9 @@ Like her other pages it only answers on this computer (127.0.0.1).
 To use only this page, with no terminal screen at all, start her with
 `./start_web.sh` (`start_web.cmd` on Windows; the same as `./start.sh --web`):
 the page opens in a window of its own, without an address bar, the terminal
-can close, and closing the window quits her ([install](install.md) has the
-rest). Plain `./start.sh` is the terminal, and both stay: the terminal is the
+can close, and her icon sits in the system tray. Closing the window leaves
+her running there; with no tray to show it in, closing the window quits her
+([install](install.md) has the rest). Plain `./start.sh` is the terminal, and both stay: the terminal is the
 one for a server or an SSH session.
 
 ## Selecting text

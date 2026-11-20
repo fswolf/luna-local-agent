@@ -11,7 +11,9 @@ in the page too, and either side can answer it.
     GET  /chat/head.js     her header, put on every page by livefeed.with_switcher
     GET  /chat/logo.png    her emblem, for the menu button
     GET  /chat/state       the conversation from where the page is up to; waits
-                           up to WAIT seconds for something to change (v=)
+                           up to WAIT seconds for something to change (v=).
+                           head=1: only her header (status, model, busy, mic, voice);
+                           tray=1 as well: the tray icon is up (app/tray.py)
     POST /chat/say         {"text"} or a form with "text" and one "file"
     POST /chat/talk        the mic button: HOME (talk, done, or stop her)
     POST /chat/stop        stop her (and anything physical), like ai-voice-ctl stop
@@ -19,6 +21,8 @@ in the page too, and either side can answer it.
     POST /chat/rate        {"e", "i", "up": true|false, "better"}: the thumbs on her
                            reply at conversation index i (matched by its text), kept as an example for her
                            patches (training/dataset.py rate)
+    POST /chat/tray        {"action": "chat" | "portrait" | "settings" | "voice" | "quit"}: the
+                           tray icon's menu (chat opens her window; voice flips tts.enabled)
 """
 import json
 import os
@@ -239,6 +243,9 @@ def _tray(body):
 
         ok, message, _entry = settings_web.change("tts.enabled", not _voice_on())
         return _json(200 if ok else 400, {"ok": ok, "message": message, "voice_on": _voice_on()})
+    if action == "chat":
+        open_window()
+        return _json(200, {"ok": True})
     command = {"portrait": "/portrait", "settings": "/settings", "quit": "/quit"}.get(action)
     if not command:
         return _json(400, {"error": "unknown action"})
