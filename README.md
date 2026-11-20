@@ -333,4 +333,19 @@ It goes toward her own home server: a second GPU so she can run bigger, smarter 
 
 # License
 
-MIT License
+Copyright (C) 2026 fswolf
+
+Luna is free software under the [GNU Affero General Public License v3.0](LICENSE)
+or any later version (AGPL-3.0-or-later). You can use her, change her and
+share her. If you share a changed version, or run one as a service other
+people use over a network, you have to offer them its source code under the
+same license.
+
+Versions released before November 20, 2026 were under the MIT License, and
+they stay that way.
+
+Third-party parts keep their own licenses: Zork I in `games/zork/` is MIT
+(see `games/zork/LICENSE-zork1`), the bundled three.js, three-vrm, pixi.js
+and pixi-live2d-display in `portrait/viewer/vendor/` are MIT, and the models
+and Live2D's Cubism Core that she downloads come under their publishers'
+licenses.
