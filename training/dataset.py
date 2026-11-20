@@ -109,6 +109,26 @@ def _me():
         return "luna"
 
 
+def _find(epoch, text):
+    """The key of the turn whose reply this is (as it shows on screen), or None.
+    Noted when her turn ended, her reply can still be getting its last words
+    on screen (the voice's last sentence, a held-back tag): so the screen's
+    text only has to start with what was noted. Caller holds _lock."""
+    text = str(text).strip()
+    if (epoch, text) in _recent:
+        return (epoch, text)
+    best = None
+    for (e, shown) in _recent:
+        if e == epoch and shown and text.startswith(shown) and (best is None or len(shown) > len(best[1])):
+            best = (e, shown)
+    if best is None and len(text) >= 40:
+        # the same opening, changed further on (a sentence held back, then put in): the newest such
+        for (e, shown) in reversed(list(_recent)):
+            if e == epoch and shown[:80] == text[:80]:
+                return (e, shown)
+    return best
+
+
 def rateable(epoch, conversation):
     """{index: "" | "up" | "fix" | "down" | "tools"} for her replies in
     conversation (the [speaker, text] list on screen) that the thumbs know:
@@ -119,8 +139,8 @@ def rateable(epoch, conversation):
     out = {}
     with _lock:
         for i, (who, text) in enumerate(conversation):
-            key = (epoch, str(text).strip())
-            if who == me and key in _recent:
+            key = _find(epoch, text) if who == me else None
+            if key:
                 out[i] = "tools" if _recent[key].get("used_tools") else _rated.get(key, "")
     return out
 
@@ -129,9 +149,9 @@ def rate(epoch, shown, up, better=None):
     """The chat page's thumbs on her reply (as it shows on screen): up keeps
     it as it is, down with your version keeps that, down alone keeps it as a
     bad reply. Returns the example; ValueError says why not."""
-    key = (int(epoch), str(shown or "").strip())
     with _lock:
-        turn = _recent.get(key)
+        key = _find(int(epoch), str(shown or "").strip())
+        turn = _recent.get(key) if key else None
         turn = json.loads(json.dumps(turn)) if turn and not turn.get("used_tools") else None
     if turn is None:
         raise ValueError("that reply is too old to keep, or wasn't one of your own turns")

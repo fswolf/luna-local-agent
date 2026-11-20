@@ -206,6 +206,13 @@ class Thumbs(unittest.TestCase):
         self.assertEqual(dataset.rateable(0, self.convo)[1], "up")
         self.assertEqual(dataset.examples()[0]["rated"], "up")
 
+    def test_words_that_reach_the_screen_after_the_turn_ended(self):
+        # noted at the end of her turn; the last sentence lands on screen just after
+        self.turn("Hi there. How are you?", shown="Hi there.")
+        self.convo[-1] = ("luna", "Hi there. How are you?")
+        self.assertEqual(dataset.rateable(0, self.convo), {1: ""})
+        self.assertEqual(dataset.rate(0, "Hi there. How are you?", True)["reply"], "Hi there. How are you?")
+
     def test_a_line_added_above_doesnt_lose_it(self):
         self.turn("a reply")
         self.convo.insert(1, ("system", "tool: something"))       # lands above her reply later
