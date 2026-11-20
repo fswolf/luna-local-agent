@@ -71,7 +71,6 @@ border-radius:12px;font-size:13px;color:var(--dim);align-self:flex-start;max-wid
 .msg.her:hover .rate,.rate.done,.rate.open{opacity:1}
 .rate>button{background:none;border:0;border-radius:8px;padding:1px 6px;font-size:14px;cursor:pointer;filter:grayscale(1)}
 .rate>button:hover,.rate>button.on{filter:none;background:#2a2040}
-.rate>button.off{opacity:.35;cursor:help;background:none;filter:grayscale(1)}
 .rate>button.copy{font-size:13px;color:var(--dim);filter:none}
 .rate .said{color:var(--dim);font-size:12px;align-self:center;margin-right:auto}
 .better{display:flex;flex-direction:column;gap:6px;margin-top:6px;width:100%}
@@ -192,28 +191,22 @@ function thumbs() {
     const st = rates[idx] === undefined ? 'old' : rates[idx];
     if (bar && bar.dataset.st === st) return;
     if (bar) bar.remove();
-    const can = st !== 'old' && st !== 'tools';
-    const why = st === 'tools' ? "she used a tool in this reply - only plain replies can be kept as examples for now"
-              : "from before Luna started - only replies since then can be kept";
+    const can = st !== 'old' && st !== 'tools';     // thumbs only where they work; copy on every reply
     const b = document.createElement('div'); b.className = 'rate' + (st === 'up' || st === 'fix' || st === 'down' ? ' done' : ''); b.dataset.st = st;
     b.innerHTML = `<span class=said>${st === 'up' ? 'kept as a good example' : st === 'fix' ? 'kept your version' : st === 'down' ? 'kept as a bad one' : ''}</span>
-      <button class=copy data-r=copy title="copy">⧉</button>
-      <button data-r=up>👍</button><button data-r=down>👎</button>`;
-    const up = b.querySelector('[data-r=up]'), dn = b.querySelector('[data-r=down]');
-    up.title = can ? "a good reply: keep it as an example for her patches" : why;
-    dn.title = can ? "not like this: say how it should have gone" : why;
-    up.classList.toggle('off', !can); dn.classList.toggle('off', !can);   // (not disabled: a disabled button shows no tooltip)
-    up.classList.toggle('on', st === 'up');
-    dn.classList.toggle('on', st === 'down' || st === 'fix');
-    up.onclick = ev => { ev.stopPropagation(); can ? rate(idx, true, '') : say(why); };
-    dn.onclick = ev => { ev.stopPropagation(); can ? better(el, b, idx) : say(why); };
+      <button class=copy data-r=copy title="copy">⧉</button>${can ? '<button data-r=up>👍</button><button data-r=down>👎</button>' : ''}`;
+    if (can) {
+      const up = b.querySelector('[data-r=up]'), dn = b.querySelector('[data-r=down]');
+      up.title = "a good reply: keep it as an example for her patches";
+      dn.title = "not like this: say how it should have gone";
+      up.classList.toggle('on', st === 'up');
+      dn.classList.toggle('on', st === 'down' || st === 'fix');
+      up.onclick = ev => { ev.stopPropagation(); rate(idx, true, ''); };
+      dn.onclick = ev => { ev.stopPropagation(); better(el, b, idx); };
+    }
     b.querySelector('[data-r=copy]').onclick = ev => { ev.stopPropagation(); copy(msgs[at] ? msgs[at][1] : '', ev.currentTarget); };
     el.appendChild(b);
   });
-}
-function say(words) {      // a note under the chat that goes away by itself
-  const err = $('#err'); err.textContent = words;
-  setTimeout(() => { if (err.textContent === words) err.textContent = ''; }, 5000);
 }
 async function copy(words, btn) {
   try { await navigator.clipboard.writeText(words); }
