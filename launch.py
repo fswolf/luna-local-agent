@@ -10,6 +10,9 @@ Any arguments are passed on to main.py. Before her:
   false}, or llm.backend "lmstudio".
 - the voice server, if the installer set one up.
 
+With --web (her window, the Luna app) and no model server answering, her
+window asks where one is first (web/connect.py), instead of her quitting.
+
 Each is started only if it isn't already answering, and stopped again
 when she exits - one that was already running before is left alone.
 
@@ -393,8 +396,9 @@ def monitor_url():
 
 def detach(args):
     """--web: start her again in a session of her own, with her output in a
-    log, and come straight back, so this terminal can close. Closing her
-    window (or /quit on the page) quits her; --here keeps her on this terminal.
+    log, and come straight back, so this terminal can close. /quit on the
+    page (or Quit on her tray icon) quits her, and so does closing her window
+    when there's no tray icon; --here keeps her on this terminal.
     Already running: open her window instead of a second Luna."""
     if _answers(monitor_url() + "/chat/state"):
         sys.path.insert(0, ROOT)
@@ -416,8 +420,19 @@ def detach(args):
                          env=dict(os.environ, LUNA_DETACHED="1"), stdin=subprocess.DEVNULL,
                          stdout=out, stderr=subprocess.STDOUT, **_own_session())
     print("Luna's starting on her own - her window opens in a moment, and this terminal can close.")
-    print(f"Closing her window quits her (so does /quit there). Her output: {log}")
+    print(f"Quit her from her tray icon or with /quit (with no tray icon, closing her window does). "
+          f"Her output: {log}")
     return 0
+
+
+def connected():
+    """--web: a model to talk to, or her window asks where one is
+    (web/connect.py) and saves what it finds. False: "Not now", or the
+    window closed, and she doesn't start."""
+    sys.path.insert(0, ROOT)
+    from web import connect
+
+    return connect.wait(say=lambda line: print(line, flush=True))
 
 
 def _answers(url):
@@ -458,6 +473,9 @@ def main():
         sys.exit(detach(args))
     s = state()
     llama = start_llama(s)
+    if "--web" in args and not connected():
+        stop_group(llama)
+        sys.exit(0)
     voice = None
     v = s.get("voice", {})
     url = tts_url()

@@ -95,7 +95,7 @@ function render(s){
   $("msg").textContent = s.message;
   const total = s.steps.length || 1;
   let done = s.steps.filter(x => x.state !== "todo" && x.state !== "doing").length;
-  const later = {"Her brain (the model server)": "Skipped for now: Luna needs a model server (LM Studio, or llama.cpp)"};
+  const later = {"Her brain (the model server)": "Later: when she starts, her window asks where one is"};
   const slow = {"Luna's Python environment": "Downloading her packages: the slow part, a few minutes",
                 "Her voice (kokoro-reader)": "Downloading her voice: a few minutes"};
   if (s.steps.some(x => x.state === "doing")) done += 0.5;
@@ -133,7 +133,7 @@ function render(s){
   if (s.phase === "failed") $("failmsg").textContent = s.message;
   if (s.phase === "failed" && lastPhase !== "failed") $("details").open = true;     // once: it can be closed again
   lastPhase = s.phase;
-  if (s.phase === "ready") { $("title").textContent = "Luna's ready"; $("msg").textContent = "Her window is opening. This one closes by itself."; }
+  if (s.phase === "ready") { $("title").textContent = "Luna's set up"; $("msg").textContent = s.message + " This window closes by itself."; }
 
   if (s.log_total !== lastLog) {      // the page gets the last 400 lines: count them all
     const pre = $("log"), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;

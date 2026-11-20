@@ -126,7 +126,17 @@ def _llm_key():
 LLM_API_KEY = _llm_key()
 
 # Sent with every request to the model server.
-if LLM_BACKEND == "llama":
+def _local(url):
+    from urllib.parse import urlparse
+
+    return (urlparse(url).hostname or "") in ("127.0.0.1", "localhost", "::1")
+
+
+if LLM_BACKEND == "llama" and LLM_API_KEY and not _local(LLAMA_URL):
+    # llama-server on another computer (web/connect.py saves its key in llm.json):
+    # this computer's start.sh key is for the one here
+    LLM_HEADERS = {"Authorization": f"Bearer {LLM_API_KEY}"}
+elif LLM_BACKEND == "llama":
     LLM_HEADERS = dict(_LLAMA_HEADERS)
 elif LLM_API_KEY:
     LLM_HEADERS = {"Authorization": f"Bearer {LLM_API_KEY}"}

@@ -358,12 +358,20 @@ def work():
     P.set(phase="starting", message="All set. Starting Luna...")
     url = monitor_url() + "/chat/"
     start_luna(her_python())           # already running: it opens her window instead
+    base = os.environ.get("LOCALAPPDATA") if WIN else os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    asking = os.path.join(base or os.path.expanduser("~"), "ai-voice", "connect.url")   # web/connect.py
+    started = time.time()
     for _ in range(240):                        # her first start loads the speech models
         if answers(url + "state"):
-            P.set(phase="ready", message="Luna's up.", ready_url=url)
+            P.set(phase="ready", message="Her window is opening.", ready_url=url)
             return
+        try:
+            if os.path.getmtime(asking) >= started - 5:
+                P.set(phase="ready", message="Set up. Now she needs a model: her window asks where one is.")
+                return
+        except OSError:
+            pass
         time.sleep(0.5)
-    base = os.environ.get("LOCALAPPDATA") if WIN else os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     P.set(phase="failed", message="She was set up but didn't start. Her log says why: "
           + os.path.join(base or os.path.expanduser("~"), "ai-voice", "web.log"))
 

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect Luna to a model</title>
+<link rel="icon" href="/logo.png">
+<style>
+:root{--bg:#120d1c;--panel:#1a1328;--line:#3a2d55;--text:#ece6f7;--dim:#a49bc0;--accent:#ff87d7;
+--ok:#7be0a8;--warn:#ffcf6b;--bad:#ff7b8a}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:620px;margin:0 auto;padding:26px 18px 40px}
+header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+header img{width:56px;height:56px;border-radius:14px}
+h1{font-size:21px;margin:0}
+h2{font-size:16px;margin:0 0 6px}
+p{margin:6px 0}
+.dim{color:var(--dim)}
+.look{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);
+border-radius:12px;padding:10px 12px;margin:10px 0 16px;font-size:13.5px}
+.spin{width:16px;height:16px;flex:none;margin-top:2px;border-radius:50%;border:2px solid var(--accent);
+border-top-color:transparent;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.look ul{margin:2px 0 0;padding-left:18px;color:var(--dim)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+ol{margin:6px 0;padding-left:22px}
+li{margin:3px 0}
+a{color:var(--accent)}
+code{font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0d0914;
+border:1px solid var(--line);border-radius:6px;padding:1px 5px}
+label{display:block;font-size:13px;color:var(--dim);margin:8px 0 3px}
+input{width:100%;background:#0d0914;color:var(--text);border:1px solid var(--line);border-radius:9px;
+padding:8px 10px;font:inherit}
+input:focus{outline:none;border-color:var(--accent)}
+.row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+button{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:7px 14px;
+font:inherit;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.main{background:var(--accent);color:#2a0d22;border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.6;cursor:default}
+.msg{font-size:13.5px}
+.msg.bad{color:var(--bad)}.msg.ok{color:var(--ok)}
+.done{text-align:center;padding:40px 10px}
+.done .big{font-size:20px;color:var(--ok);margin-bottom:6px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="/logo.png" alt="">
+    <div><h1>Connect Luna to a model</h1>
+      <p class="dim">She thinks with a language model on a model server, and none is answering yet.</p></div>
+  </header>
+
+  <div id="ask">
+    <div class="look"><span class="spin"></span>
+      <div>Looking for one now, every couple of seconds. She starts by herself as soon as one answers.
+        <ul id="places"></ul></div>
+    </div>
+
+    <div class="card">
+      <h2>On this computer: LM Studio</h2>
+      <p class="dim">The easiest way. Free, for Linux, Windows and Mac.</p>
+      <ol>
+        <li>Get it from <a href="https://lmstudio.ai" target="_blank" rel="noopener">lmstudio.ai</a> and open it.</li>
+        <li>Download a model: search for <code>qwen3.5 9b</code> (or <code>4b</code> on a smaller graphics card) and load it.</li>
+        <li>In the <b>Developer</b> tab, switch on <b>Status: Running</b>.</li>
+      </ol>
+      <p class="dim">That's all: Luna finds it on its own.</p>
+    </div>
+
+    <div class="card">
+      <h2>On another computer</h2>
+      <p class="dim">A llama.cpp, LM Studio, Ollama or vLLM server on your network, like a home server.</p>
+      <label for="addr">Its address</label>
+      <input id="addr" placeholder="192.168.1.50:8080" autocomplete="off" spellcheck="false">
+      <div id="keybox" hidden>
+        <label for="key">Its API key</label>
+        <input id="key" type="password" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="row">
+        <button class="main" id="go">Connect</button>
+        <button id="addkey">It has a key</button>
+        <span class="msg" id="msg"></span>
+      </div>
+    </div>
+
+    <div class="card" id="llamacard">
+      <h2>On this computer: llama.cpp</h2>
+      <p class="dim">Already have llama.cpp? Start <code>llama-server</code> on port 8080 with a model, and she finds it.
+        <span id="llamalinux">On Linux, <code>./installer/install.sh --backend llama</code> builds it for your graphics card.</span></p>
+    </div>
+
+    <div class="row"><button id="later">Not now</button>
+      <span class="dim">She can't start without one; this window asks again next time.</span></div>
+  </div>
+
+  <div class="done" id="done" hidden>
+    <div class="big" id="donetitle">Connected</div>
+    <div id="donetext" class="dim"></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
+
+function render(s){
+  if (s.found) {
+    $("ask").hidden = true; $("done").hidden = false;
+    $("donetitle").textContent = `Connected to ${s.found.kind}`;
+    $("donetext").textContent = `${s.found.model} at ${s.found.base}. Luna's starting...`;
+    return;
+  }
+  $("places").innerHTML = s.looking.map(p =>
+    `<li>${esc(p.what)} at ${esc(p.base.replace(/^https?:\/\//, ""))}: ${esc(p.why || "checking")}</li>`).join("");
+  $("llamalinux").hidden = !s.os.startsWith("linux");
+}
+
+async function poll(){
+  try { render(await (await fetch("/status", {cache: "no-store"})).json()); }
+  catch (e) { $("places").innerHTML = "<li>this window has stopped - start Luna again</li>"; return; }
+  setTimeout(poll, 1000);
+}
+
+$("addkey").onclick = () => { $("keybox").hidden = false; $("addkey").hidden = true; $("key").focus(); };
+$("addr").addEventListener("keydown", e => { if (e.key === "Enter") $("go").click(); });
+$("key").addEventListener("keydown", e => { if (e.key === "Enter") $("go").click(); });
+
+$("go").onclick = async () => {
+  const address = $("addr").value.trim();
+  if (!address) { $("addr").focus(); return; }
+  $("go").disabled = true; $("msg").className = "msg"; $("msg").textContent = "trying...";
+  try {
+    const r = await (await fetch("/try", {method: "POST", headers: {"Content-Type": "application/json"},
+                                           body: JSON.stringify({address, key: $("key").value})})).json();
+    if (r.ok) { $("msg").className = "msg ok"; $("msg").textContent = `found ${r.model}`; }
+    else {
+      $("msg").className = "msg bad"; $("msg").textContent = r.why;
+      if (r.needs_key) { $("keybox").hidden = false; $("addkey").hidden = true; $("key").focus(); }
+    }
+  } catch (e) { $("msg").className = "msg bad"; $("msg").textContent = "couldn't ask"; }
+  $("go").disabled = false;
+};
+
+$("later").onclick = async () => {
+  try { await fetch("/close", {method: "POST"}); } catch (e) {}
+  window.close();
+  $("ask").hidden = true; $("done").hidden = false;
+  $("donetitle").textContent = "Not now"; $("donetitle").style.color = "var(--dim)";
+  $("donetext").textContent = "You can close this window. Start Luna again once a model server is running.";
+};
+poll();
+</script>
+</body>
+</html>

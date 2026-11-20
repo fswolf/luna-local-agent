@@ -116,8 +116,8 @@ the command and a Copy button; she starts without them, typing only. When
 it's done the window closes, her chat opens, and she's in your app menu
 (Linux) or Start menu (Windows). Later starts go straight to her; an update
 that changes her packages shows the setup window again. `--setup` runs it
-again on purpose. Her model server is still yours to start, as above. The
-Windows and macOS launchers haven't been tested yet.
+again on purpose. With no model server answering yet, her window asks where
+one is (below). The Windows and macOS launchers haven't been tested yet.
 
 **Updating:** `./update.sh` gets the latest version. It saves a copy of
 your `config.json` in `agent/backups/` first, pulls the update while
@@ -144,7 +144,16 @@ the portrait, settings, her voice on or off, push to talk, Stop and Quit.
 With the tray there, closing her window leaves her running in it, like any
 app with a tray icon; without one (GNOME needs the AppIndicator extension),
 closing her window quits her. /quit always does. `monitor.tray` false turns
-the icon off; the icon's own log is `~/.cache/ai-voice/tray.log`. Running it
+the icon off; the icon's own log is `~/.cache/ai-voice/tray.log`.
+
+**No model server yet?** Started this way, she doesn't quit: her window
+asks where one is. It keeps looking where `config.json` says and where LM
+Studio (port 1234) and llama.cpp (port 8080) usually are on this computer,
+explains how to get LM Studio going, and takes the address of a server on
+another computer (and its API key, if it has one). She starts the moment
+one answers with a model loaded, and what it found is saved (`llm` in
+`config.json`; a key goes in `~/.config/ai-voice/llm.json`, outside the
+repo), so next time she starts straight away. "Not now" closes it. Running it
 again while she's up just opens her window. `--web --here` keeps her on the terminal instead (Ctrl+C quits).
 Plain `./start.sh` is the terminal screen, as before.
 
