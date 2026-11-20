@@ -82,7 +82,10 @@ asks" or "when he asks" from the `user` block in `agent/agent.json`
 If you don't say how long, it keeps going until you (or she) change or
 stop it, up to `max_seconds` (an hour by default). Ask for "ten
 seconds" and you get a short burst. The caps are always yours, in `config.json`: she
-can ask for 100, but she can't raise a ceiling.
+can ask for 100, but she can't raise a ceiling. The settings page's
+Everyday tab has a panel for each way of connecting (on at startup, the
+strongest vibration and motion, the longest run), and a changed limit
+applies to her next command, no restart needed.
 
 ## Lovense
 
@@ -355,9 +358,9 @@ Most "it won't connect" problems are Bluetooth, not Luna. In order:
   whatever the model writes.
 - **Machines and strokers have their own cap**, `max_motion` (0-100,
   default 50), so a vibration setting never becomes a machine at full
-  speed. "Max" on a machine means this cap. To allow more, raise it in
-  `config.json` and `/intiface off`, `/intiface on` to reload; it's
-  deliberately not something she can change.
+  speed. "Max" on a machine means this cap. To allow more, raise it on
+  the settings page or in `config.json`; it applies to her next
+  command. It's deliberately not something she can change.
 - Motion always **builds up from slow** over `ramp_seconds` (default 3),
   even when she asks for full speed straight away. `0` turns the ramp
   off.

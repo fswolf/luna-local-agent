@@ -93,6 +93,20 @@ class Plan(unittest.TestCase):
         self.assertEqual(len(self.sent), n + 1)                         # renewed
         self.assertEqual(self.sent[-1]["action"], "Vibrate:10")
 
+    def test_one_toy_leaves_an_every_toy_job_to_the_others(self):
+        # renewals would otherwise hand the toy back to the old job
+        end = time.monotonic() + 3600
+        lv._plan[""] = {"vibe": (10, end)}
+        with lv._plan_lock:
+            lv._claim("g1")
+        self.assertNotIn("", lv._plan)
+        self.assertEqual(lv._plan["l1"], {"vibe": (10, end)})       # the other toy carries on
+        self.assertNotIn("g1", lv._plan)
+        lv._plan["g1"] = {"vibe": (3, end)}
+        with lv._plan_lock:
+            lv._claim("")                                        # every toy again: takes over
+        self.assertEqual(lv._plan, {})
+
     def test_stop_all_clears_everything(self):
         lv._plan["g1"] = {"vibe": (5, time.monotonic() + 30)}
         lv.stop_all_toys()

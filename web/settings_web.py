@@ -52,6 +52,8 @@ RANGES = {
     "portrait.lights.brightness": (0, 2, 0.05),
     "camera.presence.fps": (1, 10, 0.5), "camera.presence.greet_after_minutes": (5, 240, 5),
     "camera.presence.quiet_after_minutes": (1, 60, 1),
+    "plugins.lovense.max_strength": (0, 20, 1), "plugins.lovense.max_motion": (0, 20, 1),
+    "plugins.buttplug.max_intensity": (0, 100, 1), "plugins.buttplug.max_motion": (0, 100, 1),
 }
 
 
@@ -152,7 +154,7 @@ def entry(path):
 
     out = {"path": path, "name": pane._short(path, group), "group": group, "kind": kind,
            "help": line, "choices": list(choices), "set": is_set,
-           "live": bool(config.SETTINGS.get(path, (None, False))[1]),
+           "live": config.applies_now(path),
            "basic": path in BASIC, "range": _range(kind, line, path)}
 
     if path in PICKERS:

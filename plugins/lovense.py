@@ -203,6 +203,7 @@ def stop():
     _state["connected"] = False
     with _plan_lock:
         _plan.clear()
+        _presets.clear()                         # (or a restart would renew one)
 
     return (False, failed) if failed else (True, "lovense: stopped")
 
@@ -406,6 +407,35 @@ def _apply(key):
         _sent.pop(key, None)
 
 
+def _claim(key, keep_plan=True):
+    """Make room for a new command to `key` ("" = every toy), under
+    _plan_lock. Every target is renewed on its own timer, so an old one
+    left in place would win the toy back at its next renewal. A command to
+    every toy takes over the single-toy ones; a command to one toy takes
+    it out of an every-toy job, which carries on for the others.
+    keep_plan: vibration and motion share a plan, so one keeps the other."""
+    if key == "":
+        for k in [k for k in _plan if k]:
+            _plan.pop(k)
+        for k in [k for k in _sent if k]:
+            _sent.pop(k)
+        _presets.clear()
+    else:
+        others = [t for t in _state["toys"] if t != key]
+        if "" in _plan:
+            plan = _plan.pop("")
+            _sent.pop("", None)
+            for t in others:
+                _plan.setdefault(t, dict(plan))
+        if "" in _presets:
+            name, end, _lease = _presets.pop("")
+            for t in others:
+                _presets.setdefault(t, [name, end, 0.0])
+        _presets.pop(key, None)
+    if not keep_plan:
+        _plan.pop(key, None)
+
+
 def _apply_preset(key):
     """Renew a preset pattern's timer while it should go on."""
     now = time.monotonic()
@@ -482,9 +512,8 @@ def _register_tools():
         return cap if seconds in (None, "", 0, "0") else max(1, min(cap, int(seconds)))
 
     def span(seconds):
-        if seconds >= _caps()[1]:
-            return f"until it's changed or stopped (at most {round(seconds / 60)} min)"
-        return f"for {seconds}s" if seconds < 120 else f"for {round(seconds / 60)} min"
+        t = f"{seconds}s" if seconds < 120 else f"{round(seconds / 60)} min"
+        return f"until it's changed or stopped (at most {t})" if seconds >= _caps()[1] else f"for {t}"
 
     def vibrate(strength=10, seconds=None, toy=None):
         why = _toys.blocked()
@@ -501,7 +530,7 @@ def _register_tools():
             return "strength and seconds must be numbers"
         key = str(toy or "")
         with _plan_lock:
-            _presets.pop(key, None)                      # a steady level replaces a pattern
+            _claim(key)                                  # (a steady level replaces a pattern)
             _plan.setdefault(key, {})["vibe"] = (strength, time.monotonic() + seconds)
         _sent.pop(key, None)                             # (send it now, even if it's the same level)
         try:
@@ -529,7 +558,7 @@ def _register_tools():
             return "speed and seconds must be numbers"
         now = time.monotonic()
         with _plan_lock:
-            _presets.pop(key, None)
+            _claim(key)
             _plan.setdefault(key, {})["move"] = (speed, now + seconds, now, ramp)
         _sent.pop(key, None)
         try:
@@ -574,7 +603,7 @@ def _register_tools():
 
         key = str(toy or "")
         with _plan_lock:
-            _plan.pop(key, None)                 # a preset replaces whatever the toy was doing
+            _claim(key, keep_plan=False)         # a preset replaces whatever the toy was doing
             _presets[key] = [name, time.monotonic() + seconds, 0.0]
         _sent.pop(key, None)
         try:

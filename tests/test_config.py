@@ -76,6 +76,32 @@ class SetAtRunTime(unittest.TestCase):
         with open(self.file) as f:
             self.assertTrue(json.load(f)["plugins"]["example_test"]["enabled"])
 
+    def test_a_toy_limit_applies_to_the_next_command(self):
+        from plugins import buttplug as bp
+
+        value, live = config.save_any("plugins.buttplug.max_intensity", "40")
+        self.assertEqual(value, 40)
+        self.assertTrue(live)                                    # no "after a restart"
+        self.assertEqual(bp._caps()[0], 0.4)                     # and the plugin reads it now
+        self.assertFalse(config.applies_now("plugins.buttplug.url"))
+        self.assertTrue(config.applies_now("plugins.buttplug.enabled"))   # the switch connects now
+
+    def test_the_switch_on_the_page_connects_the_plugin(self):
+        import types
+
+        import plugins
+        from ui import settings_pane, tools_pane
+        module = types.SimpleNamespace(__name__="plugins.toytest", NAME="toytest", CONFIG="toycfg",
+                                       running=lambda: False)
+        plugin = plugins.Plugin(module)
+        with mock.patch.dict(plugins._loaded, {"toytest": plugin}, clear=True), \
+                mock.patch.object(tools_pane, "_toggle_plugin") as toggle:
+            settings_pane._after("plugins.toycfg.enabled", True)
+            toggle.assert_called_once_with("toytest", False)
+            toggle.reset_mock()
+            settings_pane._after("plugins.toycfg.enabled", False)   # already off: nothing to do
+            toggle.assert_not_called()
+
     def test_a_plugin_thats_on_but_never_connected_can_be_switched_off(self):
         # On at launch, the game wasn't open: the switch still shows on,
         # and off is saved without a connection to stop.

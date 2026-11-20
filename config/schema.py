@@ -510,23 +510,25 @@ SCHEMA = {
     "plugins.home.skip_tools": ("list", "Home Assistant tools to leave out (by default its timers and broadcast)"),
 
     # --- Plugins: Lovense ---------------------------------------------------
-    "plugins.lovense.enabled": ("bool", "Connect to the Lovense Remote app at startup"),
+    "plugins.lovense.enabled": ("bool", "Connected to the Lovense Remote app: switching it connects now and at every start"),
     "plugins.lovense.host": ("text", "Address of the Lovense Remote app (Game Mode)"),
     "plugins.lovense.port": ("int", "Port of the Lovense Remote app"),
     "plugins.lovense.use_https": ("bool", "Talk to the Lovense app over HTTPS"),
     "plugins.lovense.max_strength": ("int", "Strongest vibration she may use, 0-20"),
-    "plugins.lovense.max_seconds": ("float", "Longest she may run a toy, in seconds"),
     "plugins.lovense.max_motion": ("int", "Strongest thrusting or machine motion she may use, 0-20"),
+    "plugins.lovense.max_seconds": ("float", "Longest one command runs, in seconds. With no length given a toy "
+                                            "keeps going until it's changed or stopped, up to this (3600 is an hour)"),
     "plugins.lovense.ramp_seconds": ("float", "Seconds motion takes to build up from slow"),
     "plugins.lovense.stop_words": ("list", "Words in your message that stop every toy at once"),
     "plugins.lovense.stop_on_interrupt": ("bool", "Stop every toy when you interrupt her (HOME)"),
 
     # --- Plugins: Intiface Central (its settings keep the old key, "buttplug") ---
-    "plugins.buttplug.enabled": ("bool", "Connect to Intiface Central at startup"),
+    "plugins.buttplug.enabled": ("bool", "Connected to Intiface Central: switching it connects now and at every start"),
     "plugins.buttplug.url": ("text", "Intiface Central's address (a ws:// link)"),
     "plugins.buttplug.max_intensity": ("int", "Strongest vibration she may use, 0-100"),
-    "plugins.buttplug.max_seconds": ("float", "Longest she may run a device, in seconds"),
     "plugins.buttplug.max_motion": ("int", "Strongest stroking or machine motion she may use, 0-100"),
+    "plugins.buttplug.max_seconds": ("float", "Longest one command runs, in seconds. With no length given a device "
+                                             "keeps going until it's changed or stopped, up to this (3600 is an hour)"),
     "plugins.buttplug.ramp_seconds": ("float", "Seconds motion takes to build up from slow"),
     "plugins.buttplug.scan_on_start": ("bool", "Look for devices as soon as it connects"),
     "plugins.buttplug.stop_words": ("list", "Words in your message that stop every device at once"),
@@ -607,6 +609,18 @@ SCHEMA = {
     "plugins.chess.turn_seconds": ("float", "Longest one of her turns may run before it is cut short, in seconds"),
 }
 
+# Plugin settings that apply the moment they're saved: the plugin reads them
+# on every use (the toy limits), so the page needn't say "after a restart".
+LIVE_PLUGIN = frozenset(f"plugins.{p}.{k}" for p in ("lovense", "buttplug") for k in (
+    "max_strength", "max_intensity", "max_motion", "max_seconds", "ramp_seconds", "stop_words",
+    "stop_on_interrupt"))
+
+# Plugins whose settings section gets a name of its own (else "Plugin: <key>")
+PLUGIN_TITLES = {
+    "lovense": "Toys: Lovense (18+)",
+    "buttplug": "Toys: Intiface Central (18+)",
+}
+
 # The everyday settings: what the terminal's settings pane shows first
 # (`a` there shows all of them), and what the web settings page opens on.
 BASIC = (
@@ -618,6 +632,11 @@ BASIC = (
     "camera.presence.enabled", "people.voice", "station.enabled",
     "vision.enabled", "knowledge.enabled", "reminders.enabled", "alarms.volume",
     "long_term_memory.enabled", "self.greet", "thoughts.enabled", "ui.mouse",
+    # toys: on at startup and the limits, for each way of connecting them
+    "plugins.lovense.enabled", "plugins.lovense.max_strength", "plugins.lovense.max_motion",
+    "plugins.lovense.max_seconds",
+    "plugins.buttplug.enabled", "plugins.buttplug.max_intensity", "plugins.buttplug.max_motion",
+    "plugins.buttplug.max_seconds",
     # history sized to the window: its own box on the settings page, for trying other models
     "history.auto_scale", "history.scale_cap", "history.scale_use", "history.scale_summary_share",
     "history.scale_message_tokens", "history.scale_prompt_reserve", "history.scale_results_reserve",

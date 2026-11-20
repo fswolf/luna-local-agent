@@ -588,7 +588,19 @@ def save_any(path, raw):
     value = _coerce(path, raw)
     _store(path, value)
 
-    return value, False
+    return value, applies_now(path)
+
+
+def applies_now(path):
+    """Does a change to this setting take effect without a restart?"""
+    if path in SETTINGS:
+        return bool(SETTINGS[path][1])
+    from config.schema import LIVE_PLUGIN
+
+    parts = path.split(".")
+    if len(parts) == 3 and parts[0] == "plugins" and parts[2] == "enabled":
+        return True                         # switching connects or disconnects it (settings_pane._after)
+    return path in LIVE_PLUGIN
 
 
 def _write_config(stored):

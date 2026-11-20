@@ -83,7 +83,9 @@ def _section(path):
     parts = path.split(".")
 
     if parts[0] == "plugins" and len(parts) > 2:
-        return f"plugins.{parts[1]}", f"Plugin: {parts[1]}"
+        from config.schema import PLUGIN_TITLES
+
+        return f"plugins.{parts[1]}", PLUGIN_TITLES.get(parts[1], f"Plugin: {parts[1]}")
 
     key = MERGED.get(parts[0], parts[0])
 
@@ -135,6 +137,25 @@ def _value(path):
 
     if path in config.SETTINGS:
         return config.current(path), False
+
+    parts = path.split(".")
+    if parts[0] == "plugins" and len(parts) == 3:
+        # a plugin's own default (its DEFAULTS), so the page shows what's in effect, not a blank
+        try:
+            import plugins
+
+            plugin = plugins.get(parts[1])
+            defaults = getattr(plugin.module, "DEFAULTS", None) if plugin else None
+            if isinstance(defaults, dict) and parts[2] in defaults:
+                return defaults[parts[2]], False
+        except Exception:
+            pass
+        if parts[2] == "enabled":
+            return False, False
+        if parts[2] in ("stop_words", "stop_on_interrupt") and parts[1] in ("lovense", "buttplug"):
+            from plugins import _toys                    # the toy plugins' shared defaults
+
+            return (list(_toys.STOP_WORDS) if parts[2] == "stop_words" else True), False
 
     return _example_values().get(path), False
 
@@ -273,7 +294,7 @@ def _fragments():
         for path in paths:
             kind, line, _choices = describe(path)
             value, is_set = _value(path)
-            live = config.SETTINGS.get(path, (None, False))[1]
+            live = config.applies_now(path)
             here = index == view.set_cursor
 
             name = _clip(_short(path, key), 24)
@@ -429,6 +450,16 @@ def _after(path, value):
             else:
                 station.stop()
                 add_message("system", "Relay stations: off")
+        elif path.startswith("plugins.") and path.endswith(".enabled") and path.count(".") == 2:
+            # a plugin switched on or off here connects or disconnects now,
+            # as in the tools pane, not only at the next start
+            import plugins
+            from ui import tools_pane
+
+            key = path.split(".")[1]
+            plugin = next((p for p in map(plugins.get, plugins.names()) if p and p.config == key), None)
+            if plugin is not None and plugin.running() != bool(value):
+                tools_pane._toggle_plugin(plugin.name, plugin.running())
         elif path == "portrait.background":
             from web import livefeed
 
