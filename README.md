@@ -106,10 +106,9 @@ portrait page. Which fans work and what to buy:
 
 ## Web UI or the terminal
 
-<p>
-<img width="49%" alt="Luna's web window: the chat on the left, with her replies in the middle, your messages on the left and her notes in small yellow boxes on the right, beside her portrait reading a book in her room" src="assets/web-ui.jpg" />
-<img width="49%" alt="Luna in the terminal: her status box and the conversation on the left, beside her animated portrait" src="assets/luna-desktop.png" />
-</p>
+<img width="1210" alt="Luna's web window: the chat on the left, with her replies in the middle, your messages on the left and her notes in small yellow boxes on the right, beside her portrait reading a book in her room" src="assets/web-ui.jpg" />
+
+<img width="1210" alt="Luna in the terminal: her status box and the conversation on the left, beside her animated portrait" src="assets/luna-desktop.png" />
 
 `./start_web.sh` (or `./start.sh --web`) starts her with no terminal at all: the chat opens in
 a window of its own beside her portrait, and the terminal you started her
