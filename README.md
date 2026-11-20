@@ -2,7 +2,7 @@
 
 <hr>
 
-<img width="1210" alt="Luna in the terminal beside her animated Live2D portrait" src="assets/luna-desktop.png" />
+<img width="1210" alt="Luna in her web chat beside her animated portrait, reading a book" src="assets/luna-web-desktop.png" />
 
 # luna-local-agent
 
@@ -106,7 +106,10 @@ portrait page. Which fans work and what to buy:
 
 ## Web UI or the terminal
 
-<img width="1210" alt="Luna's web window: the chat on the left, with her replies in the middle, your messages on the left and her notes in small yellow boxes on the right, beside her portrait reading a book in her room" src="assets/web-ui.jpg" />
+<p>
+<img width="49%" alt="Luna's web window: the chat on the left, with her replies in the middle, your messages on the left and her notes in small yellow boxes on the right, beside her portrait reading a book in her room" src="assets/web-ui.jpg" />
+<img width="49%" alt="Luna in the terminal: her status box and the conversation on the left, beside her animated portrait" src="assets/luna-desktop.png" />
+</p>
 
 `./start_web.sh` (or `./start.sh --web`) starts her with no terminal at all: the chat opens in
 a window of its own beside her portrait, and the terminal you started her
