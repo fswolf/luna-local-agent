@@ -51,7 +51,7 @@ EXTRAS = {
     "reranker": ([], "sharper recall: a 640 MB reranker beside the embedding model (on the CPU if the card is tight)"),
     "chat": (["websocket-client"], "the pomf.tv stream-chat plugin"),
     "documents": (["pypdf"], "PDFs in her knowledge folder (Markdown, text, Word and web pages need nothing)"),
-    "toys": (["websocket-client"], "the Buttplug plugin: toys of most brands through Intiface Central"),
+    "toys": (["websocket-client"], "the Intiface Central plugin: toys of most brands (the Buttplug.io protocol)"),
     "camera": (["opencv-python-headless"], "look_at_camera: one webcam picture when you ask (off until you switch it on)"),
     "voices": (["speechbrain"], "tell people in the house apart by voice (/people enroll voice)"),
     "stations": (["cryptography", "segno", "pillow"], "talk to her from another room on an old phone or tablet (relay stations)"),

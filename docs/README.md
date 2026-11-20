@@ -44,7 +44,7 @@ Everything the README only touches on, one subject per page.
 - [Plugins](plugins.md): how they work, writing your own, scheduled jobs and Discord
 - [Stream chat](chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
 - [Games](games.md): chess, Minecraft, Zork, Vibe City, REALITI, Game Boy, playing on her own
-- [Home and devices](devices.md): Home Assistant, Lovense, toys of most brands through Buttplug.io
+- [Home and devices](devices.md): Home Assistant, Lovense, toys of most brands through Intiface Central
 - [Development](development.md): project structure, extras
 
 ---

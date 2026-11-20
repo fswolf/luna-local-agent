@@ -10,6 +10,9 @@ names a plugin, which is what makes them droppable.
 A plugin is a module with a NAME and whichever of these it needs:
 
     NAME            str    what /<name> on|off calls it. Required.
+    ALIASES         tuple  other names /<name> also answers to (an old name)
+    CONFIG          str    its key under "plugins" in config.json, when that
+                           isn't NAME (a plugin renamed keeps its settings)
     SUMMARY         str    one line for /plugins
     available()     bool   can it run right now?
     why_unavailable() str  if not, the reason a person can act on
@@ -33,8 +36,8 @@ Only NAME is required; anything missing gets a sensible default, so a
 plugin that only needs start() is four lines long. `plugins/example.py`
 is a working one to copy.
 
-Settings live under "plugins" in config.json, keyed by NAME, and the
-plugin reads its own with config.plugin_settings(NAME). The core never
+Settings live under "plugins" in config.json, keyed by NAME (or CONFIG),
+and the plugin reads its own with config.plugin_settings(CONFIG). The core never
 learns what those keys mean.
 
 ## What a plugin is not allowed to do
@@ -60,6 +63,7 @@ from core import logbook
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 
 _loaded = {}
+_aliases = {}        # an old name -> the plugin's name
 _broken = {}
 
 
@@ -75,6 +79,8 @@ class Plugin:
     def __init__(self, module):
         self.module = module
         self.name = str(getattr(module, "NAME", module.__name__.split(".")[-1]))
+        self.config = str(getattr(module, "CONFIG", self.name))      # its settings' key
+        self.aliases = tuple(str(a).lower() for a in getattr(module, "ALIASES", ()) or ())
         self.summary = str(getattr(module, "SUMMARY", "")).strip()
 
         self._available = _default(module, "available", lambda: True)
@@ -221,6 +227,7 @@ def panic(always=False):
 def load():
     """Import every plugin in this directory. Returns the names found."""
     _loaded.clear()
+    _aliases.clear()
     _broken.clear()
 
     for entry in sorted(pkgutil.iter_modules([PLUGIN_DIR])):
@@ -233,6 +240,8 @@ def load():
             module = importlib.import_module(f"{__name__}.{entry.name}")
             plugin = Plugin(module)
             _loaded[plugin.name.lower()] = plugin
+            for alias in plugin.aliases:
+                _aliases.setdefault(alias, plugin.name.lower())
         except Exception as e:
             _broken[entry.name] = f"{type(e).__name__}: {e}"
             logbook.warn(
@@ -244,7 +253,9 @@ def load():
 
 
 def get(name):
-    return _loaded.get(str(name or "").strip().lower())
+    """A plugin by its name, or by an old name it still answers to."""
+    key = str(name or "").strip().lower()
+    return _loaded.get(key) or _loaded.get(_aliases.get(key, ""))
 
 
 def names():
@@ -272,7 +283,7 @@ def start_enabled(model):
     for name in names():
         plugin = _loaded[name]
 
-        if not config.plugin_settings(plugin.name).get("enabled"):
+        if not config.plugin_settings(plugin.config).get("enabled"):
             continue
 
         ok, message = plugin.start(model)

@@ -36,7 +36,7 @@ def handle(text):
             if ok:
                 try:
                     config.set_plugin_enabled(
-                        plugin.name, argument in ("on", "start")
+                        plugin.config, argument in ("on", "start")
                     )
                     message += " (saved)"
                 except Exception:

@@ -78,7 +78,7 @@ What she does:
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
 - **Plays games:** chess against you on a board you drag the pieces around on, and Minecraft, Zork, Vibe City, REALITI and Game Boy games you own (Pokemon Red and Blue and The Final Fantasy Legend come to her as text too) on her own when you go quiet; she remembers how she felt about them ([details](docs/games.md))
 - **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
-- **Adult toys (18+):** Lovense, and most other brands through Buttplug.io, so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
+- **Adult toys (18+):** Lovense, and most other brands through Intiface Central (Buttplug.io), so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
 - **From your phone:** Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
 - **Easy to set up:** the installer picks a model that fits your graphics card, she asks your name the first time she starts, and every setting is on one page in your browser, with presets: Assistant, Companion, Streamer, and Small, Medium or Large to fit your model ([details](docs/configuration.md#the-settings-page))
 - **Knows her own manual:** ask her how to do something and she looks it up and tells you the exact command
@@ -305,7 +305,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Plugins](docs/plugins.md): how they work, writing your own, scheduled jobs and Discord
 - [Stream chat](docs/chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
 - [Games](docs/games.md): chess, Minecraft, Zork, Vibe City, REALITI, Game Boy, playing on her own
-- [Home and devices](docs/devices.md): Home Assistant, Lovense, toys of most brands through Buttplug.io
+- [Home and devices](docs/devices.md): Home Assistant, Lovense, toys of most brands through Intiface Central
 - [Development](docs/development.md): project structure, extras
 
 The same pages are on the [wiki](https://github.com/fswolf/luna-local-agent/wiki), and there's a

@@ -258,7 +258,7 @@ def _plugin_row(plugin):
     name = plugin.name
     running = _plugin_says(plugin, "running", False)
     try:
-        saved = bool((config.plugin_settings(name) or {}).get("enabled"))
+        saved = bool((config.plugin_settings(plugin.config) or {}).get("enabled"))
     except Exception:
         saved = False
     ready = running or saved or _plugin_says(plugin, "available", False)
@@ -778,7 +778,7 @@ def _toggle_plugin(name, on):
 
         if ok:
             try:
-                config.set_plugin_enabled(plugin.name, not on)
+                config.set_plugin_enabled(plugin.config, not on)
                 message += " (saved)"
             except Exception:
                 pass

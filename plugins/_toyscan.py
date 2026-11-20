@@ -1,5 +1,5 @@
 """Finding the toy servers on your network: Intiface Central (Buttplug)
-and the Lovense Remote app in Game Mode, for /buttplug find and
+and the Lovense Remote app in Game Mode, for /intiface find and
 /lovense find.
 
     1. This computer first (127.0.0.1), then every machine on your own

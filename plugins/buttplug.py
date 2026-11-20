@@ -1,19 +1,23 @@
-"""Buttplug - toys of almost any brand, through Intiface Central.
+"""Intiface Central - toys of almost any brand. (The file keeps its old
+name, buttplug.py, after the protocol it speaks; its settings stay under
+"buttplug" in config.json, and /buttplug still works.)
 
-    /buttplug on        connect to Intiface Central
-    /buttplug off       stop everything and disconnect
-    /buttplug           status: what's connected and what each can do
-    /buttplug stop      stop every device now, without asking her
-    /buttplug scan      look for devices (turn the toy on first)
-    /buttplug find      look for Intiface Central on this PC and your network
+    /intiface on        connect to Intiface Central
+    /intiface off       stop everything and disconnect
+    /intiface           status: what's connected and what each can do
+    /intiface stop      stop every device now, without asking her
+    /intiface scan      look for devices (turn the toy on first)
+    /intiface find      look for Intiface Central on this PC and your network
 
-Credit where it's due: this plugin is a thin client. The hard part, the
-protocols of hundreds of devices, is the work of the Buttplug.io
-project (https://buttplug.io) and its Intiface Central app
-(https://intiface.com/central/), open source under the BSD 3-Clause
-licence. Lovense, Kiiroo, We-Vibe, Satisfyer, The Handy, Magic Motion,
-Vorze and many more, plus Xbox gamepads and Switch Joy-Cons, which makes
-it easy to test with no toy at all.
+Two names, two things. Buttplug.io (https://intiface.io) is the open
+protocol and library that knows how to talk to hundreds of devices.
+Intiface Central (https://intiface.com/central/) is the app you run: it
+talks to the devices over Bluetooth and serves the Buttplug protocol to
+programs like Luna. Both are the Buttplug.io project's work, open source
+under the BSD 3-Clause licence; this plugin is a thin client. Lovense,
+Kiiroo, We-Vibe, Satisfyer, The Handy, Magic Motion, Vorze and many
+more, plus test devices built into Intiface (simulated ones, Switch
+Joy-Cons, and Xbox gamepads on Windows), so you can try it with no toy.
 
 How it works: Intiface Central runs on your PC, talks to the devices
 over Bluetooth, and serves the Buttplug protocol (v3) on a local
@@ -23,7 +27,7 @@ Setup:
     1. Install Intiface Central and press Start Server.
     2. Turn the device on and close its own phone app (a Bluetooth toy
        talks to one thing at a time). Intiface finds it when scanning.
-    3. /buttplug on (or "enabled": true to connect at startup):
+    3. /intiface on (or "enabled": true to connect at startup):
 
     "plugins": {
         "buttplug": {
@@ -71,8 +75,10 @@ from core import safe
 
 from plugins import _toys
 
-NAME = "buttplug"
-SUMMARY = "toys of almost any brand through Intiface Central (buttplug.io)"
+NAME = "intiface"
+ALIASES = ("buttplug",)           # its old name
+CONFIG = "buttplug"               # settings keep their old place in config.json
+SUMMARY = "toys of almost any brand through Intiface Central (the Buttplug.io project)"
 
 DEFAULTS = {"url": "ws://127.0.0.1:12345", "max_intensity": 100, "max_seconds": 3600,
             "max_motion": 50, "ramp_seconds": 3, "scan_on_start": True}
@@ -101,7 +107,7 @@ _jobs_lock = threading.Lock()
 
 def settings():
     s = dict(DEFAULTS)
-    s.update({k: v for k, v in config.plugin_settings(NAME).items() if k in DEFAULTS})
+    s.update({k: v for k, v in config.plugin_settings(CONFIG).items() if k in DEFAULTS})
     return s
 
 
@@ -194,9 +200,9 @@ def _reader(ws):
                 logbook.warn(NAME, "connection to Intiface lost: %s", e)
                 _state.update(ws=None, connected=False)
                 # Intiface stops the devices when its client goes; said so
-                # you know her toy tools are gone until /buttplug on.
-                logbook.tell("buttplug: lost the connection to Intiface Central. "
-                             "/buttplug on to connect again.")
+                # you know her toy tools are gone until /intiface on.
+                logbook.tell("intiface: lost the connection to Intiface Central. "
+                             "/intiface on to connect again.")
             return
 
         try:
@@ -285,12 +291,12 @@ def _abilities(dev):
 # ---------------------------------------------------------------------------
 def start(model):
     if _state["connected"]:
-        return True, "buttplug: already connected"
+        return True, "intiface: already connected"
 
     websocket = _client()
 
     if websocket is None:
-        return False, "buttplug: " + why_unavailable()
+        return False, "intiface: " + why_unavailable()
 
     url = settings()["url"]
 
@@ -299,11 +305,11 @@ def start(model):
         ws.settimeout(None)
     except Exception as e:
         _state["error"] = str(e)
-        return False, (f"buttplug: couldn't reach Intiface Central at {url} - is it running "
-                       f"with the server started? ({e}) /buttplug find looks for it.")
+        return False, (f"intiface: couldn't reach Intiface Central at {url} - is it running "
+                       f"with the server started? ({e}) /intiface find looks for it.")
 
     _state.update(ws=ws, error="", devices={})
-    threading.Thread(target=_reader, args=(ws,), daemon=True, name="buttplug").start()
+    threading.Thread(target=_reader, args=(ws,), daemon=True, name="intiface").start()
 
     try:
         _kind, info = _send("RequestServerInfo", {"ClientName": "Luna", "MessageVersion": 3})
@@ -320,13 +326,13 @@ def start(model):
     except Exception as e:
         _close()
         _state["error"] = str(e)
-        return False, f"buttplug: Intiface answered but the handshake failed - {e}"
+        return False, f"intiface: Intiface answered but the handshake failed - {e}"
 
     _state["connected"] = True
     _register_tools()
     found = ", ".join(d["name"] for d in _state["devices"].values()) or "no devices yet - scanning"
 
-    return True, f"buttplug: connected to {_state['server']} at {url} - {found}"
+    return True, f"intiface: connected to {_state['server']} at {url} - {found}"
 
 
 def _close():
@@ -349,7 +355,7 @@ def stop():
 
     _close()
 
-    return (False, failed) if failed else (True, "buttplug: stopped")
+    return (False, failed) if failed else (True, "intiface: stopped")
 
 
 def stop_all_devices():
@@ -361,10 +367,10 @@ def stop_all_devices():
 
     try:
         _send("StopAllDevices")
-        return True, "buttplug: stopped all devices"
+        return True, "intiface: stopped all devices"
     except Exception as e:
         # Said where it can't be missed: a device may run on.
-        text = (f"buttplug: COULDN'T STOP the devices ({e}). Switch them off by hand, "
+        text = (f"intiface: COULDN'T STOP the devices ({e}). Switch them off by hand, "
                 "or stop them in Intiface Central.")
         logbook.error(NAME, "stop failed: %s", e)
         try:
@@ -378,7 +384,7 @@ def stop_all_devices():
 
 def status():
     s = settings()
-    lines = [f"buttplug: {'connected to ' + _state['server'] if _state['connected'] else 'off'} - {s['url']}"]
+    lines = [f"intiface: {'connected to ' + _state['server'] if _state['connected'] else 'off'} - {s['url']}"]
 
     if _state["error"]:
         lines.append(f"  last error: {_state['error']}")
@@ -387,9 +393,9 @@ def status():
         lines.append(f"  [{dev['index']}] {dev['name']} - {', '.join(_abilities(dev))}")
 
     if _state["connected"] and not _state["devices"]:
-        lines.append("  no devices - turn one on and /buttplug scan")
+        lines.append("  no devices - turn one on and /intiface scan")
 
-    lines.append("  Device support by Buttplug.io and Intiface Central (buttplug.io)")
+    lines.append("  Device support: the Buttplug.io project and its Intiface Central app (buttplug.io)")
 
     return "\n".join(lines)
 
@@ -405,13 +411,13 @@ def prompt_line(private=True):
 
 
 def on_user_text(text):
-    if _state["connected"] and _toys.says_stop(text, NAME):
+    if _state["connected"] and _toys.says_stop(text, CONFIG):
         logbook.info(NAME, "stop word - stopping")
         stop_all_devices()
 
 
 def panic(always=False):
-    if _state["connected"] and (always or _toys.stop_on_interrupt(NAME)):
+    if _state["connected"] and (always or _toys.stop_on_interrupt(CONFIG)):
         stop_all_devices()
 
 
@@ -424,9 +430,9 @@ def command(text):
     if word == "scan":
         try:
             _send("StartScanning")
-            return "buttplug: scanning - turn the device on; /buttplug shows what's found"
+            return "intiface: scanning - turn the device on; /intiface shows what's found"
         except Exception as e:
-            return f"buttplug: couldn't scan - {e}"
+            return f"intiface: couldn't scan - {e}"
 
     if word in ("devices", "list"):
         return status()
@@ -437,7 +443,7 @@ def command(text):
     if word == "use":
         return _use(text.strip().split(" ", 1)[1] if " " in text.strip() else "")
 
-    return "buttplug: on | off | stop | scan | find | devices"
+    return "intiface: on | off | stop | scan | find | devices"
 
 
 _found = []
@@ -448,28 +454,28 @@ def _find():
     from plugins import _toyscan
 
     if _client() is None:
-        return "buttplug: " + why_unavailable()
+        return "intiface: " + why_unavailable()
     _found[:] = _toyscan.find_intiface()
     note = (" (Luna is connected to one already, and Intiface takes one client at a time, "
             "so that one may not show)") if _state["connected"] else ""
     if not _found:
-        return ("buttplug: no Intiface server found. Is it running with the server started? On "
+        return ("intiface: no Intiface server found. Is it running with the server started? On "
                 "another device (a phone), turn on 'listen on all interfaces' in its settings." + note)
     if len(_found) == 1:
         return _use("1")
-    return ("buttplug: found " + "; ".join(f"{i}. {u} ({n})" for i, (u, n) in enumerate(_found, 1))
-            + " - /buttplug use <number> picks one." + note)
+    return ("intiface: found " + "; ".join(f"{i}. {u} ({n})" for i, (u, n) in enumerate(_found, 1))
+            + " - /intiface use <number> picks one." + note)
 
 
 def _use(which):
     try:
         url, name = _found[int(which) - 1]
     except (ValueError, IndexError):
-        return "buttplug: /buttplug find first, then /buttplug use <number>"
+        return "intiface: /intiface find first, then /intiface use <number>"
     if url == settings()["url"]:
-        return f"buttplug: found {name} at {url}, already set. /buttplug on connects."
-    config._store(f"plugins.{NAME}.url", url)
-    return f"buttplug: found {name} at {url} and saved it. /buttplug on connects."
+        return f"intiface: found {name} at {url}, already set. /intiface on connects."
+    config._store(f"plugins.{CONFIG}.url", url)
+    return f"intiface: found {name} at {url} and saved it. /intiface on connects."
 
 
 # ---------------------------------------------------------------------------
@@ -619,7 +625,7 @@ def _play(devs, seconds, level_at, every=0.15):
         finally:
             _end("spin", token)
 
-    threading.Thread(target=run, daemon=True, name="buttplug-play").start()
+    threading.Thread(target=run, daemon=True, name="intiface-play").start()
 
 
 def _stroke(devs, seconds, speed):
@@ -659,7 +665,7 @@ def _stroke(devs, seconds, speed):
         finally:
             _end("stroke", token)
 
-    threading.Thread(target=run, daemon=True, name="buttplug-stroke").start()
+    threading.Thread(target=run, daemon=True, name="intiface-stroke").start()
 
 
 # ---------------------------------------------------------------------------
@@ -788,13 +794,13 @@ def _register_tools():
 
     def toy_list():
         if not _state["devices"]:
-            return f"No devices connected. Ask {config.USER_THEM} to turn one on - /buttplug scan looks for it."
+            return f"No devices connected. Ask {config.USER_THEM} to turn one on - /intiface scan looks for it."
 
         lines = [f"[{d['index']}] {d['name']}: {', '.join(_abilities(d))}" for d in _state["devices"].values()]
         now = running_now()
         return "\n".join(lines + ["Running now: " + "; ".join(now) if now else "Nothing running now."])
 
-    off = lambda: "buttplug plugin is off - /buttplug on"   # noqa: E731
+    off = lambda: "Intiface Central isn't connected - /intiface on"   # noqa: E731
     dev = {"type": "string", "description": "Device number or name from toy_list; omit for all"}
     secs = {"type": "integer", "description": "How long, in seconds, for a short burst. Leave it out to keep "
                                               "going until it's changed or stopped (up to the settings' cap)"}

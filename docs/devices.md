@@ -1,8 +1,8 @@
 # Home and devices
 
 Things in the room she can switch: your smart home through Home
-Assistant, and toys through the Lovense Remote app or Buttplug.io's
-Intiface Central. All of it stays on your own network, and anything
+Assistant, and toys through the Lovense Remote app or Intiface
+Central. All of it stays on your own network, and anything
 physical has limits, a stop that doesn't go through her, and never
 starts from someone else's words. How plugins work in general is on
 [Plugins](plugins.md).
@@ -19,21 +19,28 @@ thermostat. Local only, and locks and garage doors always ask first.
 Setup, safety and which devices to buy are on their own page:
 [Home automation](home.md).
 
-## Lovense or Buttplug?
+## Lovense or Intiface Central?
 
 There are two ways to connect toys, and they're both plugins:
 
-| | Lovense plugin | Buttplug plugin |
+| | Lovense plugin | Intiface Central plugin |
 |---|---|---|
 | Talks to | the **Lovense Remote** app (phone or PC) in Game Mode | **Intiface Central** on the same PC as Luna |
 | Brands | Lovense only | 750+ devices: Lovense, Kiiroo, We-Vibe, Satisfyer, The Handy, Magic Motion... |
-| Good for | a Lovense toy that already lives in the Remote app (Second Life users) | anything else, and testing with simulated devices or a gamepad |
-| Needs | the app and Luna on the same network | Bluetooth on the PC running Luna |
+| Good for | a Lovense toy that already lives in the Remote app (Second Life users) | anything else, and testing with simulated devices |
+| Needs | the app and Luna on the same network | Bluetooth on the PC running Intiface |
+| Command | `/lovense` | `/intiface` (`/buttplug`, its old name, still works) |
 
 A Bluetooth toy connects to one app at a time, so pick one route per
 toy: if it's paired with Lovense Remote, use the Lovense plugin; if it's
-paired with Intiface, use the Buttplug plugin. Lovense toys work either
-way.
+paired with Intiface, use the Intiface Central plugin. Lovense toys work
+either way.
+
+**Two names, two things.** *Buttplug.io* is the open protocol and
+library that knows how to talk to hundreds of devices. *Intiface
+Central* is the app you run: it talks to the toys over Bluetooth and
+serves the Buttplug protocol to programs like Luna. Luna's plugin is
+called after the app, because that's what you open and connect to.
 
 ### What kind of device is it?
 
@@ -174,7 +181,7 @@ Discord turns without memory never get that line.
 
 ### Finding them on your network
 
-`/lovense find` and `/buttplug find` look on this computer first, then
+`/lovense find` and `/intiface find` look on this computer first, then
 on every machine on your own network: the same quiet pass
 [find_device](sysadmin.md#finding-machines-on-your-network) uses, then a
 knock on the one port each app uses (12345 for Intiface, 20010 and
@@ -182,13 +189,17 @@ knock on the one port each app uses (12345 for Intiface, 20010 and
 counts: a Buttplug handshake, or a toy list from Lovense Remote. Only
 private addresses are touched, and the address found is saved to
 `config.json` as if you'd typed it. Intiface takes one client at a
-time, so run `find` before `/buttplug on`, not while Luna is connected.
+time, so run `find` before `/intiface on`, not while Luna is connected.
 
-## Buttplug: toys of almost any brand
+## Intiface Central: toys of almost any brand
 
 ```
-/buttplug on    /buttplug off    /buttplug    /buttplug stop    /buttplug scan    /buttplug find
+/intiface on    /intiface off    /intiface    /intiface stop    /intiface scan    /intiface find
 ```
+
+(`/buttplug` is its old name and still works. Its settings keep their
+old place in `config.json`, under `"buttplug"`, so nothing needs
+moving.)
 
 `scan` looks for toys through Intiface; `find` looks for Intiface
 itself, on this PC and on your network.
@@ -202,8 +213,11 @@ plugin is a small client for it; every device it supports is their
 doing. If it's useful to you, go and say thanks.
 
 That covers Lovense, Kiiroo, We-Vibe, Satisfyer, The Handy, Magic
-Motion, Vorze and many more, and also Xbox gamepads and Switch Joy-Cons,
-so you can try the whole thing with no toy at all. Support goes by
+Motion, Vorze and many more. With no toy at all you can still try the
+whole thing: Intiface has simulated devices built in ([below](#testing-with-no-toy-simulated-devices)),
+and it can drive Switch Joy-Cons, and Xbox gamepads on Windows (its
+gamepad support uses Windows' XInput, so on Linux and macOS a gamepad
+won't show up, even one that rumbles fine in games). Support goes by
 model, not just brand, so check [buttplug.io](https://buttplug.io)
 before buying something new. Everything stays on your machine: no
 cloud, no account.
@@ -241,9 +255,8 @@ Linux, Android, iOS). On Linux:
   that's physically near the toy, because the toy talks Bluetooth to it.
 
 Intiface uses BlueZ on Linux. Check the PC has Bluetooth with
-`bluetoothctl show`; if a device that's on and not connected to anything
-else isn't found, a cheap USB Bluetooth dongle often fixes it. Pair
-through Intiface's own scan, not the system's Bluetooth settings.
+`bluetoothctl show`. Pair through Intiface's own scan, not the system's
+Bluetooth settings (see [Bluetooth trouble](#bluetooth-trouble) below).
 
 ### Setting it up
 
@@ -258,12 +271,17 @@ through Intiface's own scan, not the system's Bluetooth settings.
    talks to one thing at a time. If you use Lovense Remote for Second
    Life, use [the Lovense plugin](#lovense) instead.
 4. `pip install websocket-client` (or the installer's `toys` extra),
-   then `/buttplug on`. If Intiface runs somewhere else (a phone, with
-   "listen on all interfaces" on), `/buttplug find` looks for it on your
-   network and saves its address; `/buttplug use <number>` picks if
+   then `/intiface on`. If Intiface runs somewhere else (a phone, with
+   "listen on all interfaces" on), `/intiface find` looks for it on your
+   network and saves its address; `/intiface use <number>` picks if
    there's more than one. It scans for devices as it connects;
-   `/buttplug scan` looks again, and `/buttplug` lists each device with
+   `/intiface scan` looks again, and `/intiface` lists each device with
    what it can do.
+5. In Intiface, **Devices** shows each toy. A crossed-out Bluetooth icon
+   means a remembered device that isn't connected right now; scanning
+   connects it. Tap a device for its sliders: they're for testing by
+   hand. When Luna drives it, the sliders don't move; the graph under
+   each one shows what she sent.
 
 ```json
 "plugins": {
@@ -288,13 +306,48 @@ press **Add Simulated Device**. Luna sees it as a real toy, and
 Intiface shows what it's being told to do, so the whole path can be
 checked before any hardware arrives. A good first test:
 
-1. Add a **2-motor vibrator** and an **oscillator**, then `/buttplug on`
-   and `/buttplug`: both are listed, the oscillator with
+1. Add a **2-motor vibrator** and an **oscillator**, then `/intiface on`
+   and `/intiface`: both are listed, the oscillator with
    "stroke/thrust".
 2. Ask her to vibrate one and run the other at the same time: the
    vibrator holds its level while the oscillator starts low and climbs
    over about three seconds.
 3. Say "stop": both drop to zero at once.
+
+Simulated devices stay in Intiface's device list (with the names you
+gave them) until you remove them, so they're easy to mistake for real
+toys later; Intiface's log calls them `simulated-...`.
+
+### Bluetooth trouble
+
+Most "it won't connect" problems are Bluetooth, not Luna. In order:
+
+- **Something else has the toy.** A Bluetooth toy talks to one thing at
+  a time. Close its phone app (or turn off the phone's Bluetooth), and
+  don't pair it in your system's Bluetooth settings: if it shows there
+  (Lovense toys are named `LVS-...`), remove it, for example
+  `bluetoothctl remove <address>`. A Bluetooth tool left scanning in the
+  background fights Intiface for the adapter too; close it.
+- **`ServiceDiscoveryTimedOut` in Intiface's log.** Intiface found the
+  toy but gave up asking what it can do. Restart Bluetooth
+  (`sudo systemctl restart bluetooth`), turn the toy off and on, keep it
+  close to the adapter, and restart Intiface's server.
+- **It connects, then keeps dropping.** Charge the toy first (Intiface
+  shows its battery). Then suspect the adapter. Built-in desktop
+  Bluetooth is often weak, and many cheap dongles sold as "Bluetooth 5"
+  are old CSR clone chips (Bluetooth 4.0) that are flaky with Bluetooth
+  Low Energy on Linux. To see what yours really is: `lsusb | grep -i
+  blue` ("Cambridge Silicon Radio" is the CSR chip), and `sudo btmgmt
+  info`, whose `version` is 6 for Bluetooth 4.0, 9 for 5.0, 10 for 5.1.
+  A dongle with a Realtek RTL8761B chip (TP-Link UB500, for one) works
+  well with BlueZ and needs no drivers.
+- **Only one adapter at a time.** With two plugged in, Intiface uses the
+  one `bluetoothctl list` marks `[default]`; unplug or switch off the
+  other.
+- **Some toys aren't Bluetooth at all.** A toy that only comes with its
+  own little remote usually talks to it by plain radio, and nothing on
+  a PC can reach it. [buttplug.io](https://buttplug.io) lists what's
+  supported, by model.
 
 ### Limits
 
@@ -303,7 +356,7 @@ checked before any hardware arrives. A good first test:
 - **Machines and strokers have their own cap**, `max_motion` (0-100,
   default 50), so a vibration setting never becomes a machine at full
   speed. "Max" on a machine means this cap. To allow more, raise it in
-  `config.json` and `/buttplug off`, `/buttplug on` to reload; it's
+  `config.json` and `/intiface off`, `/intiface on` to reload; it's
   deliberately not something she can change.
 - Motion always **builds up from slow** over `ramp_seconds` (default 3),
   even when she asks for full speed straight away. `0` turns the ramp
@@ -314,7 +367,7 @@ checked before any hardware arrives. A good first test:
 ### Stopping, roleplay and who can use it
 
 These work as for [Lovense](#lovense): a stop word in your message,
-interrupting her, her walking away, `/buttplug stop`, `/buttplug off`
+interrupting her, her walking away, `/intiface stop`, `/intiface off`
 and quitting Luna all stop every device (`stop_words` and `stop_on_interrupt` work the
 same); her prompt lists what's connected and what each device can do;
 only your own turns can start one, never a turn that has read outside

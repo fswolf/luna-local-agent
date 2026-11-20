@@ -129,3 +129,23 @@ class RunningNow(unittest.TestCase):
         self.assertEqual(bp._seconds(""), bp._caps()[1])
         self.assertEqual(bp._seconds(30), 30)
         self.assertIn("until it's changed or stopped", bp._ran("spin", "Vibe at 40%", bp._caps()[1]))
+
+
+class Names(unittest.TestCase):
+    """/intiface is its name; /buttplug, the old one, still works, and the
+    settings stay where they were in config.json."""
+
+    def test_both_names_and_the_old_settings_key(self):
+        import plugins
+
+        p = plugins.Plugin(bp)
+        with mock.patch.dict(plugins._loaded, {"intiface": p}, clear=True), \
+                mock.patch.dict(plugins._aliases, {"buttplug": "intiface"}, clear=True):
+            self._check(plugins, p)
+
+    def _check(self, plugins, p):
+        self.assertIsNotNone(p)
+        self.assertIs(plugins.get("buttplug"), p)
+        self.assertEqual((p.config, p.aliases), ("buttplug", ("buttplug",)))
+        self.assertIn("intiface", plugins.names())
+        self.assertNotIn("buttplug", plugins.names())

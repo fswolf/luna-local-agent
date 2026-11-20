@@ -521,7 +521,7 @@ SCHEMA = {
     "plugins.lovense.stop_words": ("list", "Words in your message that stop every toy at once"),
     "plugins.lovense.stop_on_interrupt": ("bool", "Stop every toy when you interrupt her (HOME)"),
 
-    # --- Plugins: Buttplug --------------------------------------------------
+    # --- Plugins: Intiface Central (its settings keep the old key, "buttplug") ---
     "plugins.buttplug.enabled": ("bool", "Connect to Intiface Central at startup"),
     "plugins.buttplug.url": ("text", "Intiface Central's address (a ws:// link)"),
     "plugins.buttplug.max_intensity": ("int", "Strongest vibration she may use, 0-100"),
