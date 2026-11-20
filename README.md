@@ -1,4 +1,4 @@
-<img src="assets/luna-github-banner-v1.png" alt="Luna: Your voice. Your machine. Your Luna." width="100%">
+<img src="assets/luna-github-banner-v2.png" alt="Luna Local AI: Voice, Memory, Tools" width="100%">
 
 <hr>
 
