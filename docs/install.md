@@ -122,9 +122,13 @@ same as `./start.sh --web`, starts her with no terminal screen. Her [chat page](
 opens in a window of its own with no address bar, the way her portrait
 does, and everything happens there: talking, /commands, a tool asking
 first. She runs on her own, so the terminal you started her from can
-close; her output goes to `~/.cache/ai-voice/web.log`. Closing her window
-quits her, and so does /quit. Running it again while she's up just opens
-her window. `--web --here` keeps her on the terminal instead (Ctrl+C quits).
+close; her output goes to `~/.cache/ai-voice/web.log`. Her icon sits in
+the system tray: a left click opens her chat, a right click has her status,
+the portrait, settings, her voice on or off, push to talk, Stop and Quit.
+With the tray there, closing her window leaves her running in it, like any
+app with a tray icon; without one (GNOME needs the AppIndicator extension),
+closing her window quits her. /quit always does. `monitor.tray` false turns
+the icon off. Running it again while she's up just opens her window. `--web --here` keeps her on the terminal instead (Ctrl+C quits).
 Plain `./start.sh` is the terminal screen, as before.
 
 **Checking:** `./start.sh --check` says in plain words what's missing

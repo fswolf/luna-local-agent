@@ -160,4 +160,5 @@ MCP_SERVERS = dict(_mcp_cfg.get("servers", {}) or {})
 _monitor_cfg = setting("monitor", {})
 MONITOR_ENABLED = flag(_monitor_cfg.get("enabled", True))
 MONITOR_PORT = int(_monitor_cfg.get("port", 8792))
+MONITOR_TRAY = flag(_monitor_cfg.get("tray", True))       # web UI: her icon in the system tray (app/tray.py)
 

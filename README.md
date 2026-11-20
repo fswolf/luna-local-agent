@@ -116,7 +116,8 @@ from can close. Every one of her pages has the same header: her logo opens
 the menu (portrait, pose studio and the live monitor in windows of their
 own, then settings, thoughts, memory, help, and Exit), Online shows what
 she's running on, and the middle says what she's doing. A file or a picture
-goes in with the paperclip. Closing the window quits her
+goes in with the paperclip. Her icon in the system tray opens her chat,
+the portrait and settings, switches her voice and quits her
 ([details](docs/controls.md#chatting-in-the-browser)).
 
 `./start.sh` is still the terminal, for a server or an SSH session where

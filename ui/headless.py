@@ -62,10 +62,12 @@ def run_web(on_submit, on_hotkey=None, open_window=True):
     config.STARTED_UI[0] = True          # complaints go to the log, as with the screen up
     url = chat_web.url()
     window = chat_web.open_window() if open_window else None
+    tray = _start_tray() if open_window and getattr(config, "MONITOR_TRAY", True) else None
     print(f"Luna is running in her window ({url}).", flush=True)
     if not DETACHED:
-        print("Closing the window quits her, so does /quit there or Ctrl+C here." if window
-              else "Ctrl+C here or /quit on the page quits her.", flush=True)
+        print(("Closing the window quits her (with a tray icon, she stays there), so does /quit there or "
+               "Ctrl+C here." if tray else "Closing the window quits her, so does /quit there or Ctrl+C here.")
+              if window else "Ctrl+C here or /quit on the page quits her.", flush=True)
     if window is not None:
         threading.Thread(target=_watch, args=(window,), daemon=True, name="chat-window").start()
     try:
@@ -78,6 +80,35 @@ def run_web(on_submit, on_hotkey=None, open_window=True):
         loop.close()
         if window is not None and window.poll() is None:
             window.terminate()
+        if tray is not None and tray.poll() is None:
+            tray.terminate()
+
+
+def _start_tray():
+    """Her icon in the system tray (app/tray.py), a process of its own that
+    talks to her pages. None when it couldn't start; it says why in its log."""
+    import subprocess
+
+    from web import livefeed
+
+    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "tray.py")
+    if not os.path.exists(script):
+        return None
+    try:
+        from core import logbook
+
+        log = open(os.path.join(os.path.dirname(logbook.path()), "tray.log"), "a", encoding="utf-8")
+    except Exception:
+        log = subprocess.DEVNULL
+    flags = {"creationflags": 0x08000000} if os.name == "nt" else {"start_new_session": True}   # no console
+    try:
+        return subprocess.Popen([sys.executable, script, "--url", livefeed.url()], stdin=subprocess.DEVNULL,
+                                stdout=log, stderr=log, **flags)
+    except OSError:
+        return None
+    finally:
+        if log is not subprocess.DEVNULL:
+            log.close()                  # the tray has its own copy now
 
 
 def _watch(window):
@@ -88,6 +119,12 @@ def _watch(window):
     if time.monotonic() - started < QUIT_AFTER:
         print("The window closed straight away (handed to a browser already open?): she's "
               "still running, and /quit on the page quits her.", flush=True)
+        return
+    from web import chat_web
+
+    if chat_web.tray_up():
+        # like any app with a tray icon: the window goes, she stays, Quit there ends her
+        print("Her window closed: she's still running in the system tray.", flush=True)
         return
     stand_in = view.app
     if stand_in is not None:

@@ -431,6 +431,7 @@ SCHEMA = {
     # --- Live monitor -------------------------------------------------------
     "monitor.enabled": ("bool", "Serve the live monitor page (each turn as it happens, the portrait, the chess board)"),
     "monitor.port": ("int", "Port the live monitor uses on this machine"),
+    "monitor.tray": ("bool", "With the web UI (./start_web.sh, the Luna app): her icon in the system tray, with chat, portrait, settings, her voice and quit. Closing her window then leaves her running there"),
 
     # --- Plugins: shared stream-chat policy ---------------------------------
     "plugins.chat.tools": ("list", "Tools stream-chat strangers may reach"),

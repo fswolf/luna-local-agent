@@ -77,9 +77,32 @@ class Window(unittest.TestCase):
     def test_closing_the_window_quits(self):
         window, app = mock.Mock(), mock.Mock()
         window.wait = lambda: None
-        with mock.patch.object(ui.view, "app", app), mock.patch.object(headless.time, "monotonic", side_effect=[0, 60]):
+        with mock.patch.object(ui.view, "app", app), mock.patch.object(headless.time, "monotonic", side_effect=[0, 60, 60]):
             headless._watch(window)
         app.exit.assert_called_once_with()
+
+    def test_with_the_tray_up_closing_the_window_doesnt_quit(self):
+        window, app = mock.Mock(), mock.Mock()
+        window.wait = lambda: None
+        with mock.patch.object(ui.view, "app", app), mock.patch.object(chat_web, "tray_up", return_value=True), \
+                mock.patch.object(headless.time, "monotonic", side_effect=[0, 60]), mock.patch("builtins.print"):
+            headless._watch(window)
+        app.exit.assert_not_called()
+
+    def test_the_tray_goes_with_the_window(self):
+        """Started only alongside her window (not by tests, nor without one)."""
+        with mock.patch.object(headless, "_start_tray") as start, mock.patch.object(chat_web, "open_window", return_value=None):
+            t = threading.Thread(target=headless.run_web, kwargs={"on_submit": lambda *a, **k: None,
+                                                                  "open_window": False}, daemon=True)
+            with mock.patch("builtins.print"):
+                t.start()
+                for _ in range(100):
+                    if ui.view.loop is not None and ui.view.loop.is_running():
+                        break
+                    time.sleep(0.02)
+            ui.stop()
+            t.join(5)
+        start.assert_not_called()
 
     def test_a_window_handed_off_at_once_doesnt(self):
         window, app = mock.Mock(), mock.Mock()

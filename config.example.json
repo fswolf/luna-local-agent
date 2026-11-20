@@ -297,7 +297,8 @@
     },
     "monitor": {
         "enabled": true,
-        "port": 8792
+        "port": 8792,
+        "tray": true
     },
     "adaptive": {
         "enabled": true,

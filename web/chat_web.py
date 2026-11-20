@@ -99,7 +99,11 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
         rows = _rows(ui.state)
 
     if head:
-        return {"v": now_version, "status": status, "name": name, "mood": mood, "rows": rows}
+        from ui.conversation_pane import _voice_on
+
+        return {"v": now_version, "status": status, "name": name, "mood": mood, "rows": rows,
+                "busy": interrupts.busy(), "mic": _mic(), "can_talk": bool(ui.view.on_hotkey),
+                "voice_on": _voice_on()}
     total = len(convo)
     # have > total is the open reply dropped empty (ui.end_message): no reset
     reset = epoch != now_epoch or have < 0
@@ -211,6 +215,35 @@ def _rows(st):
     tts = f"{st['voice']} - {st['voice_server']}" + ("" if _voice_on() else " · voice off")
     return [["Status", st["status"]], ["Mood", st["mood"] or "off"], ["Voice", st["mode"]],
             ["Memory", st["memory"]], ["TTS", tts], ["Model", st["model"]]]
+
+
+# The tray icon (app/tray.py): when it last asked, so closing her window can
+# leave her running there instead of quitting (ui/headless.py)
+TRAY = {"seen": 0.0}
+TRAY_FRESH = 10          # seconds: a tray that asked this recently is there
+
+
+def tray_up():
+    return time.monotonic() - TRAY["seen"] < TRAY_FRESH
+
+
+def _tray(body):
+    """What the tray's menu does that the page has no button for."""
+    try:
+        action = str(json.loads(body or b"{}").get("action") or "")
+    except (ValueError, AttributeError):
+        return _json(400, {"error": "that couldn't be read"})
+    if action == "voice":
+        from ui.conversation_pane import _voice_on
+        from web import settings_web
+
+        ok, message, _entry = settings_web.change("tts.enabled", not _voice_on())
+        return _json(200 if ok else 400, {"ok": ok, "message": message, "voice_on": _voice_on()})
+    command = {"portrait": "/portrait", "settings": "/settings", "quit": "/quit"}.get(action)
+    if not command:
+        return _json(400, {"error": "unknown action"})
+    error = say(command)
+    return _json(503, {"error": error}) if error else _json(200, {"ok": True})
 
 
 def say(text, attachment=None):
@@ -327,6 +360,8 @@ def handle(method, sub, body, request=None):
         with open(_LOGO, "rb") as f:
             return 200, "image/png", f.read()
     if method == "GET" and sub == "/state":
+        if query.get("tray"):
+            TRAY["seen"] = time.monotonic()
         version = _int(query, "v", None)
         return _json(200, state(version, _int(query, "n", 0), _int(query, "e", None),
                                 head=bool(query.get("head"))))
@@ -342,4 +377,6 @@ def handle(method, sub, body, request=None):
         return _answer(body)
     if method == "POST" and sub == "/rate":
         return _rate(body)
+    if method == "POST" and sub == "/tray":
+        return _tray(body)
     return 404, "text/plain; charset=utf-8", "not here"

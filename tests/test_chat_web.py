@@ -150,6 +150,29 @@ class Server(unittest.TestCase):
         self.assertNotIn("msgs", s)
         self.assertEqual([k for k, _v in s["rows"]][:2], ["Status", "Mood"])
 
+    def test_the_tray_reads_her_header(self):
+        """What app/tray.py's menu needs, and its looks mark it as there."""
+        chat_web.TRAY["seen"] = 0.0
+        s = json.loads(self.ask("GET", "/chat/state?head=1")[1])
+        for key in ("status", "name", "rows", "busy", "mic", "can_talk", "voice_on"):
+            self.assertIn(key, s)
+        self.assertFalse(chat_web.tray_up())
+        self.ask("GET", "/chat/state?head=1&tray=1")
+        self.assertTrue(chat_web.tray_up())
+        chat_web.TRAY["seen"] = 0.0
+
+    def test_the_tray_menu(self):
+        self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"portrait"}')[0], 200)
+        self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"quit"}')[0], 200)
+        self.assertEqual(self.sent, [("/portrait", None), ("/quit", None)])
+        self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"rm -rf"}')[0], 400)
+        self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"quit"}', origin="http://evil.example")[0], 403)
+        from web import settings_web
+        with mock.patch.object(settings_web, "change", return_value=(True, "saved", None)) as change, \
+                mock.patch("ui.conversation_pane._voice_on", return_value=True):
+            self.assertEqual(self.ask("POST", "/chat/tray", b'{"action":"voice"}')[0], 200)
+        change.assert_called_once_with("tts.enabled", False)
+
     def test_her_logo(self):
         code, body = self.ask("GET", "/chat/logo.png")
         self.assertEqual(code, 200)
