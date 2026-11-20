@@ -98,12 +98,16 @@ def _promised_action(answer):
 
 
 # A change she says she made ("I've rewritten it", "done and done", "it's
-# fixed"), checked against what actually ran this turn: a small model writes
+# fixed", "I'm saving it to ~/x.py right now"), checked against what actually ran this turn: a small model writes
 # the "done!" that usually follows "let me fix that" whether or not a tool did.
 _CLAIM = re.compile(
     r"\bi(?:'ve|\s+have)?\s+(?:just\s+|now\s+|already\s+|also\s+)?"
     r"(?:wrote|written|rewrote|rewritten|updated|edited|fixed|changed|saved|created|"
     r"applied|patched|sent|emailed|added|removed)\b"
+    # "I'm writing it to ~/lunas_sandbox/cube.py right now": doing it, somewhere
+    r"|\bi(?:'m|\s+am)\s+(?:now\s+|just\s+|already\s+)?(?:writing|saving|putting|creating|copying)\s+"
+    r"(?:(?:it|this|that|them|the\s+\w+|your\s+\w+|a\s+\w+)\s+)?(?:to|in|into|as)\s+[`'\"]?"
+    r"(?:~|/|\.{1,2}/|[\w-]+\.\w{1,5}\b|(?:your|my|the)\s+(?:sandbox|folder|desktop|downloads|documents|home))"
     r"|\bdone and done\b|\ball (?:done|fixed|set)\b"
     r"|\b(?:it|that|the script|the file)(?:'s| is) (?:fixed|updated|done)\b",
     re.IGNORECASE)

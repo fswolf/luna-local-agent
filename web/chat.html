@@ -64,6 +64,16 @@ border-radius:12px;font-size:13px;color:var(--dim);align-self:flex-start;max-wid
 #chip button{background:none;border:0;color:var(--dim);cursor:pointer;font-size:16px}
 #err{max-width:860px;margin:0 auto;padding:0 16px;color:#ff8fa3;font-size:13px;min-height:0}
 #down{position:fixed;right:20px;bottom:86px;display:none;width:38px;height:38px}
+.rate{display:flex;gap:4px;justify-content:flex-end;margin:4px -6px -4px 0;opacity:.35;transition:opacity .15s}
+.msg.her:hover .rate,.rate.done,.rate.open{opacity:1}
+.rate>button{background:none;border:0;border-radius:8px;padding:1px 6px;font-size:14px;cursor:pointer;filter:grayscale(1)}
+.rate>button:hover,.rate>button.on{filter:none;background:#2a2040}
+.rate .said{color:var(--dim);font-size:12px;align-self:center;margin-right:auto}
+.better{display:flex;flex-direction:column;gap:6px;margin-top:6px;width:100%}
+.better textarea{font:14px/1.4 system-ui,sans-serif;color:var(--text);background:#0e0a16;border:1px solid var(--line);border-radius:10px;
+padding:7px 9px;resize:vertical;min-height:60px}
+.better .row{display:flex;gap:6px;flex-wrap:wrap}
+.better .btn{padding:5px 11px;font-size:13px}
 body.drag #log{outline:2px dashed var(--accent);outline-offset:-8px}
 </style></head><body>
 <div id=log><div id=list><div class=hint>Say something. This is the same conversation as the terminal.</div>
@@ -88,6 +98,7 @@ const BOOT = __BOOT__;
 const $ = s => document.querySelector(s);
 const log = $('#log'), list = $('#list'), typing = $('#typing'), text = $('#text'), send = $('#send'), down = $('#down');
 let offline = false, base = 0, msgs = [], els = [], v = null, e = null, busy = false, streaming = null, attached = null, askId = null, askEl = null;
+let rates = {};   // her replies the thumbs can keep: conversation index -> "" | "up" | "down"
 
 // her header (web/head.js, above this) is fed from these updates
 const lunaHead = window.lunaHead || {update() {}, reachable() {}};   // a page served on its own has none
@@ -145,6 +156,8 @@ function apply(s) {
     const hint = list.querySelector('.hint');
     if (hint && msgs.length) hint.remove();
     busy = s.busy; streaming = s.streaming;
+    rates = s.rate || {};
+    thumbs();
     // dots from your message until her first words (not while she's speaking a finished reply)
     const last = [...msgs].reverse().find(([who, words]) => who !== 'system' && words);
     typing.classList.toggle('on', busy && !s.ask && !!last && last[0] === 'user');
@@ -161,6 +174,52 @@ function apply(s) {
     : s.mic ? (s.voice_mode === 'manual' ? 'listening - click when you\'re done' : 'listening - she stops when you go quiet')
     : 'talk to her (the same as HOME)';
   buttons();
+}
+
+// --- thumbs: keep a reply as an example for her patches -------------------
+// Up keeps it as she said it (like /good), down asks how it should have gone
+// (like /fix) or, left empty, keeps it as a bad one. She never sees these.
+function thumbs() {
+  els.forEach((el, at) => {
+    const idx = base + at, st = rates[idx], bar = el.querySelector(':scope > .rate');
+    if (st === undefined || idx === streaming || !el.classList.contains('her')) { if (bar) bar.remove(); return; }
+    if (bar && bar.dataset.st === st) return;
+    if (bar) bar.remove();
+    const b = document.createElement('div'); b.className = 'rate' + (st ? ' done' : ''); b.dataset.st = st;
+    b.innerHTML = `<span class=said>${st === 'up' ? 'kept as a good example' : st === 'fix' ? 'kept your version' : st === 'down' ? 'kept as a bad one' : ''}</span>
+      <button data-r=up title="a good reply: keep it as an example for her patches">👍</button>
+      <button data-r=down title="not like this: say how it should have gone">👎</button>`;
+    b.querySelector('[data-r=up]').classList.toggle('on', st === 'up');
+    b.querySelector('[data-r=down]').classList.toggle('on', st === 'down' || st === 'fix');
+    b.querySelector('[data-r=up]').onclick = ev => { ev.stopPropagation(); rate(idx, true, ''); };
+    b.querySelector('[data-r=down]').onclick = ev => { ev.stopPropagation(); better(el, b, idx); };
+    el.appendChild(b);
+  });
+}
+function better(el, bar, idx) {
+  if (el.querySelector('.better')) return;
+  bar.classList.add('open');
+  const f = document.createElement('div'); f.className = 'better';
+  f.innerHTML = `<textarea placeholder="How should she have said it? (optional)"></textarea>
+    <div class=row><button class=btn>Keep my version</button><button class="btn no" data-bad>Just mark it bad</button>
+    <button class="btn no" data-x>Cancel</button></div>`;
+  const ta = f.querySelector('textarea'), close = () => { f.remove(); bar.classList.remove('open'); };
+  f.querySelector('.btn').onclick = () => { if (ta.value.trim()) rate(idx, false, ta.value).then(ok => ok && close()); else ta.focus(); };
+  f.querySelector('[data-bad]').onclick = () => rate(idx, false, '').then(ok => ok && close());
+  f.querySelector('[data-x]').onclick = close;
+  f.onclick = ev => ev.stopPropagation();
+  el.appendChild(f); ta.focus();
+}
+async function rate(idx, up, better) {
+  try {
+    const r = await fetch('rate', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({e, i: idx, up, better})});
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) { $('#err').textContent = out.error || ('error ' + r.status); return false; }
+    $('#err').textContent = '';
+    rates[idx] = out.rated; thumbs();
+    return true;
+  } catch (err) { $('#err').textContent = "can't reach Luna - is she running?"; return false; }
 }
 
 // --- a tool asking first --------------------------------------------------

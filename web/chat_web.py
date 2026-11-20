@@ -16,6 +16,9 @@ in the page too, and either side can answer it.
     POST /chat/talk        the mic button: HOME (talk, done, or stop her)
     POST /chat/stop        stop her (and anything physical), like ai-voice-ctl stop
     POST /chat/answer      {"id", "answer": "yes" | "no" | "all"}
+    POST /chat/rate        {"e", "i", "up": true|false, "better"}: the thumbs on her
+                           reply at conversation index i (matched by its text), kept as an example for her
+                           patches (training/dataset.py rate)
 """
 import json
 import os
@@ -109,7 +112,42 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
             "msgs": [[speaker, text] for speaker, text in convo[start:]], "total": total,
             "streaming": streaming, "busy": interrupts.busy(), "status": status, "name": name,
             "mood": mood, "rows": rows, "ask": ui.pending_approval(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
-            "can_talk": bool(ui.view.on_hotkey)}
+            "can_talk": bool(ui.view.on_hotkey), "rate": _rateable(now_epoch, convo)}
+
+
+def _rateable(epoch, convo):
+    """{index: "" | "up" | "fix" | "down"} for her replies the thumbs can keep."""
+    try:
+        from training import dataset
+
+        return {str(i): r for i, r in dataset.rateable(epoch, convo).items()}
+    except Exception:
+        return {}
+
+
+def _rate(body):
+    import ui
+    from training import dataset
+    from ui.shared import _lock
+
+    try:
+        data = json.loads(body or b"{}")
+        epoch, index, up = int(data.get("e")), int(data.get("i")), data.get("up") is True
+        better = str(data.get("better") or "")[:MAX_TYPED]
+    except (ValueError, TypeError, AttributeError):
+        return _json(400, {"error": "that couldn't be read"})
+    with _lock:
+        shown = ui.conversation[index][1] if epoch == ui.view.epoch and 0 <= index < len(ui.conversation) else None
+    try:
+        if shown is None:
+            raise ValueError("that reply has gone from the conversation")
+        ex = dataset.rate(epoch, shown, up, better)
+    except ValueError as e:
+        return _json(409, {"error": str(e)})
+    n = dataset.counts()
+    kind = ex.get("kind", "habit")
+    return _json(200, {"ok": True, "rated": ex.get("mark", "up" if up else "down"), "kind": kind,
+                       "approved": n.get(kind, {}).get("approved", 0)})
 
 
 def _mic():
@@ -302,4 +340,6 @@ def handle(method, sub, body, request=None):
         return _json(200, {"ok": True})
     if method == "POST" and sub == "/answer":
         return _answer(body)
+    if method == "POST" and sub == "/rate":
+        return _rate(body)
     return 404, "text/plain; charset=utf-8", "not here"

@@ -38,6 +38,22 @@ class Claims(unittest.TestCase):
                "result": "$ sed -i ...\n(exit code 0 after 0.0s)"}
         self.assertEqual(_unbacked("I've fixed the script.", [sed], "fix it"), "")
 
+    def test_writing_it_right_now_with_no_write(self):
+        # a real turn: asked to save a script, she said this and called nothing
+        answer = ("You want me to save it in my sandbox? Of course~ I'm writing it to "
+                  "`~/lunas_sandbox/scripts/cube_3d.py` right now. It'll be there whenever you want it~")
+        nudge = _unbacked(answer, [], "silly luna save it in your sand box :)")
+        self.assertIn("I'm writing it to", nudge)
+        self.assertIn("nothing this turn changed a file", nudge)
+
+    def test_writing_without_a_place_is_not_a_claim(self):
+        self.assertEqual(_unbacked("I'm writing you a little poem~ here it is:", [], "write me a poem"), "")
+        self.assertEqual(_unbacked("I'm putting it in perspective, love~", [], "save me from this day"), "")
+
+    def test_saving_to_a_file_name_or_your_folder(self):
+        self.assertIn("nothing this turn", _unbacked("I'm saving it as cube.py now~", [], "save it"))
+        self.assertIn("nothing this turn", _unbacked("I'm putting it in your sandbox right now", [], "save it"))
+
     def test_praise_is_not_held_to_it(self):
         self.assertEqual(_unbacked("I wrote it for you, after all~ 🌸", [], "thats beautiful luna!"), "")
 

@@ -41,6 +41,18 @@ Talk to her as usual. When a reply is right, or you know how it should have gone
 /examples             how many there are, and the page to look through them
 ```
 
+In the web chat, her replies have a 👍 and a 👎 (they show when you hover over a
+reply), so you can keep any of her recent replies, not only the last one:
+
+- 👍 keeps the reply as it is, like `/good`.
+- 👎 asks how it should have gone. Type your version and it's kept like `/fix`; leave it
+  empty ("Just mark it bad") and the reply is kept as a bad example. A bad example is never
+  trained on as it is (it's dropped), but it's kept: a later kind of training learns from
+  good and bad replies side by side.
+- A reply with gesture tags in it goes to the **gesture** examples, the rest to **habit**.
+  You can still switch it on the examples page.
+- Changed your mind? Click the other thumb: it's still one example.
+
 She never sees these: commands don't go into her history, her transcript or her notes,
 so collecting examples doesn't change the conversation you're having.
 

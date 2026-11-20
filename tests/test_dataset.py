@@ -167,3 +167,78 @@ class Store(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Thumbs(unittest.TestCase):
+    """The chat page's thumbs: any recent reply of hers, by its text on screen."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.patches = [mock.patch.object(dataset, "FOLDER", self.tmp),
+                        mock.patch.object(dataset, "FILE", os.path.join(self.tmp, "examples.jsonl")),
+                        mock.patch.object(dataset, "_me", return_value="luna")]
+        for p in self.patches:
+            p.start()
+        dataset._last.clear(); dataset._recent.clear(); dataset._rated.clear()
+        self.convo = []
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        dataset._last.clear(); dataset._recent.clear(); dataset._rated.clear()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def turn(self, reply, tools=False, shown=None):
+        shown = shown or reply
+        self.convo += [("user", "hi"), ("luna", shown)]
+        with mock.patch.object(dataset, "_ui_ref", return_value=(0, shown)):
+            a_turn(reply, tools)
+
+    def test_an_older_reply_can_be_kept(self):
+        self.turn("first reply")
+        self.turn("second reply")
+        self.turn("used a tool", tools=True)
+        self.assertEqual(dataset.rateable(0, self.convo), {1: "", 3: ""})      # not the tool turn
+        ex = dataset.rate(0, "first reply", True)
+        self.assertEqual((ex["reply"], ex["approved"], ex["source"]), ("first reply", True, "good"))
+        self.assertEqual(dataset.rateable(0, self.convo)[1], "up")
+        self.assertEqual(dataset.examples()[0]["rated"], "up")
+
+    def test_a_line_added_above_doesnt_lose_it(self):
+        self.turn("a reply")
+        self.convo.insert(1, ("system", "tool: something"))       # lands above her reply later
+        self.assertEqual(dataset.rateable(0, self.convo), {2: ""})
+
+    def test_kept_with_its_gesture_tags_even_though_the_screen_hides_them(self):
+        with mock.patch("life.gestures.names", return_value=("hug", "wave")):
+            from life import gestures
+            gestures._tag_cache.clear()
+            self.turn("come here [hug] you~", shown="come here you~")
+            ex = dataset.rate(0, "come here you~", True)
+            self.assertEqual((ex["kind"], ex["reply"]), ("gesture", "come here [hug] you~"))
+            gestures._tag_cache.clear()
+
+    def test_down_with_your_version_and_down_alone(self):
+        self.turn("meh reply")
+        self.turn("bad reply")
+        fixed = dataset.rate(0, "meh reply", False, "a better reply")
+        self.assertEqual((fixed["reply"], fixed["original"], fixed["approved"]), ("a better reply", "meh reply", True))
+        self.assertEqual(dataset.rateable(0, self.convo)[1], "fix")
+        bad = dataset.rate(0, "bad reply", False)
+        self.assertEqual((bad["reply"], bad["approved"], bad["source"]), ("bad reply", False, "bad"))
+
+    def test_changing_your_mind_keeps_one_example(self):
+        self.turn("a reply")
+        dataset.rate(0, "a reply", True)
+        dataset.rate(0, "a reply", False)
+        dataset.rate(0, "a reply", True)
+        rows = dataset.examples()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]["approved"], rows[0]["rated"]), (True, "up"))
+
+    def test_unknown_or_other_conversation_is_refused(self):
+        self.turn("hi there")
+        with self.assertRaises(ValueError):
+            dataset.rate(1, "hi there", True)          # after a /clear
+        with self.assertRaises(ValueError):
+            dataset.rate(0, "never said this", True)
