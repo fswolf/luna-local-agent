@@ -12,14 +12,7 @@
 # (server.mac.env on macOS), then server.local.env if present.
 set -uo pipefail
 
-# macOS still ships bash 3.2, which has no mapfile. Hop to Homebrew's.
-if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
-    for b in /opt/homebrew/bin/bash /usr/local/bin/bash; do
-        [ -x "$b" ] && exec "$b" "$0" "$@"
-    done
-    echo "This needs bash 4 or newer (macOS ships 3.2): brew install bash" >&2
-    exit 1
-fi
+# macOS still ships bash 3.2: everything here works in it (no mapfile).
 
 cd "$(dirname "$(realpath "$0" 2>/dev/null || echo "$0")")" || exit 1
 
@@ -39,6 +32,15 @@ echo "settings: server/llama/$SERVER_ENV$([ -f server.local.env ] && echo ' + se
 BIN=./bin/llama-server
 [ -x "$BIN" ] || { echo "llama-server isn't built yet - run server/llama/install.sh first." >&2; exit 1; }
 
+# lines_into NAME < input: input's lines into the array NAME (bash 3.2 has no mapfile)
+lines_into() {
+    local _line
+    eval "$1=()"
+    while IFS= read -r _line; do
+        eval "$1+=(\"\$_line\")"
+    done
+}
+
 # find_model PATTERN -> the one GGUF matching it in server/llama/models or LM
 # Studio's model folders (normal install, old cache, Flatpak). Prints
 # why on stderr and fails if there's none, or more than one to choose
@@ -46,7 +48,7 @@ BIN=./bin/llama-server
 find_model() {
     local pattern="$1" found=()
 
-    mapfile -t found < <(
+    lines_into found < <(
         find ./models "$HOME/.lmstudio/models" "$HOME/.cache/lm-studio/models" \
              "$HOME/.var/app/ai.lmstudio.lm-studio/.lmstudio/models" \
              -maxdepth 5 -iname "${pattern}.gguf" ! -iname "*mmproj*" \
@@ -84,9 +86,9 @@ if [ "$MMPROJ" = off ]; then
     MMPROJ=""
     VISION_WHY="MMPROJ=off in server.env"
 elif [ -z "$MMPROJ" ]; then
-    mapfile -t mm < <(find "$(dirname "$MODEL")" -maxdepth 1 -iname "*mmproj*.gguf" 2>/dev/null | sort)
+    lines_into mm < <(find "$(dirname "$MODEL")" -maxdepth 1 -iname "*mmproj*.gguf" 2>/dev/null | sort)
     if [ "${#mm[@]}" -eq 0 ] && [ -n "$MMPROJ_MATCH" ]; then
-        mapfile -t mm < <(find ./models "$HOME/.lmstudio/models" "$HOME/.cache/lm-studio/models" \
+        lines_into mm < <(find ./models "$HOME/.lmstudio/models" "$HOME/.cache/lm-studio/models" \
                                "$HOME/.var/app/ai.lmstudio.lm-studio/.lmstudio/models" \
                                -maxdepth 5 -iname "${MMPROJ_MATCH}.gguf" -iname "*mmproj*" 2>/dev/null | sort)
     fi

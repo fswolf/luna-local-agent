@@ -15,6 +15,9 @@ without asking first - system packages show the exact command and wait.
     --extras a,b         wakeword, mcp, portrait, live2d, embeddings, reranker, chat, camera, voices  (or "all")
     --model X            auto (default: picked for your GPU's memory), skip, or a size: 4b, 9b-q4, 9b, 27b...
     --no-system          don't install system packages, just say which are missing
+    --prebuilt           with --backend llama: llama.cpp's ready-made release (Vulkan, or Metal
+                         on a Mac) instead of building it; LUNA_LLAMA_TAG=b12397 pins a release
+    --only llama         just the model server and her model (her window's "Set it up for me")
     --check              only run the health check
 """
 import argparse
@@ -184,7 +187,7 @@ def download(url, dest):
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(request, timeout=60) as r, open(tmp, "wb") as f:
             total = int(r.headers.get("Content-Length") or 0)
-            got = 0
+            got, said = 0, -1
             while True:
                 chunk = r.read(1 << 20)
                 if not chunk:
@@ -193,6 +196,10 @@ def download(url, dest):
                 got += len(chunk)
                 if total and sys.stdout.isatty():
                     print(f"\r    {got * 100 // total}% of {total // (1 << 20)} MB", end="", flush=True)
+                elif total and got * 100 // total >= said + 5:
+                    # not a terminal (the app's setup pages): a line every 5%
+                    said = got * 100 // total
+                    print(f"    {said}% of {total // (1 << 20)} MB", flush=True)
         if total and sys.stdout.isatty():
             print()
         os.replace(tmp, dest)
@@ -598,6 +605,11 @@ def backend(state):
             warn("the llama.cpp build script is Linux and macOS only so far - use LM Studio here")
             note("model server", False, "llama.cpp: not on Windows yet")
             return
+        if ARGS.prebuilt:
+            good = prebuilt_llama()
+            note("model server", good, "llama.cpp (ready-made release) - ./start.sh starts it with her"
+                 if good else "llama.cpp download failed - see above")
+            return
         if SYSTEM == "Darwin":
             kind = "metal"
             if not shutil.which("cmake"):
@@ -613,6 +625,97 @@ def backend(state):
              if good else "llama.cpp build failed - see above, then run server/llama/install.sh again")
     else:
         note("model server", False, "skipped")
+
+
+# llama.cpp's own ready-made releases: no compiler, no system packages. The
+# Vulkan build runs on AMD, NVIDIA and Intel cards alike (and on the CPU with
+# none); the macOS one uses Metal. What the Luna app sets up.
+LLAMA_RELEASES = "https://github.com/ggml-org/llama.cpp/releases"
+
+
+def llama_asset(tag):
+    """The release file for this machine, or None."""
+    arch = {"x86_64": "x64", "amd64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(platform.machine().lower())
+    if not arch:
+        return None
+    if SYSTEM == "Linux":
+        return f"llama-{tag}-bin-ubuntu-vulkan-{arch}.tar.gz"
+    if SYSTEM == "Darwin":
+        return f"llama-{tag}-bin-macos-{arch}.tar.gz"
+    return None
+
+
+def latest_llama_tag():
+    """The newest release's tag (b12600...), from where /releases/latest goes.
+    LUNA_LLAMA_TAG=b12397 pins one instead."""
+    pinned = os.environ.get("LUNA_LLAMA_TAG", "").strip()
+    if pinned:
+        return pinned if pinned.startswith("b") and pinned[1:].isdigit() else None
+    try:
+        request = urllib.request.Request(LLAMA_RELEASES + "/latest", headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=30) as r:
+            tag = r.geturl().rstrip("/").rsplit("/", 1)[-1]
+    except Exception as e:
+        fail(f"couldn't ask GitHub for the newest llama.cpp: {e}")
+        return None
+    return tag if tag.startswith("b") and tag[1:].isdigit() else None
+
+
+def prebuilt_llama():
+    """llama.cpp's release for this machine into server/llama/bin (llama-server
+    and the libraries beside it). A build of your own already there is kept."""
+    import tarfile
+    import tempfile
+
+    bindir = os.path.join(ROOT, "server", "llama", "bin")
+    mark = os.path.join(bindir, ".release")
+    if os.path.exists(os.path.join(bindir, "llama-server")) and not os.path.exists(mark):
+        ok("llama.cpp built here already - kept")
+        return True
+    tag = latest_llama_tag()
+    asset = llama_asset(tag) if tag else None
+    if not asset:
+        if tag:
+            warn(f"no ready-made llama.cpp for {SYSTEM} {platform.machine()} - LM Studio works here")
+        return False
+    try:
+        with open(mark, encoding="utf-8") as f:
+            if f.read().strip() == tag:
+                ok(f"llama.cpp {tag} (ready-made)")
+                return True
+    except OSError:
+        pass
+    work = tempfile.mkdtemp(prefix="luna-llama-", dir=os.path.join(ROOT, "server", "llama"))
+    try:
+        archive = os.path.join(work, asset)
+        if not download(f"{LLAMA_RELEASES}/download/{tag}/{asset}", archive):
+            return False
+        with tarfile.open(archive) as t:
+            if sys.version_info >= (3, 12):
+                t.extractall(work, filter="data")     # nothing outside work, no device files
+            else:
+                bad = [m.name for m in t.getmembers() if m.name.startswith("/") or ".." in m.name.split("/")]
+                if bad:
+                    fail(f"the download has odd paths in it ({bad[0]}) - not unpacked")
+                    return False
+                t.extractall(work)
+        server = next((os.path.join(top, "llama-server") for top, _d, files in os.walk(work)
+                       if "llama-server" in files), None)
+        if not server or os.path.dirname(server) == work:
+            fail("no llama-server folder in the download")
+            return False
+        if os.path.isdir(bindir):
+            shutil.rmtree(bindir)
+        shutil.move(os.path.dirname(server), bindir)
+        with open(mark, "w", encoding="utf-8") as f:
+            f.write(tag + "\n")
+        ok(f"llama.cpp {tag} (ready-made, {'Metal' if SYSTEM == 'Darwin' else 'Vulkan'})")
+        return True
+    except (OSError, tarfile.TarError) as e:
+        fail(f"couldn't unpack llama.cpp: {e}")
+        return False
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1150,6 +1253,10 @@ def main():
     ap.add_argument("--standard", action="store_true",
                     help="Qwen's own release instead of the uncensored (abliterated) one")
     ap.add_argument("--no-system", action="store_true")
+    ap.add_argument("--prebuilt", action="store_true",
+                    help="--backend llama: llama.cpp's ready-made release instead of building it here")
+    ap.add_argument("--only", choices=["llama"],
+                    help="llama: just the model server and her model (what Luna's connect page runs)")
     ap.add_argument("--check", action="store_true")
     ARGS = ap.parse_args()
 
@@ -1162,6 +1269,14 @@ def main():
     gpu = check_system()
     if ARGS.gpu != "auto":
         gpu = ARGS.gpu
+
+    if ARGS.only == "llama":
+        backend(state)
+        save_state(state)
+        model(state)
+        save_state(state)
+        summary()
+        return
 
     if ARGS.extras is None:
         if ARGS.yes:

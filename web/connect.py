@@ -7,6 +7,9 @@ instead of quitting: a small page in her window that
 
 - keeps looking where config.json says, and where LM Studio and llama.cpp
   usually are on this computer, and goes on the moment one has a model;
+- on Linux and macOS, sets one up here with a click: llama.cpp's ready-made
+  release and a model sized for the graphics card (installer/install.py
+  --only llama), then starts it;
 - says how to get LM Studio going here;
 - takes the address of a server on another computer (and its key, when it
   wants one), tries it, and saves it.
@@ -207,10 +210,17 @@ class State:
         self.looking = []          # [{what, base, why}] the last look round
         self.found = None          # probe() of the one she connected to
         self.closed = False        # "Not now"
+        # "Set it up for me": idle | running | starting | failed, the step it's on,
+        # its last line, what went wrong, and the whole log for "details"
+        self.setup = {"state": "idle", "step": "", "line": "", "errors": [], "log": []}
+        self.start = None          # wait()'s start: starts the server set up here
+        self.server = None         # ...and the process it returned (launch.py stops it)
 
     def snapshot(self):
         with self.lock:
-            return json.dumps({"looking": self.looking, "found": self.found, "os": sys.platform})
+            setup = dict(self.setup, log=self.setup["log"][-300:])
+            return json.dumps({"looking": self.looking, "found": self.found, "os": sys.platform,
+                               "can_setup": can_setup(), "setup": setup})
 
 
 S = State()
@@ -237,6 +247,92 @@ def look_once():
     with S.lock:
         S.looking = seen
     return False
+
+
+# ---------------------------------------------------------------------------
+# "Set it up for me": llama.cpp and a model on this computer
+# ---------------------------------------------------------------------------
+def can_setup():
+    """llama.cpp's ready-made releases and server/llama/start.sh cover Linux and
+    macOS; on Windows it's LM Studio for now."""
+    return sys.platform.startswith("linux") or sys.platform == "darwin"
+
+
+def _local_env_model():
+    """The model server/llama/server.local.env points at, when that file is there."""
+    try:
+        with open(os.path.join(ROOT, "server", "llama", "server.local.env"), encoding="utf-8") as f:
+            for line in f:
+                m = re.match(r'\s*MODEL\s*=\s*"?([^"\n]*)"?', line)
+                if m:
+                    return m.group(1).strip()
+    except OSError:
+        pass
+    return ""
+
+
+def llama_ready():
+    """llama.cpp is here and a model for it was downloaded."""
+    server = os.path.join(ROOT, "server", "llama", "bin", "llama-server")
+    model = _local_env_model()
+    return os.path.exists(server) and bool(model) and os.path.exists(model)
+
+
+def _set(**kw):
+    with S.lock:
+        S.setup.update(kw)
+
+
+def run_setup(standard=False):
+    """The installer's model-server steps, unattended, fed to the page; then
+    point her at it and start it. Runs in a thread of its own."""
+    import subprocess
+
+    _set(state="running", step="Starting", line="", errors=[], log=[])
+    cmd = [sys.executable, "-u", os.path.join(ROOT, "installer", "install.py"), "--only", "llama", "--yes",
+           "--no-system", "--backend", "llama", "--prebuilt", "--model", "auto"] + (["--standard"] if standard else [])
+    env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", NO_COLOR="1")
+    env.pop("WT_SESSION", None)
+    try:
+        proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
+    except OSError as e:
+        _set(state="failed", errors=[f"couldn't run the installer: {e}"])
+        return
+    for raw in proc.stdout:
+        text = re.sub(r"\x1b\[[0-9;]*m", "", raw.rstrip("\r\n"))
+        with S.lock:
+            S.setup["log"].append(text)
+            stripped = text.strip()
+            if stripped.startswith("== "):
+                if stripped[3:] != "Summary":
+                    S.setup["step"], S.setup["line"] = stripped[3:], ""
+            elif stripped.startswith("✗"):
+                S.setup["errors"].append(stripped[1:].strip())
+            elif stripped.startswith("downloading "):
+                S.setup["file"] = stripped.rsplit("/", 1)[-1]
+                S.setup["line"] = f"downloading {S.setup['file']}"
+            elif re.match(r"\d+% of \d+ MB$", stripped) and S.setup.get("file"):
+                S.setup["line"] = f"{S.setup['file']}: {stripped}"
+            elif stripped:
+                S.setup["line"] = stripped.lstrip("✓! ").strip()
+    proc.wait()
+    if proc.returncode != 0 or not llama_ready():
+        with S.lock:
+            if not S.setup["errors"]:
+                S.setup["errors"].append("it didn't finish - the details below say why")
+            S.setup["state"] = "failed"
+        return
+    save({"kind": "llama.cpp", "base": "http://127.0.0.1:8080"})
+    _set(state="starting", step="Starting her model", line="loading it onto the graphics card...")
+    started = S.start() if S.start else None
+    with S.lock:
+        S.server = started
+        if started is None:
+            S.setup.update(state="failed", errors=["it's set up, but llama.cpp didn't start: "
+                                                   "server/llama/server.log says why"])
+        else:
+            S.setup["state"] = "done"
 
 
 def try_address(body):
@@ -295,6 +391,16 @@ class Page(BaseHTTPRequestHandler):
         body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 1 << 16))
         if self.path == "/try":
             self._send(200, json.dumps(try_address(body)))
+        elif self.path == "/setup":
+            try:
+                standard = bool(json.loads(body or b"{}").get("standard"))
+            except (ValueError, AttributeError):
+                standard = False
+            with S.lock:
+                busy = S.setup["state"] in ("running", "starting")
+            if can_setup() and not busy:
+                threading.Thread(target=run_setup, args=(standard,), daemon=True, name="connect-setup").start()
+            self._send(200, "{}")
         elif self.path == "/close":
             with S.lock:
                 S.closed = True
@@ -328,10 +434,13 @@ def _open(url):
     return None
 
 
-def wait(show=True, say=print):
+def wait(show=True, say=print, start=None):
     """Show the page and look until a server with a model answers. True:
     connected (config.json says where), go on and start her. False: "Not
-    now", or her window closed."""
+    now", or her window closed. start: starts the model server once "Set it
+    up for me" has put one here, returning its process (or None); that
+    process is S.server afterwards, for the caller to stop when she exits."""
+    S.start = start
     if look_once():
         return True
     server = ThreadingHTTPServer(("127.0.0.1", 0), Page)
@@ -350,6 +459,12 @@ def wait(show=True, say=print):
     try:
         while True:
             if look_once():
+                # the server "Set it up" started: its process is handed over once start() returns
+                for _ in range(240):
+                    with S.lock:
+                        if S.setup["state"] != "starting":
+                            break
+                    time.sleep(0.5)
                 time.sleep(2.5)                     # long enough for the page to say who she found
                 return True
             if S.closed:

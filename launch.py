@@ -427,12 +427,14 @@ def detach(args):
 
 def connected():
     """--web: a model to talk to, or her window asks where one is
-    (web/connect.py) and saves what it finds. False: "Not now", or the
-    window closed, and she doesn't start."""
+    (web/connect.py) and saves what it finds. (found, process): found False
+    is "Not now", or the window closed, and she doesn't start; process is
+    the llama.cpp its "Set it up for me" started here, stopped when she exits."""
     sys.path.insert(0, ROOT)
     from web import connect
 
-    return connect.wait(say=lambda line: print(line, flush=True))
+    found = connect.wait(say=lambda line: print(line, flush=True), start=lambda: start_llama(state()))
+    return found, connect.S.server
 
 
 def _answers(url):
@@ -473,9 +475,12 @@ def main():
         sys.exit(detach(args))
     s = state()
     llama = start_llama(s)
-    if "--web" in args and not connected():
-        stop_group(llama)
-        sys.exit(0)
+    if "--web" in args:
+        found, started = connected()
+        llama = llama or started
+        if not found:
+            stop_group(llama)
+            sys.exit(0)
     voice = None
     v = s.get("voice", {})
     url = tts_url()

@@ -240,5 +240,79 @@ class Waiting(unittest.TestCase):
             self.assertFalse(connect.wait(show=False, say=lambda *_: None))
 
 
+class SetItUp(unittest.TestCase):
+    """"Set it up for me": the installer's output reaches the page, and a
+    finished setup points her at llama.cpp and starts it. A stand-in installer."""
+
+    FAKE = r"""import os, sys
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print("== Her brain (the model server)")
+print("  downloading llama.cpp")
+print("    50% of 35 MB")
+if "--standard" in sys.argv:
+    print("  ✗ pretend it failed")
+    sys.exit(1)
+os.makedirs(os.path.join(root, "server", "llama", "bin"), exist_ok=True)
+open(os.path.join(root, "server", "llama", "bin", "llama-server"), "w").close()
+model = os.path.join(root, "server", "llama", "models", "m.gguf")
+os.makedirs(os.path.dirname(model), exist_ok=True)
+open(model, "w").close()
+with open(os.path.join(root, "server", "llama", "server.local.env"), "w") as f:
+    f.write('MODEL="%s"\n' % model)
+print("== Her model")
+print("  ✓ Qwen3.5 4B")
+print("== Summary")
+print("  ✓ model server")
+"""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.root, "installer"))
+        with open(os.path.join(self.root, "installer", "install.py"), "w", encoding="utf-8") as f:
+            f.write(self.FAKE)
+        connect.S.__init__()
+        self.p = [mock.patch.object(connect, "ROOT", self.root), mock.patch.object(connect, "save")]
+        self.saved = None
+        for p in self.p:
+            started = p.start()
+            if p is self.p[1]:
+                self.saved = started
+
+    def tearDown(self):
+        for p in self.p:
+            p.stop()
+
+    def test_done_then_started(self):
+        server = object()
+        connect.S.start = lambda: server
+        connect.run_setup()
+        s = json.loads(connect.S.snapshot())["setup"]
+        self.assertEqual(s["state"], "done")
+        self.assertIn("    50% of 35 MB", s["log"])
+        self.assertIs(connect.S.server, server)
+        self.saved.assert_called_once_with({"kind": "llama.cpp", "base": "http://127.0.0.1:8080"})
+        self.assertTrue(connect.llama_ready())
+
+    def test_a_failure_is_said(self):
+        connect.S.start = lambda: self.fail("nothing to start")
+        connect.run_setup(standard=True)
+        s = connect.S.setup
+        self.assertEqual(s["state"], "failed")
+        self.assertEqual(s["errors"], ["pretend it failed"])
+        self.saved.assert_not_called()
+
+    def test_set_up_but_wont_start(self):
+        connect.S.start = lambda: None
+        connect.run_setup()
+        self.assertEqual(connect.S.setup["state"], "failed")
+        self.assertIn("didn't start", connect.S.setup["errors"][0])
+
+    def test_only_where_it_can(self):
+        with mock.patch.object(connect.sys, "platform", "win32"):
+            self.assertFalse(connect.can_setup())
+        with mock.patch.object(connect.sys, "platform", "darwin"):
+            self.assertTrue(connect.can_setup())
+
+
 if __name__ == "__main__":
     unittest.main()

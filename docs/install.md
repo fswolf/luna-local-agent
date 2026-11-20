@@ -150,8 +150,12 @@ the icon off; the icon's own log is `~/.cache/ai-voice/tray.log`.
 asks where one is. It keeps looking where `config.json` says and where LM
 Studio (port 1234) and llama.cpp (port 8080) usually are on this computer,
 explains how to get LM Studio going, and takes the address of a server on
-another computer (and its API key, if it has one). She starts the moment
-one answers with a model loaded, and what it found is saved (`llm` in
+another computer (and its API key, if it has one). On Linux and macOS it
+can also set one up for you: **Set it up** downloads llama.cpp's ready-made
+release (Vulkan, or Metal on a Mac, about 40 MB) and a Qwen 3.5 model sized
+for your graphics card into Luna's folder, with a progress bar, then starts
+it (the same as `./installer/install.sh --only llama --backend llama
+--prebuilt`). She starts the moment one answers with a model loaded, and what it found is saved (`llm` in
 `config.json`; a key goes in `~/.config/ai-voice/llm.json`, outside the
 repo), so next time she starts straight away. "Not now" closes it. Running it
 again while she's up just opens her window. `--web --here` keeps her on the terminal instead (Ctrl+C quits).
