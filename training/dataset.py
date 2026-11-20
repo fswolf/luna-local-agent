@@ -110,13 +110,19 @@ def _me():
 
 
 def rateable(epoch, conversation):
-    """{index: "" | "up" | "fix" | "down"} for her replies in conversation
-    (the [speaker, text] list on screen) the thumbs can still keep: your own
-    turns without tools, from this conversation."""
+    """{index: "" | "up" | "fix" | "down" | "tools"} for her replies in
+    conversation (the [speaker, text] list on screen) that the thumbs know:
+    your own turns from this conversation, "tools" for one where she used a
+    tool (not keepable yet). A reply that isn't here is from before Luna
+    started, or not a turn of yours."""
     me = _me()
+    out = {}
     with _lock:
-        return {i: _rated.get((epoch, str(text).strip()), "") for i, (who, text) in enumerate(conversation)
-                if who == me and not (_recent.get((epoch, str(text).strip())) or {"used_tools": True})["used_tools"]}
+        for i, (who, text) in enumerate(conversation):
+            key = (epoch, str(text).strip())
+            if who == me and key in _recent:
+                out[i] = "tools" if _recent[key].get("used_tools") else _rated.get(key, "")
+    return out
 
 
 def rate(epoch, shown, up, better=None):

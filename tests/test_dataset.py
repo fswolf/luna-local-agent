@@ -198,7 +198,9 @@ class Thumbs(unittest.TestCase):
         self.turn("first reply")
         self.turn("second reply")
         self.turn("used a tool", tools=True)
-        self.assertEqual(dataset.rateable(0, self.convo), {1: "", 3: ""})      # not the tool turn
+        self.assertEqual(dataset.rateable(0, self.convo), {1: "", 3: "", 5: "tools"})   # a tool turn: shown, not keepable
+        with self.assertRaises(ValueError):
+            dataset.rate(0, "used a tool", True)
         ex = dataset.rate(0, "first reply", True)
         self.assertEqual((ex["reply"], ex["approved"], ex["source"]), ("first reply", True, "good"))
         self.assertEqual(dataset.rateable(0, self.convo)[1], "up")
