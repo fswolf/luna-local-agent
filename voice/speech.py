@@ -12,7 +12,7 @@ for anything that used to live here. The pieces:
 import queue
 import threading
 import requests
-import sounddevice as sd  # noqa: F401  (speech.sd: tests and /mic reach the device layer through here)
+from voice.nosound import sd  # noqa: F401  (speech.sd: tests and /mic reach the device layer through here)
 from core import interrupts
 from core import logbook
 import ui

@@ -2,3 +2,5 @@
 # Windows, shell scripts break with it.
 *.cmd text eol=crlf
 *.sh text eol=lf
+*.command text eol=lf
+*.ps1 text eol=crlf

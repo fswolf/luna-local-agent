@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Setting up Luna</title>
+<link rel="icon" href="/logo.png">
+<style>
+:root{--bg:#120d1c;--panel:#1a1328;--line:#3a2d55;--text:#ece6f7;--dim:#a49bc0;--accent:#ff87d7;
+--ok:#7be0a8;--warn:#ffcf6b;--bad:#ff7b8a}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:560px;margin:0 auto;padding:28px 18px 40px}
+header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+header img{width:56px;height:56px;border-radius:14px}
+h1{font-size:21px;margin:0}
+#msg{color:var(--dim);margin:2px 0 0}
+.bar{height:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:6px 0 4px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#b46cff,var(--accent));transition:width .6s}
+.time{font-size:12px;color:var(--dim);text-align:right}
+ol{list-style:none;padding:0;margin:16px 0}
+li{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-bottom:7px}
+.row{display:flex;align-items:center;gap:10px}
+.dot{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12px;
+border:2px solid var(--line);color:var(--bg);font-weight:700}
+.todo{opacity:.5}
+.doing .dot{border-color:var(--accent);border-top-color:transparent;animation:spin 1s linear infinite}
+.done .dot{background:var(--ok);border-color:var(--ok)}
+.warn .dot{background:var(--warn);border-color:var(--warn)}
+.bad .dot{background:var(--bad);border-color:var(--bad)}
+.skip{opacity:.6}.skip .dot{color:var(--dim)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.notes{margin:6px 0 0 30px;font-size:13px;color:var(--dim)}
+.notes div{overflow-wrap:anywhere}
+.notes .w{color:var(--warn)}.notes .f{color:var(--bad)}
+.box{background:#272012;border:1px solid #5a4a22;color:#e9d9a6;border-radius:12px;padding:10px 12px;margin:12px 0;font-size:13.5px}
+.box.bad{background:#2a1218;border-color:#6a2a36;color:#ffd0d6}
+code,pre{font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.cmd{display:flex;gap:8px;align-items:flex-start;margin-top:6px}
+.cmd code{flex:1;background:#0d0914;border:1px solid var(--line);border-radius:8px;padding:6px 8px;overflow-wrap:anywhere;color:var(--text)}
+button{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:6px 12px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.main{background:var(--accent);color:#2a0d22;border-color:var(--accent);font-weight:600}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--dim)}
+pre{background:#0d0914;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:#cfc6e4}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="/logo.png" alt="">
+    <div><h1 id="title">Setting up Luna</h1><p id="msg">Getting Luna ready...</p></div>
+  </header>
+  <div class="bar"><i id="fill"></i></div>
+  <div class="time" id="time">This takes a few minutes the first time.</div>
+
+  <div class="box" id="missing" hidden>
+    <b>Some things need installing by you</b> (they need your password, so Luna can't do it).
+    She works without them, but they make her better. Paste this in a terminal:
+    <div id="cmds"></div>
+  </div>
+  <div class="box bad" id="failed" hidden>
+    <b id="failmsg"></b>
+    <div class="actions"><button class="main" id="retry">Try again</button><button id="close">Close</button></div>
+  </div>
+
+  <ol id="steps"></ol>
+
+  <details id="details"><summary>Show details</summary><pre id="log"></pre>
+    <div class="time" id="logpath"></div></details>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let lastLog = -1, stuck = false, lastPhase = "", lastCmds = "";
+
+function esc(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function copyBtn(text){
+  const b = document.createElement("button");
+  b.textContent = "Copy";
+  b.onclick = async () => {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t);
+                t.select(); document.execCommand("copy"); t.remove(); }
+    b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy", 1500);
+  };
+  return b;
+}
+
+function render(s){
+  $("msg").textContent = s.message;
+  const total = s.steps.length || 1;
+  let done = s.steps.filter(x => x.state !== "todo" && x.state !== "doing").length;
+  const later = {"Her brain (the model server)": "Skipped for now: Luna needs a model server (LM Studio, or llama.cpp)"};
+  const slow = {"Luna's Python environment": "Downloading her packages: the slow part, a few minutes",
+                "Her voice (kokoro-reader)": "Downloading her voice: a few minutes"};
+  if (s.steps.some(x => x.state === "doing")) done += 0.5;
+  let pct = Math.round(done / total * 90);
+  if (s.phase === "starting") pct = 95;
+  if (s.phase === "ready") pct = 100;
+  $("fill").style.width = pct + "%";
+  const m = Math.floor(s.elapsed / 60), sec = s.elapsed % 60;
+  $("time").textContent = s.phase === "ready" ? "Done." :
+    `${m}:${String(sec).padStart(2, "0")} so far. This takes a few minutes the first time.`;
+
+  $("steps").innerHTML = s.steps.map(st => {
+    const icon = {done: "✓", warn: "!", bad: "✗", skip: "–"}[st.state] || "";
+    const notes = st.lines.filter(l => (l.kind !== "ok" || st.state === "doing") && !/^install these yourself/.test(l.text)).slice(-4)
+      .map(l => `<div class="${l.kind === "warn" ? "w" : l.kind === "fail" ? "f" : ""}">${esc(l.text)}</div>`).join("");
+    return `<li class="${st.state}"><div class="row"><span class="dot">${icon}</span>${esc(st.title)}</div>`
+      + (notes ? `<div class="notes">${notes}</div>` : "")
+      + (st.state === "doing" && slow[st.title] ? `<div class="notes">${slow[st.title]}</div>` : "")
+      + (st.state === "skip" && later[st.title] ? `<div class="notes">${later[st.title]}</div>` : "") + "</li>";
+  }).join("");
+
+  const cmds = s.missing.map(t => t.replace(/^install these yourself:\s*/, "")).filter(t => /\binstall\b|\s-S\s/.test(t));
+  $("missing").hidden = !cmds.length;
+  if (cmds.join("\n") !== lastCmds) {
+    lastCmds = cmds.join("\n");
+    $("cmds").innerHTML = "";
+    for (const c of cmds) {
+      const row = document.createElement("div"); row.className = "cmd";
+      const code = document.createElement("code"); code.textContent = c;
+      row.append(code, copyBtn(c)); $("cmds").append(row);
+    }
+  }
+
+  $("failed").hidden = s.phase !== "failed";
+  if (s.phase === "failed") $("failmsg").textContent = s.message;
+  if (s.phase === "failed" && lastPhase !== "failed") $("details").open = true;     // once: it can be closed again
+  lastPhase = s.phase;
+  if (s.phase === "ready") { $("title").textContent = "Luna's ready"; $("msg").textContent = "Her window is opening. This one closes by itself."; }
+
+  if (s.log_total !== lastLog) {      // the page gets the last 400 lines: count them all
+    const pre = $("log"), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
+    pre.textContent = s.log.join("\n");
+    if (atEnd) pre.scrollTop = pre.scrollHeight;
+    lastLog = s.log_total;
+  }
+  $("logpath").textContent = "Full log: " + s.log_path;
+}
+
+async function poll(){
+  try {
+    const r = await fetch("/status", {cache: "no-store"});
+    render(await r.json());
+    stuck = false;
+  } catch (e) {
+    if (!stuck) {
+      $("msg").textContent = lastPhase === "ready" ? "Luna's open in her own window. You can close this one."
+        : "The setup stopped. Start Luna again to carry on where it left off.";
+      stuck = true;
+    }
+  }
+  setTimeout(poll, 700);
+}
+$("retry").onclick = () => fetch("/retry", {method: "POST"});
+$("close").onclick = () => { fetch("/quit", {method: "POST"}).finally(() => window.close()); };
+poll();
+</script>
+</body>
+</html>

@@ -294,7 +294,9 @@ def system_packages():
     if WIN:
         if not shutil.which("git"):
             warn("git isn't installed - needed to fetch the voice server")
-            if not ARGS.no_system and shutil.which("winget") and ask("Install it with winget?"):
+            if ARGS.no_system:
+                warn("install these yourself: winget install --id Git.Git -e")
+            elif shutil.which("winget") and ask("Install it with winget?"):
                 run(["winget", "install", "--id", "Git.Git", "-e", "--accept-source-agreements"])
         else:
             ok("git")
@@ -319,6 +321,12 @@ def system_packages():
         wanted[f"python{mm}-venv"] = "virtual environments"
         wanted.pop("python3-dev", None)
         wanted.pop("python3-venv", None)
+    # A Python of its own outside /usr (uv's, which the app launcher uses)
+    # brings its own headers and venv: none of the system's needed.
+    if not sys.base_prefix.startswith("/usr"):
+        for p in list(wanted):
+            if p.startswith("python") and p.endswith(("-devel", "-dev", "-venv")):
+                wanted.pop(p)
     missing = [p for p in wanted if not installed(pm, p)]
     if SYSTEM == "Linux":
         optional = [p for p in OPTIONAL_LINUX if not installed(pm, p)
@@ -336,7 +344,10 @@ def system_packages():
     if optional:
         print(f"  {D}optional: {', '.join(f'{p} ({OPTIONAL_LINUX[p]})' for p in optional)}{X}")
     if ARGS.no_system:
-        warn("--no-system: install those yourself")
+        if missing:
+            warn(f"install these yourself: {' '.join(install + missing)}")
+        if optional:
+            print(f"  optional: {' '.join(install + optional)}")
         note("system packages", not missing, "skipped" if missing else "")
         return not missing
     todo = list(missing)
@@ -567,6 +578,10 @@ def backend(state):
         if SYSTEM == "Windows":
             options = [o for o in options if o[0] != "llama"]
         choice = choose("Which model server?", options, "lmstudio")
+    if choice == "skip" and os.environ.get("LUNA_APP") and state.get("backend") not in (None, "skip"):
+        # the app's setup skips this step; one chosen before is left as it was
+        ok(f"keeping {state['backend']}")
+        return
     state["backend"] = choice
 
     if choice == "lmstudio":
@@ -978,6 +993,11 @@ def extras_files(extras):
 # ---------------------------------------------------------------------------
 def launchers(state):
     step("Launchers")
+    if os.environ.get("LUNA_APP"):
+        # run by the Luna app (app/bootstrap.py): it makes its own menu entry
+        ok("the Luna app starts her - nothing to add")
+        note("launcher", True, "the Luna app")
+        return
     launch = os.path.join(ROOT, "launch.py")
     py = state["venv_python"]
     if WIN:
@@ -1083,9 +1103,11 @@ def health(state):
         bad = {"python": str(e)}
     if bad:
         for m, e in bad.items():
-            fail(f"{m}: {e}")
-            if m == "sounddevice":
-                print("    (PortAudio missing - install the system packages step's audio package)")
+            if m == "sounddevice":       # she starts without it (voice/nosound.py), typing only
+                warn(f"{m}: {e} - no voice or microphone until PortAudio is installed "
+                     "(the system packages step's audio package)")
+            else:
+                fail(f"{m}: {e}")
     else:
         ok("every package imports")
     note("imports", not bad, ", ".join(bad) if bad else "")

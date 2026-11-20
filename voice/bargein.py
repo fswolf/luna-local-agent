@@ -3,7 +3,7 @@ waiting for the wake word.
 
 Part of the voice package; voice/speech.py is the front door.
 """
-import sounddevice as sd
+from voice.nosound import sd   # sounddevice, or a silent stand-in without PortAudio
 from core import logbook, safe
 import ui
 import config

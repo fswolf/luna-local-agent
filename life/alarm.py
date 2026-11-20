@@ -132,7 +132,7 @@ def tone():
 
 def play_tone():
     """Play it once, at the alarm's own volume. Interruptible."""
-    import sounddevice as sd
+    from voice.nosound import sd
 
     samples, rate = tone()
 

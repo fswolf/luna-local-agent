@@ -105,6 +105,12 @@ def _load_speech():
     conversation, scroll, and type immediately; only voice has to wait,
     and it says so if you try it early.
     """
+    from voice import nosound
+
+    if nosound.MISSING:
+        ui.add_message("system", "PortAudio isn't installed on this computer, so she can't hear or speak "
+                                 "yet - typing works. Install it (portaudio19-dev on Ubuntu, portaudio-devel "
+                                 "on Fedora, portaudio on Arch) and start her again.")
     try:
         load_models()
         ui.set_status("Idle")

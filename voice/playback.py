@@ -10,7 +10,7 @@ import sys
 import tempfile
 import threading
 import time
-import sounddevice as sd
+from voice.nosound import sd   # sounddevice, or a silent stand-in without PortAudio
 import numpy as np
 from core import logbook
 import ui
