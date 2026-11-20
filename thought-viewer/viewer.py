@@ -345,17 +345,35 @@ PAGE = r"""<!DOCTYPE html>
   #meta .warn { color: var(--amber); }
   #meta .off { color: var(--danger); }
   #search {
-    flex: 1; min-width: 220px; padding: 7px 11px; border-radius: 8px;
+    flex: 1; min-width: 160px; padding: 7px 11px; border-radius: 8px;
     border: 1px solid var(--line); background: var(--bg); color: var(--text);
     font-size: 13px; outline: none;
   }
   #search:focus { border-color: var(--accent-dim); }
-  #flagchips button { color: #e8b8c8; }
-  #flagchips button.on { color: var(--danger); border-color: var(--danger); }
-  #flagchips button i { font-style: normal; color: var(--dim); margin-left: 4px; }
+  .top { flex-wrap: nowrap; }
+  .top #meta { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  select {
+    background: var(--bg); border: 1px solid var(--line); color: var(--dim); border-radius: 8px;
+    padding: 6px 8px; font: 12.5px system-ui, sans-serif; max-width: 210px; cursor: pointer; outline: none;
+  }
+  select:hover, select:focus { border-color: var(--accent-dim); color: var(--text); }
+  select option { background: var(--panel); color: var(--text); }
+  #flagsel.on { color: var(--danger); border-color: var(--danger); }
+  #modelsel.on { color: var(--cyan); border-color: #3f6b6b; }
   #daychip { color: var(--cyan); border-color: #3f6b6b; }
-  #models button i { font-style: normal; color: var(--dim); margin-left: 5px; }
-  #models button.on { color: var(--cyan); border-color: #3f6b6b; }
+  .chips { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+  .menu { position: relative; }
+  #morebtn { font-size: 14px; line-height: 1; padding: 3px 9px; }
+  #more {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; min-width: 150px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 4px;
+    display: flex; flex-direction: column; box-shadow: 0 6px 20px #0008;
+  }
+  #more[hidden] { display: none; }
+  #more a, #more button { border: 0; text-align: left; color: var(--text); text-decoration: none;
+                          font-size: 12.5px; padding: 6px 10px; border-radius: 5px; }
+  #more a:hover, #more button:hover { background: var(--line); }
+  #more .danger { color: var(--danger); }
   .pill.model { color: var(--dim); font-family: ui-monospace, monospace; font-size: 10px; }
 
   /* ---- two panes ---- */
@@ -451,36 +469,50 @@ PAGE = r"""<!DOCTYPE html>
     body:not(.showing) #detail { display: none; }
     #back { display: inline-block; }
   }
+  @media (max-width: 600px) {
+    header { padding: 10px 12px 8px; }
+    .top { flex-wrap: wrap; }
+    .top #meta { order: 9; flex-basis: 100%; white-space: normal; }
+    .top .sp { flex: 1; }
+    #search { min-width: 0; flex-basis: 100%; }
+    select { flex: 1; max-width: none; }
+  }
 </style></head><body>
 
 <header>
-  <div class="row">
+  <div class="row top">
     <h1>Luna's thoughts</h1>
     <div id="meta">loading…</div>
+    <span class="sp"></span>
+    <button id="rec" onclick="toggleRecording()" title="record her reasoning - saved to config.json, same as /set thoughts.enabled"><span class="dot"></span><span id="rectext">recording</span></button>
+    <button class="live on" onclick="toggleLive()" title="refresh as new turns arrive">live</button>
+    <div class="menu">
+      <button id="morebtn" onclick="menu()" title="more">⋯</button>
+      <div id="more" hidden>
+        <a href="report?kind=starred" target="_blank" title="a printable page of your starred turns - Save as PDF from there">starred → PDF</a>
+        <a id="livelink" href="http://127.0.0.1:8792/" target="_blank" title="watch her think as it happens (Luna has to be running)">watch live ↗</a>
+        <a href="api/export" download>export</a>
+        <button class="danger" onclick="clearAll()">clear…</button>
+      </div>
+    </div>
   </div>
   <div class="row" style="margin-top:10px">
     <input id="search" placeholder="search her thinking, your words, her answer, your notes   ( / )" autocomplete="off">
-    <span id="kindchips">
-      <button class="on" data-kind="">all</button>
-      <button data-kind="tools">used tools</button>
-      <button data-kind="voice">voice</button>
-      <button data-kind="reminder">reminders</button>
-      <button data-kind="starred">★ starred</button>
-      <button data-kind="flagged">flagged</button>
-      <button data-kind="scored" title="turns recorded on llama-server, with token confidence">confidence</button>
-      <button data-kind="introspect" title="turns where she looked at her own numbers">introspected</button>
-      <button data-kind="rethink" title="second looks: the same question again with more thinking, because the first answer was shaky">rethinks</button>
-    </span>
+    <select id="flagsel" hidden title="only turns with this flag"></select>
+    <select id="modelsel" hidden title="only this model's turns (and how often it was flagged)"></select>
     <button id="daychip" style="display:none" onclick="setDay('')"></button>
-    <button id="rec" onclick="toggleRecording()" title="record her reasoning - saved to config.json, same as /set thoughts.enabled"><span class="dot"></span><span id="rectext">recording</span></button>
-    <button class="live on" onclick="toggleLive()" title="refresh as new turns arrive">live</button>
-    <a href="report?kind=starred" target="_blank" title="a printable page of your starred turns - Save as PDF from there"><button>starred → PDF</button></a>
-    <a id="livelink" href="http://127.0.0.1:8792/" target="_blank" title="watch her think as it happens (Luna has to be running)"><button>live ↗</button></a>
-    <a href="api/export" download><button>export</button></a>
-    <button class="danger" onclick="clearAll()">clear</button>
   </div>
-  <div class="row" id="flagchips" style="margin-top:8px"></div>
-  <div class="row" id="models" style="margin-top:8px"></div>
+  <div id="kindchips" class="chips">
+    <button class="on" data-kind="">all</button>
+    <button data-kind="tools">used tools</button>
+    <button data-kind="voice">voice</button>
+    <button data-kind="reminder">reminders</button>
+    <button data-kind="starred">★ starred</button>
+    <button data-kind="flagged">flagged</button>
+    <button data-kind="scored" title="turns recorded on llama-server, with token confidence">confidence</button>
+    <button data-kind="introspect" title="turns where she looked at her own numbers">introspected</button>
+    <button data-kind="rethink" title="second looks: the same question again with more thinking, because the first answer was shaky">rethinks</button>
+  </div>
 </header>
 
 <main>
@@ -566,35 +598,25 @@ function meta(d) {
   dc.style.display = S.day ? "" : "none";
   dc.textContent = S.day ? `${dayLabel(S.day + "T12:00")} ✕` : "";
 }
+function opt(value, text) { const o = el("option", null, text); o.value = value; return o; }
 function flagChips(st) {
-  const box = $("flagchips"); box.replaceChildren();
-  const codes = Object.entries(st.by_flag || {}).sort((a, b) => b[1] - a[1]);
-  if (!codes.length) return;
-  box.appendChild(el("span", null, "flags:")).style.cssText = "color:var(--dim);font-size:12px";
-  for (const [code, n] of codes) {
-    const b = el("button", S.flag === code ? "on" : "", code);
-    b.appendChild(el("i", null, String(n)));
-    b.onclick = () => { S.flag = S.flag === code ? "" : code; S.offset = 0; S.sel = null; load(); };
-    box.appendChild(b);
-  }
+  const sel = $("flagsel"), codes = Object.entries(st.by_flag || {}).sort((a, b) => b[1] - a[1]);
+  if (S.flag && !codes.some(c => c[0] === S.flag)) codes.unshift([S.flag, 0]);
+  sel.hidden = !codes.length;
+  sel.replaceChildren(opt("", "flag: any"), ...codes.map(([c, n]) => opt(c, `${c} (${n})`)));
+  sel.value = S.flag; sel.classList.toggle("on", !!S.flag);
 }
-
 function modelChips(st) {
   // Only once there's a comparison to make. One model is a fact, not a
   // breakdown; two is "which one lies less", as a number from your own turns.
-  const box = $("models"); box.replaceChildren();
-  const ms = st.by_model || [];
-  if (ms.length < 2) { box.style.display = "none"; return; }
-  box.style.display = "";
-  box.appendChild(el("span", null, "models:")).style.cssText = "color:var(--dim);font-size:12px";
-  for (const m of ms) {
-    const pct = m.total ? Math.round(100 * m.flagged / m.total) : 0;
-    const b = el("button", S.model === m.model ? "on" : "", shortModel(m.model));
-    b.title = m.model;
-    b.appendChild(el("i", null, `${m.total} turns, ${pct}% flagged`));
-    b.onclick = () => { S.model = S.model === m.model ? "" : m.model; S.offset = 0; S.sel = null; load(); };
-    box.appendChild(b);
-  }
+  const sel = $("modelsel"), ms = st.by_model || [];
+  sel.hidden = ms.length < 2 && !S.model;
+  sel.replaceChildren(opt("", "model: any"), ...ms.map(m => {
+    const o = opt(m.model, `${shortModel(m.model)} · ${m.total} turns, ${m.total ? Math.round(100 * m.flagged / m.total) : 0}% flagged`);
+    o.title = m.model; return o;
+  }));
+  if (S.model && !ms.some(m => m.model === S.model)) sel.appendChild(opt(S.model, shortModel(S.model)));
+  sel.value = S.model; sel.classList.toggle("on", !!S.model);
 }
 function shortModel(m) {
   // "qwen3.5-9b-the-defiant-fable-uncensored-heretic-neo-imatrix-max-mtp" is
@@ -607,7 +629,7 @@ function shortModel(m) {
 function list() {
   const box = $("list"); box.replaceChildren();
   if (!S.rows.length) {
-    box.appendChild(el("div", "empty", (S.q || S.kind || S.flag || S.day)
+    box.appendChild(el("div", "empty", (S.q || S.kind || S.flag || S.day || S.model)
       ? "nothing matches" : "nothing recorded yet - she writes a row here every time she thinks before answering"));
     return;
   }
@@ -845,6 +867,13 @@ async function toggleRecording() {
   S.newest = -1; load();
 }
 
+function menu(open) {
+  const m = $("more"); m.hidden = open === undefined ? !m.hidden : !open;
+}
+document.addEventListener("click", e => { if (!e.target.closest(".menu")) menu(false); });
+$("more").addEventListener("click", e => { if (e.target.closest("a, button")) menu(false); });
+$("flagsel").onchange = e => { S.flag = e.target.value; S.offset = 0; S.sel = null; load(); };
+$("modelsel").onchange = e => { S.model = e.target.value; S.offset = 0; S.sel = null; load(); };
 function toggleLive() { S.live = !S.live; document.querySelector("button.live").classList.toggle("on", S.live); schedule(); }
 function schedule() {
   clearInterval(S.timer);
@@ -860,8 +889,8 @@ $("search").addEventListener("input", e => {
   clearTimeout(deb); deb = setTimeout(() => { S.q = e.target.value.trim(); S.offset = 0; S.sel = null; load(); }, 250);
 });
 document.addEventListener("keydown", e => {
-  const typing = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
-  if (e.key === "Escape") { document.activeElement.blur(); if (S.q) { $("search").value = ""; S.q = ""; S.offset = 0; load(); } return; }
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (e.key === "Escape") { menu(false); document.activeElement.blur(); if (S.q) { $("search").value = ""; S.q = ""; S.offset = 0; load(); } return; }
   if (e.key === "/" && !typing) { e.preventDefault(); $("search").focus(); return; }
   if (typing) return;
   const i = S.rows.findIndex(x => x.id === S.sel);

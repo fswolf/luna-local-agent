@@ -247,12 +247,13 @@ const base = { lookY: 1.45, headZ: 0, follow: 0.7, dist: 2, headY: 0, rim: 1 };
 // to put the camera back. Off on the live portrait, so a stray click in OBS
 // or on the desktop never moves her.
 const orbit = { yaw: 0, pitch: 0, zoom: 1 };
+// No browser right-click menu over her (it has nothing for a portrait); text boxes keep theirs.
+document.addEventListener('contextmenu', e => { if (!e.target.closest?.('input, textarea, [contenteditable]')) e.preventDefault(); });
 if (params.get('debug')) {
   const el = renderer.domElement;
   let drag = null;
   el.style.cursor = 'grab';
-  // Left button only turns her; no right-click menu in the viewer.
-  document.addEventListener('contextmenu', e => e.preventDefault());
+  // Left button only turns her.
   el.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); el.style.cursor = 'grabbing';
@@ -915,9 +916,15 @@ function noteEvent(ev) {
   setTimeout(() => token === noteToken && props.hide('note'), (+g.prop_off || g.dur) * 1000);
 }
 
+// What each prop should be doing now. The pickup shows it and sets her hold
+// on timers; a "down" that comes first (a phone waking up hands both over at
+// once) must not have them put it back in her hands afterwards.
+const propWanted = {};
 function propEvent(ev) {
   const p = props?.PROPS[ev.name];
   if (!p || !moves) return;
+  propWanted[ev.name] = !!ev.on;
+  const still = fn => () => { if (propWanted[ev.name] === !!ev.on) fn(); };
   if (p.wear || p.bone) {   // something she wears (the blanket, the pacifier): on and off, her hands stay free
     if (ev.on) props.show(ev.name); else props.hide(ev.name);
     return;
@@ -929,16 +936,16 @@ function propEvent(ev) {
     if (other) {
       const putName = props.PROPS[other].putdown || other + '_putdown', put = GESTURES[putName];
       if (!moves.playing().includes(putName)) propEvent({ name: other, on: false });   // (already going down: just wait)
-      setTimeout(() => propEvent(ev), ((put ? lengthOf(put) : 0) + 0.2) * 1000);
+      setTimeout(still(() => propEvent(ev)), ((put ? lengthOf(put) : 0) + 0.2) * 1000);
       return;
     }
     const g = GESTURES[p.pickup || ev.name + '_pickup'];
     if (!g) { props.show(ev.name); if (p.pair) props.show(p.pair); return; }
     gesture(p.pickup || ev.name + '_pickup');
-    setTimeout(() => props.show(ev.name), (+g.prop_at || 0) * 1000);
-    setTimeout(() => moves.hold(heldPose(g)), Math.max(0, g.dur - (g.fade?.[1] ?? 0.4)) * 1000);
+    setTimeout(still(() => props.show(ev.name)), (+g.prop_at || 0) * 1000);
+    setTimeout(still(() => moves.hold(heldPose(g))), Math.max(0, g.dur - (g.fade?.[1] ?? 0.4)) * 1000);
   } else {
-    if (!props.held(ev.name)) return;
+    if (!props.held(ev.name)) return;      // (a pickup still on its way sees propWanted and stops)
     const g = GESTURES[p.putdown || ev.name + '_putdown'];
     if (!g) { props.hide(ev.name); if (p.pair) props.hide(p.pair); moves.hold(null); return; }
     gesture(p.putdown || ev.name + '_putdown');
