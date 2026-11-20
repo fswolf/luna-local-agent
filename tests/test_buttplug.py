@@ -106,3 +106,26 @@ class Channels(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RunningNow(unittest.TestCase):
+    """toy_list says what's going, so "turn it up" has a level to go from."""
+    setUp, tearDown = Channels.setUp, Channels.tearDown
+
+    def test_what_runs_shows_until_it_ends_or_stops(self):
+        bp._play([VIBE], 0.6, lambda t: 0.75)
+        self.assertEqual(bp._ran("spin", "Vibe at 75%", 0.6), "Vibe at 75% for 0.6s")
+        now = bp.running_now()
+        self.assertEqual(len(now), 1)
+        self.assertTrue(now[0].startswith("Vibe at 75%, "))
+        self.assertTrue(until(lambda: not bp.running_now()))           # its time ran out
+        bp._play([VIBE], 5, lambda t: 0.5)
+        bp._ran("spin", "Vibe at 50%", 5)
+        bp.stop_all_devices()
+        self.assertEqual(bp.running_now(), [])
+
+    def test_no_length_means_until_stopped(self):
+        self.assertEqual(bp._seconds(None), bp._caps()[1])
+        self.assertEqual(bp._seconds(""), bp._caps()[1])
+        self.assertEqual(bp._seconds(30), 30)
+        self.assertIn("until it's changed or stopped", bp._ran("spin", "Vibe at 40%", bp._caps()[1]))

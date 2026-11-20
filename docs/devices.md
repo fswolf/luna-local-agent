@@ -63,6 +63,8 @@ Plain words work; she picks the tools and the numbers:
 - "Both toys on max" → vibration at 100 (or your `max_intensity`), the
   machine at its `max_motion` cap, which is 50% unless you've raised it
 - "Stop" → everything stops at once, before she even reads it
+- "Turn it up" or "a bit lower" → she starts it again at a new level;
+  `toy_list` tells her what's running and how long it has left
 
 In a scene it works the same way: "faster", "harder", "tease me a
 little more" mean the toy, and her prompt tells her that describing it
@@ -70,8 +72,9 @@ isn't doing it - she calls the tool. Her instructions say "when she
 asks" or "when he asks" from the `user` block in `agent/agent.json`
 (see [configuration](configuration.md#whos-she-talking-to)).
 
-If you don't say how long, it's about 10 seconds; nothing runs longer
-than `max_seconds`. The caps are always yours, in `config.json`: she
+If you don't say how long, it keeps going until you (or she) change or
+stop it, up to `max_seconds` (an hour by default). Ask for "ten
+seconds" and you get a short burst. The caps are always yours, in `config.json`: she
 can ask for 100, but she can't raise a ceiling.
 
 ## Lovense
@@ -104,7 +107,7 @@ put them in `config.json`:
         "port": 20010,
         "use_https": false,
         "max_strength": 20,
-        "max_seconds": 60,
+        "max_seconds": 3600,
         "max_motion": 10,
         "ramp_seconds": 3
     }
@@ -133,8 +136,9 @@ vibration command:
   3), even if she asks for full speed straight away.
 - A toy that does both (Gravity vibrates and thrusts) runs both at once,
   and each part stops when its own time is up.
-- The app is always given the time left, so if Luna crashes or the
-  network drops, the toy still stops on its own.
+- The app is only ever given a minute at a time, renewed while it
+  should go on, so if Luna crashes or the network drops, the toy stops
+  on its own within a minute.
 
 `lovense_toys` lists what each toy can do, so she knows which one moves.
 
@@ -267,7 +271,7 @@ through Intiface's own scan, not the system's Bluetooth settings.
         "enabled": false,
         "url": "ws://127.0.0.1:12345",
         "max_intensity": 100,
-        "max_seconds": 60,
+        "max_seconds": 3600,
         "max_motion": 50,
         "ramp_seconds": 3,
         "scan_on_start": true

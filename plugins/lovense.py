@@ -35,13 +35,17 @@ Setup:
             "port": 20010,
             "use_https": false,
             "max_strength": 20,
-            "max_seconds": 60,
+            "max_seconds": 3600,
             "max_motion": 10,
             "ramp_seconds": 3
         }
     }
 
-    max_strength (0-20) and max_seconds cap whatever she asks for.
+    max_strength (0-20) and max_seconds cap whatever she asks for. With no
+    length given it keeps going until it's changed or stopped, up to
+    max_seconds (an hour). The app is only ever told LEASE seconds at a
+    time, renewed while it should go on, so it stops on its own within a
+    minute if Luna goes away.
 
     Machines (the Mini Sex Machine, the Solace, Gravity's thrusting) move
     with lovense_move, which has its own lower cap, max_motion (0-20,
@@ -69,7 +73,8 @@ NAME = "lovense"
 SUMMARY = "control Lovense toys via the Remote app on the LAN"
 
 DEFAULTS = {"host": "127.0.0.1", "port": 20010, "use_https": False,
-            "max_strength": 20, "max_seconds": 60, "max_motion": 10, "ramp_seconds": 3}
+            "max_strength": 20, "max_seconds": 3600, "max_motion": 10, "ramp_seconds": 3}
+LEASE = 60                    # seconds the app is told at a time; renewed while it should go on
 
 # What machines do, in the Remote app's words (each 0-20). Vibration is
 # "Vibrate"; anything here goes through lovense_move instead.
@@ -87,7 +92,8 @@ _state = {"model": None, "toys": {}, "error": "", "connected": False}
 # longest time left, so the app stops the toy itself if Luna goes away.
 _plan = {}
 _plan_lock = threading.Lock()
-_sent = {}
+_sent = {}                    # toy id -> (action sent, when the app's own timer for it runs out)
+_presets = {}                 # toy id -> [preset name, end, when the app's timer runs out]
 _stop = threading.Event()
 _thread = None
 
@@ -104,7 +110,7 @@ def _caps():
     and half a minute, never to the most the toy can do."""
     s = settings()
 
-    return safe.whole(s["max_strength"], 10, 0, 20), safe.whole(s["max_seconds"], 30, 1, 600)
+    return safe.whole(s["max_strength"], 10, 0, 20), safe.whole(s["max_seconds"], 30, 1, 4 * 3600)
 
 
 def _motion_caps():
@@ -133,6 +139,7 @@ def stop_all_toys():
     """Stop everything now. No model involved, never blocked."""
     with _plan_lock:
         _plan.clear()
+        _presets.clear()
     try:
         _post({"command": "Function", "action": "Stop", "apiVer": 1})
         return True, "lovense: stopped all toys"
@@ -382,17 +389,42 @@ def _apply(key):
         action, left = _action(key, now)
         if action is None:
             _plan.pop(key, None)
-    if action == _sent.get(key):
+    sent = _sent.get(key)
+    if action is None and sent is None:
         return
-    payload = ({"command": "Function", "action": action, "timeSec": max(1, math.ceil(left)), "apiVer": 1}
+    if action and sent and sent[0] == action and sent[1] - now > LEASE / 4:
+        return                                          # the same, and the app's timer has a while yet
+    lease = min(left, LEASE)
+    payload = ({"command": "Function", "action": action, "timeSec": max(1, math.ceil(lease)), "apiVer": 1}
                if action else {"command": "Function", "action": "Stop", "apiVer": 1})
     if key:
         payload["toy"] = key
     _post(payload)
     if action:
-        _sent[key] = action
+        _sent[key] = (action, now + lease)
     else:
         _sent.pop(key, None)
+
+
+def _apply_preset(key):
+    """Renew a preset pattern's timer while it should go on."""
+    now = time.monotonic()
+    with _plan_lock:
+        p = _presets.get(key)
+        if not p:
+            return
+        name, end, lease_end = p
+        if now >= end:
+            _presets.pop(key, None)                     # the app's own timer ends it
+            return
+        if lease_end - now > LEASE / 4:
+            return
+        lease = min(end - now, LEASE)
+        p[2] = now + lease
+    payload = {"command": "Preset", "name": name, "timeSec": max(1, math.ceil(lease)), "apiVer": 1}
+    if key:
+        payload["toy"] = key
+    _post(payload)
 
 
 def _drive():
@@ -408,6 +440,11 @@ def _drive():
         for key in list(_plan) + [k for k in list(_sent) if k not in _plan]:
             try:
                 _apply(key)
+            except Exception as e:
+                failed = e
+        for key in list(_presets):
+            try:
+                _apply_preset(key)
             except Exception as e:
                 failed = e
         if failed is None:
@@ -439,30 +476,42 @@ def _watch():
 def _register_tools():
     import tools
 
-    def vibrate(strength=10, seconds=5, toy=None):
+    def length(seconds):
+        """Seconds asked for, capped; none given = until it's changed or stopped (the cap)."""
+        cap = _caps()[1]
+        return cap if seconds in (None, "", 0, "0") else max(1, min(cap, int(seconds)))
+
+    def span(seconds):
+        if seconds >= _caps()[1]:
+            return f"until it's changed or stopped (at most {round(seconds / 60)} min)"
+        return f"for {seconds}s" if seconds < 120 else f"for {round(seconds / 60)} min"
+
+    def vibrate(strength=10, seconds=None, toy=None):
         why = _toys.blocked()
         if why:
             logbook.info(NAME, "vibrate refused: %s", why)
             return why
 
-        top, longest = _caps()
+        top = _caps()[0]
 
         try:
             strength = max(0, min(top, int(strength)))
-            seconds = max(1, min(longest, int(seconds)))
+            seconds = length(seconds)
         except (TypeError, ValueError, OverflowError):   # inf too
             return "strength and seconds must be numbers"
         key = str(toy or "")
         with _plan_lock:
+            _presets.pop(key, None)                      # a steady level replaces a pattern
             _plan.setdefault(key, {})["vibe"] = (strength, time.monotonic() + seconds)
+        _sent.pop(key, None)                             # (send it now, even if it's the same level)
         try:
             _apply(key)
             who = f"toy {toy}" if toy else "all toys"
-            return f"vibrating {who} at {strength}/20 for {seconds}s"
+            return f"vibrating {who} at {strength}/20 {span(seconds)}"
         except Exception as e:
             return f"couldn't vibrate: {e}"
 
-    def move(speed=5, seconds=10, toy=None):
+    def move(speed=5, seconds=None, toy=None):
         why = _toys.blocked()
         if why:
             logbook.info(NAME, "move refused: %s", why)
@@ -475,16 +524,18 @@ def _register_tools():
         top, ramp = _motion_caps()
         try:
             speed = max(0, min(top, int(speed)))
-            seconds = max(1, min(_caps()[1], int(seconds)))
+            seconds = length(seconds)
         except (TypeError, ValueError, OverflowError):   # inf too
             return "speed and seconds must be numbers"
         now = time.monotonic()
         with _plan_lock:
+            _presets.pop(key, None)
             _plan.setdefault(key, {})["move"] = (speed, now + seconds, now, ramp)
+        _sent.pop(key, None)
         try:
             _apply(key)
             who = f"toy {toy}" if toy else "all toys"
-            return (f"moving {who} at {speed}/20 for {seconds}s"
+            return (f"moving {who} at {speed}/20 {span(seconds)}"
                     + (f", building up over {ramp:g}s" if ramp else ""))
         except Exception as e:
             return f"couldn't move: {e}"
@@ -493,8 +544,10 @@ def _register_tools():
         with _plan_lock:
             if toy:
                 _plan.pop(str(toy), None)
+                _presets.pop(str(toy), None)
             else:
                 _plan.clear()
+                _presets.clear()
         payload = {"command": "Function", "action": "Stop", "apiVer": 1}
         if toy:
             payload["toy"] = toy
@@ -504,7 +557,7 @@ def _register_tools():
         except Exception as e:
             return f"couldn't stop: {e}"
 
-    def pattern(name="pulse", seconds=10, toy=None):
+    def pattern(name="pulse", seconds=None, toy=None):
         why = _toys.blocked()
         if why:
             logbook.info(NAME, "pattern refused: %s", why)
@@ -515,19 +568,18 @@ def _register_tools():
             return "pattern must be one of: " + ", ".join(PRESETS)
 
         try:
-            seconds = max(1, min(_caps()[1], int(seconds)))
+            seconds = length(seconds)
         except (TypeError, ValueError, OverflowError):   # inf too
             return "seconds must be a number"
 
+        key = str(toy or "")
         with _plan_lock:
-            _plan.pop(str(toy or ""), None)      # a preset replaces whatever the toy was doing
-        _sent.pop(str(toy or ""), None)
-        payload = {"command": "Preset", "name": name, "timeSec": seconds, "apiVer": 1}
-        if toy:
-            payload["toy"] = toy
+            _plan.pop(key, None)                 # a preset replaces whatever the toy was doing
+            _presets[key] = [name, time.monotonic() + seconds, 0.0]
+        _sent.pop(key, None)
         try:
-            _post(payload)
-            return f"{name} on {f'toy {toy}' if toy else 'all toys'} for {seconds}s"
+            _apply_preset(key)
+            return f"{name} on {f'toy {toy}' if toy else 'all toys'} {span(seconds)}"
         except Exception as e:
             return f"couldn't start the pattern: {e}"
 
@@ -535,12 +587,15 @@ def _register_tools():
         ok, msg = _refresh_toys()
         return msg
 
+    SECS = ("How long, in seconds, for a short burst. Leave it out to keep going until it's changed or "
+            "stopped (up to the settings' cap)")
+    AGAIN = (" A new call replaces what's running, so to turn it up or down, call again with the new level.")
     tools.register_external(
         "lovense_vibrate",
         "Vibrate a Lovense toy at a steady level. strength is 0-20, seconds is how long. "
-        "Leave toy blank to hit every connected toy.",
+        "Leave toy blank to hit every connected toy." + AGAIN,
         {"strength": {"type": "integer", "description": "0-20"},
-         "seconds": {"type": "integer", "description": "how long, 1-60"},
+         "seconds": {"type": "integer", "description": SECS},
          "toy": {"type": "string", "description": "toy id, or omit for all"}},
         required=("strength",), run=vibrate, group="Lovense",
         available=running, why=lambda: "lovense plugin is off - /lovense on",
@@ -549,9 +604,9 @@ def _register_tools():
         "lovense_move",
         "Thrust or stroke with a Lovense machine (Mini Sex Machine, Solace, Gravity...), building up "
         "from slow. speed is 0-20 and capped lower than vibration. Runs alongside vibration on toys "
-        "that do both.",
+        "that do both." + AGAIN,
         {"speed": {"type": "integer", "description": "0-20"},
-         "seconds": {"type": "integer", "description": "how long"},
+         "seconds": {"type": "integer", "description": SECS},
          "toy": {"type": "string", "description": "toy id, or omit for all"}},
         required=("speed",), run=move, group="Lovense",
         available=running, why=lambda: "lovense plugin is off - /lovense on",
@@ -559,9 +614,9 @@ def _register_tools():
     tools.register_external(
         "lovense_pattern",
         "Run one of the Lovense app's built-in patterns instead of a steady level: "
-        "pulse, wave, fireworks or earthquake.",
+        "pulse, wave, fireworks or earthquake." + AGAIN,
         {"name": {"type": "string", "enum": list(PRESETS), "description": "Which pattern"},
-         "seconds": {"type": "integer", "description": "How long"},
+         "seconds": {"type": "integer", "description": SECS},
          "toy": {"type": "string", "description": "toy id, or omit for all"}},
         required=("name",), run=pattern, group="Lovense",
         available=running, why=lambda: "lovense plugin is off - /lovense on",

@@ -283,7 +283,7 @@ class Toys(unittest.TestCase):
         self.assertLess(strength, 20)
         self.assertLess(seconds, 60)
         with mock.patch.object(lv, "settings", return_value=dict(lv.DEFAULTS)):
-            self.assertEqual(lv._caps(), (20, 60))      # good settings unchanged
+            self.assertEqual(lv._caps(), (20, 3600))    # good settings unchanged
 
     def test_buttplug_nan_cap_isnt_full_power(self):
         from plugins import buttplug as bp
@@ -291,7 +291,7 @@ class Toys(unittest.TestCase):
         with mock.patch.object(bp, "settings", return_value=dict(bp.DEFAULTS, max_intensity=float("nan"))):
             self.assertLess(bp._caps()[0], 1.0)
         with mock.patch.object(bp, "settings", return_value=dict(bp.DEFAULTS)):
-            self.assertEqual(bp._caps(), (1.0, 60))
+            self.assertEqual(bp._caps(), (1.0, 3600))
 
     def test_lovense_failed_stop_is_loud(self):
         from plugins import lovense as lv

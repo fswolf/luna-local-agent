@@ -80,6 +80,19 @@ class Plan(unittest.TestCase):
         self.assertEqual(self.sent[-1]["action"], "Stop")
         self.assertNotIn("g1", lv._plan)
 
+    def test_a_long_run_goes_a_minute_at_a_time(self):
+        now = time.monotonic()
+        lv._plan["l1"] = {"vibe": (10, now + 3600)}
+        lv._apply("l1")
+        self.assertEqual(self.sent[-1]["timeSec"], lv.LEASE)            # the app stops it within a minute if Luna goes
+        n = len(self.sent)
+        lv._apply("l1")
+        self.assertEqual(len(self.sent), n)                             # nothing new to say yet
+        lv._sent["l1"] = (lv._sent["l1"][0], time.monotonic() + 5)      # its timer nearly up
+        lv._apply("l1")
+        self.assertEqual(len(self.sent), n + 1)                         # renewed
+        self.assertEqual(self.sent[-1]["action"], "Vibrate:10")
+
     def test_stop_all_clears_everything(self):
         lv._plan["g1"] = {"vibe": (5, time.monotonic() + 30)}
         lv.stop_all_toys()

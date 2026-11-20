@@ -30,15 +30,16 @@ Setup:
             "enabled": false,
             "url": "ws://127.0.0.1:12345",
             "max_intensity": 100,
-            "max_seconds": 60,
+            "max_seconds": 3600,
             "max_motion": 50,
             "ramp_seconds": 3,
             "scan_on_start": true
         }
     }
 
-    max_intensity (0-100) and max_seconds cap whatever she asks for.
-    Machines and strokers (thrusting machines, the Solace, The Handy) have
+    max_intensity (0-100) and max_seconds cap whatever she asks for. With no
+    length given it keeps going until it's changed or stopped, up to
+    max_seconds (an hour). Machines and strokers (thrusting machines, the Solace, The Handy) have
     their own lower cap, max_motion (default 50), and always build up from
     slow over ramp_seconds (default 3) instead of starting at full speed.
 
@@ -73,7 +74,7 @@ from plugins import _toys
 NAME = "buttplug"
 SUMMARY = "toys of almost any brand through Intiface Central (buttplug.io)"
 
-DEFAULTS = {"url": "ws://127.0.0.1:12345", "max_intensity": 100, "max_seconds": 60,
+DEFAULTS = {"url": "ws://127.0.0.1:12345", "max_intensity": 100, "max_seconds": 3600,
             "max_motion": 50, "ramp_seconds": 3, "scan_on_start": True}
 
 PATTERNS = ("pulse", "wave", "escalate", "heartbeat", "tease")
@@ -94,6 +95,7 @@ _waiting = {}          # message id -> [Event, reply]
 # turns off only its own motor. token: bumped when a job is replaced or
 # stopped, so its worker quits. devs: the device indexes it's driving.
 _jobs = {"spin": {"token": 0, "devs": set()}, "stroke": {"token": 0, "devs": set()}}
+_running = {}        # channel -> (what, token, until): what's going now, for toy_list ("turn it up" needs it)
 _jobs_lock = threading.Lock()
 
 
@@ -110,7 +112,7 @@ def _caps():
     s = settings()
 
     return (safe.number(s["max_intensity"], 50, 0, 100) / 100.0,
-            safe.whole(s["max_seconds"], 30, 1, 600))
+            safe.whole(s["max_seconds"], 30, 1, 4 * 3600))
 
 
 def _motion_caps():
@@ -520,8 +522,8 @@ def _shape(name, t, seconds):
         return 1.0 if (t % 1.0) < 0.5 else 0.0
     if name == "wave":
         return 0.5 - 0.5 * math.cos(2 * math.pi * t / 4.0)
-    if name == "escalate":
-        return min(1.0, 0.15 + 0.85 * t / max(1.0, seconds))
+    if name == "escalate":                     # (over two minutes at most, then it holds the peak)
+        return min(1.0, 0.15 + 0.85 * t / max(1.0, min(seconds, 120)))
     if name == "heartbeat":
         beat = t % 1.2
         return 1.0 if beat < 0.12 or 0.25 <= beat < 0.37 else 0.0
@@ -663,17 +665,43 @@ def _stroke(devs, seconds, speed):
 # ---------------------------------------------------------------------------
 # Tools she can call
 # ---------------------------------------------------------------------------
-def _seconds(value, default=10):
+def _seconds(value):
+    """Seconds asked for, capped; none given = until it's changed or stopped (the cap)."""
+    cap = _caps()[1]
+    if value in (None, "", 0, "0"):
+        return cap
     try:
-        return max(1, min(_caps()[1], int(value if value not in (None, "") else default)))
+        return max(1, min(cap, int(value)))
     except (TypeError, ValueError, OverflowError):   # inf too
         return None
+
+
+def _span(secs):
+    return f"{secs}s" if secs < 120 else f"{round(secs / 60)} min"
+
+
+def _ran(channel, what, secs):
+    """Note what a tool just started (for toy_list), and say so."""
+    _running[channel] = (what, _jobs[channel]["token"], time.monotonic() + secs)
+    if secs >= _caps()[1]:
+        return f"{what}, until it's changed or stopped (at most {_span(secs)})"
+    return f"{what} for {_span(secs)}"
+
+
+def running_now():
+    """What's going right now: ["Butt Plug at 75%, 8s left", ...]."""
+    out = []
+    for channel, (what, token, until) in list(_running.items()):
+        left = until - time.monotonic()
+        if _jobs[channel]["token"] == token and _jobs[channel]["devs"] and left > 0:
+            out.append(f"{what}, {_span(round(left))} left at most")
+    return out
 
 
 def _register_tools():
     import tools
 
-    def toy_vibrate(intensity=50, seconds=10, device=None):
+    def toy_vibrate(intensity=50, seconds=None, device=None):
         why = _toys.blocked()
         if why:
             logbook.info(NAME, "vibrate refused: %s", why)
@@ -693,9 +721,9 @@ def _register_tools():
             return "intensity and seconds must be numbers"
 
         _play(devs, secs, lambda t: level)
-        return f"{', '.join(d['name'] for d in devs)} at {round(level * 100)}% for {secs}s"
+        return _ran("spin", f"{', '.join(d['name'] for d in devs)} at {round(level * 100)}%", secs)
 
-    def toy_pattern(name="wave", seconds=15, intensity=100, device=None):
+    def toy_pattern(name="wave", seconds=None, intensity=100, device=None):
         why = _toys.blocked()
         if why:
             logbook.info(NAME, "pattern refused: %s", why)
@@ -709,7 +737,7 @@ def _register_tools():
         if not devs:
             return "No connected device can do that - toy_list shows what's there."
 
-        secs = _seconds(seconds, 15)
+        secs = _seconds(seconds)
         try:
             peak = min(_caps()[0], max(0.0, float(intensity) / 100.0))
         except (TypeError, ValueError, OverflowError):   # inf too
@@ -718,9 +746,9 @@ def _register_tools():
             return "intensity and seconds must be numbers"
 
         _play(devs, secs, lambda t: round(peak * _shape(name, t, secs), 2))
-        return f"{name} on {', '.join(d['name'] for d in devs)} for {secs}s, peak {round(peak * 100)}%"
+        return _ran("spin", f"{name} on {', '.join(d['name'] for d in devs)}, peak {round(peak * 100)}%", secs)
 
-    def toy_stroke(speed=50, seconds=10, device=None):
+    def toy_stroke(speed=50, seconds=None, device=None):
         why = _toys.blocked()
         if why:
             logbook.info(NAME, "stroke refused: %s", why)
@@ -740,7 +768,7 @@ def _register_tools():
 
         _stroke(devs, secs, pace)
         ramp = _motion_caps()[1]
-        return (f"{', '.join(d['name'] for d in devs)} moving at {round(pace * 100)}% for {secs}s"
+        return (_ran("stroke", f"{', '.join(d['name'] for d in devs)} moving at {round(pace * 100)}%", secs)
                 + (f", building up over {ramp:g}s" if ramp else ""))
 
     def toy_stop(device=None):
@@ -762,30 +790,34 @@ def _register_tools():
         if not _state["devices"]:
             return f"No devices connected. Ask {config.USER_THEM} to turn one on - /buttplug scan looks for it."
 
-        return "\n".join(f"[{d['index']}] {d['name']}: {', '.join(_abilities(d))}"
-                         for d in _state["devices"].values())
+        lines = [f"[{d['index']}] {d['name']}: {', '.join(_abilities(d))}" for d in _state["devices"].values()]
+        now = running_now()
+        return "\n".join(lines + ["Running now: " + "; ".join(now) if now else "Nothing running now."])
 
     off = lambda: "buttplug plugin is off - /buttplug on"   # noqa: E731
     dev = {"type": "string", "description": "Device number or name from toy_list; omit for all"}
-    secs = {"type": "integer", "description": "How long"}
+    secs = {"type": "integer", "description": "How long, in seconds, for a short burst. Leave it out to keep "
+                                              "going until it's changed or stopped (up to the settings' cap)"}
+    again = (" A new call replaces what's running, so to turn it up or down, call again with the new "
+             "level; toy_list says what's running now.")
 
     tools.register_external(
         "toy_vibrate",
         "Set a connected toy to a steady intensity for a while: vibration, and rotation on toys "
-        "that do that. Machines and strokers use toy_stroke instead. intensity is 0-100.",
+        "that do that. Machines and strokers use toy_stroke instead. intensity is 0-100." + again,
         {"intensity": {"type": "integer", "description": "0-100"}, "seconds": secs, "device": dev},
         required=("intensity",), run=toy_vibrate, group="Toys", available=running, why=off)
     tools.register_external(
         "toy_pattern",
         "Run a pattern instead of a steady level: pulse, wave, escalate (builds up), heartbeat "
-        "or tease. intensity is the peak, 0-100.",
+        "or tease. intensity is the peak, 0-100." + again,
         {"name": {"type": "string", "enum": list(PATTERNS)}, "seconds": secs,
          "intensity": {"type": "integer", "description": "Peak, 0-100"}, "device": dev},
         required=("name",), run=toy_pattern, group="Toys", available=running, why=off)
     tools.register_external(
         "toy_stroke",
         "For strokers and machines (The Handy, the Solace, thrusting machines): move at a speed, "
-        "building up from slow. speed is 0-100; it's capped lower than vibration.",
+        "building up from slow. speed is 0-100; it's capped lower than vibration." + again,
         {"speed": {"type": "integer", "description": "0-100"}, "seconds": secs, "device": dev},
         required=("speed",), run=toy_stroke, group="Toys", available=running, why=off)
     tools.register_external(
