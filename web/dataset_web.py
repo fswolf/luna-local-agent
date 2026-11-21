@@ -36,7 +36,24 @@ def _row(r):
             "model": r.get("model"), "approved": r.get("approved"), "said": said, "reply": r.get("reply"),
             "original": r.get("original"),
             "context": [m for m in msgs if m.get("role") != "system"][:-1],
+            "steps": _steps(r.get("rounds")),
             "system": f"{system}\n\n{note}" if note else system}
+
+
+def _steps(rounds):
+    """A tool turn's calls and results as lines to read: what she called, what came back."""
+    out = []
+    for m in rounds or ():
+        if m.get("role") == "assistant":
+            if m.get("content"):
+                out.append(f"Luna: {m['content']}")
+            for c in m.get("tool_calls") or ():
+                f = c.get("function") or {}
+                out.append(f"called {f.get('name', '?')}({f.get('arguments') or ''})")
+        elif m.get("role") == "tool":
+            text = str(m.get("content") or "")
+            out.append(f"{m.get('name') or 'tool'} said: {text if len(text) <= 1500 else text[:1500] + ' ...'}")
+    return out
 
 
 def handle(method, sub, body):

@@ -145,6 +145,20 @@ def prompt_budget(text="hello"):
     return parts, total, lmstudio.context_length()
 
 
+def _tool_steps(answer):
+    """(the tool rounds, her answer after them) for a training example, or
+    None when the reply on screen isn't exactly those rounds' words: put
+    right by a second look or a follow-through, stopped partway, or a
+    screenshot handed in, which an example can't hold."""
+    rounds, final = _last_raw.get("rounds") or [], _last_raw.get("rounds_final")
+    if not rounds or not final or _last_raw.get("rounds_image"):
+        return None
+    said = [m["content"] for m in rounds if m.get("role") == "assistant" and m.get("content")]
+    if _strip_leading_timestamps(" ".join(said + [final]).strip()) != answer.strip():
+        return None
+    return [dict(m) for m in rounds], _strip_leading_timestamps(final).strip()
+
+
 def _heard(send, payload, *args):
     """Send the turn; if the server turned the recording away, once more
     as words only (hearing.drop says so in the log)."""
@@ -489,9 +503,11 @@ def _ask(text, model, on_text=None, on_sentence=None,
         try:
             from training import dataset
 
-            dataset.note_turn(base_messages[0]["content"], replayed, kept_user or hearing.words_only(base_messages[-1]), answer,
-                              model=payload.get("model", ""),
-                              used_tools=bool(_last_raw.get("exchanges")) or bool(turn.exchanges))
+            used = bool(_last_raw.get("exchanges")) or bool(turn.exchanges)
+            steps, reply = (_tool_steps(answer) if used else None) or (None, answer)
+            dataset.note_turn(base_messages[0]["content"], replayed, kept_user or hearing.words_only(base_messages[-1]), reply,
+                              model=payload.get("model", ""), used_tools=used,
+                              rounds=steps, tools=payload.get("tools") if steps else None)
         except Exception:
             logbook.exception("llm", "couldn't note the turn for /good")
 

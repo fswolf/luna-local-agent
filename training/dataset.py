@@ -14,12 +14,21 @@ thumbs can keep any of them: up is /good, down with your version is /fix,
 and down alone records the reply as a bad one (approved False, so it's
 never trained on as it is; kept for training from good-and-bad pairs later). Only your own turns are
 offered: not a guest's or a stranger's, not stream chat or Discord, not a
-job, and not a turn that called tools (tool calls train differently; later).
+job.
+
+A turn that called tools is kept whole: each call she made, what came back,
+and her answer after it (rounds), with the tools she was offered (tools), so
+the trainer sees what she saw. "reply" is her answer after the tools; your
+version replaces that, the calls stay as they were. A tool turn whose reply
+was put right afterwards (a second look, a follow-through) or that was
+stopped partway isn't the rounds' own words, so it can't be kept.
 
 Each example:
     id, when, model, kind ("habit" | "gesture"), source ("good" | "fix" | ...),
     messages   the system prompt, the last few turns and your message, as she saw them
-    reply      what she should have said
+    rounds     a tool turn's calls and results, in order (assistant with tool_calls, then tool)
+    tools      the tool definitions that turn was offered
+    reply      what she should have said (after the tools, on a tool turn)
     original   what she did say, when it was corrected
     approved   True, False (dropped) or None (waiting to be looked at)
     rated      "up" | "down", from the chat page's thumbs
@@ -78,14 +87,17 @@ def kind_of(reply):
     return "habit"
 
 
-def note_turn(system, context, user, reply, model="", used_tools=False):
-    """Her finished turn, as she saw it. Called by every one of your own turns."""
+def note_turn(system, context, user, reply, model="", used_tools=False, rounds=None, tools=None):
+    """Her finished turn, as she saw it. Called by every one of your own turns.
+    A tool turn brings its rounds (and the tools offered) when it can be kept."""
     ref = _ui_ref()
     with _lock:
         _last.clear()
         _last.update(system=str(system or ""), context=[dict(m) for m in (context or [])][-CONTEXT:],
                      user=dict(user or {}), reply=str(reply or ""), model=str(model or ""),
                      used_tools=bool(used_tools), at=time.time())
+        if used_tools and rounds:
+            _last.update(rounds=json.loads(json.dumps(rounds)), tools=json.loads(json.dumps(tools or [])))
         if ref is not None:
             _recent.pop(ref, None)                  # (the same words again: the newest wins)
             _recent[ref] = _last.copy()
@@ -129,19 +141,24 @@ def _find(epoch, text):
     return best
 
 
+def _keepable(turn):
+    """A plain turn, or a tool turn that came with its rounds."""
+    return bool(turn) and (not turn.get("used_tools") or bool(turn.get("rounds")))
+
+
 def rateable(epoch, conversation):
     """{index: "" | "up" | "fix" | "down" | "tools"} for her replies in
     conversation (the [speaker, text] list on screen) that the thumbs know:
-    your own turns from this conversation, "tools" for one where she used a
-    tool (not keepable yet). A reply that isn't here is from before Luna
-    started, or not a turn of yours."""
+    your own turns from this conversation, "tools" for a tool turn that
+    can't be kept (put right afterwards, or stopped partway). A reply that
+    isn't here is from before Luna started, or not a turn of yours."""
     me = _me()
     out = {}
     with _lock:
         for i, (who, text) in enumerate(conversation):
             key = _find(epoch, text) if who == me else None
             if key:
-                out[i] = "tools" if _recent[key].get("used_tools") else _rated.get(key, "")
+                out[i] = _rated.get(key, "") if _keepable(_recent[key]) else "tools"
     return out
 
 
@@ -152,7 +169,9 @@ def rate(epoch, shown, up, better=None):
     with _lock:
         key = _find(int(epoch), str(shown or "").strip())
         turn = _recent.get(key) if key else None
-        turn = json.loads(json.dumps(turn)) if turn and not turn.get("used_tools") else None
+        if turn and not _keepable(turn):
+            raise ValueError(_NOT_WHOLE)
+        turn = json.loads(json.dumps(turn)) if turn else None
     if turn is None:
         raise ValueError("that reply is too old to keep, or wasn't one of your own turns")
     better = str(better).strip() if better else ""
@@ -173,6 +192,10 @@ def rate(epoch, shown, up, better=None):
         update(ex["id"], rated="up" if up else "down")
     ex["mark"] = mark
     return ex
+
+
+_NOT_WHOLE = ("that turn's tool calls can't be kept: the reply was put right afterwards "
+              "(a second look or a follow-through) or stopped partway")
 
 
 def _messages(turn):
@@ -196,9 +219,17 @@ def keep(source="good", reply=None, kind="habit", turn=None):
 
     if not turn:
         raise ValueError("there's no turn of hers to keep yet - talk to her first")
-    if turn["used_tools"]:
-        raise ValueError("that turn called tools; examples are plain replies for now")
+    if not _keepable(turn):
+        raise ValueError(_NOT_WHOLE)
 
+    if reply is not None and turn.get("rounds"):
+        # Your version of a tool turn is the answer after the tools. Copied
+        # from the screen, it can start with what she said before the calls
+        # ("one sec~"): that part belongs to the calls, not the answer.
+        before = " ".join(m["content"] for m in turn["rounds"]
+                          if m.get("role") == "assistant" and m.get("content")).strip()
+        if before and str(reply).strip().startswith(before):
+            reply = str(reply).strip()[len(before):].strip() or turn["reply"]
     corrected = reply is not None and str(reply).strip() != turn["reply"].strip()
 
     # One example per reply: /good twice keeps it once, and /fix after /good
@@ -222,6 +253,7 @@ def keep(source="good", reply=None, kind="habit", turn=None):
         "kind": kind,
         "source": source,
         "messages": _messages(turn),
+        **({"rounds": turn["rounds"], "tools": turn.get("tools") or []} if turn.get("rounds") else {}),
         "reply": str(reply).strip() if corrected else turn["reply"],
         "original": turn["reply"] if corrected else None,
         "approved": not bad,        # you chose it, so it's approved; a bad one never trains as it is

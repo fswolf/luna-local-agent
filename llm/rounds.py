@@ -61,6 +61,13 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
     streaming = bool(on_text or on_sentence)
     _last_raw["called"] = set()
     _last_raw["exchanges"] = []
+    # The turn as the training examples keep it (training/dataset.py): each
+    # round's words and calls, each result, then the answer that followed.
+    # "final" stays None when the turn didn't end in one (stopped, a picture
+    # handed in, out of rounds): such a turn can't be kept.
+    _last_raw["rounds"] = []
+    _last_raw["rounds_final"] = None
+    _last_raw["rounds_image"] = False
 
     # A round can produce prose *and* a tool call ("let me check that
     # for you" followed by get_datetime). That preamble is spoken and
@@ -106,12 +113,15 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
         if not calls:
             if text or not said:
                 if said:
+                    _last_raw["rounds_final"] = text
                     return " ".join(said).strip()
                 # Nothing usable and nothing to call: the model has finished
                 # but said nothing. One more attempt with tools removed,
                 # asked for the answer if a tool already brought one back.
                 nudge = _ANSWER_WITH_IT if _last_raw["exchanges"] else _SAY_WHAT_YOU_DID
-                return _force_prose(payload, on_text, on_sentence, nudge=nudge) or ""
+                forced = _force_prose(payload, on_text, on_sentence, nudge=nudge) or ""
+                _last_raw["rounds_final"] = forced.strip() or None
+                return forced
 
             # The round after a tool came back empty. Only the preamble
             # from before the call ("let me ask Claude") was said, so
@@ -122,6 +132,7 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             more = _force_prose(payload, on_text, on_sentence, nudge=_ANSWER_WITH_IT)
             if more:
                 said.append(more)
+                _last_raw["rounds_final"] = more.strip() or None
             return " ".join(said).strip()
 
         # The thinking that led here gets told what it decided. Only if
@@ -140,6 +151,7 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
             "content": message.get("content") or "",
             "tool_calls": calls,
         })
+        _last_raw["rounds"].append({"role": "assistant", "content": text or "", "tool_calls": calls})
 
         for call in calls:
             function = call.get("function", {})
@@ -188,6 +200,8 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
                 "name": name,
                 "content": result,
             })
+            _last_raw["rounds"].append({"role": "tool", "tool_call_id": call.get("id", ""),
+                                        "name": name, "content": result})
 
         # more_tools, or a hidden tool called by name, attached a group:
         # the next round gets the longer list.
@@ -205,6 +219,7 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
         image = vision.take()
 
         if image:
+            _last_raw["rounds_image"] = True
             payload["messages"].append({
                 "role": "user",
                 "content": [
@@ -219,7 +234,9 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
     if said:
         return " ".join(said).strip()
 
-    return _force_prose(payload, on_text, on_sentence) or ""
+    forced = _force_prose(payload, on_text, on_sentence) or ""
+    _last_raw["rounds_final"] = forced.strip() or None
+    return forced
 
 
 def _log_tool_call(name, result):

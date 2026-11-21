@@ -207,7 +207,7 @@ function thumbs() {
   els.forEach((el, at) => {
     const idx = base + at, bar = el.querySelector(':scope > .rate');
     if (idx === streaming || !el.classList.contains('her')) { if (bar) bar.remove(); return; }
-    // rates[idx]: "" | up | fix | down (keepable), "tools" (she used a tool), missing (from before Luna started)
+    // rates[idx]: "" | up | fix | down (keepable), "tools" (a tool turn put right afterwards: can't be kept), missing (from before Luna started)
     const st = rates[idx] === undefined ? 'old' : rates[idx];
     if (bar && bar.dataset.st === st) return;
     if (bar) bar.remove();

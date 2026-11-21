@@ -58,8 +58,16 @@ She never sees these: commands don't go into her history, her transcript or her 
 so collecting examples doesn't change the conversation you're having.
 
 Only your own turns can be kept. Not a guest's or a stranger's, not stream chat or
-Discord, not a game or a job, and not a turn where she called tools (those train
-differently, later).
+Discord, not a game or a job.
+
+**Turns where she used tools** are kept whole: each call she made, what came back, and her
+answer after it, with the tools she was offered, so training sees what she saw. Your
+version replaces the answer after the tools; the calls stay as she made them. What came
+back is never learned (it's the tool's words, not hers). Her calls are learned only where
+the model's chat template writes them the way she would: Qwen's drops the thinking from
+calls before her answer, so on Qwen the calls are context and her answer is what's learned.
+A tool turn that was put right afterwards (a second look or a follow-through added to it)
+or stopped partway can't be kept: it shows Copy only.
 
 A first patch wants **300 to 500** examples. There's no rush: they keep.
 
@@ -172,9 +180,10 @@ they carry over to every model you use.
 - **AMD cards.** ROCm support for the RX 6000 series is listed as limited, and 4-bit
   loading on AMD is newer than on NVIDIA. If the model won't load in 4 bits, that's
   where to look first.
-- **Tools.** The examples don't carry the tool list she's given, and turns where she
-  called tools aren't collected yet, so a patch never sees tools while it trains. Keep
-  patches gentle and check tools still work after loading one (`/tooltest`).
+- **Tools.** Plain examples train without the tool list she's given; tool turns carry it.
+  A tool turn is long (the tool list and every result count), so `MAX_LEN` in
+  `training/train.env` may leave some out: the trainer says how many. Keep patches gentle
+  and check tools still work after loading one (`/tooltest`).
 - **Gesture tagging.** Gesture examples have to be tagged by hand for now: `/fix` with
   the tags where they belong (or edit them in on the examples page), then switch the
   example to **gesture** there; `/good` and `/fix` keep examples as habits. Tagging her real

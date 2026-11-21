@@ -68,5 +68,39 @@ class AfterATool(unittest.TestCase):
         self.assertIn("using it", sent[2]["messages"][-1]["content"])
 
 
+class KeptForTraining(AfterATool):
+    """What the training examples keep of a tool turn (_last_raw rounds)."""
+
+    def test_the_rounds_and_the_answer_after_them(self):
+        said, _ = self.run_turn([
+            {"content": "Let me ask Claude.", "tool_calls": [CALL]},
+            {"content": "Claude says local is good."},
+        ])
+        raw = rounds._last_raw
+        self.assertEqual([m["role"] for m in raw["rounds"]], ["assistant", "tool"])
+        self.assertEqual(raw["rounds"][0]["content"], "Let me ask Claude.")
+        self.assertEqual(raw["rounds"][0]["tool_calls"], [CALL])
+        self.assertEqual(raw["rounds"][1], {"role": "tool", "tool_call_id": "c1", "name": "ask_bigger_model",
+                                            "content": "Claude answered:\nLocal is good."})
+        self.assertEqual(raw["rounds_final"], "Claude says local is good.")
+
+        from llm import turns
+        steps, reply = turns._tool_steps(said)
+        self.assertEqual(reply, "Claude says local is good.")
+        self.assertEqual(len(steps), 2)
+        self.assertIsNone(turns._tool_steps(said + " Also, one more thing."))   # put right afterwards
+
+    def test_the_answer_asked_for_again_counts(self):
+        self.run_turn([{"content": "", "tool_calls": [CALL]}, {"content": ""},
+                       {"content": "Claude says local is good."}])
+        self.assertEqual(rounds._last_raw["rounds_final"], "Claude says local is good.")
+
+    def test_out_of_rounds_has_no_answer(self):
+        with mock.patch.object(rounds.config, "MAX_TOOL_ROUNDS", 1):
+            said, _ = self.run_turn([{"content": "Let me ask Claude.", "tool_calls": [CALL]}])
+        self.assertEqual(said, "Let me ask Claude.")
+        self.assertIsNone(rounds._last_raw["rounds_final"])
+
+
 if __name__ == "__main__":
     unittest.main()

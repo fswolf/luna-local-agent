@@ -16,6 +16,14 @@ between "assistant" and the reply (Qwen's empty <think></think> when no
 thinking is given) is context too, so a patch never teaches her to skip
 thinking.
 
+A tool turn (training/export.py) is built with the tools she was offered,
+and the calls she made are learned too: choosing check_email, and with what,
+is part of what you approved. The results that came back are context, never
+learned: they're the server's words, not hers. A call is only learned where
+the template shows it the way she'd write it, after the same opening as a
+reply; Qwen drops the thinking from calls before her answer, so there the
+calls stay context and only the answer is learned.
+
 Saves the adapter (safetensors) in --out; train.sh turns it into a GGUF.
 """
 import argparse
@@ -36,18 +44,45 @@ def reply_prefix(tok):
     return full[len(prompt):full.index(MARK)]
 
 
-def encode(tok, messages, prefix, max_len):
-    """input_ids and labels: -100 everywhere but her last reply and its end."""
-    context = tok.apply_chat_template(messages[:-1], tokenize=False, add_generation_prompt=True) + prefix
-    full = tok.apply_chat_template(messages, tokenize=False)
-    if not full.startswith(context):
+def encode(tok, messages, prefix, max_len, tools=None):
+    """input_ids and labels: -100 everywhere but what she wrote after your
+    last message (her answer, and her tool calls where the template keeps
+    them whole) and the end of each."""
+    def render(msgs, prompt=False):
+        return tok.apply_chat_template(msgs, tools=tools or None, tokenize=False,
+                                       add_generation_prompt=prompt)
+
+    full = render(messages)
+    last_user = max((i for i, m in enumerate(messages) if m.get("role") == "user"), default=None)
+    if last_user is None or messages[-1].get("role") != "assistant":
         return None
-    # the two halves tokenized apart, so the line between them is exact
-    ids_context = tok(context, add_special_tokens=False).input_ids
-    ids_reply = tok(full[len(context):], add_special_tokens=False).input_ids
-    if len(ids_context) + len(ids_reply) > max_len:
+    spans = []
+    for k in range(last_user + 1, len(messages)):
+        if messages[k].get("role") != "assistant":
+            continue
+        context = render(messages[:k], prompt=True)
+        if k == len(messages) - 1:               # her answer: always, or the example's no use
+            if not full.startswith(context + prefix):
+                return None
+            spans.append((len(context) + len(prefix), len(full)))
+            continue
+        done = render(messages[:k + 1])
+        # a call, learned only where it's written as she would write it
+        if full.startswith(done) and done.startswith(context + prefix) and len(done) > len(context + prefix):
+            spans.append((len(context) + len(prefix), len(done)))
+    # the pieces tokenized apart, so every line between learned and not is exact
+    ids, labels, at = [], [], 0
+    for start, end in spans:
+        if start < at:
+            return None
+        before = tok(full[at:start], add_special_tokens=False).input_ids
+        mine = tok(full[start:end], add_special_tokens=False).input_ids
+        ids += before + mine
+        labels += [-100] * len(before) + mine
+        at = end
+    if len(ids) > max_len:
         return None
-    return {"input_ids": ids_context + ids_reply, "labels": [-100] * len(ids_context) + ids_reply}
+    return {"input_ids": ids, "labels": labels}
 
 
 def main():
@@ -86,9 +121,11 @@ def main():
         for line in f:
             if not line.strip():
                 continue
-            r = encode(tok, json.loads(line)["messages"], prefix, a.max_len)
+            row = json.loads(line)
+            r = encode(tok, row["messages"], prefix, a.max_len, row.get("tools"))
             if r is None:
-                n = len(tok(tok.apply_chat_template(json.loads(line)["messages"], tokenize=False),
+                n = len(tok(tok.apply_chat_template(row["messages"], tools=row.get("tools") or None,
+                                                    tokenize=False),
                             add_special_tokens=False).input_ids)
                 too_long, odd = too_long + (n > a.max_len), odd + (n <= a.max_len)
             else:

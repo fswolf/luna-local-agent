@@ -27,6 +27,18 @@ def a_turn(reply="Mrrp~ hello there", tools=False):
                       {"role": "user", "content": "how are you?"}, reply, model="qwen", used_tools=tools)
 
 
+ROUNDS = [{"role": "assistant", "content": "One sec~",
+           "tool_calls": [{"id": "c1", "type": "function",
+                           "function": {"name": "check_email", "arguments": "{\"limit\": 5}"}}]},
+          {"role": "tool", "tool_call_id": "c1", "name": "check_email", "content": "2 unread in INBOX."}]
+TOOLS = [{"type": "function", "function": {"name": "check_email", "parameters": {"type": "object"}}}]
+
+
+def a_tool_turn(reply="Two new ones, nothing urgent."):
+    dataset.note_turn("You are Luna.", [], {"role": "user", "content": "any email?"}, reply,
+                      model="qwen", used_tools=True, rounds=ROUNDS, tools=TOOLS)
+
+
 class Store(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -66,6 +78,32 @@ class Store(unittest.TestCase):
         a_turn(tools=True)
         with self.assertRaises(ValueError):
             dataset.keep("good")
+
+    def test_a_tool_turn_is_kept_whole(self):
+        a_tool_turn()
+        ex = dataset.keep("good")
+        self.assertEqual(ex["reply"], "Two new ones, nothing urgent.")
+        self.assertEqual(ex["rounds"], ROUNDS)
+        self.assertEqual(ex["tools"], TOOLS)
+        self.assertEqual(ex["messages"][-1]["content"], "any email?")
+
+    def test_your_version_replaces_the_answer_not_the_calls(self):
+        a_tool_turn()
+        ex = dataset.keep("fix", reply="You've got two: John and Timothy.")
+        self.assertEqual(ex["reply"], "You've got two: John and Timothy.")
+        self.assertEqual(ex["original"], "Two new ones, nothing urgent.")
+        self.assertEqual(ex["rounds"], ROUNDS)
+
+    def test_your_version_copied_with_her_preamble(self):
+        a_tool_turn()
+        ex = dataset.keep("fix", reply="One sec~ You've got two: John and Timothy.")
+        self.assertEqual(ex["reply"], "You've got two: John and Timothy.")
+
+    def test_the_page_shows_the_calls(self):
+        a_tool_turn()
+        row = dataset_web._row(dataset.keep("good"))
+        self.assertEqual(row["steps"], ["Luna: One sec~", 'called check_email({"limit": 5})',
+                                        "check_email said: 2 unread in INBOX."])
 
     def test_one_example_per_reply(self):
         a_turn()
@@ -193,6 +231,24 @@ class Thumbs(unittest.TestCase):
         self.convo += [("user", "hi"), ("luna", shown)]
         with mock.patch.object(dataset, "_ui_ref", return_value=(0, shown)):
             a_turn(reply, tools)
+
+    def tool_turn(self, shown, rounds=True):
+        self.convo += [("user", "any email?"), ("luna", shown)]
+        with mock.patch.object(dataset, "_ui_ref", return_value=(0, shown)):
+            if rounds:
+                a_tool_turn(shown)
+            else:
+                a_turn(shown, tools=True)
+
+    def test_tool_turns_get_thumbs(self):
+        self.tool_turn("Two new ones.")
+        self.tool_turn("Checked twice, then said this.", rounds=False)
+        self.assertEqual(dataset.rateable(0, self.convo), {1: "", 3: "tools"})
+        ex = dataset.rate(0, "Two new ones.", True)
+        self.assertEqual(ex["rounds"], ROUNDS)
+        with self.assertRaises(ValueError) as e:
+            dataset.rate(0, "Checked twice, then said this.", True)
+        self.assertIn("put right afterwards", str(e.exception))
 
     def test_an_older_reply_can_be_kept(self):
         self.turn("first reply")

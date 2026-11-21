@@ -130,7 +130,7 @@ class Masking(unittest.TestCase):
                                "{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}")
 
         class Tok:
-            def apply_chat_template(self, msgs, tokenize=False, add_generation_prompt=False):
+            def apply_chat_template(self, msgs, tools=None, tokenize=False, add_generation_prompt=False):
                 return tmpl.render(messages=msgs, add_generation_prompt=add_generation_prompt)
 
             def __call__(self, text, add_special_tokens=False):
@@ -146,6 +146,95 @@ class Masking(unittest.TestCase):
         learned = "".join(chr(i) for i, lab in zip(r["input_ids"], r["labels"]) if lab != -100)
         self.assertEqual(learned, "Mrrp [wave]<|im_end|>\n")            # not "old", not the think block
         self.assertIsNone(train.encode(tok, msgs, prefix, 20))          # too long: left out
+
+
+TOOL_EXAMPLE = {
+    "id": "t1", "kind": "habit", "approved": True, "reply": "Two new ones, nothing urgent.",
+    "messages": [{"role": "system", "content": "S"}, {"role": "user", "content": "any email?"}],
+    "rounds": [{"role": "assistant", "content": "One sec~",
+                "tool_calls": [{"id": "", "type": "function", "function": {"name": "check_email",
+                                                                           "arguments": '{"limit": 5}'}},
+                               {"id": "", "type": "function", "function": {"name": "search_email",
+                                                                           "arguments": "not json"}}]},
+               {"role": "tool", "tool_call_id": "", "name": "check_email", "content": "2 unread"},
+               {"role": "tool", "tool_call_id": "", "name": "search_email", "content": "nothing"}],
+    "tools": [{"type": "function", "function": {"name": "check_email"}}],
+}
+
+
+class ExportTools(unittest.TestCase):
+    def test_calls_and_results_between_your_message_and_her_answer(self):
+        conv = export.conversation(TOOL_EXAMPLE)
+        self.assertEqual([m["role"] for m in conv["messages"]],
+                         ["system", "user", "assistant", "tool", "tool", "assistant"])
+        calls = conv["messages"][2]["tool_calls"]
+        self.assertEqual(calls[0]["function"]["arguments"], {"limit": 5})      # an object, not a string
+        self.assertEqual(calls[1]["function"]["arguments"], {})
+        ids = [c["id"] for c in calls]
+        self.assertEqual(len(set(ids)), 2)                                      # made up, and distinct
+        self.assertEqual([m["tool_call_id"] for m in conv["messages"][3:5]], ids)
+        self.assertEqual(conv["tools"], TOOL_EXAMPLE["tools"])
+        self.assertEqual(conv["messages"][-1]["content"], "Two new ones, nothing urgent.")
+
+    def test_rounds_that_dont_pair_up_are_left_out(self):
+        bad = dict(TOOL_EXAMPLE, rounds=TOOL_EXAMPLE["rounds"][:2])            # a call with no result
+        self.assertIsNone(export.conversation(bad))
+        self.assertIsNone(export.conversation(dict(TOOL_EXAMPLE, rounds=[{"role": "user", "content": "x"}])))
+
+    def test_a_plain_example_is_as_before(self):
+        self.assertEqual(export.conversation(row(1)), {"messages": [
+            {"role": "system", "content": "You are Luna."}, {"role": "user", "content": "hello 1"},
+            {"role": "assistant", "content": "Hi there [wave]"}]})
+
+
+@unittest.skipIf(jinja2 is None, "jinja2 isn't installed")
+class MaskingTools(unittest.TestCase):
+    """A tool turn: her calls are learned where the template writes them whole,
+    the results never."""
+
+    BODY = ("{%- for m in messages %}<|im_start|>{{ 'user' if m.role == 'tool' else m.role }}\n"
+            "{% if m.role == 'tool' %}<tool_response>{{ m.content }}</tool_response>"
+            "{% else %}{{ THINK }}{{ m.content }}"
+            "{% for c in m.tool_calls or [] %}<tool_call>{{ c.function.name }} {{ c.function.arguments | tojson }}</tool_call>{% endfor %}"
+            "{% endif %}<|im_end|>\n{% endfor %}"
+            "{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}")
+
+    def tok(self, think):
+        tmpl = jinja2.Template(self.BODY.replace("{{ THINK }}", think))
+
+        class Tok:
+            seen_tools = []
+
+            def apply_chat_template(self, msgs, tools=None, tokenize=False, add_generation_prompt=False):
+                Tok.seen_tools.append(tools)
+                return tmpl.render(messages=msgs, add_generation_prompt=add_generation_prompt)
+
+            def __call__(self, text, add_special_tokens=False):
+                return mock.Mock(input_ids=[ord(c) for c in text])
+
+        return Tok()
+
+    def learned(self, think):
+        sys.path.insert(0, os.path.join(HERE, "training"))
+        import train
+
+        tok = self.tok(think)
+        conv = export.conversation(TOOL_EXAMPLE)
+        r = train.encode(tok, conv["messages"], train.reply_prefix(tok), 8192, conv["tools"])
+        self.assertIn(conv["tools"], tok.seen_tools)
+        return "".join(chr(i) for i, lab in zip(r["input_ids"], r["labels"]) if lab != -100)
+
+    def test_calls_learned_when_written_whole(self):
+        got = self.learned("")
+        self.assertIn('One sec~<tool_call>check_email {"limit": 5}</tool_call>', got)
+        self.assertIn("Two new ones, nothing urgent.<|im_end|>", got)
+        self.assertNotIn("2 unread", got)                                        # results are context
+        self.assertNotIn("any email?", got)
+
+    def test_qwen_drops_thinking_from_calls_so_only_the_answer(self):
+        # thinking shown only on the last message, as Qwen's template does
+        got = self.learned("{% if m.role == 'assistant' and loop.last %}<think>\n\n</think>\n\n{% endif %}")
+        self.assertEqual(got, "Two new ones, nothing urgent.<|im_end|>\n")
 
 
 @unittest.skipUnless(shutil.which("bash"), "no bash")
