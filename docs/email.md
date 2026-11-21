@@ -52,6 +52,15 @@ Restart Luna and the email tools appear in the tools pane under Email. On a fres
 folder is opened read-only, so a message she reads stays unread for
 you, and nothing is moved or deleted.
 
+**One login, kept open.** Checking, reading and searching share one
+connection that stays open for five minutes after the last use, so a
+busy evening isn't a login per message. If the server still says "not
+now" (some throttle a mailbox that logs in a lot), Luna says it's the
+server, leaves it alone for a minute and a half, and doesn't send you
+off to change passwords. A wrong password gets its own message, naming
+the server, and isn't tried again for 15 minutes unless you change
+`email.json`, so a bad password can't get the mailbox locked out.
+
 ## Sending
 
 Off by default. Space on `send_email` in the tools pane (Tab twice), or

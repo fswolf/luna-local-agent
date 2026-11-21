@@ -36,7 +36,7 @@ class Reply(unittest.TestCase):
         server.__enter__.return_value = server
         server.send_message.side_effect = sent.append
         with mock.patch.object(mail, "account", return_value=dict(ACCOUNT)), \
-                mock.patch.object(mail, "_open", return_value=mock.Mock()), \
+                mock.patch.object(mail, "_mailbox", return_value=mock.MagicMock()), \
                 mock.patch.object(mail, "_fetch", return_value=[("33", msg_in)]), \
                 mock.patch.object(mail, "_approve_send", return_value=True), \
                 mock.patch.object(mail.smtplib, "SMTP_SSL", return_value=server):
