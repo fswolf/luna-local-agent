@@ -54,7 +54,7 @@ def url():
 
 
 WINDOW = (900, 980)   # the --web window, in pixels
-WINDOWS = {"/portrait": "open or close her portrait window", "/pose": "pose studio, in a window of its own",
+WINDOWS = {"/portrait": "open or close the portrait window", "/pose": "pose studio, in a window of its own",
            "/monitor": "the live monitor, in a window of its own"}
 
 
@@ -258,7 +258,7 @@ def say(text, attachment=None):
     import ui
 
     if not ui.view.on_submit:
-        return "she isn't taking messages yet"
+        return "Luna isn't taking messages yet"
     ui.submit_soon(text, attachment)
     return None
 

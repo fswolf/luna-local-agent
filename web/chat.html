@@ -27,7 +27,8 @@ padding:12px 15px;display:none;gap:5px}
 .typing i,.waiting i{width:7px;height:7px;border-radius:50%;background:var(--dim);animation:blink 1.2s infinite}
 .typing i:nth-child(2),.waiting i:nth-child(2){animation-delay:.2s}
 .typing i:nth-child(3),.waiting i:nth-child(3){animation-delay:.4s}
-.msg.her.waiting{display:flex;gap:5px;padding:12px 15px}   /* her reply before its first word: the dots, in it */
+.msg.her.waiting{display:flex;gap:5px;padding:12px 15px}
+.msg[hidden]{display:none}                     /* over .waiting's display:flex */   /* her reply before its first word: the dots, in it */
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
 .askwrap{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;
 background:#0a0612b3;backdrop-filter:blur(2px)}
@@ -98,7 +99,7 @@ body.drag #log{outline:2px dashed var(--accent);outline-offset:-8px}
     <div class=box>
       <div id=chip><span id=chipname></span><button id=unclip title="remove">×</button></div>
       <div class=line><textarea id=text rows=1 placeholder="Say something" autocomplete=off></textarea>
-      <button id=mic title="talk to her (the same as HOME)"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/>
+      <button id=mic title="talk to Luna (the same as HOME)"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/>
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/></svg></button></div>
     </div>
     <button class=round id=send title="send (Enter)">➤</button>
@@ -187,8 +188,8 @@ function apply(s) {
   // the same as HOME in each voice mode (voice/ptt.py)
   mic.title = s.voice_mode === 'open'
     ? (s.mic ? 'hands-free is on - click to turn it off' : 'turn hands-free on (the same as HOME)')
-    : s.mic ? (s.voice_mode === 'manual' ? 'listening - click when you\'re done' : 'listening - she stops when you go quiet')
-    : 'talk to her (the same as HOME)';
+    : s.mic ? (s.voice_mode === 'manual' ? 'listening - click when you\'re done' : 'listening - it stops when you go quiet')
+    : 'talk to Luna (the same as HOME)';
   buttons();
 }
 
@@ -217,7 +218,7 @@ function thumbs() {
         ? `<button data-r=up aria-label="good reply">${ICON.up}</button><button data-r=down aria-label="bad reply">${ICON.down}</button>` : ''}`;
     if (can) {
       const up = b.querySelector('[data-r=up]'), dn = b.querySelector('[data-r=down]');
-      up.title = "a good reply: keep it as an example for her patches";
+      up.title = "a good reply: keep it as an example for Luna's patches";
       dn.title = "not like this: say how it should have gone";
       up.classList.toggle('on', st === 'up');
       dn.classList.toggle('on', st === 'down' || st === 'fix');
@@ -240,7 +241,7 @@ function better(el, bar, idx) {
   if (el.querySelector('.better')) return;
   bar.classList.add('open');
   const f = document.createElement('div'); f.className = 'better';
-  f.innerHTML = `<textarea placeholder="How should she have said it? (optional)"></textarea>
+  f.innerHTML = `<textarea placeholder="How should it have been said? (optional)"></textarea>
     <div class=row><button class=btn>Keep my version</button><button class="btn no" data-bad>Just mark it bad</button>
     <button class="btn no" data-x>Cancel</button></div>`;
   const ta = f.querySelector('textarea'), close = () => { f.remove(); bar.classList.remove('open'); };
@@ -259,7 +260,7 @@ async function rate(idx, up, better) {
     $('#err').textContent = '';
     rates[idx] = out.rated; thumbs();
     return true;
-  } catch (err) { $('#err').textContent = "can't reach Luna - is she running?"; return false; }
+  } catch (err) { $('#err').textContent = "can't reach Luna - is it running?"; return false; }
 }
 
 // --- a tool asking first --------------------------------------------------
@@ -299,7 +300,7 @@ async function follow() {
       if (offline) { offline = false; $('#err').textContent = ''; }
       lunaHead.reachable(true);
     } catch (err) {
-      offline = true; lunaHead.reachable(false); $('#err').textContent = "can't reach Luna - is she running?";
+      offline = true; lunaHead.reachable(false); $('#err').textContent = "can't reach Luna - is it running?";
       await new Promise(res => setTimeout(res, 2000));
     }
   }
@@ -314,7 +315,7 @@ async function post(path, body, form) {
     if (!r.ok) { $('#err').textContent = out.error || ('error ' + r.status); return false; }
     $('#err').textContent = '';
     return true;
-  } catch (err) { $('#err').textContent = "can't reach Luna - is she running?"; return false; }
+  } catch (err) { $('#err').textContent = "can't reach Luna - is it running?"; return false; }
 }
 
 function buttons() {
@@ -322,7 +323,7 @@ function buttons() {
   const stopping = busy && !typed;
   send.classList.toggle('stop', stopping);
   send.textContent = stopping ? '■' : '➤';
-  send.title = stopping ? 'stop her' : 'send (Enter)';
+  send.title = stopping ? 'stop' : 'send (Enter)';
 }
 
 async function go() {
@@ -356,7 +357,7 @@ $('#file').onchange = () => { if ($('#file').files[0]) attach($('#file').files[0
 $('#unclip').onclick = unattach;
 function attach(f) {
   const img = images.includes(f.type), cap = img ? (files.images || {}).max_bytes : (files.documents || {}).max_bytes;
-  if (img && (files.images || {}).can_see === false) { $('#err').textContent = "her model can't see pictures right now"; return; }
+  if (img && (files.images || {}).can_see === false) { $('#err').textContent = "the model can't see pictures right now"; return; }
   if (cap && f.size > cap) { $('#err').textContent = `that's too big (up to ${Math.round(cap / 1048576)} MB)`; return; }
   attached = f;
   const chip = $('#chip'); chip.querySelector('img')?.remove();

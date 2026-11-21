@@ -85,22 +85,16 @@ class Luna:
 
 def items(luna):
     """The menu as it should look now: [(id, label, kind, enabled, checked)].
-    kind: "label" (status, greyed), "item", "check" or "sep"."""
+    kind: "item", "check" or "sep". Status and model are in the tooltip."""
     name = luna.get("name") or "Luna"
-    status = luna.get("status") or "starting"
-    model = dict(luna.get("rows") or []).get("Model", "")
-    out = [("status", f"{name}: {status}", "label", False, False)]
-    if model:
-        out.append(("model", f"Model: {model}", "label", False, False))
-    out += [("sep1", "", "sep", True, False),
-            ("chat", "Open chat", "item", True, False),
-            ("portrait", "Portrait", "item", True, False),
-            ("settings", "Settings", "item", True, False),
-            ("sep2", "", "sep", True, False)]
+    out = [("chat", "Open chat", "item", True, False),
+           ("portrait", "Portrait", "item", True, False),
+           ("settings", "Settings", "item", True, False),
+           ("sep2", "", "sep", True, False)]
     if luna.get("can_talk"):
         out.append(("talk", "Done talking" if luna.get("mic") else "Talk (push to talk)", "item", True, False))
-    out.append(("stop", "Stop her", "item", bool(luna.get("busy")), False))
-    out.append(("voice", "Her voice", "check", True, bool(luna.get("voice_on", True))))
+    out.append(("stop", "Stop", "item", bool(luna.get("busy")), False))
+    out.append(("voice", "Voice", "check", True, bool(luna.get("voice_on", True))))
     out += [("sep3", "", "sep", True, False),
             ("quit", f"Quit {name}", "item", True, False)]
     return out
@@ -461,11 +455,11 @@ def run_sni(luna):
                         shown_to, luna.up = now, True
                         print("tray icon up", flush=True)
                     except Exception as e:
-                        print(f"The tray wouldn't take her icon ({e.__class__.__name__}: {e})", file=sys.stderr)
+                        print(f"The tray wouldn't take Luna's icon ({e.__class__.__name__}: {e})", file=sys.stderr)
                 else:
                     shown_to = None
                     if not said:
-                        print("No system tray to put her icon in yet (KDE, waybar's tray, XFCE and GNOME with "
+                        print("No system tray to put Luna's icon in yet (KDE, waybar's tray, XFCE and GNOME with "
                               "the AppIndicator extension all have one); waiting for one.", file=sys.stderr, flush=True)
                         said = True
             menu.update()
@@ -503,8 +497,7 @@ def run_pystray(luna):
                                 checked=checked if key == "voice" else None, enabled=enabled,
                                 visible=shown, default=(key == "chat"))
 
-    menu = pystray.Menu(entry("status"), entry("model"), pystray.Menu.SEPARATOR,
-                        entry("chat"), entry("portrait"), entry("settings"), pystray.Menu.SEPARATOR,
+    menu = pystray.Menu(entry("chat"), entry("portrait"), entry("settings"), pystray.Menu.SEPARATOR,
                         entry("talk"), entry("stop"), entry("voice"), pystray.Menu.SEPARATOR, entry("quit"))
     logo = Image.open(LOGO).convert("RGBA")
     picture = Image.new("RGBA", logo.size, (0, 0, 0, 0))           # the same margin as on Linux

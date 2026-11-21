@@ -132,9 +132,9 @@ section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;m
 <div id="presetbox"><div class="presets" id="presets"></div>
 <div class="ptitle">Model size <span id="sizehint">sets how much fits in each prompt; pick the one closest to your model and its context window</span></div>
 <div class="presets" id="sizes"></div></div>
-<section id="agentbox" class="closed" data-group="agent"><h2><div>Who she is <em style="color:var(--dim)">agent/agent.json</em></div> <span>edit</span></h2>
+<section id="agentbox" class="closed" data-group="agent"><h2><div>Personality <em style="color:var(--dim)">agent/agent.json</em></div> <span>edit</span></h2>
 <div class="rows">
-<p>Her name, personality, tone, traits and rules, and who you are, as the file holds them. Save checks it first and keeps the old one in <code>agent/backups/</code>; she uses it from her next turn. Ctrl+S saves; Tab indents, Esc leaves the box.</p>
+<p>The name, personality, tone, traits and rules, and who you are, as the file holds them. Save checks it first and keeps the old one in <code>agent/backups/</code>; it's used from the next turn. Ctrl+S saves; Tab indents, Esc leaves the box.</p>
 <textarea id="agenttext" spellcheck="false" autocomplete="off" aria-label="agent.json"></textarea>
 <div class="bar"><button id="agentsave" disabled>Save</button><button id="agentload" title="Throw away your edits and load the file again">Reload</button><span id="agentstate"></span></div>
 </div></section>
@@ -190,7 +190,7 @@ async function send(body) {
       load();                                   // she restarted: show what's set now
     }
     out = await r.json();
-  } catch (e) { out = {ok: false, message: "no answer from Luna - is she running?"}; }
+  } catch (e) { out = {ok: false, message: "no answer from Luna - is it running?"}; }
   return out;
 }
 
@@ -227,7 +227,7 @@ function control(s) {
     const full = c => c.length === 4 ? "#" + [...c.slice(1)].map(x => x + x).join("") : c;
     const opt = (val, label, on) => `<option value="${esc(val)}" ${on ? "selected" : ""}>${esc(label)}</option>`;
     return `<select id="${id}" data-path="${esc(s.path)}" data-bg="pick">` +
-      opt("", "default (her dark gradient)", !v) + opt("none", "none (see-through)", v === "none") +
+      opt("", "default (the dark gradient)", !v) + opt("none", "none (see-through)", v === "none") +
       opt("seasonal", "seasonal (by the date and time of day)", v === "seasonal") +
       opt("colour", "a colour", colour) +
       (s.choices.length ? `<optgroup label="pictures (portrait/backgrounds/)">` +
@@ -298,7 +298,7 @@ function sizeHint() {
   const k = Math.round(w / 1024), fit = w < 24576 ? "small" : w < 49152 ? "medium" : "large";
   const label = (data.presets.find(p => p.name === fit) || {}).label || fit;
   const now = data.presets.find(p => p.kind === "size" && p.active);
-  el.textContent = `sets how much fits in each prompt. Your model server gives her ${k}k: ${label} fits` +
+  el.textContent = `sets how much fits in each prompt. Your model server gives ${k}k: ${label} fits` +
     (!now ? "" : now.name === fit ? " (in use)" : ["small", "medium", "large"].indexOf(now.name) < ["small", "medium", "large"].indexOf(fit)
       ? ` (${now.label} leaves room unused)` : ` (${now.label} may not fit)`) + ".";
 }
@@ -311,7 +311,7 @@ function scaleBox() {
   const sum = s.window ? `<table>
     <tr><td>Context window, from the model server</td><td class="n">${n(s.window)}</td></tr>
     <tr><td>− every tool's description, as switched on now</td><td class="n">${n(s.tools)}</td></tr>
-    <tr><td>− her prompt: persona, rules, facts, lessons <span class="st">(scale_prompt_reserve)</span></td><td class="n">${n(s.prompt)}</td></tr>
+    <tr><td>− the prompt: persona, rules, facts, lessons <span class="st">(scale_prompt_reserve)</span></td><td class="n">${n(s.prompt)}</td></tr>
     <tr><td>− a full reply, thinking included <span class="st">(generation.max_tokens)</span></td><td class="n">${n(s.reply)}</td></tr>
     <tr><td>− one turn's tool results <span class="st">(scale_results_reserve)</span></td><td class="n">${n(s.results)}</td></tr>
     <tr class="sum"><td>left over</td><td class="n">${n(s.left)}</td></tr>
@@ -319,7 +319,7 @@ function scaleBox() {
     </table>` : "";
   const fits = s.fits !== undefined ? ` (room for ${n(s.fits)}, cap ${n(s.cap)})` : "";
   return `<div class="stationbox scalebox">
-    <div class="st big">She keeps <b>${n(s.keep)} messages</b> word for word${fits} and a summary of up to <b>${n(s.chars)} characters</b>.</div>
+    <div class="st big">Luna keeps <b>${n(s.keep)} messages</b> word for word${fits} and a summary of up to <b>${n(s.chars)} characters</b>.</div>
     <div class="st">${esc((s.why || "").charAt(0).toUpperCase() + (s.why || "").slice(1))}. Your own settings, never gone under: ${n(s.settings_keep)} messages, ${n(s.settings_chars)} characters.</div>
     ${sum}<div class="add"><button id="scalefresh" title="Ask the model server again (after loading another model)">Measure again</button>
     <span class="st">Estimates, at about 3.5 characters a token; llama-server's log has the real count of each prompt.</span></div></div>`;
@@ -380,7 +380,7 @@ async function agentLoad() {
   agent.loading = true;
   let out;
   try { out = await (await fetch("api/agent", {cache: "no-store"})).json(); }
-  catch (e) { return agentState("no answer from Luna - is she running?", "bad"); }
+  catch (e) { return agentState("no answer from Luna - is it running?", "bad"); }
   finally { agent.loading = false; }
   if (!out.ok) return agentState(out.message, "bad");
   agent.stamp = out.stamp; agent.saved = out.text; agent.typed = false;

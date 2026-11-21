@@ -54,8 +54,8 @@ def run_web(on_submit, on_hotkey=None, open_window=True):
 
     if "chat" not in livefeed.PAGES:
         # the live monitor registers it once its port is open (livefeed.start)
-        print(f"Her pages aren't being served, so there's no window to open: is port "
-              f"{livefeed.port()} taken (another Luna running)? Her log says why.", file=sys.stderr)
+        print(f"Luna's pages aren't being served, so there's no window to open: is port "
+              f"{livefeed.port()} taken (another Luna running)? The log says why.", file=sys.stderr)
         return
 
     view.loop = asyncio.new_event_loop()
@@ -65,11 +65,11 @@ def run_web(on_submit, on_hotkey=None, open_window=True):
     url = chat_web.url()
     window = chat_web.open_window() if open_window else None
     tray = _start_tray() if open_window and getattr(config, "MONITOR_TRAY", True) else None
-    print(f"Luna is running in her window ({url}).", flush=True)
+    print(f"Luna is running in its window ({url}).", flush=True)
     if not DETACHED:
-        print(("Closing the window quits her (with a tray icon, she stays there), so does /quit there or "
-               "Ctrl+C here." if tray else "Closing the window quits her, so does /quit there or Ctrl+C here.")
-              if window else "Ctrl+C here or /quit on the page quits her.", flush=True)
+        print(("Closing the window quits Luna (with a tray icon, it stays there), so does /quit there or "
+               "Ctrl+C here." if tray else "Closing the window quits Luna, so does /quit there or Ctrl+C here.")
+              if window else "Ctrl+C here or /quit on the page quits Luna.", flush=True)
     if window is not None:
         threading.Thread(target=_watch, args=(window,), daemon=True, name="chat-window").start()
     try:
@@ -119,14 +119,14 @@ def _watch(window):
     started = time.monotonic()
     window.wait()
     if time.monotonic() - started < QUIT_AFTER:
-        print("The window closed straight away (handed to a browser already open?): she's "
-              "still running, and /quit on the page quits her.", flush=True)
+        print("The window closed straight away (handed to a browser already open?): Luna's "
+              "still running, and /quit on the page quits it.", flush=True)
         return
     from web import chat_web
 
     if chat_web.tray_up():
         # like any app with a tray icon: the window goes, she stays, Quit there ends her
-        print("Her window closed: she's still running in the system tray.", flush=True)
+        print("The window closed: Luna's still running in the system tray.", flush=True)
         return
     stand_in = view.app
     if stand_in is not None:

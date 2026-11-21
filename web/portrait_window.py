@@ -4,7 +4,9 @@ A Chromium-style browser's --app window does that (on the PATH, then as a
 Flatpak). Firefox has no app mode, so it gets a profile of her own whose
 userChrome.css hides every toolbar. Each runs on its own profile, so it's
 a process of its own that /portrait can close again, never a tab handed to
-a browser that's already open. portrait.browser overrides all of it.
+a browser that's already open. portrait.browser overrides all of it. Every
+window opened here (open_app: her chat, the pose studio, the live monitor)
+is closed with her when she quits (close()).
 
 Whatever starts here starts with its output thrown away: a browser started
 from Luna's process would otherwise print its warnings ("Safe Browsing
@@ -152,7 +154,7 @@ def open_app(url, w, h, profile):
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     stdin=subprocess.DEVNULL, start_new_session=True)
-            _opened.append(proc)                 # closed with her (close())
+            _opened[:] = [p for p in _opened if p.poll() is None] + [proc]   # closed with her (close())
             return proc
         except OSError:
             pass
@@ -231,7 +233,7 @@ def toggle(obs=False):
     proc = _window["proc"]
 
     if proc and proc.poll() is None:
-        proc.terminate()
+        _stop(proc)
         _window["proc"] = None
         ui.add_message("system", "Portrait closed.")
         return

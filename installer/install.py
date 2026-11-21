@@ -465,7 +465,7 @@ def python_env(state, extras):
 # 4. The voice: kokoro-reader
 # ---------------------------------------------------------------------------
 def voice(state, gpu_choice):
-    step("Her voice (kokoro-reader)")
+    step("Voice (kokoro-reader)")
     mode = ARGS.voice
     if mode == "install" and http_ok("http://127.0.0.1:8899/health") and not state.get("kokoro_dir"):
         ok("a voice server is already answering on :8899 - using that one")
@@ -579,7 +579,7 @@ def build_packages(kind):
 
 
 def backend(state):
-    step("Her brain (the model server)")
+    step("Model server")
     choice = ARGS.backend
     if choice is None:
         options = [("lmstudio", "LM Studio - an app with a model browser; easiest"),
@@ -973,7 +973,7 @@ def _write_local_env(values):
 
 
 def model(state):
-    step("Her model")
+    step("Model")
     choice = (ARGS.model or "auto").lower()
     if choice == "skip" or state.get("backend") == "skip":
         note("model", False, "skipped")

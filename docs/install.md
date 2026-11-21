@@ -139,11 +139,14 @@ opens in a window of its own with no address bar, the way her portrait
 does, and everything happens there: talking, /commands, a tool asking
 first. She runs on her own, so the terminal you started her from can
 close; her output goes to `~/.cache/ai-voice/web.log`. Her icon sits in
-the system tray: a left click opens her chat, a right click has her status,
-the portrait, settings, her voice on or off, push to talk, Stop and Quit.
+the system tray: a left click opens her chat, a right click has the portrait,
+settings, her voice on or off, push to talk, Stop and Quit, and hovering
+shows her status and model.
 With the tray there, closing her window leaves her running in it, like any
 app with a tray icon; without one (GNOME needs the AppIndicator extension),
-closing her window quits her. /quit always does. `monitor.tray` false turns
+closing her window quits her. /quit always does, and quitting closes every
+window she opened (her chat, the portrait, the pose studio, the live
+monitor). `monitor.tray` false turns
 the icon off; the icon's own log is `~/.cache/ai-voice/tray.log`.
 
 **No model server yet?** Started this way, she doesn't quit: her window

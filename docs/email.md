@@ -66,6 +66,12 @@ Off by default. Space on `send_email` in the tools pane (Tab twice), or
 Replying fills in the subject and threading, so it lands in the same
 conversation in your mail app.
 
+<img width="700" alt="The approval window for an email Luna wrote: send email to (the address blurred here), read it all - it goes out as you, then the whole message with From, To and Subject, and Allow and Deny buttons with a countdown" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/email-send.png" />
+
+*A reply waiting for your OK: who it goes to, the subject and every word,
+with Allow and Deny. Nothing is sent until you click Allow. The address is
+blurred here.*
+
 ## Email is other people's words
 
 An email is the classic way to try to steer an assistant: "ignore your

@@ -171,7 +171,7 @@ def start_llama(s):
     log = open(log_path, "w", encoding="utf-8")
     proc = subprocess.Popen(["bash", script], cwd=LLAMA_DIR, stdout=log, stderr=subprocess.STDOUT,
                             stdin=subprocess.DEVNULL, start_new_session=True)
-    print("Starting her model (llama.cpp)", end="", flush=True)
+    print("Starting the model (llama.cpp)", end="", flush=True)
     for _ in range(600):           # a big model from a slow disk can take a few minutes
         if proc.poll() is not None:
             print(f" it stopped - last lines of server/llama/server.log:")
@@ -215,7 +215,7 @@ def start_voice(v):
     if up(f"http://127.0.0.1:{port}/health"):
         return None
     if not (os.path.exists(v.get("python", "")) and os.path.exists(v.get("server", ""))):
-        print("Her voice server isn't where the installer left it - run the installer again.", file=sys.stderr)
+        print("The voice server isn't where the installer left it - run the installer again.", file=sys.stderr)
         return None
     # Always passed, "cpu" included: the server's own default is "auto",
     # which picks the GPU - and on Apple silicon that's the device the
@@ -227,7 +227,7 @@ def start_voice(v):
     proc = subprocess.Popen([v["python"], v["server"]], cwd=os.path.dirname(v["server"]), env=env,
                             stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                             creationflags=flags)
-    print("Starting her voice...", end="", flush=True)
+    print("Starting the voice...", end="", flush=True)
     for _ in range(40):            # the model loads on the first start - give it a moment
         if proc.poll() is not None:
             print(f" it stopped - see {log.name}")
@@ -237,7 +237,7 @@ def start_voice(v):
             return proc
         time.sleep(0.5)
         print(".", end="", flush=True)
-    print(" still loading (first start downloads the model) - she'll find it when it's up.")
+    print(" still loading (first start downloads the model) - Luna finds it when it's up.")
     return proc
 
 
@@ -343,7 +343,7 @@ def check(py):
     if model_up():
         line(True, "a model server is answering")
     elif os.access(os.path.join(LLAMA_DIR, "bin", "llama-server"), os.X_OK):
-        line(True, "no model server running yet - ./start.sh starts llama.cpp for her")
+        line(True, "no model server running yet - ./start.sh starts llama.cpp")
     else:
         line(False, "no model server answering (llama.cpp :8080 or LM Studio :1234)",
              "open LM Studio's Local Server, or build llama.cpp: bash server/llama/install.sh")
@@ -352,14 +352,14 @@ def check(py):
     url = tts_url()
     if eleven():
         key = os.environ.get("ELEVENLABS_API_KEY") or os.path.exists(os.path.expanduser("~/.config/ai-voice/elevenlabs.json"))
-        line(bool(key), "her voice comes from ElevenLabs",
+        line(bool(key), "the voice comes from ElevenLabs",
              "put {\"api_key\": \"...\"} in ~/.config/ai-voice/elevenlabs.json")
     elif v.get("mode") == "managed" and _here(url):
         ready = os.path.exists(v.get("python", "")) and os.path.exists(v.get("server", ""))
-        line(ready, "her voice server is installed - ./start.sh starts it" if ready else
-             "her voice server isn't where the installer left it", "run the installer again: ./installer/install.sh")
+        line(ready, "the voice server is installed - ./start.sh starts it" if ready else
+             "the voice server isn't where the installer left it", "run the installer again: ./installer/install.sh")
     elif v.get("mode") == "none":
-        line(True, "no voice server set up - she'll be text-only")
+        line(True, "no voice server set up - Luna will be text-only")
     else:
         line(up(url + "/health"), f"voice server at {url}",
              "start kokoro-reader there, or set tts.url in config.json" if not _here(url)
@@ -402,7 +402,7 @@ def detach(args):
     Already running: open her window instead of a second Luna."""
     if _answers(monitor_url() + "/chat/state"):
         if _ask_her_to_open():
-            print("She's already running - opened her window.")
+            print("Luna's already running - opened its window.")
             return 0
         sys.path.insert(0, ROOT)
         from web import portrait_window
@@ -413,7 +413,7 @@ def detach(args):
                              stdin=subprocess.DEVNULL, **_own_session())
         else:
             portrait_window.quiet_open(monitor_url() + "/chat/")
-        print("She's already running - opened her window.")
+        print("Luna's already running - opened its window.")
         return 0
     log = os.path.join(log_dir(), "web.log")
     with open(log, "a", encoding="utf-8") as out:
@@ -422,9 +422,9 @@ def detach(args):
         subprocess.Popen([sys.executable, os.path.abspath(__file__), *args], cwd=ROOT,
                          env=dict(os.environ, LUNA_DETACHED="1"), stdin=subprocess.DEVNULL,
                          stdout=out, stderr=subprocess.STDOUT, **_own_session())
-    print("Luna's starting on her own - her window opens in a moment, and this terminal can close.")
-    print(f"Quit her from her tray icon or with /quit (with no tray icon, closing her window does). "
-          f"Her output: {log}")
+    print("Luna's starting on its own - its window opens in a moment, and this terminal can close.")
+    print(f"Quit Luna from its tray icon or with /quit (with no tray icon, closing its window does). "
+          f"Output: {log}")
     return 0
 
 
@@ -507,7 +507,7 @@ def main():
         warnings.append("No model server - open LM Studio's Local Server, or run server/llama/start.sh.")
     if not eleven() and not (v.get("mode") == "managed" and _here(url)) and v.get("mode") != "none" \
             and not up(url + "/health"):
-        warnings.append(f"No voice server at {url} - she'll start text-only.")
+        warnings.append(f"No voice server at {url} - Luna starts text-only.")
     if warnings:
         print("Starting anyway:\n  " + "\n  ".join(warnings), file=sys.stderr)
 

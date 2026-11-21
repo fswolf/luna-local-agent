@@ -217,10 +217,10 @@ class Panes(unittest.TestCase):
     def test_tools_pane_rows(self):
         rows = {r[0]: r for r in self.rows({"enabled": True, "auto": True})}
         self.assertTrue(rows["ask plugin"][1])
-        self.assertEqual(rows["on her own"][5], "pluginset:plugins.ask.auto")
-        self.assertTrue(rows["on her own"][1])
-        self.assertGreater(rows["on her own"][4], 0)          # shows what the line costs
-        self.assertFalse({r[0]: r for r in self.rows({})}["on her own"][1])
+        self.assertEqual(rows["on its own"][5], "pluginset:plugins.ask.auto")
+        self.assertTrue(rows["on its own"][1])
+        self.assertGreater(rows["on its own"][4], 0)          # shows what the line costs
+        self.assertFalse({r[0]: r for r in self.rows({})}["on its own"][1])
 
     def test_flipping_on_her_own_saves_it(self):
         from ui import tools_pane

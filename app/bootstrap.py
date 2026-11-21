@@ -30,7 +30,7 @@ MAC = sys.platform == "darwin"
 # The installer's steps, in the order it runs them, so the page can show
 # what's coming and a bar. A step it skips just never lights up.
 STEPS = ["Checking this machine", "System packages", "Luna's Python environment",
-         "Her voice (kokoro-reader)", "Her brain (the model server)", "Her model",
+         "Voice (kokoro-reader)", "Model server", "Model",
          "Launchers", "Health check"]
 # The first run leaves the model to the Connect card in her window
 INSTALL_ARGS = ["--yes", "--no-system", "--backend", "skip", "--model", "skip"]
@@ -363,16 +363,16 @@ def work():
     started = time.time()
     for _ in range(240):                        # her first start loads the speech models
         if answers(url + "state"):
-            P.set(phase="ready", message="Her window is opening.", ready_url=url)
+            P.set(phase="ready", message="Luna's window is opening.", ready_url=url)
             return
         try:
             if os.path.getmtime(asking) >= started - 5:
-                P.set(phase="ready", message="Set up. Now she needs a model: her window asks where one is.")
+                P.set(phase="ready", message="Set up. Now Luna needs a model: its window asks where one is.")
                 return
         except OSError:
             pass
         time.sleep(0.5)
-    P.set(phase="failed", message="She was set up but didn't start. Her log says why: "
+    P.set(phase="failed", message="Luna was set up but didn't start. The log says why: "
           + os.path.join(base or os.path.expanduser("~"), "ai-voice", "web.log"))
 
 

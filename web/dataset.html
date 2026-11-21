@@ -41,7 +41,7 @@ details pre{white-space:pre-wrap;max-height:320px;overflow:auto;background:#0e0a
 </style>
 </head><body>
 <header><div class="top">
-  <h1>Examples <small>for her patches</small></h1>
+  <h1>Examples <small>for Luna's patches</small></h1>
   <div class="seg" id="kinds"><button data-k="" class="on">All</button><button data-k="habit">Habits</button><button data-k="gesture">Gestures</button></div>
   <div class="seg" id="states"><button data-s="" class="on">Any</button><button data-s="wait">Waiting</button><button data-s="yes">Approved</button><button data-s="no">Dropped</button></div>
   <div class="counts" id="counts"></div>
@@ -90,7 +90,7 @@ async function send(body) {
     r = await post(body);
     if (r.status === 403 && await freshKey()) r = await post(body);
     out = await r.json();
-  } catch (e) { out = {ok: false, message: "no answer from Luna - is she running?"}; }
+  } catch (e) { out = {ok: false, message: "no answer from Luna - is it running?"}; }
   if (out.counts) counts(out.counts);
   return out;
 }
@@ -103,10 +103,10 @@ function card(r) {
       <select data-kind>${["habit", "gesture"].map(k => `<option${k === r.kind ? " selected" : ""}>${k}</option>`).join("")}</select>
       <span>${esc(r.source)} · ${esc(r.when)} · ${esc(r.model)}</span></div>
     <div class="who">You said</div><div class="said">${esc(r.said)}</div>
-    ${r.original ? `<div class="who">She said</div><div class="was">${esc(r.original)}</div>` : ""}
-    <div class="who">${r.original ? "Your version (what she learns)" : "Her reply (what she learns)"}</div>
+    ${r.original ? `<div class="who">Luna said</div><div class="was">${esc(r.original)}</div>` : ""}
+    <div class="who">${r.original ? "Your version (what is learned)" : "The reply (what is learned)"}</div>
     <textarea data-reply>${esc(r.reply)}</textarea>
-    <details><summary>the conversation before (${(r.context || []).length} turns) and her prompt</summary>
+    <details><summary>the conversation before (${(r.context || []).length} turns) and the prompt</summary>
       ${ctx ? `<pre>${esc(ctx)}</pre>` : ""}<pre>${esc(r.system)}</pre></details>
     <div class="acts">
       <button data-act="approve">Approve</button>
@@ -119,8 +119,8 @@ function render() {
   const shown = rows.filter(r => (!kind || r.kind === kind) && (!state || stateOf(r) === state));
   $("#list").innerHTML = shown.length ? shown.map(card).join("") :
     `<div class="empty">${rows.length ? "Nothing here with these filters." :
-      "No examples yet. In Luna, <code>/good</code> keeps her last reply as an example and " +
-      "<code>/fix &lt;better reply&gt;</code> keeps your version of it. She never sees either."}</div>`;
+      "No examples yet. In Luna, <code>/good</code> keeps the last reply as an example and " +
+      "<code>/fix &lt;better reply&gt;</code> keeps your version of it. Luna never sees either."}</div>`;
 }
 
 function rowOf(el) { const id = el.closest(".ex").dataset.id; return rows.find(r => r.id === id); }

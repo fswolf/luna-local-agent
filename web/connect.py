@@ -342,7 +342,7 @@ def run_setup(standard=False):
             S.setup["state"] = "failed"
         return
     save({"kind": "llama.cpp", "base": "http://127.0.0.1:8080"})
-    _set(state="starting", step="Starting her model", line="loading it onto the graphics card...")
+    _set(state="starting", step="Starting the model", line="loading it onto the graphics card...")
     started = S.start() if S.start else None
     with S.lock:
         S.server = started
@@ -474,7 +474,7 @@ def wait(show=True, say=print, start=None):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     window = _open(url) if show else None
     opened = time.monotonic()
-    say(f"No model server answering - her window asks where one is ({url}).")
+    say(f"No model server answering - the window asks where one is ({url}).")
     try:
         os.makedirs(os.path.dirname(SHOWING), exist_ok=True)
         with open(SHOWING, "w", encoding="utf-8") as f:

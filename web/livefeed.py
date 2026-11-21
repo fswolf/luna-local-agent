@@ -653,8 +653,8 @@ def add_page(name, label, handler, visible=lambda: True, max_body=65536, request
     PAGE_OPTS[name] = {"max_body": max_body, "request": request}
 
 
-MOUNTS = {"thoughts": ("thought-viewer", "viewer.py", "her thoughts"),
-          "memory": ("memory-manager", "manager.py", "her memory")}
+MOUNTS = {"thoughts": ("thought-viewer", "viewer.py", "thoughts"),
+          "memory": ("memory-manager", "manager.py", "memory")}
 _mount_classes = {}
 
 

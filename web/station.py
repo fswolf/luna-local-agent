@@ -852,7 +852,7 @@ class _Station(_Base):
             _tidy()
             with _lock:
                 if any(t.device == device["key"] and not t.done_at for t in _turns.values()):
-                    return self._json(409, {"error": "she's still answering the last one"})
+                    return self._json(409, {"error": "still answering the last one"})
                 turn = Turn(device["name"], device["key"])
                 _turns[turn.id] = turn
             threading.Thread(target=_run, args=(turn,) + args, daemon=True, name="station-turn").start()

@@ -17,14 +17,14 @@ from .text import vwidth
 
 # (label, what it is, command, address). The address is filled in from livefeed.
 _FIXED = (
-    ("Chat", "talk to her in the browser: the same conversation as here", "/chat", "chat/"),
-    ("Portrait", "her animated portrait in a window of its own (again closes it)", "/portrait", "portrait/"),
+    ("Chat", "talk to Luna in the browser: the same conversation as here", "/chat", "chat/"),
+    ("Portrait", "the animated portrait in a window of its own (again closes it)", "/portrait", "portrait/"),
     ("Portrait for OBS", "the see-through address for a browser source", "/portrait obs", "portrait/?bg=transparent"),
     ("Pose studio", "the debug viewer: make and try gestures, touches and moods", "/pose", "portrait/?debug=1"),
     ("Settings", "every setting, with switches, sliders, search and presets", "/settings", "settings/"),
-    ("Live monitor", "watch her think: stages, tokens, tools, mood", "/monitor", ""),
-    ("Thoughts", "her reasoning, turn by turn", "/thoughts", "thoughts/"),
-    ("Memory", "the facts she keeps, to add, edit or delete", "/memory", "memory/"),
+    ("Live monitor", "watch Luna think: stages, tokens, tools, mood", "/monitor", ""),
+    ("Thoughts", "the reasoning, turn by turn", "/thoughts", "thoughts/"),
+    ("Memory", "the facts Luna keeps, to add, edit or delete", "/memory", "memory/"),
     ("Help", "every command and key", "/help", "help/"),
 )
 _HEAD = 3          # lines above the first entry

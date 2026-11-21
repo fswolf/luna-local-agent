@@ -271,7 +271,7 @@ class SetItUp(unittest.TestCase):
 
     FAKE = r"""import os, sys
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-print("== Her brain (the model server)")
+print("== Model server")
 print("  downloading llama.cpp")
 print("    50% of 35 MB")
 if "--standard" in sys.argv:
@@ -284,7 +284,7 @@ os.makedirs(os.path.dirname(model), exist_ok=True)
 open(model, "w").close()
 with open(os.path.join(root, "server", "llama", "server.local.env"), "w") as f:
     f.write('MODEL="%s"\n' % model)
-print("== Her model")
+print("== Model")
 print("  ✓ Qwen3.5 4B")
 print("== Summary")
 print("  ✓ model server")

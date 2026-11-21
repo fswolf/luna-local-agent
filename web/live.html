@@ -73,7 +73,7 @@
     <span id="conn" class="pill">connecting…</span>
   </div>
 </header>
-<main id="feed"><div class="empty" id="empty">Waiting for her next turn. Talk to her and it streams in here.</div></main>
+<main id="feed"><div class="empty" id="empty">Waiting for the next turn. Talk to Luna and it streams in here.</div></main>
 <script>
 const $ = id => document.getElementById(id);
 let turn = null, box = null, boxKind = "";
@@ -115,7 +115,7 @@ function stream(kind) {
   if (!turn) newTurn({text: "(a turn already in progress)"});
   if (boxKind === kind && box) return box;
   document.querySelectorAll(".cursor").forEach(c => c.classList.remove("cursor"));
-  turn.appendChild(el("div", "lab", kind === "t" ? "thinking" : "she says"));
+  turn.appendChild(el("div", "lab", kind === "t" ? "thinking" : "Luna says"));
   box = el("div", (kind === "t" ? "think" : "say") + " cursor");
   turn.appendChild(box); boxKind = kind;
   return box;

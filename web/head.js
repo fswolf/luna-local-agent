@@ -75,10 +75,10 @@ color:#ece6f7;cursor:pointer}
   const head = document.createElement('div');
   head.id = 'luna-head';
   head.innerHTML = `<div class=lh-top>
-    <div class=lh-id><button class=lh-logo title="her pages" aria-haspopup=true aria-expanded=false><img src="/chat/logo.png" alt="Luna"></button>
-    <span class=lh-name>Luna</span><span class=lh-mood title="her mood right now">mood: <b></b></span></div>
+    <div class=lh-id><button class=lh-logo title="Luna's pages" aria-haspopup=true aria-expanded=false><img src="/chat/logo.png" alt="Luna"></button>
+    <span class=lh-name>Luna</span><span class=lh-mood title="current mood">mood: <b></b></span></div>
     <${onChat ? 'span' : 'a href="/chat/" title="to the chat"'} class=lh-status></${onChat ? 'span' : 'a'}>
-    <button class=lh-online title="what she's running on" aria-haspopup=true aria-expanded=false><i></i><span>Online</span></button>
+    <button class=lh-online title="what Luna is running on" aria-haspopup=true aria-expanded=false><i></i><span>Online</span></button>
     <div class="lh-drop lh-pages" role=menu><div class=lh-h>Luna</div></div>
     <div class="lh-drop lh-info"><table></table></div></div>`;
   const at = document.currentScript;      // right after <body>, so the header comes first
@@ -125,16 +125,10 @@ color:#ece6f7;cursor:pointer}
     if (label === lastOwn) rule();
   }
   rule();
-  // Exit: /quit, the same as typing it; a second click within a few seconds, so a slip doesn't end her
+  // Exit: /quit, the same as typing it (and her windows close with her)
   const exit = item('Exit', document.createElement('button'));
   exit.title = 'quit Luna';
-  let armed = null;
-  exit.onclick = ev => {
-    ev.stopPropagation();
-    if (armed) { clearTimeout(armed); say('/quit'); exit.lastChild.textContent = 'Exit'; armed = null; open_(pages, false); return; }
-    exit.lastChild.textContent = 'Exit - click again to quit her';
-    armed = setTimeout(() => { exit.lastChild.textContent = 'Exit'; armed = null; }, 4000);
-  };
+  exit.onclick = ev => { ev.stopPropagation(); open_(pages, false); say('/quit'); };
   function open_(drop, on) {
     drop.classList.toggle('on', on);
     (drop === pages ? logo : online).setAttribute('aria-expanded', on);

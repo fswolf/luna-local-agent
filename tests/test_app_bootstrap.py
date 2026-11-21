@@ -58,7 +58,7 @@ class Steps(unittest.TestCase):
         self.assertEqual(self.by["System packages"]["state"], "warn")
         self.assertEqual(self.by["Luna's Python environment"]["state"], "bad")
         self.assertEqual(self.by["Launchers"]["state"], "done")
-        self.assertEqual(self.by["Her model"]["state"], "todo")     # skipped: never lit
+        self.assertEqual(self.by["Model"]["state"], "todo")     # skipped: never lit
 
     def test_unknown_step_lands_in_order(self):
         titles = [st["title"] for st in self.s["steps"]]

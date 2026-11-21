@@ -98,7 +98,7 @@ def _perm_group():
         value = _perm_value(name)
 
         if name == "write" and value == "allow":
-            note += " - her folder, ~/.config, ~/.local still ask"
+            note += " - Luna's folder, ~/.config, ~/.local still ask"
 
         members.append((name, value != "off", True, note, 0, "perm:" + name))
 
@@ -218,7 +218,7 @@ def _with_ask_switches(groups):
         saved = bool(s.get("enabled"))
         ready = running or saved or _plugin_says(plugin, "available", False)
         if running:
-            why = "on - asks only when you tell her to, unless on her own is on"
+            why = "on - asks only when you tell it to, unless on its own is on"
         elif saved:
             why = "on, but not running - space switches it off"
         else:
@@ -236,7 +236,7 @@ def _with_ask_switches(groups):
     note = (f"stuck on a script or server problem, {daily} a day"
             + ("" if running else " - only while the plugin is on"))
     rows = [("ask plugin", running or saved, ready, why, 0, "plugin:ask"),
-            ("on her own", alone, True, note, cost, "pluginset:plugins.ask.auto")]
+            ("on its own", alone, True, note, cost, "pluginset:plugins.ask.auto")]
     live = cost if alone and running else 0
 
     out = list(groups)
@@ -719,7 +719,7 @@ def _tool_toggle():
                     config.save_setting(path, stored)
                     if label == "write" and nxt == "allow":
                         add_message("system", "Write: allow - file changes won't ask, now or after a "
-                                    "restart. Her own folder, ~/.config and ~/.local still ask; the "
+                                    "restart. Luna's own folder, ~/.config and ~/.local still ask; the "
                                     "deny list still refuses. Space again to go back to off/ask.")
                     break
         elif setting:

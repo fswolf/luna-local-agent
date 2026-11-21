@@ -41,11 +41,12 @@ Talk to her as usual. When a reply is right, or you know how it should have gone
 /examples             how many there are, and the page to look through them
 ```
 
-In the web chat, her replies have a 👍 and a 👎 (they show when you hover over a
-reply), so you can keep any of her recent replies, not only the last one:
+In the web chat, her replies have a thumbs up and a thumbs down beside the copy
+button (small grey icons that show when you hover over a reply, and stay faintly there
+on a phone), so you can keep any of her recent replies, not only the last one:
 
-- 👍 keeps the reply as it is, like `/good`.
-- 👎 asks how it should have gone. Type your version and it's kept like `/fix`; leave it
+- Thumbs up keeps the reply as it is, like `/good`.
+- Thumbs down asks how it should have gone. Type your version and it's kept like `/fix`; leave it
   empty ("Just mark it bad") and the reply is kept as a bad example. A bad example is never
   trained on as it is (it's dropped), but it's kept: a later kind of training learns from
   good and bad replies side by side.

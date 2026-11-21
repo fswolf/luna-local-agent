@@ -60,7 +60,7 @@ pre{background:#0d0914;border:1px solid var(--line);border-radius:10px;padding:1
 
   <div class="box" id="missing" hidden>
     <b>Some things need installing by you</b> (they need your password, so Luna can't do it).
-    She works without them, but they make her better. Paste this in a terminal:
+    Luna works without them, but they make it better. Paste this in a terminal:
     <div id="cmds"></div>
   </div>
   <div class="box bad" id="failed" hidden>
@@ -95,9 +95,9 @@ function render(s){
   $("msg").textContent = s.message;
   const total = s.steps.length || 1;
   let done = s.steps.filter(x => x.state !== "todo" && x.state !== "doing").length;
-  const later = {"Her brain (the model server)": "Later: when she starts, her window asks where one is"};
-  const slow = {"Luna's Python environment": "Downloading her packages: the slow part, a few minutes",
-                "Her voice (kokoro-reader)": "Downloading her voice: a few minutes"};
+  const later = {"Model server": "Later: when Luna starts, its window asks where one is"};
+  const slow = {"Luna's Python environment": "Downloading Luna's packages: the slow part, a few minutes",
+                "Voice (kokoro-reader)": "Downloading the voice: a few minutes"};
   if (s.steps.some(x => x.state === "doing")) done += 0.5;
   let pct = Math.round(done / total * 90);
   if (s.phase === "starting") pct = 95;
@@ -151,7 +151,7 @@ async function poll(){
     stuck = false;
   } catch (e) {
     if (!stuck) {
-      $("msg").textContent = lastPhase === "ready" ? "Luna's open in her own window. You can close this one."
+      $("msg").textContent = lastPhase === "ready" ? "Luna's open in its own window. You can close this one."
         : "The setup stopped. Start Luna again to carry on where it left off.";
       stuck = true;
     }

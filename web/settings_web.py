@@ -393,7 +393,7 @@ def agent_save(text, stamp=""):
 
     config.apply_agent(data)
     logbook.info("settings", "web: agent.json saved (old one in agent/backups/)")
-    return True, f"saved - {config.AGENT_NAME} uses it from her next turn"
+    return True, f"saved - {config.AGENT_NAME} uses it from the next turn"
 
 
 # ---------------------------------------------------------------------------

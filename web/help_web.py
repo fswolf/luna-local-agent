@@ -62,7 +62,7 @@ h2{font-size:15px;color:var(--accent);margin:0 0 8px}
 @media(max-width:600px){.row{flex-direction:column;gap:0}.row code{flex:none}}
 </style></head><body><main>
 <h1>Luna: commands and keys</h1>
-<p class=sub>Type these in her terminal. Most of what she does needs no command at all: just ask.</p>
+<p class=sub>Type these in the chat or the terminal. Most things need no command at all: just ask.</p>
 <input id=q placeholder="search" autofocus>
 __BODY__
 </main><script>

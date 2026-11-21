@@ -23,12 +23,15 @@ class Menu(unittest.TestCase):
     def keys(self, l):
         return [e[0] for e in tray.items(l)]
 
-    def test_status_first_quit_last(self):
+    def test_chat_first_quit_last(self):
         menu = tray.items(luna())
-        self.assertEqual(menu[0][1], "Luna: Idle")
-        self.assertEqual(menu[1][1], "Model: qwen")
+        self.assertEqual(menu[0][:2], ("chat", "Open chat"))
         self.assertEqual(menu[-1][:2], ("quit", "Quit Luna"))
-        self.assertEqual(menu[0][2], "label")
+        self.assertNotIn("status", self.keys(luna()))
+        self.assertNotIn("model", self.keys(luna()))
+
+    def test_tooltip_keeps_status_and_model(self):
+        self.assertEqual(tray.tooltip(luna()), ("Luna", "Idle · qwen"))
 
     def test_talk_only_with_push_to_talk(self):
         self.assertNotIn("talk", self.keys(luna()))
@@ -43,9 +46,6 @@ class Menu(unittest.TestCase):
         busy = {e[0]: e for e in tray.items(luna(busy=True, voice_on=True))}
         self.assertTrue(busy["stop"][3])
         self.assertTrue(busy["voice"][4])
-
-    def test_no_model_row_no_model_line(self):
-        self.assertNotIn("model", self.keys(luna(rows=[])))
 
     def test_actions(self):
         l = luna()
