@@ -184,6 +184,16 @@ def probe(base, key="", timeout=3.0):
     return out
 
 
+def key_for(what, base):
+    """The key Luna herself would send there (config/server.py): for llama.cpp,
+    llm.json's on another computer when it has one, else server/llama/.api_key
+    (start.sh's, or one copied from the server); for anything else, llm.json's."""
+    if what != "llama.cpp":
+        return saved_key()
+    local = re.match(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:|$)", base)
+    return (not local and saved_key()) or llama_key()
+
+
 def places():
     """Where to look, in order: config.json's addresses first, then this
     computer's usual ports. [(what, base, key)]"""
@@ -195,9 +205,7 @@ def places():
         base = base_of(url) if url else None
         if base and base not in seen:
             seen.add(base)
-            local = re.match(r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:|$)", base)
-            key = llama_key() if what == "llama.cpp" and local else saved_key()
-            out.append((what, base, key))
+            out.append((what, base, key_for(what, base)))
     return out
 
 
@@ -355,7 +363,14 @@ def try_address(body):
     if not base:
         return {"ok": False, "why": "that doesn't look like an address - something like 192.168.1.50:8080"}
     key = str(data.get("key") or "").strip()
-    p = probe(base, key or saved_key())
+    if key:
+        p = probe(base, key)
+    else:
+        # nothing typed: the keys she already has, llm.json's then server/llama/.api_key
+        for known in dict.fromkeys(k for k in (saved_key(), llama_key(), "") if k is not None):
+            p = probe(base, known)
+            if not p["needs_key"]:
+                break
     if p["ok"]:
         use(p, key)
     return p

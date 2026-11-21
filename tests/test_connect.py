@@ -122,6 +122,16 @@ class Probe(unittest.TestCase):
         with mock.patch.object(connect, "llm_settings", return_value={"model": "b"}):
             self.assertEqual(connect.probe(base)["model"], "b")
 
+    def test_typed_address_uses_the_key_she_has(self):
+        base = self.serve("llama", key="fromfile")
+        connect.S.__init__()
+        with mock.patch.object(connect, "saved_key", return_value=""), \
+                mock.patch.object(connect, "llama_key", return_value="fromfile"), \
+                mock.patch.object(connect, "save") as saved:
+            r = connect.try_address(json.dumps({"address": base}).encode())
+        self.assertTrue(r["ok"])
+        saved.assert_called_once()
+
     def test_nothing_there(self):
         p = connect.probe("http://127.0.0.1:9", timeout=0.5)
         self.assertEqual((p["ok"], p["why"]), (False, "nothing answered there"))
@@ -177,6 +187,21 @@ class Places(unittest.TestCase):
                 mock.patch.object(connect, "saved_key", return_value=""), mock.patch.object(connect, "llama_key", return_value=""):
             bases = [b for _w, b, _k in connect.places()]
         self.assertEqual(bases, ["http://box:1234", "http://127.0.0.1:8080", "http://localhost:1234"])
+
+
+class Keys(unittest.TestCase):
+    """The key each place gets is the one Luna would send (config/server.py)."""
+
+    def test_which_key_where(self):
+        with mock.patch.object(connect, "saved_key", return_value="json"), \
+                mock.patch.object(connect, "llama_key", return_value="file"):
+            self.assertEqual(connect.key_for("llama.cpp", "http://192.168.1.50:8080"), "json")
+            self.assertEqual(connect.key_for("llama.cpp", "http://127.0.0.1:8080"), "file")
+            self.assertEqual(connect.key_for("LM Studio", "http://localhost:1234"), "json")
+        # a key copied from the server into server/llama/.api_key, and no llm.json
+        with mock.patch.object(connect, "saved_key", return_value=""), \
+                mock.patch.object(connect, "llama_key", return_value="file"):
+            self.assertEqual(connect.key_for("llama.cpp", "http://192.168.1.50:8080"), "file")
 
 
 class Page(unittest.TestCase):
