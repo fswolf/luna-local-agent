@@ -167,32 +167,57 @@ def read_png(path):
     return w, h, pixels
 
 
-def shrink(w, h, rgba, size):
-    """A box-filtered smaller copy (size x size) of a square image."""
-    step = w // size
-    out = bytearray()
+# Her logo is a disc that fills its square, so at the same size it looks bigger
+# than the tray icons beside it, which leave a margin: drawn at this much of the
+# square, centred, it matches them.
+FILL = 0.78
+
+
+def resize(w, h, rgba, size):
+    """An area-averaged size x size copy of a square RGBA image, colours weighted
+    by alpha so the soft edge doesn't go dark."""
+    out = bytearray(size * size * 4)
+    scale = w / size
     for y in range(size):
+        y0, y1 = int(y * scale), max(int(y * scale) + 1, int((y + 1) * scale))
         for x in range(size):
-            acc = [0, 0, 0, 0]
-            for dy in range(step):
-                row = (y * step + dy) * w
-                for dx in range(step):
-                    i = (row + x * step + dx) * 4
-                    for k in range(4):
-                        acc[k] += rgba[i + k]
-            n = step * step
-            out += bytes(v // n for v in acc)
+            x0, x1 = int(x * scale), max(int(x * scale) + 1, int((x + 1) * scale))
+            r = g = b = a = n = 0
+            for sy in range(y0, min(y1, h)):
+                row = sy * w
+                for sx in range(x0, min(x1, w)):
+                    i = (row + sx) * 4
+                    al = rgba[i + 3]
+                    r += rgba[i] * al
+                    g += rgba[i + 1] * al
+                    b += rgba[i + 2] * al
+                    a += al
+                    n += 1
+            o = (y * size + x) * 4
+            if a:
+                out[o:o + 4] = bytes((r // a, g // a, b // a, a // n))
+    return bytes(out)
+
+
+def padded(w, h, rgba, size, fill=FILL):
+    """The image at fill of a size x size square, centred on transparency."""
+    inner = max(1, round(size * fill))
+    small = resize(w, h, rgba, inner)
+    out = bytearray(size * size * 4)
+    off = (size - inner) // 2
+    for y in range(inner):
+        o = ((y + off) * size + off) * 4
+        out[o:o + inner * 4] = small[y * inner * 4:(y + 1) * inner * 4]
     return bytes(out)
 
 
 def argb_pixmaps(path=LOGO):
-    """[(w, h, ARGB32 big-endian)] at a few sizes: what a StatusNotifierItem wants."""
+    """[(w, h, ARGB32 big-endian)] at a few sizes: what a StatusNotifierItem
+    wants (the tray picks the nearest and scales it)."""
     w, h, rgba = read_png(path)
     out = []
-    for size in (22, 32, 64, w):
-        px = rgba if size == w else shrink(w, h, rgba, size) if w % size == 0 else None
-        if px is None:
-            continue
+    for size in (16, 22, 24, 32, 48, 64):
+        px = padded(w, h, rgba, size)
         argb = bytearray(len(px))
         argb[0::4], argb[1::4], argb[2::4], argb[3::4] = px[3::4], px[0::4], px[1::4], px[2::4]
         out.append((size, size, bytes(argb)))
@@ -481,7 +506,11 @@ def run_pystray(luna):
     menu = pystray.Menu(entry("status"), entry("model"), pystray.Menu.SEPARATOR,
                         entry("chat"), entry("portrait"), entry("settings"), pystray.Menu.SEPARATOR,
                         entry("talk"), entry("stop"), entry("voice"), pystray.Menu.SEPARATOR, entry("quit"))
-    icon = pystray.Icon("luna", Image.open(LOGO), "Luna", menu=menu)
+    logo = Image.open(LOGO).convert("RGBA")
+    picture = Image.new("RGBA", logo.size, (0, 0, 0, 0))           # the same margin as on Linux
+    inner = round(logo.width * FILL)
+    picture.paste(logo.resize((inner, inner), Image.LANCZOS), ((logo.width - inner) // 2,) * 2)
+    icon = pystray.Icon("luna", picture, "Luna", menu=menu)
 
     def watch():
         while True:

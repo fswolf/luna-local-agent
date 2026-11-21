@@ -76,13 +76,17 @@ class Icon(unittest.TestCase):
 
     def test_argb_sizes(self):
         maps = tray.argb_pixmaps()
-        self.assertIn(32, [m[0] for m in maps])
+        self.assertIn(22, [m[0] for m in maps])
         for w, h, data in maps:
             self.assertEqual(len(data), w * h * 4)
-        w, h, rgba = tray.read_png(tray.LOGO)
-        big = maps[-1][2]
-        self.assertEqual(big[:4], bytes([rgba[3], rgba[0], rgba[1], rgba[2]]))   # RGBA -> ARGB
 
+    def test_a_margin_like_the_other_icons(self):
+        """The disc fills its square: drawn smaller, with clear corners and edges."""
+        w, h, data = next(m for m in tray.argb_pixmaps() if m[0] == 32)
+        alpha = data[0::4]
+        self.assertEqual(alpha[0], 0)                                   # a corner
+        self.assertEqual(max(alpha[:w * 2]), 0)                         # the top two rows
+        self.assertGreater(alpha[(h // 2) * w + w // 2], 200)           # the middle
 
 if __name__ == "__main__":
     unittest.main()
