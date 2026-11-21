@@ -401,6 +401,9 @@ def detach(args):
     when there's no tray icon; --here keeps her on this terminal.
     Already running: open her window instead of a second Luna."""
     if _answers(monitor_url() + "/chat/state"):
+        if _ask_her_to_open():
+            print("She's already running - opened her window.")
+            return 0
         sys.path.insert(0, ROOT)
         from web import portrait_window
 
@@ -423,6 +426,18 @@ def detach(args):
     print(f"Quit her from her tray icon or with /quit (with no tray icon, closing her window does). "
           f"Her output: {log}")
     return 0
+
+
+def _ask_her_to_open():
+    """She opens her own window (the tray's Open chat), so it's one of hers and
+    closes when she quits. False if she couldn't be asked (an older Luna)."""
+    try:
+        request = urllib.request.Request(monitor_url() + "/chat/tray", data=b'{"action": "chat"}',
+                                         headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=3) as r:
+            return r.status == 200
+    except Exception:
+        return False
 
 
 def connected():

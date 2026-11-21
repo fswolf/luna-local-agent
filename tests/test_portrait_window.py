@@ -89,3 +89,36 @@ class PortraitWindow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(os.name == "nt", "process groups are POSIX")
+class ClosedWithHer(unittest.TestCase):
+    """Quitting closes every window she opened, and what each one started
+    (a browser's helpers, a Flatpak's sandbox): real processes, no browser."""
+
+    def test_close_takes_them_all(self):
+        import time
+
+        from web import portrait_window as pw
+
+        script = "sleep 30 & echo $! > {}; wait"
+        marks = [tempfile.mktemp() for _ in range(2)]
+        with mock.patch("config.PORTRAIT_BROWSER", "", create=True), \
+                mock.patch.object(pw, "command", side_effect=[["sh", "-c", script.format(m)] for m in marks]):
+            procs = [pw.open_app("http://x/", 1, 1, "t") for _ in marks]
+        for _ in range(50):
+            if all(os.path.exists(m) and open(m).read().strip() for m in marks):
+                break
+            time.sleep(0.05)
+        children = [int(open(m).read()) for m in marks]
+        pw.close()
+        for p in procs:
+            p.wait(5)
+        time.sleep(0.2)
+        for child in children:                    # the sleep it started went with it (gone, or a zombie
+            try:                                  # nobody has reaped yet)
+                with open(f"/proc/{child}/stat") as f:
+                    self.assertEqual(f.read().rsplit(")", 1)[1].split()[0], "Z")
+            except FileNotFoundError:
+                pass
+        self.assertEqual(pw._opened, [])

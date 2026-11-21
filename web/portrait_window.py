@@ -150,8 +150,10 @@ def open_app(url, w, h, profile):
         cmd = None
     if cmd:
         try:
-            return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     stdin=subprocess.DEVNULL, start_new_session=True)
+            _opened.append(proc)                 # closed with her (close())
+            return proc
         except OSError:
             pass
     quiet_open(url)
@@ -182,6 +184,29 @@ def quiet_open(url):
 # /portrait: open and close it
 # ---------------------------------------------------------------------------
 _window = {"proc": None}
+# Every window open_app started this run (her chat, the pose studio, the live
+# monitor...): close() shuts them when she quits. A page that went to a browser
+# tab instead isn't hers to close.
+_opened = []
+
+
+def _stop(proc):
+    """Close a window process and what it started (a Flatpak's sandbox, a
+    browser's helpers): its own session's process group, where there is one."""
+    if not proc or proc.poll() is not None:
+        return
+    try:
+        if os.name != "nt":
+            import signal
+
+            os.killpg(proc.pid, signal.SIGTERM)
+        else:
+            proc.terminate()
+    except (OSError, ProcessLookupError):
+        try:
+            proc.terminate()
+        except OSError:
+            pass
 
 
 def toggle(obs=False):
@@ -248,8 +273,10 @@ def toggle(obs=False):
 
 
 def close():
-    """Close the portrait window if this run opened one (Luna quitting)."""
-    proc = _window["proc"]
-    if proc and proc.poll() is None:
-        proc.terminate()
+    """Luna quitting: close every window this run opened, the portrait and the
+    rest (open_app)."""
+    _stop(_window["proc"])
+    _window["proc"] = None
+    while _opened:
+        _stop(_opened.pop())
 
