@@ -82,6 +82,18 @@ class Unpack(unittest.TestCase):
             self.assertTrue(install.prebuilt_llama())
         dl.assert_not_called()
 
+    def test_a_link_out_of_the_folder_is_refused_on_older_pythons(self):
+        def evil(url, dest):
+            with tarfile.open(dest, "w:gz") as t:
+                info = tarfile.TarInfo("llama-b100/llama-server")
+                info.type, info.linkname = tarfile.SYMTYPE, "../../../etc/passwd"
+                t.addfile(info)
+            return True
+        with mock.patch.object(install.sys, "version_info", (3, 11, 0)), \
+                mock.patch.object(install, "download", side_effect=evil):
+            self.assertFalse(install.prebuilt_llama())
+        self.assertFalse(os.path.exists(self.bin))
+
     def test_an_odd_archive_is_refused(self):
         with mock.patch.object(install, "download", side_effect=lambda url, dest: fake_release(dest, top="")):
             self.assertFalse(install.prebuilt_llama())

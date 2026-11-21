@@ -181,7 +181,10 @@ def _curl(url, tmp):
 
 def download(url, dest):
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    tmp = dest + ".part"
+    # model.part.gguf, not model.gguf.part: a download cut short still matches
+    # .gitignore's *.gguf, so a half model never shows up to be committed
+    stem, ext = os.path.splitext(dest)
+    tmp = stem + ".part" + ext
     print(f"  {D}downloading {url}{X}")
     try:
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -685,7 +688,7 @@ def prebuilt_llama():
                 return True
     except OSError:
         pass
-    work = tempfile.mkdtemp(prefix="luna-llama-", dir=os.path.join(ROOT, "server", "llama"))
+    work = tempfile.mkdtemp(prefix="luna-llama-")      # the system's temp folder, never the repo
     try:
         archive = os.path.join(work, asset)
         if not download(f"{LLAMA_RELEASES}/download/{tag}/{asset}", archive):
@@ -694,7 +697,12 @@ def prebuilt_llama():
             if sys.version_info >= (3, 12):
                 t.extractall(work, filter="data")     # nothing outside work, no device files
             else:
-                bad = [m.name for m in t.getmembers() if m.name.startswith("/") or ".." in m.name.split("/")]
+                def odd(path):
+                    return path.startswith("/") or ".." in path.split("/")
+
+                bad = [m.name for m in t.getmembers()
+                       if odd(m.name) or ((m.issym() or m.islnk()) and odd(m.linkname))
+                       or not (m.isfile() or m.isdir() or m.issym() or m.islnk())]
                 if bad:
                     fail(f"the download has odd paths in it ({bad[0]}) - not unpacked")
                     return False

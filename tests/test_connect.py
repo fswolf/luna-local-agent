@@ -307,6 +307,13 @@ print("  ✓ model server")
         self.assertEqual(connect.S.setup["state"], "failed")
         self.assertIn("didn't start", connect.S.setup["errors"][0])
 
+    def test_another_server_found_meanwhile_stands(self):
+        connect.S.start = lambda: self.fail("nothing to start: she has one")
+        connect.S.found = {"ok": True, "kind": "LM Studio", "base": "http://localhost:1234", "model": "q"}
+        connect.run_setup()
+        self.assertEqual(connect.S.setup["state"], "done")
+        self.saved.assert_not_called()
+
     def test_only_where_it_can(self):
         with mock.patch.object(connect.sys, "platform", "win32"):
             self.assertFalse(connect.can_setup())

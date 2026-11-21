@@ -215,6 +215,7 @@ class State:
         self.setup = {"state": "idle", "step": "", "line": "", "errors": [], "log": []}
         self.start = None          # wait()'s start: starts the server set up here
         self.server = None         # ...and the process it returned (launch.py stops it)
+        self.installer = None      # the installer while it runs (stopped if she goes on without it)
 
     def snapshot(self):
         with self.lock:
@@ -299,6 +300,8 @@ def run_setup(standard=False):
     except OSError as e:
         _set(state="failed", errors=[f"couldn't run the installer: {e}"])
         return
+    with S.lock:
+        S.installer = proc
     for raw in proc.stdout:
         text = re.sub(r"\x1b\[[0-9;]*m", "", raw.rstrip("\r\n"))
         with S.lock:
@@ -317,6 +320,13 @@ def run_setup(standard=False):
             elif stripped:
                 S.setup["line"] = stripped.lstrip("✓! ").strip()
     proc.wait()
+    with S.lock:
+        S.installer = None
+        elsewhere = S.found is not None
+    if elsewhere:
+        # she found another server meanwhile (LM Studio switched on, an address typed): that one stands
+        _set(state="done")
+        return
     if proc.returncode != 0 or not llama_ready():
         with S.lock:
             if not S.setup["errors"]:
@@ -476,6 +486,10 @@ def wait(show=True, say=print, start=None):
                     return False                    # closed: like "Not now"
             time.sleep(LOOK_EVERY)
     finally:
+        with S.lock:
+            installer = S.installer
+        if installer is not None and installer.poll() is None:
+            installer.terminate()                   # not needed any more: "Not now", or another server answered
         if window is not None and window.poll() is None:
             window.terminate()
         server.shutdown()

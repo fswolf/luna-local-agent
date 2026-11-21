@@ -152,7 +152,7 @@ Studio (port 1234) and llama.cpp (port 8080) usually are on this computer,
 explains how to get LM Studio going, and takes the address of a server on
 another computer (and its API key, if it has one). On Linux and macOS it
 can also set one up for you: **Set it up** downloads llama.cpp's ready-made
-release (Vulkan, or Metal on a Mac, about 40 MB) and a Qwen 3.5 model sized
+release (Vulkan, or Metal on a Mac, under 50 MB) and a Qwen 3.5 model sized
 for your graphics card into Luna's folder, with a progress bar, then starts
 it (the same as `./installer/install.sh --only llama --backend llama
 --prebuilt`). She starts the moment one answers with a model loaded, and what it found is saved (`llm` in
