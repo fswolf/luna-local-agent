@@ -187,7 +187,7 @@ _GROUPS = (
     ("Web", ("web_search", "research", "read_page")),
     ("Shell", ("run_command",)),
     ("Network", ("find_device", "scan_network")),
-    ("Email", ("check_email", "read_email", "search_email", "send_email")),
+    ("Email", ("check_email", "read_email", "search_email", "mark_email", "send_email")),
     ("Knowledge", ("search_docs",)),
     ("Textures", ("make_texture",)),
     ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
@@ -255,7 +255,7 @@ OPT_IN = {"look_at_camera"}
 # off-list keeps it.
 STARTER_OFF = (
     "run_command", "find_device", "scan_network",
-    "check_email", "read_email", "search_email", "send_email",
+    "check_email", "read_email", "search_email", "mark_email", "send_email",
     "control_audio", "clipboard", "focus_window",
     "introspect", "self_status", "reflect_now", "save_skill",
     "make_texture",

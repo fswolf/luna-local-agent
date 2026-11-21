@@ -166,5 +166,50 @@ class KeptOpen(unittest.TestCase):
         b.logout.assert_not_called()
 
 
+class Mark(unittest.TestCase):
+    def setUp(self):
+        fresh()
+        self.addCleanup(fresh)
+
+    def mark(self, answer=None, **kw):
+        b = box()
+        b.uid.return_value = ("OK", answer if answer is not None else
+                              [b"1 (UID 36 FLAGS (\\Seen))", b"2 (FLAGS (\\Seen) UID 37)", b"3 (UID 5 FLAGS ())"])
+        with mock.patch.object(mail, "account", return_value=dict(PRIVATE)), \
+                mock.patch.object(mail, "_imap", return_value=b):
+            return mail._mark_email(**kw), b
+
+    def test_marks_read_on_a_writable_folder(self):
+        out, b = self.mark(ids="[36], 37, 36")
+        self.assertEqual(out, "Marked 2 emails read in INBOX.")
+        b.select.assert_called_with('"INBOX"', readonly=False)
+        b.uid.assert_called_once_with("store", "36,37", "+FLAGS", "(\\Seen)")
+
+    def test_unread(self):
+        out, b = self.mark(ids="5", read=False)
+        self.assertEqual(out, "Marked 1 email unread in INBOX.")
+        self.assertEqual(b.uid.call_args.args[2], "-FLAGS")
+
+    def test_no_numbers(self):
+        self.assertTrue(self.mark(ids="the dentist one")[0].startswith("Couldn't mark them"))
+
+    def test_numbers_that_are_not_there(self):
+        self.assertEqual(self.mark(ids="36, 99")[0], "Marked 1 email read in INBOX. Not there: 99.")
+        out = self.mark(answer=[None], ids="99")[0]
+        self.assertTrue(out.startswith("Couldn't mark them: no message 99"))
+
+    def test_reading_stays_read_only(self):
+        b = box()
+        with mock.patch.object(mail, "_imap", return_value=b):
+            with mail._mailbox(PRIVATE, "INBOX"):
+                pass
+        b.select.assert_called_with('"INBOX"', readonly=True)
+
+    def test_registered_with_the_other_email_tools(self):
+        import tools
+        self.assertIn("mark_email", dict(tools._GROUPS)["Email"])
+        self.assertIn("mark_email", tools.STARTER_OFF)
+
+
 if __name__ == "__main__":
     unittest.main()

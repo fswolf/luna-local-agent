@@ -104,6 +104,8 @@ _CLAIM = re.compile(
     r"\bi(?:'ve|\s+have)?\s+(?:just\s+|now\s+|already\s+|also\s+)?"
     r"(?:wrote|written|rewrote|rewritten|updated|edited|fixed|changed|saved|created|"
     r"applied|patched|sent|emailed|added|removed)\b"
+    # "I've marked them as read": only with read/unread, so a marked calendar isn't a claim
+    r"|\bi(?:'ve|\s+have)?\s+(?:just\s+|now\s+|already\s+|also\s+)?marked\b[^.!?\n]{0,40}?\b(?:un)?read\b"
     # "I'm writing it to ~/lunas_sandbox/cube.py right now": doing it, somewhere
     r"|\bi(?:'m|\s+am)\s+(?:now\s+|just\s+|already\s+)?(?:writing|saving|putting|creating|copying)\s+"
     r"(?:(?:it|this|that|them|the\s+\w+|your\s+\w+|a\s+\w+)\s+)?(?:to|in|into|as)\s+[`'\"]?"
@@ -111,7 +113,9 @@ _CLAIM = re.compile(
     r"|\bdone and done\b|\ball (?:done|fixed|set)\b"
     r"|\b(?:it|that|the script|the file)(?:'s| is) (?:fixed|updated|done)\b",
     re.IGNORECASE)
-_EMAIL_CLAIM = re.compile(r"\b(?:sent|emailed|mailed)\b", re.IGNORECASE)
+# Claims only one tool backs: (what the claim says, the tool, what didn't happen).
+_SPECIFIC = ((re.compile(r"\b(?:sent|emailed|mailed)\b", re.IGNORECASE), "send_email", "sent an email"),
+             (re.compile(r"\bmarked\b", re.IGNORECASE), "mark_email", "marked any email"))
 # Saying it works, which a failed run right before contradicts.
 _WORKS = re.compile(r"\b(?:done|works|working|fixed|all set|ready|success(?:ful)?|perfect(?:ly)?)\b",
                     re.IGNORECASE)
@@ -136,11 +140,11 @@ def _failed(result):
 
 
 def _changed(exchange):
-    """Did this call change something (a file written, an email sent)?"""
+    """Did this call change something (a file written, an email sent or marked)?"""
     name = exchange.get("name", "")
     if _failed(exchange.get("result")):
         return False
-    if name in _FILE_TOOLS or name == "send_email":
+    if name in _FILE_TOOLS or name in ("send_email", "mark_email"):
         return True
     if name == "run_command":
         try:
@@ -168,11 +172,11 @@ def _unbacked(answer, exchanges, asked=""):
 
     claim = _CLAIM.search(text)
     if claim and (exchanges or _ASKED_WORK.search(str(asked or ""))):
-        wanted = {"send_email"} if _EMAIL_CLAIM.search(claim.group(0)) else None
-        backed = any(_changed(x) and (wanted is None or x.get("name") in wanted) for x in exchanges)
+        said = claim.group(0).strip()
+        wanted, what = next(((name, what) for words, name, what in _SPECIFIC if words.search(said)),
+                            (None, "changed a file or sent anything"))
+        backed = any(_changed(x) and (wanted is None or x.get("name") == wanted) for x in exchanges)
         if not backed:
-            said = claim.group(0).strip()
-            what = "sent an email" if wanted else "changed a file or sent anything"
             return (f"your reply says \u201c{said}\u201d, but nothing this turn {what}. If you "
                     "meant to, do it now with your tools. If you can't, say plainly that it "
                     "isn't done yet.")

@@ -57,6 +57,18 @@ class Claims(unittest.TestCase):
     def test_praise_is_not_held_to_it(self):
         self.assertEqual(_unbacked("I wrote it for you, after all~ 🌸", [], "thats beautiful luna!"), "")
 
+    def test_marked_read_needs_a_mark(self):
+        checked = {"name": "check_email", "arguments": "{}", "result": "2 unread in INBOX."}
+        marked = {"name": "mark_email", "arguments": "{}", "result": "Marked 2 emails read in INBOX."}
+        failed = dict(marked, result="Couldn't mark them: no message 99 in INBOX")
+        nudge = _unbacked("I've marked both of them as read~", [checked], "mark them read")
+        self.assertIn("nothing this turn marked any email", nudge)
+        self.assertEqual(_unbacked("I've marked both of them as read~", [checked, marked], "mark them read"), "")
+        self.assertIn("marked any email", _unbacked("I marked them read.", [failed], "mark them read"))
+
+    def test_marked_without_read_is_not_an_email_claim(self):
+        self.assertEqual(_unbacked("I marked it on your calendar.", [], "thanks"), "")
+
     def test_a_claimed_email_needs_a_send(self):
         nudge = _unbacked("I've sent it to you, Daddy~", [EDITED], "email me the story")
         self.assertIn("I've sent", nudge)

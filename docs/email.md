@@ -46,11 +46,13 @@ Restart Luna and the email tools appear in the tools pane under Email. On a fres
 | `check_email` | The newest messages, unread by default: sender, subject, date and a one-line preview |
 | `read_email` | One message's text, with attachments listed but never opened |
 | `search_email` | By sender, subject or words. On Gmail it uses Gmail's own search, so `from:amazon` works as typed |
+| `mark_email` | Marks messages read or unread, when you ask ("mark those as read") |
 | `send_email` | Send, or reply to a message by its number. Off until you switch it on |
 
 **Reading never changes your mailbox.** Every fetch is a peek and the
 folder is opened read-only, so a message she reads stays unread for
-you, and nothing is moved or deleted.
+you, and nothing is moved or deleted. The one change is `mark_email`,
+when you ask for it: "mark those as read" after a check.
 
 **One login, kept open.** Checking, reading and searching share one
 connection that stays open for five minutes after the last use, so a

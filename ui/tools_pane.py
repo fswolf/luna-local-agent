@@ -621,6 +621,7 @@ def _tool_move(step):
 _GATES = {
     "send_email": "email.send",
     "check_email": "email.enabled", "read_email": "email.enabled", "search_email": "email.enabled",
+    "mark_email": "email.enabled",
     "read_page": "web_search.fetch_pages", "research": "web_search.fetch_pages",
     "search_history": "history.transcript",
     "introspect": "thoughts.enabled",
