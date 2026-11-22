@@ -83,6 +83,15 @@ conversation in your mail app.
 with Allow and Deny. Nothing is sent until you click Allow. The address is
 blurred here.*
 
+**Read every reply before you allow it, more so on a small model.**
+Everything Luna has read that turn sits in the same context as the
+reply she's writing, along with what she knows about you. A small model
+(9B and under) doesn't keep those apart well. Answering straight after
+reading a stack of emails is when it shows: a detail from another
+message, or about your setup or your life, ends up in a reply to a
+stranger. One thread at a time keeps her on track. If one slips
+through, Deny it and ask again.
+
 ## Email is other people's words
 
 An email is the classic way to try to steer an assistant: "ignore your

@@ -8,7 +8,7 @@
 
 [![Tests](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/fswolf/luna-local-agent/actions/workflows/tests.yml)
 [![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/fswolf)
-[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/wEqrYjPxAU)
+[![Discord](https://img.shields.io/badge/chat-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/zCP5wZm5VZ)
 
 **A persistent-state agent manager, with heavy tooling, research and
 learning, built from several local models working as one. All on your
@@ -319,7 +319,7 @@ friendlier tour of her at [luna.imbored.me](https://luna.imbored.me/).
 # Community
 
 Questions, ideas, or want to show what you've built with her? Come say hi on
-[Discord](https://discord.gg/wEqrYjPxAU). Feature ideas are welcome there too;
+[Discord](https://discord.gg/zCP5wZm5VZ). Feature ideas are welcome there too;
 bugs still go in the [issues](https://github.com/fswolf/luna-local-agent/issues).
 
 ---
