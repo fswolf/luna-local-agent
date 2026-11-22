@@ -48,7 +48,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, urlsplit
 
 import config
-from core import logbook
+from core import logbook, safe
 
 FOLDER = os.path.expanduser("~/.config/ai-voice/station")
 DEVICES_FILE = os.path.join(FOLDER, "devices.json")
@@ -60,7 +60,6 @@ MAX_AUDIO = 6 * 1024 * 1024        # about 3 minutes of 16 kHz mono
 MAX_TYPED = 2000                   # characters typed in the station's box
 MAX_BODY = 11 * 1024 * 1024        # the biggest request: a 10 MB picture and its words
 API_VERSION = 2                    # GET /info: 2 added attachments (core/attachments.py)
-ASK_SECONDS = 120                  # how long a permission question waits on the tablet
 TURN_KEEP = 300                    # finished turns are forgotten after this
 
 # The portrait (/portrait/): her model and its scripts are all files of our
@@ -368,7 +367,7 @@ class Turn:
         self._asked.clear()
         self.ask = {"kind": str(kind), "title": str(title)[:300],
                     "body": "\n".join(str(x) for x in (lines or []))[:4000], "warn": bool(warn)}
-        answered = self._asked.wait(ASK_SECONDS)
+        answered = self._asked.wait(safe.seconds(getattr(config, "FILES_APPROVAL_TIMEOUT", 300), 300, lo=5))
         self.ask = None
         return bool(answered and self._answer)
 

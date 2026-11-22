@@ -109,7 +109,7 @@ her; commands only work at the PC.
 
 If she wants to do something that needs your OK (write a file, run a
 command), the question appears on the device that asked, with **Allow**
-and **Deny**. Unanswered for two minutes means no.
+and **Deny**. Unanswered for five minutes (`files.approval_timeout`) means no.
 
 While a voice enrolment is running at the PC (`/people enroll voice`), the
 stations wait: read the enrolment lines at the PC.

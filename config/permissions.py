@@ -19,7 +19,7 @@ EMAIL_MAX = int(_email_cfg.get("max", 20))   # most messages one check or search
 
 _files_cfg = setting("files", {})
 FILES_ENABLED = flag(_files_cfg.get("enabled", True))
-FILES_APPROVAL_TIMEOUT = float(_files_cfg.get("approval_timeout", 120))
+FILES_APPROVAL_TIMEOUT = float(_files_cfg.get("approval_timeout", 300))
 # The Permissions group in the tools pane. read: allow | ask | off,
 # write: ask | allow | off. "allow" for write is the saved form of the
 # popup's A: her own folder, ~/.config and ~/.local still ask, and the

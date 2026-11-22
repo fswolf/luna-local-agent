@@ -32,7 +32,7 @@ from .text import vwidth
 _numbers = itertools.count(1)    # each question's own number, for the chat page to answer by
 
 
-def ask_approval(title, body, note="", timeout=120, allow_all=None):
+def ask_approval(title, body, note="", timeout=300, allow_all=None):
     """Show the request and wait. Returns True only on an explicit yes.
 
     Safe to call from any thread. Headless (no app running) is a no:
@@ -49,7 +49,7 @@ def ask_approval(title, body, note="", timeout=120, allow_all=None):
     # A timeout someone typed as "inf" or 99999999999 to mean "never" would
     # raise OverflowError from the wait, leaving the popup up for good and
     # its countdown failing on every repaint. A day is plenty of "never".
-    wait = safe.seconds(timeout, 120, lo=5)
+    wait = safe.seconds(timeout, 300, lo=5)
 
     with _approval_lock:
         answered = threading.Event()

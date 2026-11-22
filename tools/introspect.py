@@ -333,7 +333,7 @@ def _approve(text):
         title=f"{config.AGENT_NAME} wants to keep a lesson",
         note="added to her prompt from now on - /lessons forget <n> undoes it",
         body=[text],
-        timeout=getattr(config, "FILES_APPROVAL_TIMEOUT", 120),
+        timeout=getattr(config, "FILES_APPROVAL_TIMEOUT", 300),
     )
 
 
@@ -473,7 +473,7 @@ def _approve_skill(name, when, steps, warn=""):
         title=f"{config.AGENT_NAME} wants to save a recipe",
         note="it comes back in her prompt when a similar job does - /skills forget <n> undoes it",
         body=body,
-        timeout=getattr(config, "FILES_APPROVAL_TIMEOUT", 120),
+        timeout=getattr(config, "FILES_APPROVAL_TIMEOUT", 300),
     )
 
 

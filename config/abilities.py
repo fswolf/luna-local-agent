@@ -48,7 +48,7 @@ DESKTOP_ENABLED = flag(_desktop_cfg.get("enabled", True))
 # Her hands on your files: list_files/read_file are free under ~, minus
 # a deny list; write_file/edit_file pop an approval window in the TUI
 # and wait. No answer within approval_timeout seconds is a no.
-#   "files": { "enabled": true, "approval_timeout": 120 }
+#   "files": { "enabled": true, "approval_timeout": 300 }
 # Tools switched off by hand, by name. Not in SETTINGS because it's a
 # list rather than a scalar - the tools pane (Tab, twice) edits it, and
 # tools.set_enabled writes it back.

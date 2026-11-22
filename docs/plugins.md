@@ -206,7 +206,7 @@ A job that can't write is half a job, and a popup at 3am is a no. So
 there's one carve-out, and **it lives in `files`, not in the plugin**:
 
 ```json
-"files": { "enabled": true, "approval_timeout": 120,
+"files": { "enabled": true, "approval_timeout": 300,
            "job_write_dirs": ["~/luna-jobs"] }
 ```
 

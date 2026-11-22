@@ -120,7 +120,7 @@ learns from both.
 ```json
 "files": {
     "enabled": true,
-    "approval_timeout": 120
+    "approval_timeout": 300
 }
 ```
 
