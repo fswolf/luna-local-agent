@@ -341,6 +341,7 @@ class Turn:
     def speaker(self):
         """Turn each sentence into a WAV for the tablet, in order."""
         from voice import speech
+        from voice.tts import _speakable
 
         while True:
             with self._more:
@@ -349,6 +350,10 @@ class Turn:
                 if not self._sentences:
                     break
                 text = self._sentences.pop(0)
+            # as at the desk: the screen keeps the emoji, the voice doesn't read them out
+            text = _speakable(text)
+            if not text:
+                continue
             try:
                 self.state = "speaking"
                 samples, rate = speech._synthesize(text)

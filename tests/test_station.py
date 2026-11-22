@@ -494,6 +494,25 @@ class Stations(unittest.TestCase):
             self.assertNotIn('width="', svg.split(">", 1)[0])
 
 
+class SpokenWithoutEmoji(unittest.TestCase):
+    """The station's voice skips emoji and markdown, as the desk does; the reply shown keeps them."""
+
+    def test_voice_loses_the_emoji_the_text_keeps_them(self):
+        import numpy as np
+
+        turn = station.Turn(room=None)
+        turn.sentence("Mrrp~ hi there 💕✨")
+        turn.sentence("🐾 🌸")                       # nothing left to say: no clip
+        turn.sentence("*tilts head* ok")
+        turn.close()
+        with mock.patch("voice.speech._synthesize",
+                        return_value=(np.zeros(240, dtype=np.float32), 24000)) as synth:
+            turn.speaker()
+        self.assertEqual([c.args[0] for c in synth.call_args_list], ["Mrrp hi there", "tilts head ok"])
+        self.assertEqual(len(turn.clips), 2)
+        self.assertEqual(turn.view()["reply"], "Mrrp~ hi there 💕✨ 🐾 🌸 *tilts head* ok")
+
+
 class HomeNetworkOnly(unittest.TestCase):
     def test_addresses(self):
         for ip in ("192.168.0.20", "10.1.2.3", "172.16.5.4", "127.0.0.1", "fe80::1", "::ffff:192.168.1.2"):
