@@ -316,7 +316,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
         "messages": messages,
     }
 
-    payload.update(build_generation_params())
+    payload.update(build_generation_params(payload["model"]))
 
     # Adaptive thinking: a modest budget up front, a deeper second look
     # only if the answer comes out shaky. The messages are copied now,

@@ -2,7 +2,16 @@
     "voice": "af_bella",
     "generation": {
         "max_tokens": 4800,
-        "reasoning": "low"
+        "reasoning": "low",
+        "sampling": {
+            "qwen3.5": {
+                "temperature": 1.0,
+                "top_p": 0.95,
+                "top_k": 20,
+                "min_p": 0.0,
+                "presence_penalty": 1.5
+            }
+        }
     },
     "stt": {
         "mode": "manual",

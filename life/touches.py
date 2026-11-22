@@ -139,9 +139,13 @@ def _request(messages, model):
 
     from core import lmstudio
 
+    from llm.prompts import sampling_for
+
     gen = getattr(config, "GENERATION", None) or {}
-    body = lmstudio.chore({"model": model, "messages": messages,
-                           "temperature": gen.get("temperature", 0.8)}, max_tokens=MAX_TOKENS, think=0)
+    sampling = sampling_for(model)          # her words: the model's own settings, as in her replies
+    body = lmstudio.chore({"model": model, "messages": messages, **sampling,
+                           "temperature": sampling.get("temperature", gen.get("temperature", 0.8))},
+                          max_tokens=MAX_TOKENS, think=0)
     r = requests.post(config.LM_URL, headers=config.LLM_HEADERS, json=body, timeout=60)
     r.raise_for_status()
     return r.json()["choices"][0]["message"].get("content") or ""

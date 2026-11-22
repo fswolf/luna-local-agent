@@ -661,7 +661,7 @@ def _approve_send(lines, title):
 
 
 def _shingles(text, n=5):
-    words = re.findall(r"[a-z0-9']+", str(text or "").lower())
+    words = re.findall(r"\w+(?:'\w+)?", str(text or "").lower())      # any language's letters
     return {" ".join(words[i:i + n]) for i in range(len(words) - n + 1)}
 
 

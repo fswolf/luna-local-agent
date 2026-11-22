@@ -202,7 +202,43 @@ def listing():
                 "active": all(pane._value(path)[0] == v for path, v in p["values"].items())}
                for n, p in PRESETS.items()]
 
-    return {"groups": groups, "presets": presets, "station": _station_panel(), "scale": _scale()}
+    return {"groups": groups, "presets": presets, "station": _station_panel(), "scale": _scale(),
+            "sampling": sampling_panel()}
+
+
+def sampling_panel():
+    """The per-model sampling table (generation.sampling), the model loaded
+    now and which entry it uses. Nothing secret in it, so the page gets it all."""
+    from llm import prompts
+
+    try:
+        from core import lmstudio
+
+        model = lmstudio.model or ""
+    except Exception:
+        model = ""
+    table = (config.GENERATION or {}).get("sampling")
+    table = table if isinstance(table, dict) else {}
+    return {"table": table, "model": model, "uses": prompts.matching(model, table),
+            "fields": list(prompts.SAMPLING)}
+
+
+def sampling_save(table):
+    """Save the sampling table from the page: checked, written to config.json,
+    and used from her next reply. Returns (ok, message)."""
+    from llm import prompts
+
+    clean, problems = prompts.clean_sampling(table)
+    if problems:
+        return False, "; ".join(problems[:3]) + (f" (and {len(problems) - 3} more)" if len(problems) > 3 else "")
+    try:
+        config.save_any("generation.sampling", clean)
+    except (ValueError, OSError) as e:
+        return False, f"couldn't write config.json: {e}"
+    if isinstance(config.GENERATION, dict):
+        config.GENERATION["sampling"] = clean            # the same block llm.prompts reads: live from now
+    logbook.info("settings", "web: generation.sampling changed (%d models)", len(clean))
+    return True, "saved, used from her next reply"
 
 
 def _scale(fresh=False):
@@ -261,6 +297,9 @@ def reset(path):
         removed = config.reset_setting(path)
     except (OSError, ValueError) as e:
         return False, f"couldn't write config.json: {e}", None
+    if path == "generation.sampling" and isinstance(config.GENERATION, dict):
+        config.GENERATION.pop("sampling", None)          # no table: every model back to its server's, now
+        return True, "cleared: every model gets its server's own settings", entry(path)
     return True, ("back to the default after a restart" if removed else "already the default"), entry(path)
 
 
@@ -432,6 +471,10 @@ def handle(method, sub, body, key=None):
             ok, message, item = preset(str(data.get("name", "")))
         elif action == "browse":
             return 200, "application/json", json.dumps(browse(str(data.get("setting", "")), data.get("at")))
+        elif action == "sampling_save":
+            ok, message = sampling_save(data.get("table"))
+            return (200 if ok else 400), "application/json", json.dumps(
+                {"ok": ok, "message": message, "sampling": sampling_panel()})
         elif action in ("station_pair", "station_forget"):
             return 200, "application/json", json.dumps(_station_action(action, data))
         elif action == "agent_save":

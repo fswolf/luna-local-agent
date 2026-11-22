@@ -72,6 +72,20 @@ section>h2 .after{color:var(--warn);font-size:11.5px;font-weight:400;margin-left
 .stationbox ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .stationbox li{display:flex;justify-content:space-between;align-items:center;font-size:13px}
 .stationbox li span{color:var(--dim)}
+.sampbox{border-top:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.sampbox .st{color:var(--dim);font-size:13px}.sampbox .st b{color:var(--text)}
+.sampbox .wrap{overflow-x:auto}
+.sampbox table{border-collapse:collapse;font-size:13px;min-width:100%}
+.sampbox th{color:var(--dim);font-weight:400;text-align:left;padding:4px 6px;white-space:nowrap}
+.sampbox td{padding:3px 4px}
+.sampbox input{background:#0e0a16;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 7px;font:inherit;width:74px}
+.sampbox input[data-samp=name]{width:150px}.sampbox input[data-samp=more]{width:170px}
+.sampbox tr.uses input[data-samp=name]{border-color:var(--accent)}
+.sampbox .acts{display:flex;gap:8px;flex-wrap:wrap}
+.sampbox button{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}
+.sampbox button:hover{background:var(--accent);color:#14081c}
+.sampbox button.x{border-color:var(--line);color:var(--dim);padding:3px 9px}
+.sampbox button[disabled]{opacity:.45;cursor:default;background:none;color:var(--accent)}
 .scalebox table{border-collapse:collapse;font-size:13px}
 .scalebox td{padding:2px 14px 2px 0}.scalebox td.n{text-align:right;font-family:ui-monospace,monospace;color:var(--text)}
 .scalebox tr.sum td{border-top:1px solid var(--line);padding-top:5px}
@@ -235,6 +249,8 @@ function control(s) {
       `</select> <input type="color" id="${id}_c" data-path="${esc(s.path)}" data-bg="colour" value="${colour ? full(v) : "#1a1025"}"` +
       ` title="pick the colour" ${colour ? "" : "hidden"}>`;
   }
+  if (s.kind === "dict" && s.path === "generation.sampling")
+    return `<span class="note">Set per model in the table below</span>`;
   if (s.kind === "dict")
     return `<span class="note">${s.has ? s.has + " entries, edited" : "Edited"} in config.json (a nested block)</span>`;
   if (s.kind === "secret")
@@ -269,6 +285,67 @@ function row(s) {
     <div class="ctl">${control(s)}</div>
     <button class="reset" data-reset="${esc(s.path)}" title="Back to the default">↺</button>
     ${s.help ? `<div class="help">${hl(s.help)}</div>` : ""}</div>`;
+}
+
+// Sampling per model (generation.sampling): a row per model name, the five
+// settings most models' cards give, "more" for the rest as name=value. Kept
+// in samp while you edit, so a re-render of the list doesn't lose it.
+const MAIN = ["temperature", "top_p", "top_k", "min_p", "presence_penalty"];
+const samp = {rows: [], dirty: false};
+function sampFrom(table) {
+  samp.rows = Object.entries(table || {}).map(([name, v]) => ({name,
+    vals: Object.fromEntries(MAIN.map(k => [k, k in v ? String(v[k]) : ""])),
+    more: Object.entries(v).filter(([k]) => !MAIN.includes(k)).map(([k, x]) => k + "=" + x).join(", ")}));
+  samp.dirty = false;
+}
+function sampUses() {      // the row the loaded model would use: the longest name inside its name
+  const model = String((data.sampling || {}).model || "").toLowerCase();
+  let best = -1;
+  samp.rows.forEach((r, i) => { const n = r.name.trim().toLowerCase();
+    if (n && model.includes(n) && (best < 0 || n.length > samp.rows[best].name.trim().length)) best = i; });
+  return best;
+}
+function sampState() {
+  const p = data.sampling || {}, i = sampUses();
+  return !p.model ? "No model is loaded right now, so nothing is matched yet."
+    : i >= 0 ? `<b>${esc(p.model)}</b> is loaded and uses <b>${esc(samp.rows[i].name.trim())}</b>.`
+    : `<b>${esc(p.model)}</b> is loaded. No row matches it, so its server's own settings apply.`;
+}
+function samplingBox() {
+  const p = data.sampling;
+  if (!p) return "";
+  if (!samp.dirty) sampFrom(p.table);
+  const uses = sampUses();
+  const head = `<tr><th>Model (part of its name)</th>${MAIN.map(k => `<th>${k.replace("_", " ")}</th>`).join("")}<th>more (name=value)</th><th></th></tr>`;
+  const rows = samp.rows.map((r, i) => `<tr class="${i === uses ? "uses" : ""}">
+      <td><input data-samp="name" data-i="${i}" value="${esc(r.name)}" placeholder="qwen3.5" maxlength="80" spellcheck="false"></td>
+      ${MAIN.map(k => `<td><input type="number" step="any" data-samp="${k}" data-i="${i}" value="${esc(r.vals[k])}" placeholder="-"></td>`).join("")}
+      <td><input data-samp="more" data-i="${i}" value="${esc(r.more)}" placeholder="repeat_penalty=1.1" spellcheck="false"></td>
+      <td><button class="x" data-sampdel="${i}" title="Remove this model">✕</button></td></tr>`).join("");
+  return `<div class="sampbox">
+    <div class="st">How the model picks its words, per model: each model's card recommends its own values. A model whose name contains a row's name gets that row (the longest match wins); an empty box is left to the server. Others: ${esc(p.fields.filter(k => !MAIN.includes(k)).join(", "))}.</div>
+    <div class="st" id="sampuses">${sampState()}</div>
+    ${samp.rows.length ? `<div class="wrap"><table>${head}${rows}</table></div>` : `<div class="st">No models listed: every model gets its server's own settings.</div>`}
+    <div class="acts"><button id="sampadd">+ Add a model</button><button id="sampsave" ${samp.dirty ? "" : "disabled"}>Save</button>${samp.dirty ? `<button id="sampundo" class="x">Undo changes</button>` : ""}</div></div>`;
+}
+function sampTable() {
+  const table = {};
+  for (const r of samp.rows) {
+    const vals = {};
+    for (const k of MAIN) if (r.vals[k].trim() !== "") vals[k] = Number(r.vals[k]);
+    for (const part of r.more.split(",").map(x => x.trim()).filter(Boolean)) {
+      const m = part.match(/^([a-z_]+)\s*=\s*(-?[0-9.]+)$/i);
+      if (!m) throw new Error(`${r.name || "a row"}: "${part}" should look like repeat_penalty=1.1`);
+      vals[m[1]] = Number(m[2]);
+    }
+    if (r.name.trim() in table) throw new Error(`${r.name.trim()} is listed twice`);
+    table[r.name.trim()] = vals;
+  }
+  return table;
+}
+function sampRedraw() {
+  const box = document.querySelector(".sampbox");
+  if (box) box.outerHTML = samplingBox();
 }
 
 // Relay stations: their state, pairing a phone or tablet (QR), the paired ones
@@ -347,7 +424,7 @@ function render() {
     const after = allRestart.has(g.key) ? '<span class="after" title="every setting here takes effect after a restart">↻ after a restart</span>' : "";
     sections.push(g);
     html += `<section class="${shut ? "closed" : ""}" data-group="${esc(g.key)}" id="s_${esc(g.key)}"><h2><div>${esc(g.title)}${changed && view !== "changed" ? `<em>${changed} set</em>` : ""}${after}</div> <span>${rows.length}</span></h2>
-             <div class="rows">${rows.map(row).join("")}</div>${g.key === "station" ? stationBox() : ""}${g.key === "history" && !q && view !== "changed" ? scaleBox() : ""}</section>`;
+             <div class="rows">${rows.map(row).join("")}</div>${g.key === "station" ? stationBox() : ""}${g.key === "generation" && !q && view !== "changed" ? samplingBox() : ""}${g.key === "history" && !q && view !== "changed" ? scaleBox() : ""}</section>`;
   }
   $("#list").innerHTML = html || `<div class="empty">${query ? `Nothing matches "${esc(query)}".` : "Nothing set in config.json yet: everything is at its default."}</div>`;
   // presets are for browsing, not for a search or the list of your changes
@@ -438,7 +515,7 @@ window.addEventListener("load", () => {
   agentEnsure();
   if (agent.stamp) agentDirty();
 });
-window.addEventListener("beforeunload", e => { if (agentDirty()) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", e => { if (agentDirty() || samp.dirty) { e.preventDefault(); e.returnValue = ""; } });
 
 function update(entry) {
   for (const g of data.groups) {
@@ -486,6 +563,22 @@ $("#list").addEventListener("change", e => {
 });
 $("#list").addEventListener("input", e => {
   if (e.target.type === "range") e.target.nextElementSibling.textContent = e.target.value;
+  const f = e.target.dataset.samp;
+  if (f) {
+    const r = samp.rows[+e.target.dataset.i];
+    if (f === "name" || f === "more") r[f] = e.target.value; else r.vals[f] = e.target.value;
+    const first = !samp.dirty;
+    samp.dirty = true;
+    if (first) {                      // Save and Undo appear; the box is redrawn once, focus kept
+      const at = [f, e.target.dataset.i, e.target.selectionStart];
+      sampRedraw();
+      const el = document.querySelector(`.sampbox [data-samp="${at[0]}"][data-i="${at[1]}"]`);
+      if (el) { el.focus(); try { el.setSelectionRange(at[2], at[2]); } catch (err) {} }
+    } else {
+      document.querySelectorAll(".sampbox tr").forEach((tr, i) => tr.classList.toggle("uses", i - 1 === sampUses()));
+    }
+    const st = $("#sampuses"); if (st) st.innerHTML = sampState();
+  }
 });
 // Browse… by a path setting: a folder browser served by Luna (settings_web.browse),
 // since a browser's own file dialog never tells the page where a file is
@@ -537,6 +630,25 @@ $("#list").addEventListener("click", async e => {
     return;
   }
   if (e.target.id === "scalefresh") { await scaleRefresh(); return toast("measured again"); }
+  if (e.target.id === "sampadd") {
+    samp.rows.push({name: "", vals: Object.fromEntries(MAIN.map(k => [k, ""])), more: ""});
+    samp.dirty = true; sampRedraw();
+    const names = document.querySelectorAll('.sampbox [data-samp="name"]');
+    if (names.length) names[names.length - 1].focus();
+    return;
+  }
+  if (e.target.dataset.sampdel !== undefined) {
+    samp.rows.splice(+e.target.dataset.sampdel, 1); samp.dirty = true; sampRedraw();
+    return;
+  }
+  if (e.target.id === "sampundo") { samp.dirty = false; sampRedraw(); return; }
+  if (e.target.id === "sampsave") {
+    let table;
+    try { table = sampTable(); } catch (err) { return toast(err.message, true); }
+    const out = await send({action: "sampling_save", table});
+    if (out.ok) { data.sampling = out.sampling; samp.dirty = false; load(); }
+    return toast(out.message, !out.ok);
+  }
   if (e.target.id === "stpair") {
     const out = await send({action: "station_pair", name: ($("#stname").value || "station").trim()});
     if (!out.ok) return toast(out.message, true);
@@ -561,6 +673,7 @@ $("#list").addEventListener("click", async e => {
   if (r) {
     const out = await send({action: "reset", path: r.dataset.reset});
     if (out.entry) update(out.entry);
+    if (out.ok && r.dataset.reset === "generation.sampling") { samp.dirty = false; load(); }   // the table follows
     toast(out.ok ? `${r.dataset.reset}: ${out.message}` : out.message, !out.ok);
   }
 });

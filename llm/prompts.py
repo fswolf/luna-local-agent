@@ -480,9 +480,107 @@ def with_live(live, content):
     return f"{live}{content}"
 
 
-def build_generation_params():
+# What a sampling entry may set, and the range that makes sense for it.
+# Standard OpenAI fields plus llama.cpp's own (top_k, min_p, repeat and DRY),
+# which LM Studio takes too; a server ignores what it doesn't know.
+SAMPLING = {
+    "temperature": (0.0, 5.0), "top_p": (0.0, 1.0), "top_k": (0, 1000), "min_p": (0.0, 1.0),
+    "presence_penalty": (-2.0, 2.0), "frequency_penalty": (-2.0, 2.0),
+    "repeat_penalty": (0.0, 5.0), "repeat_last_n": (-1, 100000),
+    "dry_multiplier": (0.0, 10.0), "dry_base": (1.0, 10.0), "dry_allowed_length": (0, 100),
+    "dry_penalty_last_n": (-1, 100000),
+}
+
+
+def matching(model, table):
+    """The name of the entry in a sampling table that this model uses, or None."""
+    name = str(model or "").lower()
+    if not isinstance(table, dict) or not name:
+        return None
+    hits = [k for k in table if isinstance(k, str) and k.strip() and k.strip().lower() in name
+            and isinstance(table[k], dict)]
+    return max(hits, key=lambda k: len(k.strip())) if hits else None
+
+
+def _number(key, value):
+    """The value as the number this setting takes, or None if it can't be one."""
+    if key not in SAMPLING or isinstance(value, bool):
+        return None
+    lo, hi = SAMPLING[key]
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number or not lo <= number <= hi:      # NaN or out of range
+        return None
+    return int(number) if isinstance(lo, int) else number
+
+
+def clean_sampling(table):
+    """A sampling table from the settings page, checked: (table, problems).
+    Problems name what's wrong in words; the table is only good with none."""
+    problems, out, seen = [], {}, set()
+    if not isinstance(table, dict):
+        return {}, ["that isn't a table of models"]
+    for name, values in table.items():
+        name = str(name or "").strip()
+        if not name:
+            problems.append("every row needs a model name (part of it is enough, like qwen3.5)")
+            continue
+        if len(name) > 80 or name.lower() in seen:
+            problems.append(f"{name[:40]}: " + ("too long a name" if len(name) > 80 else "listed twice"))
+            continue
+        seen.add(name.lower())
+        if not isinstance(values, dict):
+            problems.append(f"{name}: its settings aren't a list of values")
+            continue
+        clean = {}
+        for key, value in values.items():
+            if key not in SAMPLING:
+                problems.append(f"{name}: there's no setting called {str(key)[:30]!r}")
+                continue
+            number = _number(key, value)
+            if number is None:
+                lo, hi = SAMPLING[key]
+                problems.append(f"{name}: {key} has to be a number from {lo} to {hi}")
+                continue
+            clean[key] = number
+        out[name] = clean
+    return out, problems
+
+
+def sampling_for(model, table=None):
+    """The sampling settings for this model: the entry in generation.sampling
+    whose name is in the model's (any case), the longest such name if
+    several are ("qwen3.5-9b" over "qwen3.5"). {} when none matches, so the
+    server and the model's own settings decide, as before. Values are
+    model-specific (Qwen's are wrong for Gemma), hence by name, never for all."""
+    table = (GENERATION or {}).get("sampling") if table is None else table
+    name = matching(model, table)
+    if name is None:
+        return {}
+    out = {}
+    for key, value in table[name].items():
+        number = _number(key, value)
+        if number is not None:                               # anything else is left out
+            out[key] = number
+    return out
+
+
+def build_generation_params(model=None):
+    """The request's generation settings. model: the model it's for (the one
+    loaded, when not given), which picks its sampling settings."""
     gen = GENERATION
     params = {}
+
+    if model is None:
+        try:
+            from core import lmstudio
+
+            model = lmstudio.model
+        except Exception:
+            model = ""
+    params.update(sampling_for(model))
 
     max_tokens = gen.get("max_tokens")
     if max_tokens:

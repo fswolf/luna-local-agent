@@ -93,6 +93,45 @@ and reports which tools the model actually called. It takes about twenty
 seconds and doesn't touch your conversation. It's the quickest way to
 see whether a new model is any good for her.
 
+## Sampling settings
+
+How a model picks its next word (temperature, top_k, the repetition
+penalties) is set per model, because each model's makers recommend their
+own: Qwen's values are wrong for Gemma. So Luna sends them only for a
+model she has an entry for, matched by part of its name:
+
+```json
+"generation": {
+    "sampling": {
+        "qwen3.5": { "temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 1.5 }
+    }
+}
+```
+
+- A model whose name contains `qwen3.5` (any case) gets those. If several
+  entries match, the longest name wins, so `qwen3.5-27b` can differ from
+  `qwen3.5`.
+- **A model with no entry gets nothing sent**: the server and the model's
+  own settings decide, as in LM Studio's per-model presets or your
+  llama-server flags.
+- The Qwen3.5 entry is Qwen's own recommendation for thinking mode. The
+  presence penalty is the one that matters most: without it, a small Qwen
+  tends to copy what's already in front of it, like repeating its last
+  reply or rewriting an email instead of answering it.
+- What an entry can set: `temperature`, `top_p`, `top_k`, `min_p`,
+  `presence_penalty`, `frequency_penalty`, `repeat_penalty`,
+  `repeat_last_n`, and llama.cpp's DRY settings (`dry_multiplier`,
+  `dry_base`, `dry_allowed_length`, `dry_penalty_last_n`). Anything else,
+  or a value out of range, is left out.
+- These are sent with each of her replies, so they win over a server's
+  own settings for those replies. Add an entry for your model from its
+  model card, or delete one to go back to the server's.
+- **On the settings page** (Replies, under All): a table with a row per
+  model and the five common settings, plus a "more" box for the rest
+  (`repeat_penalty=1.1, dry_multiplier=0.8`). It shows which model is
+  loaded and which row it uses, checks the values when you save, and she
+  uses them from her next reply, no restart.
+
 ## Model quirks
 
 - **Chat template:** the model's GGUF needs a chat template that knows
