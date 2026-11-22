@@ -22,7 +22,7 @@ from core import turnctx
 from mind import websearch
 from voice import hearing
 
-from . import session
+from . import repeats, session
 from .prompts import _calibration_note, _previous_user_text, build_generation_params, build_memory_prompt, build_self_prompt, build_tools_prompt, turn_prompt, with_live
 from .replay import _demonstration, _has_tool_example, _replay, _strip_leading_timestamps, _timestamped
 from .rounds import _generate, _log_tool_call, _tool_rounds, _why_empty
@@ -495,6 +495,17 @@ def _ask(text, model, on_text=None, on_sentence=None,
             # The grounding check ran a tool turn: its calls are what the
             # thought log should show, not the vote's empty exchanges.
             second = None
+
+    if remember:
+        # A reply that says itself twice, or says your message back, is cut
+        # before it's saved (llm/repeats.py): left in her history, every later
+        # reply copies the shape. The thought log keeps what she wrote.
+        before = next((_strip_leading_timestamps(m["content"]) for m in reversed(replayed)
+                       if m.get("role") == "assistant" and isinstance(m.get("content"), str)), "")
+        trimmed, why = repeats.trim(answer, str(text or ""), before)
+        if why:
+            logbook.info("llm", "cut her reply's %s: %d -> %d characters", why, len(answer), len(trimmed))
+            answer = trimmed
 
     if remember and source is None and turn.private and not turn.speaker and not turn.job \
             and not turn.remote:

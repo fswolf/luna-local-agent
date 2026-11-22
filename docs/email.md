@@ -77,6 +77,13 @@ Off by default. Space on `send_email` in the tools pane (Tab twice), or
 Replying fills in the subject and threading, so it lands in the same
 conversation in your mail app.
 
+**A reply has to be hers.** Small models tend to answer an email by
+rewriting it: the other person's news, in the first person, as if it
+were hers. A reply that's mostly the email it answers, in that email's
+own wording (more than about a third of it), goes back to her to write
+again before the approval window ever opens. Quoting a line back is
+fine; the earlier messages quoted under theirs don't count.
+
 <img width="700" alt="The approval window for an email Luna wrote: send email to (the address blurred here), read it all - it goes out as you, then the whole message with From, To and Subject, and Allow and Deny buttons with a countdown" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/email-send.png" />
 
 *A reply waiting for your OK: who it goes to, the subject and every word,
