@@ -113,7 +113,7 @@ SCHEMA = {
     # --- Replies ------------------------------------------------------------
     "generation.max_tokens": ("int", "Longest a reply can be, thinking included (tokens)"),
     "generation.reasoning": ("text", "How hard a reasoning model thinks, like low"),
-    "generation.sampling": ("dict", "Sampling settings per model, by part of its name (qwen3.5: temperature, top_k, presence_penalty...). A model with no match gets the server's own. See docs/models.md"),
+    "generation.sampling": ("dict", "Sampling settings per model, by part of its name (temperature, top_k, presence_penalty...). Empty, or a model with no match: the model server's own settings. See docs/models.md"),
 
     # --- Model server -------------------------------------------------------
     "llm.backend": ("choice", "Which model server: auto uses llama-server when it's running, otherwise LM Studio",

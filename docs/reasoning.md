@@ -271,19 +271,6 @@ you to try). Only on a working turn, one where she used a tool or your
 message asked for work, so "I wrote it for you~" said back to praise
 isn't held to it. The calls she already made stay in the turn.
 
-**Saying it twice.** A small model copies what it sees, including its
-own history. Once one reply came out as itself, then "There we go~",
-then itself again, every later reply copied that shape, sometimes with
-the reply before or your own message pasted in. So before a reply is
-saved, a tail made of what's already been said (earlier in that reply,
-in her previous reply, or in your message) is cut, along with the short
-line that led into it, and a paragraph that is just your message said
-back is dropped. Something new has to come first: a reply that's all
-repeat is left alone. Her usual short lines ("*tilts head* 🌸") never
-count on their own. The thought log keeps what she actually wrote. To
-clean replies already saved, stop Luna and run `python3 llm/repeats.py`:
-it fixes `history/conversation.json` and keeps the old file beside it.
-
 A confident reply never pays for a second look. A turn that already
 called a tool is never re-run, so a reminder can't be set twice or a
 file written twice. The second look is offered the same tools, but

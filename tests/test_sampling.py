@@ -47,11 +47,12 @@ class PerModel(unittest.TestCase):
             self.assertEqual(params["presence_penalty"], 1.5)
             self.assertNotIn("presence_penalty", prompts.build_generation_params("llama-3.3-8b"))
 
-    def test_the_example_config_has_qwens_and_parses(self):
+    def test_the_example_config_has_qwens_and_only_qwen_gets_it(self):
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         with open(os.path.join(here, "config.example.json"), encoding="utf-8") as f:
             table = json.load(f)["generation"]["sampling"]
         self.assertEqual(prompts.sampling_for(LUNAS, table), QWEN)
+        self.assertEqual(prompts.sampling_for("gemma-4-12b-it", table), {})
 
 
 class FromTheSettingsPage(unittest.TestCase):

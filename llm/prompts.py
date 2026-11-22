@@ -525,7 +525,7 @@ def clean_sampling(table):
     for name, values in table.items():
         name = str(name or "").strip()
         if not name:
-            problems.append("every row needs a model name (part of it is enough, like qwen3.5)")
+            problems.append("every row needs a model name (part of it is enough)")
             continue
         if len(name) > 80 or name.lower() in seen:
             problems.append(f"{name[:40]}: " + ("too long a name" if len(name) > 80 else "listed twice"))

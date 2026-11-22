@@ -318,7 +318,7 @@ function samplingBox() {
   const uses = sampUses();
   const head = `<tr><th>Model (part of its name)</th>${MAIN.map(k => `<th>${k.replace("_", " ")}</th>`).join("")}<th>more (name=value)</th><th></th></tr>`;
   const rows = samp.rows.map((r, i) => `<tr class="${i === uses ? "uses" : ""}">
-      <td><input data-samp="name" data-i="${i}" value="${esc(r.name)}" placeholder="qwen3.5" maxlength="80" spellcheck="false"></td>
+      <td><input data-samp="name" data-i="${i}" value="${esc(r.name)}" placeholder="part of the model's name" maxlength="80" spellcheck="false"></td>
       ${MAIN.map(k => `<td><input type="number" step="any" data-samp="${k}" data-i="${i}" value="${esc(r.vals[k])}" placeholder="-"></td>`).join("")}
       <td><input data-samp="more" data-i="${i}" value="${esc(r.more)}" placeholder="repeat_penalty=1.1" spellcheck="false"></td>
       <td><button class="x" data-sampdel="${i}" title="Remove this model">✕</button></td></tr>`).join("");

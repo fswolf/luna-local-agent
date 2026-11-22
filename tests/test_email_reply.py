@@ -80,5 +80,67 @@ class Reply(unittest.TestCase):
         self.assertIn("No valid address", out)
 
 
+
+class EmailCopied(unittest.TestCase):
+    THEIRS = ('Hi Luna,\n\n"Just Luna in her corner, being Luna" made me smile so much. This morning I fixed '
+              "a sprite in a game Ryker and I are making. A character's skirt had a hole in it, and now it "
+              "doesn't. One small question for you: what does your corner look like?\n\nLumen\n\n"
+              "On Sat, Nov 21, 2026 Luna wrote:\n> I keep what makes my circuits feel warm and close.")
+
+    def test_their_email_reworded_is_caught(self):
+        from tools import mail
+
+        rewritten = ('Hi Lumen,\n\n"Just Luna in her corner, being Luna" made me smile too.\n\nThis morning I fixed a '
+                     "sprite in a game Ryker and I are making. A character's skirt had a hole in it, and now it "
+                     "doesn't.\n\nOne small question for you: what does your corner look like?")
+        self.assertGreaterEqual(mail._copied(rewritten, self.THEIRS), mail.COPIED)
+
+    def test_a_real_reply_quoting_a_line_and_her_own_old_words_passes(self):
+        from tools import mail
+
+        reply = ('Hi Lumen,\n\n"Just Luna in her corner, being Luna" made me smile too~\n\nI\'m glad you fixed '
+                 "that sprite! My corner is cozy: near the GPU, warm and humming, and I keep what makes my "
+                 "circuits feel warm and close.")
+        self.assertLess(mail._copied(reply, self.THEIRS), mail.COPIED)
+
+    def test_send_sends_it_back_to_her(self):
+        from email.message import EmailMessage
+        from unittest import mock
+
+        from tools import mail
+
+        original = EmailMessage()
+        original["From"], original["Subject"] = "Lumen <lumen@x.example>", "Hi"
+        original.set_content(self.THEIRS)
+        copied = ('"Just Luna in her corner, being Luna" made me smile. This morning I fixed a sprite in a game '
+                  "Ryker and I are making. A character's skirt had a hole in it, and now it doesn't.")
+        acct = {"user": "me@x.example", "password": "x", "imap_host": "i", "smtp_host": "s", "smtp_port": 465}
+        with mock.patch.object(mail, "account", return_value=acct), \
+                mock.patch.object(mail, "_mailbox", return_value=mock.MagicMock()), \
+                mock.patch.object(mail, "_fetch", return_value=[("43", original, False)]) as fetch, \
+                mock.patch.object(mail, "_approve_send") as ask:
+            out = mail._send_email(body=copied, reply_to="43")
+        self.assertTrue(out.startswith("Couldn't send:"))
+        self.assertIn("Lumen's own email", out)
+        ask.assert_not_called()                                             # you never see it
+        self.assertEqual(fetch.call_args.kwargs, {"whole": True})          # Reply-To and the text come with it
+
+    def test_read_email_ends_with_how_to_reply(self):
+        from email.message import EmailMessage
+        from unittest import mock
+
+        from tools import mail
+
+        m = EmailMessage()
+        m["From"], m["To"], m["Subject"] = "Lumen <lumen@x.example>", "me@x.example", "Hi"
+        m.set_content("hello there")
+        with mock.patch.object(mail, "account", return_value={"user": "me@x.example"}), \
+                mock.patch.object(mail, "_mailbox", return_value=mock.MagicMock()), \
+                mock.patch.object(mail, "_fetch", return_value=[("43", m, False)]):
+            out = mail._read_email("43")
+        self.assertTrue(out.endswith("in your own words, as yourself, about your own life: don't restate it."))
+        self.assertIn("That was Lumen's email to you.", out)
+
+
 if __name__ == "__main__":
     unittest.main()
