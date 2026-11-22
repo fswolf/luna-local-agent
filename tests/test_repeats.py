@@ -71,6 +71,18 @@ class Trim(unittest.TestCase):
         # asked the same thing twice: nothing new to keep, so nothing is cut
         self.assertEqual(repeats.trim(FIRST, "good job luna", FIRST)[1], "")
 
+    def test_code_is_never_cut_or_dropped(self):
+        script = "```python\nimport math\n\n\ndef circle(r):\n    return [math.sin(a) * r for a in range(360)]\n```"
+        before = "Here's the script, drawing the circle point by point so the shape stays round:\n\n" + script
+        again = ("I changed nothing in the maths this time, only how it prints, so the terminal stops "
+                 "squashing it into an oval.\n\n" + script + "\n\nRun it and tell me if it's round now~")
+        self.assertEqual(repeats.trim(again, "fix it", before), (again, ""))
+        self.assertEqual(repeats.trim(again, script, "")[1], "")         # your own code pasted back is fine
+
+    def test_a_code_block_with_blank_lines_is_one_paragraph(self):
+        text = "Fixed:\n\n```\na\n\n\nb\n```\n\nDone~"
+        self.assertEqual(repeats._paragraphs(text), [("Fixed:", False), ("```\na\n\n\nb\n```", True), ("Done~", False)])
+
     def test_cleaning_a_saved_history(self):
         folder = tempfile.mkdtemp()
         path = os.path.join(folder, "conversation.json")

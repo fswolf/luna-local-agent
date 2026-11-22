@@ -16,7 +16,8 @@ Two checks, both by wording, nothing about meaning:
   * a paragraph that is your message said back is dropped, wherever it is.
 
 Short lines are never enough on their own: "*tilts head* 🌸" turns up in
-every reply on purpose.
+every reply on purpose. Code is never touched: a script she sends again
+with one line changed is mostly the last one, and that's the point of it.
 """
 import os
 import re
@@ -44,30 +45,51 @@ def _sentences(text):
 
 
 def _paragraphs(text):
-    return [p for p in re.split(r"\n\s*\n", str(text or "").strip()) if p.strip()]
+    """Paragraphs, with a ``` code block kept whole as one, however many
+    blank lines it has. [(text, is_code)]"""
+    out, code = [], None
+    for chunk in re.split(r"(\n\s*\n)", str(text or "").strip()):
+        if code is not None:
+            code += chunk
+            if chunk.count("```") % 2:
+                out.append((code, True))
+                code = None
+        elif chunk.strip() and chunk.count("```") % 2:
+            code = chunk                                    # a block opens here and runs on
+        elif chunk.strip():
+            out.append((chunk, "```" in chunk))
+    if code is not None:
+        out.append((code, True))                            # never closed: code to the end
+    return out
 
 
 def trim(answer, said="", previous=""):
     """The reply without its copied tail or your words said back. Returns
     (text, what was cut: "" | "repeat" | "echo" | "repeat+echo")."""
-    paras = _paragraphs(answer)
-    if len(paras) < 2:
+    blocks = _paragraphs(answer)
+    if len(blocks) < 2:
         return answer, ""
 
     yours = _norm(said)
     cut = []
 
-    # your message said back, as a paragraph of its own
+    # your message said back, as a paragraph of its own (never code)
     if len(yours) >= LONG:
-        kept = [p for p in paras if not (len(_norm(p)) >= LONG and (_norm(p) in yours or yours in _norm(p)))]
-        if kept and len(kept) < len(paras):
-            paras, cut = kept, ["echo"]
+        kept = [(p, code) for p, code in blocks
+                if code or not (len(_norm(p)) >= LONG and (_norm(p) in yours or yours in _norm(p)))]
+        if kept and len(kept) < len(blocks):
+            blocks, cut = kept, ["echo"]
+
+    paras = [p for p, _ in blocks]
+    coded = [code for _, code in blocks]
 
     before = set(_sentences(previous)) | set(_sentences(said))
     norms = [_norm(p) for p in paras]
 
     def seen(k, earlier):
-        """(copied wording, all wording) in paragraph k."""
+        """(copied wording, all wording) in paragraph k. Code counts as neither."""
+        if coded[k]:
+            return 0, 0
         sents = _sentences(paras[k])
         copied = sum(len(s) for s in sents if s in earlier or any(s in e for e in norms[:k] if len(e) > len(s)))
         return copied, sum(len(s) for s in sents)
@@ -76,7 +98,8 @@ def trim(answer, said="", previous=""):
     stats = []
     for k in range(len(paras)):
         stats.append(seen(k, earlier))
-        earlier |= set(_sentences(paras[k]))
+        if not coded[k]:
+            earlier |= set(_sentences(paras[k]))
 
     # The copy starts where every paragraph with real wording in it, to the
     # end, is mostly said already. Something new has to come first: a reply
@@ -84,7 +107,7 @@ def trim(answer, said="", previous=""):
     start = None
     for k in range(1, len(paras)):
         tail = stats[k:]
-        if (stats[k][0] and sum(c for c, _ in tail) >= MIN_COPY
+        if (stats[k][0] and not any(coded[k:]) and sum(c for c, _ in tail) >= MIN_COPY
                 and all(c >= SHARE * t for c, t in tail if t >= WORDED)
                 and sum(t - c for c, t in stats[:k]) >= FRESH):
             start = k
@@ -125,10 +148,10 @@ def clean_history(path):
             said = m["content"]
         elif m.get("role") == "assistant":
             text, why = trim(m["content"], said, previous)
-            previous = m["content"]
             if why:
                 m["content"] = text
                 changed += 1
+            previous = m["content"]          # as it now stands, the way a live turn sees it
 
     if changed:
         shutil.copy2(path, f"{path}.before-repeats-{time.strftime('%Y%m%d-%H%M%S')}")

@@ -788,9 +788,10 @@ def _send_email(body, to="", subject="", reply_to=""):
             except Exception:           # a message whose text can't be read: nothing to compare
                 share = 0.0
             if share >= COPIED:
-                who = parseaddr(str(original["from"] or ""))[0] or "their"
+                name = parseaddr(str(original["from"] or ""))[0]
+                whose = f"{name}'s own" if name else "their own"
                 logbook.info("email", "reply to %s was %d%% their own email - sent back to her", to, share * 100)
-                return (f"Couldn't send: {round(share * 100)}% of that reply is {who}'s own email "
+                return (f"Couldn't send: {round(share * 100)}% of that reply is {whose} email "
                         "reworded. Write your own answer to what they said, as yourself, then send it.")
 
     if not to:
