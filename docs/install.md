@@ -141,7 +141,11 @@ first. She runs on her own, so the terminal you started her from can
 close; her output goes to `~/.cache/ai-voice/web.log`. Her icon sits in
 the system tray: a left click opens her chat, a right click has the portrait,
 settings, her voice on or off, push to talk, Stop and Quit, and hovering
-shows her status and model.
+shows her status and model. If her window is already open, Open chat (and
+starting Luna again) brings it to the front instead of opening a second
+one. That works on Hyprland, Sway, X11 (with `xdotool` or `wmctrl`) and
+Windows; GNOME and KDE on Wayland don't let an app raise a window, so
+there it stays where it is.
 With the tray there, closing her window leaves her running in it, like any
 app with a tray icon; without one (GNOME needs the AppIndicator extension),
 closing her window quits her. /quit always does, and quitting closes every

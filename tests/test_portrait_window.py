@@ -87,9 +87,6 @@ class PortraitWindow(unittest.TestCase):
             self.assertIsNone(self.m.command("http://x/", 420, 560))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 @unittest.skipIf(os.name == "nt", "process groups are POSIX")
 class ClosedWithHer(unittest.TestCase):
@@ -105,7 +102,7 @@ class ClosedWithHer(unittest.TestCase):
         marks = [tempfile.mktemp() for _ in range(2)]
         with mock.patch("config.PORTRAIT_BROWSER", "", create=True), \
                 mock.patch.object(pw, "command", side_effect=[["sh", "-c", script.format(m)] for m in marks]):
-            procs = [pw.open_app("http://x/", 1, 1, "t") for _ in marks]
+            procs = [pw.open_app("http://x/", 1, 1, f"t{i}") for i, _ in enumerate(marks)]
         for _ in range(50):
             if all(os.path.exists(m) and open(m).read().strip() for m in marks):
                 break
@@ -122,3 +119,64 @@ class ClosedWithHer(unittest.TestCase):
             except FileNotFoundError:
                 pass
         self.assertEqual(pw._opened, [])
+
+
+class OneWindowAProfile(unittest.TestCase):
+    """Asking again while the window is open brings it to the front: Firefox
+    refuses a second start on a profile it holds ("already running, but is not
+    responding"), and a Chromium one would open a second window."""
+
+    def setUp(self):
+        from web import portrait_window as pw
+
+        self.pw = pw
+        pw._mine.clear()
+        self.addCleanup(pw._mine.clear)
+
+    def test_open_again_comes_to_the_front(self):
+        proc = mock.Mock(pid=4242)
+        proc.poll.return_value = None
+        with mock.patch("config.PORTRAIT_BROWSER", "", create=True), \
+                mock.patch.object(self.pw, "command", return_value=["firefox", "x"]), \
+                mock.patch.object(self.pw, "_holder", return_value=None), \
+                mock.patch("subprocess.Popen", return_value=proc) as start, \
+                mock.patch.object(self.pw, "_raise", return_value=True) as front:
+            self.assertIs(self.pw.open_app("http://x/", 1, 1, "luna-chat"), proc)
+            self.assertIs(self.pw.open_app("http://x/", 1, 1, "luna-chat"), proc)
+            proc.poll.return_value = 0                         # closed: the next one opens anew
+            self.pw.open_app("http://x/", 1, 1, "luna-chat")
+        self.assertEqual(start.call_count, 2)
+        front.assert_called_once_with(4242)
+
+    def test_a_window_left_by_an_earlier_run(self):
+        import tempfile
+
+        folder = tempfile.mkdtemp()
+        os.symlink(f"127.0.1.1:+{os.getpid()}", os.path.join(folder, "lock"))          # Firefox's
+        with mock.patch.object(self.pw, "_profile_dirs", return_value=[folder]):
+            self.assertEqual(self.pw._holder("x"), os.getpid())
+            with mock.patch("subprocess.Popen") as start, \
+                    mock.patch.object(self.pw, "_raise", return_value=False) as front:
+                self.assertIsNone(self.pw.open_app("http://x/", 1, 1, "x"))
+            start.assert_not_called()
+            front.assert_called_once_with(os.getpid())
+        os.remove(os.path.join(folder, "lock"))
+        os.symlink("host-999999999", os.path.join(folder, "SingletonLock"))          # a dead one
+        with mock.patch.object(self.pw, "_profile_dirs", return_value=[folder]):
+            self.assertIsNone(self.pw._holder("x"))
+
+    def test_hyprland_focuses_its_window(self):
+        def run(cmd, **kw):
+            out = '[{"pid": 4243, "address": "0xabc"}]' if list(cmd[:2]) == ["hyprctl", "-j"] else ""
+            return mock.Mock(stdout=out, returncode=0)
+
+        with mock.patch.dict(os.environ, {"HYPRLAND_INSTANCE_SIGNATURE": "x"}), \
+                mock.patch("shutil.which", return_value="/usr/bin/hyprctl"), \
+                mock.patch.object(self.pw, "_group", return_value={4242, 4243}), \
+                mock.patch("subprocess.run", side_effect=run) as ran:
+            self.assertTrue(self.pw._raise(4242))
+        self.assertEqual(list(ran.call_args.args[0]), ["hyprctl", "dispatch", "focuswindow", "address:0xabc"])
+
+
+if __name__ == "__main__":
+    unittest.main()

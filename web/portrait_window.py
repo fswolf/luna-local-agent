@@ -8,6 +8,11 @@ a browser that's already open. portrait.browser overrides all of it. Every
 window opened here (open_app: her chat, the pose studio, the live monitor)
 is closed with her when she quits (close()).
 
+Each profile is one window: asking again while it's open (the tray's Open
+chat, the launcher run a second time) brings that window to the front
+instead of starting the browser again on a profile it already holds,
+which Firefox refuses ("already running, but is not responding").
+
 Whatever starts here starts with its output thrown away: a browser started
 from Luna's process would otherwise print its warnings ("Safe Browsing
 server returned a 400...") straight over her screen.
@@ -134,12 +139,152 @@ def command(url, w, h, profile="luna-portrait"):
     return None
 
 
+def _profile_dirs(profile):
+    """Where command() keeps this profile, for each browser it may have used."""
+    home = os.path.expanduser("~")
+    return [os.path.join(home, ".cache", profile), os.path.join(home, ".cache", profile + "-firefox")]
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _holder(profile):
+    """The pid of a browser that has this profile open, or None: one this run
+    didn't start (left by a Luna that was killed, not quit). Firefox and
+    Chromium each leave a lock naming it while they run: Firefox's "lock"
+    (ip:+pid), Chromium's "SingletonLock" (host-pid). Linux and macOS only;
+    a Flatpak's sandbox has its own pids, so its folders aren't looked at."""
+    if os.name == "nt":
+        return None
+    for folder in _profile_dirs(profile):
+        for name, sep in (("lock", "+"), ("SingletonLock", "-")):
+            try:
+                target = os.readlink(os.path.join(folder, name))
+            except OSError:
+                continue
+            tail = target.rsplit(sep, 1)[-1]
+            if tail.isdigit() and _alive(int(tail)):
+                return int(tail)
+    return None
+
+
+def _group(pid):
+    """The pid and every process in its group: a browser's windows can belong
+    to a child it started (open_app gives each its own session)."""
+    pids = {pid}
+    try:
+        for entry in os.listdir("/proc"):
+            if entry.isdigit():
+                try:
+                    with open(f"/proc/{entry}/stat", encoding="utf-8", errors="replace") as f:
+                        fields = f.read().rsplit(")", 1)[1].split()
+                    if int(fields[2]) == pid:          # its process group
+                        pids.add(int(entry))
+                except (OSError, ValueError, IndexError):
+                    continue
+    except OSError:
+        pass
+    return pids
+
+
+def _raise(pid):
+    """Bring the window of this process (or its group) to the front. True if a
+    window manager that can do it was found and did: Hyprland, Sway, X11
+    (xdotool or wmctrl) or Windows. GNOME and KDE on Wayland offer no way."""
+    import json
+    import shutil
+    import subprocess
+
+    def run(*cmd):
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+
+    try:
+        if os.name == "nt":
+            return _raise_windows(pid)
+        pids = _group(pid)
+        if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") and shutil.which("hyprctl"):
+            for c in json.loads(run("hyprctl", "-j", "clients").stdout or "[]"):
+                if c.get("pid") in pids:
+                    return run("hyprctl", "dispatch", "focuswindow", f"address:{c['address']}").returncode == 0
+            return False
+        if os.environ.get("SWAYSOCK") and shutil.which("swaymsg"):
+            stack = [json.loads(run("swaymsg", "-t", "get_tree").stdout or "{}")]
+            while stack:
+                node = stack.pop()
+                if node.get("pid") in pids:
+                    return run("swaymsg", f"[con_id={node['id']}]", "focus").returncode == 0
+                stack += node.get("nodes", []) + node.get("floating_nodes", [])
+            return False
+        if os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+            if shutil.which("xdotool"):
+                for p in pids:
+                    found = run("xdotool", "search", "--onlyvisible", "--pid", str(p)).stdout.split()
+                    if found:
+                        return run("xdotool", "windowactivate", found[-1]).returncode == 0
+            if shutil.which("wmctrl"):
+                for line in run("wmctrl", "-lp").stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) > 2 and parts[2].isdigit() and int(parts[2]) in pids:
+                        return run("wmctrl", "-ia", parts[0]).returncode == 0
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        pass
+    return False
+
+
+def _raise_windows(pid):
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    found = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd):
+            found.append(hwnd)
+            return False
+        return True
+
+    user32.EnumWindows(each, 0)
+    if not found:
+        return False
+    user32.ShowWindow(found[0], 9)                  # SW_RESTORE, if it's minimised
+    return bool(user32.SetForegroundWindow(found[0]))
+
+
+def _front(pid, profile):
+    from core import logbook
+
+    if not _raise(pid):
+        logbook.info("window", "the %s window is already open (this desktop gives no way to bring it "
+                     "to the front)", profile)
+
+
 def open_app(url, w, h, profile):
     """A page in a window of its own (command(); portrait.browser, when set,
-    picks the browser): the process, or None when it went to a browser tab."""
+    picks the browser): the process, or None when it went to a browser tab.
+    Already open on this profile: that window comes to the front instead."""
     import subprocess
 
     import config
+
+    mine = _mine.get(profile)
+    if mine is not None and mine.poll() is None:
+        _front(mine.pid, profile)
+        return mine
+    held = _holder(profile)
+    if held is not None:               # a window this run didn't open, still on its profile
+        _front(held, profile)
+        return None
 
     try:
         if getattr(config, "PORTRAIT_BROWSER", ""):
@@ -155,6 +300,7 @@ def open_app(url, w, h, profile):
             proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     stdin=subprocess.DEVNULL, start_new_session=True)
             _opened[:] = [p for p in _opened if p.poll() is None] + [proc]   # closed with her (close())
+            _mine[profile] = proc
             return proc
         except OSError:
             pass
@@ -190,6 +336,7 @@ _window = {"proc": None}
 # monitor...): close() shuts them when she quits. A page that went to a browser
 # tab instead isn't hers to close.
 _opened = []
+_mine = {}            # profile -> the window open_app started on it, to bring back rather than start twice
 
 
 def _stop(proc):
@@ -281,4 +428,5 @@ def close():
     _window["proc"] = None
     while _opened:
         _stop(_opened.pop())
+    _mine.clear()
 
