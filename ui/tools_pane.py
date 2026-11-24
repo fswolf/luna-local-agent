@@ -52,53 +52,25 @@ _SELF_FEATURES = (
 )
 
 
-# What she may do to your machine, cycled with space and saved to
-# config.json. Read and write cover the file tools; execute is the shell
-# tool, which always asks when it's on - there's deliberately no
-# "allow" for commands.
-_PERMS = (
-    ("read", "files.read", "FILES_READ", ("allow", "ask", "off"), "list and read files"),
-    ("write", "files.write", "FILES_WRITE", ("ask", "allow", "off"), "create and edit files"),
-    ("execute", "shell.enabled", "SHELL_ENABLED", ("ask", "off"), "run commands - each one asks"),
-    # Smart-home changes: the home plugin's ask_all. "allow" still asks
-    # for locks, doors, alarms and valves (its ask_domains).
-    ("home", "plugins.home.ask_all", None, ("ask", "allow"), "smart-home changes - locks and doors always ask"),
-)
-
-
+# What she may do to your machine: config.PERMISSIONS, the same table the
+# settings page's Permissions box shows. Space cycles a row and saves it.
 def _perm_value(label):
     import config
 
-    if label == "home":
-        return "ask" if config.plugin_settings("home").get("ask_all", False) else "allow"
-
-    for name, _path, key, values, _note in _PERMS:
-        if name == label:
-            raw = getattr(config, key, None)
-
-            if isinstance(raw, bool):
-                return "ask" if raw else "off"
-
-            raw = str(raw or "").lower()
-
-            return raw if raw in values else values[0]
-
-    return ""
+    return config.permission(label)
 
 
 def _perm_group():
     try:
-        import config  # noqa: F401
+        import config
     except Exception:
         return None
 
     members = []
 
-    for name, _path, _key, _values, note in _PERMS:
+    for name, _path, _values, _note in config.PERMISSIONS:
         value = _perm_value(name)
-
-        if name == "write" and value == "allow":
-            note += " - Luna's folder, ~/.config, ~/.local still ask"
+        note = config.permission_note(name, value)
 
         members.append((name, value != "off", True, note, 0, "perm:" + name))
 
@@ -706,23 +678,13 @@ def _tool_toggle():
         elif setting and setting.startswith("perm:"):
             import config
 
-            for label, path, _key, values, _note in _PERMS:
-                if label == name:
-                    now = _perm_value(label)
-                    nxt = values[(values.index(now) + 1) % len(values)]
-                    if label == "home":
-                        # a plugin setting, so _store rather than save_setting, and
-                        # the plugin reads the refreshed block on its next call
-                        config._store(path, nxt == "ask")
-                        config._plugins_cfg = config.settings.get("plugins", {})
-                        break
-                    stored = ("true" if nxt != "off" else "false") if path == "shell.enabled" else nxt
-                    config.save_setting(path, stored)
-                    if label == "write" and nxt == "allow":
-                        add_message("system", "Write: allow - file changes won't ask, now or after a "
-                                    "restart. Luna's own folder, ~/.config and ~/.local still ask; the "
-                                    "deny list still refuses. Space again to go back to off/ask.")
-                    break
+            values = next(v for label, _p, v, _n in config.PERMISSIONS if label == name)
+            nxt = values[(values.index(_perm_value(name)) + 1) % len(values)]
+            config.set_permission(name, nxt)
+            if name == "write" and nxt == "allow":
+                add_message("system", "Write: allow - file changes won't ask, now or after a "
+                            "restart. Luna's own folder, ~/.config and ~/.local still ask; the "
+                            "deny list still refuses. Space again to go back to off/ask.")
         elif setting:
             import config
 

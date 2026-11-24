@@ -45,15 +45,20 @@ that runs later, and a page she reads can steer a write as
 easily as you can), the deny list still refuses, and Discord turns and
 scheduled jobs keep their own rules. Commands never get an allow-all.
 
-**Permissions in the tools pane.** The top of the tools pane (Tab
-twice) has a Permissions group with three rows. Space cycles each one
-and it's saved to `config.json`:
+**Permissions.** The top of the tools pane (Tab twice) has a
+Permissions group, and the settings page has the same rows in a
+Permissions box at the top (Everyday and All): one table behind both,
+so they always agree. Space cycles a row in the pane, a click picks a
+value on the page; either saves it to `config.json` and applies at once:
 
 | Row | Settings | What it covers |
 |-----|----------|----------------|
 | read | allow / ask / off | `list_files`, `read_file`. *ask* pops a window before she looks |
 | write | ask / allow / off | `write_file`, `edit_file`. *allow* is the saved form of `A`: it lasts across restarts, and her folder, `~/.config` and `~/.local` still ask |
 | execute | ask / off | `run_command`. There's no allow: every command asks |
+| home | ask / allow | Smart-home changes. *allow* still asks for locks, doors, alarms and valves |
+| email | allow / off | Reading your email (`email.enabled`). Needs a login in `~/.config/ai-voice/email.json` ([Email](email.md)) |
+| send email | ask / off | Sending as you (`email.send`). There's no allow: every message shows in full and asks |
 
 *off* takes the tools away entirely, so they don't cost any context
 either. The deny list applies whatever these say, and Discord turns

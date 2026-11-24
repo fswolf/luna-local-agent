@@ -41,7 +41,7 @@ MAX_TOKENS = 40       # her line, not a paragraph
 
 _lock = threading.Lock()
 _pending = {}         # zone -> times, since the last touch she answered
-_state = {"model": None, "timer": None, "last": 0.0}
+_state = {"model": None, "timer": None, "last": 0.0, "cooling": False}
 
 
 def start(model):
@@ -63,17 +63,22 @@ def cooldown():
 def note(zone):
     """A touch on the portrait. True if it was taken (she may still not
     answer it: too soon after the last, or she's busy)."""
+    cooling = False
     if zone == "spank":
-        # counted whether or not she talks about it: too many is a punishment
+        # counted whether or not she talks about it: past the first few,
+        # each one cools her off (mood.note_spank)
         try:
             from mind import mood
 
-            mood.note_spank()
+            cooling = mood.note_spank()
         except Exception:
             pass
     if zone not in PLACES or not enabled() or not _state["model"]:
         return False
     with _lock:
+        # only with a touch she'll answer: set with touch talk off, it waited
+        # and told some later, unrelated touch line that it was cooling her off
+        _state["cooling"] = _state["cooling"] or cooling
         _pending[zone] = _pending.get(zone, 0) + 1
         if _state["timer"] is None:
             timer = threading.Timer(WINDOW, _fire)
@@ -94,11 +99,12 @@ def _fire():
         _state["timer"] = None
         touches = dict(_pending)
         _pending.clear()
+        cooling, _state["cooling"] = _state["cooling"], False
         too_soon = time.monotonic() - _state["last"] < cooldown()
     if not touches or too_soon or not enabled():
         return
     try:
-        _answer(touches)
+        _answer(touches, cooling)
     except Exception:
         logbook.exception("touches", "touch turn failed")
 
@@ -127,11 +133,13 @@ def _tired():
         return False
 
 
-def _note(where):
+def _note(where, cooling=False):
     who = getattr(config, "USER", "the user")
     tired = " You're tired right now." if _tired() else ""
+    # past the playful few (mood.note_spank): her line cools with her dials
+    enough = " That's more spanking than you're in the mood for: it's cooling you off, let it show." if cooling else ""
     return (f"(Not words from {who}: {who} just touched you {where} on your portrait. React to it in "
-            f"character, out loud, in one short line - under 12 words. Don't narrate the touch back.{tired})")
+            f"character, out loud, in one short line - under 12 words. Don't narrate the touch back.{tired}{enough})")
 
 
 def _request(messages, model):
@@ -158,7 +166,7 @@ def clean(reply):
     return line.strip('"“” ')[:200]
 
 
-def _answer(touches):
+def _answer(touches, cooling=False):
     from core import assistant
     from core import history
     from core import interrupts
@@ -172,7 +180,7 @@ def _answer(touches):
         return
     model = _state["model"]
     where = describe(touches)
-    note = _note(where)
+    note = _note(where, cooling)
     if "qwen3" in str(model).lower() and getattr(config, "LLM_BACKEND", "") != "llama":
         note += " /no_think"      # LM Studio has no thinking budget; Qwen3 listens for this
 
@@ -213,12 +221,17 @@ def _answer(touches):
             history.save()
             transcript.add("user", remembered)
             transcript.add("assistant", said)
-            try:
-                from mind import mood
+            # Spanks move her mood themselves (mood.note_spank): read as a
+            # message they scored as flirting and added desire every time.
+            # Any other touch with them is still read.
+            others = {z: n for z, n in touches.items() if z != "spank"}
+            if others:
+                try:
+                    from mind import mood
 
-                mood.note_exchange(remembered, said, model)
-            except Exception:
-                pass
+                    mood.note_exchange(f"*touches you {describe(others)}*", said, model)
+                except Exception:
+                    pass
 
             if not stop.speaking.is_set():
                 player = speech.Player()

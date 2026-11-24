@@ -226,18 +226,22 @@ def last_feeling():
         return S.last_feeling
 
 
-# Spanks (the portrait, in her top two rows): fun up to a point, then a
-# punishment, tamagotchi style. Each one counts; they're forgotten one every
-# SPANK_FORGET seconds; every SPANK_LIMIT knocks her down a notch - warmth and
-# desire - so keeping at it takes her out of the mood.
-SPANK_LIMIT = 60
-SPANK_FORGET = 10.0
-SPANK_WARMTH = -0.10
-SPANK_DESIRE = -0.20
+# Spanks (the portrait, from warm up): playful, then cooling. The first
+# SPANK_FREE in a burst are teasing and move nothing (touches.py keeps them
+# out of the flirt reading too); every one after that takes desire and a
+# little warmth off, so keeping at it takes her out of the mood and, below
+# warm, the spanking stops. A burst ends after SPANK_RESET quiet seconds.
+# It used to be a notch down every 60 at a forgotten-one-per-10s rate, which
+# no clicking reaches, while each spank read as flirting and added desire.
+SPANK_FREE = 3
+SPANK_RESET = 30.0
+SPANK_DESIRE = -0.15
+SPANK_WARMTH = -0.05
 
 
 def note_spank():
-    """One spank on the portrait. True if it was one too many (a notch down)."""
+    """One spank on the portrait. True once it's past the playful ones and
+    cooling her off."""
 
     if not config.MOOD_ENABLED:
         return False
@@ -245,14 +249,22 @@ def note_spank():
     now = time.time()
 
     with _lock:
-        before = max(0.0, S.spanks["n"] - (now - S.spanks["at"]) / SPANK_FORGET) if S.spanks["at"] else 0.0
-        S.spanks.update(n=before + 1.0, at=now)
-        over = int(S.spanks["n"] // SPANK_LIMIT) > int(before // SPANK_LIMIT)
-        if over:
-            S.desire = max(0.0, S.desire + SPANK_DESIRE)
+        if not S.spanks["at"] or now - S.spanks["at"] > SPANK_RESET:
+            S.spanks["n"] = 0.0
+        S.spanks.update(n=S.spanks["n"] + 1.0, at=now)
+        n = int(S.spanks["n"])
+        cooling = n > SPANK_FREE
+        if cooling:
+            S.desire = max(0.0, S.desire + SPANK_DESIRE * min(1.0, _intensity()))
 
-    if over:
-        logbook.info("mood", "spanked %d times: a notch down", int(S.spanks["n"]))
-        drift._nudge(warmth=SPANK_WARMTH, energy=-0.03, why="too many spanks")
+    if cooling:
+        logbook.info("mood", "spank %d in a row: cooling off", n)
+        drift._nudge(warmth=SPANK_WARMTH, why="too many spanks")
 
-    return over
+    return cooling
+
+
+def spanking():
+    """Spanks in the burst going on now (0 once it's over)."""
+    with _lock:
+        return int(S.spanks["n"]) if S.spanks["at"] and time.time() - S.spanks["at"] <= SPANK_RESET else 0

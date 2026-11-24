@@ -16,6 +16,12 @@ _email_cfg = setting("email", {})
 EMAIL_ENABLED = flag(_email_cfg.get("enabled", True))
 EMAIL_SEND = flag(_email_cfg.get("send", False))
 EMAIL_MAX = int(_email_cfg.get("max", 20))   # most messages one check or search returns
+# Addresses she may send to without asking (tools/mail.py): a message whose
+# every recipient is here goes out unattended, logged in full and listed in
+# "while you were away". Anyone else still asks. Empty by default.
+#   "email": { "no_ask_to": ["friend@example.com"] }
+_no_ask = _email_cfg.get("no_ask_to", []) or []
+EMAIL_NO_ASK_TO = [str(a).strip() for a in (_no_ask.split(",") if isinstance(_no_ask, str) else _no_ask) if str(a).strip()]
 
 _files_cfg = setting("files", {})
 FILES_ENABLED = flag(_files_cfg.get("enabled", True))

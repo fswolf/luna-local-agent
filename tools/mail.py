@@ -498,32 +498,42 @@ def _fail(what, e, acct=None):
     "check_email",
     "See what's in the user's inbox: the newest messages with sender, subject, date "
     "and a one-line preview, unread ones marked NEW. Use for 'any new email?', "
-    "'what's in my inbox'. Nothing is marked read.",
+    "'what's in my inbox'. Nothing is marked read. Looking for one person's mail "
+    "(a task like 'check for email from lumen@...'): pass sender, and only theirs is listed.",
     {
         "unread_only": {"type": "boolean", "description": "Only unread messages. Default true."},
+        "sender": {"type": "string", "description": "Optional: only mail from this address (or part of it)."},
         "limit": {"type": "integer", "description": "How many, newest first. Default 8."},
         "folder": {"type": "string", "description": "A folder inside the mailbox, like INBOX or Sent. Default INBOX."},
     },
     available=_available,
     why=_why,
 )
-def _check_email(unread_only=True, limit=8, folder="INBOX"):
+def _check_email(unread_only=True, limit=8, folder="INBOX", sender=""):
     acct = account()
     unread_only = str(unread_only).lower() not in ("false", "0", "no")
+    # an address or part of one, as an IMAP FROM search: the server does the
+    # filtering, so nobody else's mail is even fetched
+    # printable ASCII without quotes or backslashes: a name ("Lumen Light")
+    # works, and nothing can close the quoted string and add search terms
+    sender = re.sub(r'[^\x20-\x7e]|["\\]', "", str(sender or "")).strip()[:120]
+    criteria = ["UNSEEN" if unread_only else "ALL"] + (["FROM", f'"{sender}"'] if sender else [])
 
     try:
         with _mailbox(acct, folder) as box:
-            _status, data = box.uid("search", None, "UNSEEN" if unread_only else "ALL")
+            _status, data = box.uid("search", None, *criteria)
             uids = (data[0] or b"").decode().split()
             total = len(uids)
             rows = _fetch(box, uids[-_limit(limit):])
     except Exception as e:
         return _fail("check email", e, acct)
 
-    if not rows:
-        return f"No {'unread ' if unread_only else ''}email in {folder}."
+    whose = f" from {sender}" if sender else ""
 
-    head = (f"{total} unread in {folder}" if unread_only else f"{total} in {folder}") + \
+    if not rows:
+        return f"No {'unread ' if unread_only else ''}email{whose} in {folder}."
+
+    head = (f"{total} unread{whose} in {folder}" if unread_only else f"{total}{whose} in {folder}") + \
         (f", newest {len(rows)} shown" if total > len(rows) else "") + "."
 
     return "\n".join([UNTRUSTED, head] + [_line(*r) for r in rows] +
@@ -635,6 +645,26 @@ def _search_email(query, days=30, limit=8, folder="INBOX"):
                      [_line(*r) for r in rows])
 
 
+def no_ask_to():
+    """email.no_ask_to as lowercase addresses, read from config.json each
+    time so a change on the settings page counts at once."""
+    raw = config._stored("email.no_ask_to")
+    if raw is None:
+        raw = getattr(config, "EMAIL_NO_ASK_TO", [])
+    if isinstance(raw, str):
+        raw = raw.split(",")
+    if not isinstance(raw, (list, tuple)):
+        return set()            # hand-edited into something else (a number, a block): no one
+    return {a.lower() for item in raw for a in _addresses(str(item))}
+
+
+def _unasked(to):
+    """True when every recipient is on email.no_ask_to (and there is one)."""
+    allowed = no_ask_to()
+    whom = {a.lower() for a in _addresses(to)}
+    return bool(whom) and bool(allowed) and whom <= allowed
+
+
 def _approve_send(lines, title):
     """Every send asks: the desk popup, or the remote's own approver as a
     flagged request. A scheduled job never sends."""
@@ -733,8 +763,9 @@ def _mark_email(ids, read=True, folder="INBOX"):
 
 @tool(
     "send_email",
-    "Send an email as the user. They see the whole message and must approve it; "
-    "if the result says denied, tell them and don't retry. To answer one, pass its "
+    "Send an email as the user. They see the whole message and must approve it "
+    "(addresses on their no-ask list go without asking); if the result says denied, "
+    "tell them and don't retry. To answer one, pass its "
     "number as reply_to: who it goes back to, the subject and threading are filled in.",
     {
         "to": {"type": "string", "description": "Address(es), comma separated. Replying: leave "
@@ -812,7 +843,18 @@ def _send_email(body, to="", subject="", reply_to=""):
     if turnctx.current().job:
         return "Scheduled jobs can't send email - tell the user what you'd have sent instead."
 
-    if not _approve_send(lines, f"send email to {to[:80]}"):
+    if _unasked(to):
+        # Every recipient is on your no-ask list: it goes out without the
+        # popup, so it works while you're away - in full in the log, and
+        # in "while you were away", so nothing she sends is unseen.
+        logbook.info("email", "sent without asking (email.no_ask_to) to %s:\n%s", to, "\n".join(lines))
+        try:
+            from life import away
+
+            away.note("email", f"emailed {to} (no-ask list): {msg['Subject']} - {str(body or '')[:150]}")
+        except Exception:
+            pass
+    elif not _approve_send(lines, f"send email to {to[:80]}"):
         logbook.info("email", "send to %s denied", to)
 
         try:

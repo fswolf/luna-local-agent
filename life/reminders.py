@@ -22,6 +22,7 @@ import re
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 
 import requests
 from datetime import datetime, timedelta
@@ -174,6 +175,12 @@ def is_alarm(reminder):
     return (reminder or {}).get("kind") == "alarm"
 
 
+def is_task(reminder):
+    """Something she set herself to do at a time (set_task): checked the
+    same way, but when it's due she does it instead of mentioning it."""
+    return (reminder or {}).get("kind") == "task"
+
+
 def describe(reminder, now=None):
     """'tomorrow 09:00 - take the bins out (in 18 hours)'.
 
@@ -197,7 +204,7 @@ def describe(reminder, now=None):
     # The word "alarm" goes in the sentence rather than in a symbol or a
     # bracketed tag, because this string gets spoken as often as printed
     # and "left square bracket alarm" is not a thing anyone wants to hear.
-    label = "alarm: " if is_alarm(reminder) else ""
+    label = "alarm: " if is_alarm(reminder) else "task: " if is_task(reminder) else ""
 
     return "{} - {}{} ({}){}".format(
         timeutil.friendly(due, now), label, reminder.get("text", "?"),
@@ -649,9 +656,26 @@ def _note_away(kind, text):
         pass
 
 
+@contextmanager
+def _her_turn():
+    """A reminder or task speaking up takes her turn the way a reply to you
+    does (core/assistant.py): it waits for one in progress, and a message
+    of yours meanwhile cuts its speech short. Without it a reminder ran
+    alongside your turn - two replies writing history at once, sharing
+    one turn's tool record (llm.streaming._last_raw), which a task, with
+    its tool calls, would have scrambled."""
+    from core import assistant, interrupts
+
+    with assistant._turn, interrupts.using(kind="reminder") as stop:
+        assistant._hold(stop)
+        try:
+            yield stop
+        finally:
+            assistant._hold(None)
+
+
 def _deliver(model, texts, missed=False):
     """Hand the reminder(s) to Luna so she raises them in her own voice."""
-    from core import interrupts
     import llm
     import ui
     from voice.speech import speak
@@ -675,12 +699,39 @@ def _deliver(model, texts, missed=False):
 
     # Its own Stop (interrupts): a stop meant for it stops its words and
     # its speech, and nothing it does clears anyone else's.
-    with interrupts.using(kind="reminder") as stop:
+    with _her_turn() as stop:
         ui.set_status("Reminder due...")
         answer = llm.ask(trigger, model, source="reminder")
         _sticky("show", texts)          # she holds the note up as she says it (portrait)
         ui.add_message(AGENT_NAME.lower(), answer)
         _note_away("reminder", f"a reminder went off: {body}")
+
+        if not stop.speaking.is_set():
+            ui.set_status("Speaking...")
+            speak(answer)
+
+    ui.set_status("Idle")
+
+
+def _deliver_task(model, text, missed=False):
+    """A task she set herself, done now: a full turn of hers, with her day
+    and her memory in front of her and kept in history like any other, so
+    what she did and found is something she can talk about afterwards.
+    Only the note differs from a reminder's: do it, don't bring it up."""
+    import llm
+    import ui
+    from voice.speech import speak
+
+    when = "It came due while the app was closed, so" if missed else "It's time:"
+    trigger = (f'(A task you set yourself: "{text}". {when} do it now - call the tools it needs '
+               "and actually do each step, don't just say you will. Then say briefly, in your own "
+               "voice, what you did and what you found.)")
+
+    with _her_turn() as stop:
+        ui.set_status("Task due...")
+        answer = llm.ask(trigger, model, source="task")
+        ui.add_message(AGENT_NAME.lower(), answer)
+        _note_away("task", f"she did a task: {text} - {answer[:300]}")
 
         if not stop.speaking.is_set():
             ui.set_status("Speaking...")
@@ -830,23 +881,42 @@ def _scan_once(model, first_pass):
     # about hours later, so an overdue one at startup is retired rather
     # than fired.
     alarms = [r for r in due if is_alarm(r)]
+    # A task goes on its own too: it's a turn of work, not a line to say,
+    # and two tasks in one turn would mix up what each was about.
+    tasks = [r for r in due if is_task(r)]
+    reminders_due = [r for r in due if not is_alarm(r) and not is_task(r)]
 
     if alarms:
         batch = alarms[:1]
-    elif first_pass and len(due) > 1:
-        batch = due
+    elif reminders_due:
+        batch = reminders_due if first_pass and len(reminders_due) > 1 else reminders_due[:1]
     else:
-        batch = due[:1]
+        batch = tasks[:1]
 
     snooze = 0
 
     try:
         if alarms:
             snooze = _deliver_alarm(model, batch[0])
+        elif is_task(batch[0]):
+            _deliver_task(model, str(batch[0].get("text", "?")), missed=first_pass)
         else:
             _deliver(model, [str(r.get("text", "?")) for r in batch], missed=first_pass)
     except Exception as e:
         logbook.exception("reminders", "delivery failed")
+
+        if is_task(batch[0]):
+            # Not tried again: a task may have done part of its work (an
+            # email sent) before it failed, and doing it again would do that
+            # twice. It's said, and a repeating one waits for its next time.
+            ui.add_message("system", f"Task \"{batch[0].get('text', '?')}\" failed partway: {e}")
+            _note_away("task", f"a task failed: {batch[0].get('text', '?')} - {e}")
+            try:
+                _retire(batch[0], delivered=True)
+            except Exception:
+                logbook.exception("reminders", "couldn't reschedule a failed task")
+            ui.set_status("Idle")
+            return
 
         for reminder in batch:
             _failed(reminder, e)

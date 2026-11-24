@@ -69,7 +69,15 @@ anyway. (The one exception is reading the exchange, below.)
 Every turn also pulls both dials back toward baseline, and the baseline
 for warmth is *warm*. Without that, one bad five minutes would set the
 tone for the evening, and an assistant you have to manage out of a
-sulk is a worse assistant.
+sulk is a worse assistant. Typed, spoken and station turns all take
+that step.
+
+**Time winds her down too, talking or not.** Every minute, anything
+above her resting warmth and any energy away from the hour's eases back
+by half every `settle_minutes` (45), and desire by half every
+`desire_minutes` (20). Left alone she cools off; a hurt Luna comes back
+up the same way, slower by `forgive`. Neutral turns don't add anything,
+so in a plain conversation the clock wins.
 
 **Being away is a curve, not a switch.** This assistant spends most of
 its life waiting, so "you came back" deserves more than one branch:
@@ -87,10 +95,11 @@ card pinned at 90% for six hours tells her you were *there* (gaming,
 rendering), just not talking to her. That lands a little livelier and a
 little less fond than being genuinely out, which is about right.
 
-**It survives a restart**, faded by however long you were gone. A mood
-that resets every launch isn't a mood, it's decoration, and this app
-gets restarted a lot. Pick up five minutes later and it resumes; pick
-up tomorrow and last night's is long gone. Saved in `agent/mood.json`.
+**It survives a restart**, wound down by however long you were gone,
+exactly as if she'd sat idle that long. A mood that resets every launch
+isn't a mood, it's decoration, and this app gets restarted a lot. Pick
+up five minutes later and it resumes; pick up tomorrow and last night's
+is long gone. Saved in `agent/mood.json`.
 
 **The label sticks.** A value has to clear a band boundary properly
 before the label changes, because resting a hair from an edge made the
@@ -118,7 +127,9 @@ Small enough to read as mood rather than as a broken setting.
 |---------|--------------|
 | `intensity` | How far she swings and how strongly it shows. 0 is almost flat (the ship's computer end: she rests calm and nothing moves her), 1 is as designed, 2 wears her heart on her sleeve |
 | `warmth` | Where she settles when nothing's pushing |
-| `recovery` | How hard each turn pulls her home: 0 means moods never fade, 1 means nothing survives a single turn |
+| `recovery` | How hard each turn pulls her home: 0 means turns never pull her back, 1 means nothing survives a single turn |
+| `settle_minutes` | Minutes for half of any extra warmth or energy to wear off on its own (45) |
+| `desire_minutes` | Minutes for half of desire to wear off on its own (20) |
 | `prompt` | The one line in her system prompt |
 | `voice` | The speed and pitch tint |
 | `face` | Her face on the portrait, and the quick feelings |
@@ -169,7 +180,7 @@ Her touch reactions follow too: `portrait/touch.json` has `lewd` and
 files can tag `moods: ['lewd']` to join in.
 
 `/mood` shows desire and any grudge with the time left. Both survive a
-restart (desire faded by the time away).
+restart (desire wound down by the time away).
 
 ### Streams where lewd isn't allowed
 
@@ -253,11 +264,21 @@ turns the whole thing off: the header row disappears with it.
 
 The one signal that asks the model instead of reading the session, and
 the only one that costs anything: after her reply, a short background
-call reads what you said and what she answered and returns one line:
+call reads what you said and what she answered and returns one line.
+An everyday message reads:
 
 ```
-2 + + laughing 1 normal
+0 = = none 0 normal
 ```
+
+Your warmth, the warmth mark, flirting and heaviness rate **your
+message alone**; her answer only feeds energy and the feeling. (It used
+to read them side by side with a sample line of `2 + + laughing 1`, and
+the model copied it: nearly every message came back affectionate and
+flirty, a web search included, so she never came down.)
+`/mood check` runs your last 20 exchanges (`/mood check 40` for more)
+through the old reading and the new and shows both side by side, so you
+can see what it does on your model. Nothing about her mood moves.
 
 - **how warm your message was**, 0-3, the warmth rating below
 - **energy**, `-` `=` `+`: did that wear on her or liven her up

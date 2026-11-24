@@ -140,7 +140,7 @@ class OneWindowAProfile(unittest.TestCase):
                 mock.patch.object(self.pw, "command", return_value=["firefox", "x"]), \
                 mock.patch.object(self.pw, "_holder", return_value=None), \
                 mock.patch("subprocess.Popen", return_value=proc) as start, \
-                mock.patch.object(self.pw, "_raise", return_value=True) as front:
+                mock.patch.object(self.pw, "_raise", return_value=(True, "test")) as front:
             self.assertIs(self.pw.open_app("http://x/", 1, 1, "luna-chat"), proc)
             self.assertIs(self.pw.open_app("http://x/", 1, 1, "luna-chat"), proc)
             proc.poll.return_value = 0                         # closed: the next one opens anew
@@ -156,7 +156,7 @@ class OneWindowAProfile(unittest.TestCase):
         with mock.patch.object(self.pw, "_profile_dirs", return_value=[folder]):
             self.assertEqual(self.pw._holder("x"), os.getpid())
             with mock.patch("subprocess.Popen") as start, \
-                    mock.patch.object(self.pw, "_raise", return_value=False) as front:
+                    mock.patch.object(self.pw, "_raise", return_value=(False, "test")) as front:
                 self.assertIsNone(self.pw.open_app("http://x/", 1, 1, "x"))
             start.assert_not_called()
             front.assert_called_once_with(os.getpid())
@@ -174,7 +174,7 @@ class OneWindowAProfile(unittest.TestCase):
                 mock.patch("shutil.which", return_value="/usr/bin/hyprctl"), \
                 mock.patch.object(self.pw, "_group", return_value={4242, 4243}), \
                 mock.patch("subprocess.run", side_effect=run) as ran:
-            self.assertTrue(self.pw._raise(4242))
+            self.assertEqual(self.pw._raise(4242)[0], True)
         self.assertEqual(list(ran.call_args.args[0]), ["hyprctl", "dispatch", "focuswindow", "address:0xabc"])
 
 

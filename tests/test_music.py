@@ -126,6 +126,12 @@ class Track(unittest.TestCase):
         finally:
             music._listening.release()
 
+    def test_a_failure_says_why(self):
+        with mock.patch.object(music, "record", return_value=b"x" * 100), \
+                mock.patch.object(music, "ask", side_effect=RuntimeError("404 at /health/listen")):
+            self.assertIsNone(music.listen_now())
+        self.assertIn("404 at /health/listen", music._state["why"])
+
     def test_off_without_url(self):
         with mock.patch.object(config, "MUSIC_URL", "", create=True):
             self.assertFalse(music.enabled())
@@ -145,6 +151,27 @@ except ImportError:
 
 
 @unittest.skipIf(listen is None, "numpy isn't installed")
+class MusicNow(unittest.TestCase):
+    """Real threads here: Track's setUp runs every Thread inline."""
+
+    def test_music_now_waits_for_a_listen_under_way(self):
+        """/music now landing on the track's own listen used to say it couldn't."""
+        import threading
+        heard = dict(music.summary(ANSWER, 1000.0))
+        self.addCleanup(music._state.update, answer=None)
+        music._listening.acquire()
+        got = []
+        t = threading.Thread(target=lambda: got.append(music.listen_now(wait=True)))
+        t.start()
+        t.join(0.2)
+        self.assertEqual(got, [])                          # waiting, not failing
+        music._state["answer"] = heard
+        music._listening.release()
+        t.join(2)
+        self.assertEqual(got, [heard])
+
+
+
 class Service(unittest.TestCase):
     def test_kind(self):
         labels = ["Non-Music---Spoken Word", "Electronic---Techno"]
@@ -171,3 +198,58 @@ class Service(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Address(unittest.TestCase):
+    """music.url is the service's address; one of its paths pasted in (as
+    Ryan's was: .../health) sent every clip to .../health/listen, a 404."""
+
+    def test_a_pasted_path_is_taken_off(self):
+        for url in ("http://192.168.0.186:8795", "http://192.168.0.186:8795/", "http://192.168.0.186:8795/health",
+                    "http://192.168.0.186:8795/listen/", " http://192.168.0.186:8795/HEALTH "):
+            with mock.patch.object(music.config, "MUSIC_URL", url, create=True):
+                self.assertEqual(music.service(), "http://192.168.0.186:8795", url)
+
+    def test_clips_go_to_listen(self):
+        seen = []
+        class Reply(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        def opened(req, timeout):
+            seen.append(req.full_url)
+            return Reply(b'{"kind": "music"}')
+        with mock.patch.object(music.config, "MUSIC_URL", "http://h:8795/health", create=True), \
+                mock.patch("urllib.request.urlopen", side_effect=opened):
+            self.assertEqual(music.ask(b"wav"), {"kind": "music"})
+        self.assertEqual(seen, ["http://h:8795/listen"])
+
+    def test_a_404_says_what_to_set(self):
+        import urllib.error
+        err = urllib.error.HTTPError("http://h:9/x/listen", 404, "Not Found", {}, None)
+        with mock.patch.object(music.config, "MUSIC_URL", "http://h:9/x", create=True), \
+                mock.patch("urllib.request.urlopen", side_effect=err):
+            with self.assertRaisesRegex(RuntimeError, "should be its address"):
+                music.ask(b"wav")
+
+
+class TheEventLeaves(unittest.TestCase):
+    """The music event has its own "kind" field (music, speech, mixed): it
+    collided with emit's first argument, a TypeError on every song."""
+
+    def test_sent_with_its_kind(self):
+        from web import livefeed
+        seen = []
+        with mock.patch.object(livefeed, "_line", side_effect=lambda ev: seen.append(ev) or "x"), \
+                mock.patch.object(livefeed, "_subs", [object()]), mock.patch.object(livefeed, "_send_all", create=True):
+            try:
+                livefeed.emit("music", on=True, kind="music", bpm=128)
+            except Exception:
+                pass
+        self.assertEqual((seen[0]["t"], seen[0]["kind"]), ("music", "music"))
+
+    def test_send_doesnt_raise(self):
+        s = music.summary(ANSWER, 1000.0)
+        with mock.patch("web.livefeed.emit") as emit:
+            music._send(s)
+        self.assertEqual(emit.call_args.args, ("music",))
+        self.assertEqual(emit.call_args.kwargs["kind"], "music")

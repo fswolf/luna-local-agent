@@ -195,9 +195,9 @@ def _group(pid):
 
 
 def _raise(pid):
-    """Bring the window of this process (or its group) to the front. True if a
-    window manager that can do it was found and did: Hyprland, Sway, X11
-    (xdotool or wmctrl) or Windows. GNOME and KDE on Wayland offer no way."""
+    """Bring the window of this process (or its group) to the front:
+    (done, how it went, for the log). Hyprland, Sway, X11 (xdotool or
+    wmctrl) or Windows; GNOME and KDE on Wayland offer no way."""
     import json
     import shutil
     import subprocess
@@ -207,35 +207,45 @@ def _raise(pid):
 
     try:
         if os.name == "nt":
-            return _raise_windows(pid)
+            return (True, "windows") if _raise_windows(pid) else (False, f"windows: no window for pid {pid}")
         pids = _group(pid)
         if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") and shutil.which("hyprctl"):
-            for c in json.loads(run("hyprctl", "-j", "clients").stdout or "[]"):
+            clients = json.loads(run("hyprctl", "-j", "clients").stdout or "[]")
+            for c in clients:
                 if c.get("pid") in pids:
-                    return run("hyprctl", "dispatch", "focuswindow", f"address:{c['address']}").returncode == 0
-            return False
+                    done = run("hyprctl", "dispatch", "focuswindow", f"address:{c['address']}").returncode == 0
+                    return done, f"hyprland: focuswindow {c['address']} " + ("done" if done else "failed")
+            return False, (f"hyprland: none of {len(clients)} windows belongs to pids {sorted(pids)[:8]} "
+                           f"(window pids: {sorted({c.get('pid') for c in clients})[:12]})")
         if os.environ.get("SWAYSOCK") and shutil.which("swaymsg"):
             stack = [json.loads(run("swaymsg", "-t", "get_tree").stdout or "{}")]
             while stack:
                 node = stack.pop()
                 if node.get("pid") in pids:
-                    return run("swaymsg", f"[con_id={node['id']}]", "focus").returncode == 0
+                    done = run("swaymsg", f"[con_id={node['id']}]", "focus").returncode == 0
+                    return done, "sway: focus " + ("done" if done else "failed")
                 stack += node.get("nodes", []) + node.get("floating_nodes", [])
-            return False
+            return False, f"sway: no window for pids {sorted(pids)[:8]}"
         if os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
             if shutil.which("xdotool"):
                 for p in pids:
                     found = run("xdotool", "search", "--onlyvisible", "--pid", str(p)).stdout.split()
                     if found:
-                        return run("xdotool", "windowactivate", found[-1]).returncode == 0
+                        done = run("xdotool", "windowactivate", found[-1]).returncode == 0
+                        return done, "x11: xdotool " + ("done" if done else "failed")
             if shutil.which("wmctrl"):
                 for line in run("wmctrl", "-lp").stdout.splitlines():
                     parts = line.split()
                     if len(parts) > 2 and parts[2].isdigit() and int(parts[2]) in pids:
-                        return run("wmctrl", "-ia", parts[0]).returncode == 0
-    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
-        pass
-    return False
+                        done = run("wmctrl", "-ia", parts[0]).returncode == 0
+                        return done, "x11: wmctrl " + ("done" if done else "failed")
+            return False, "x11: no window found (xdotool or wmctrl needed)"
+        desktop = os.environ.get("XDG_CURRENT_DESKTOP") or "this desktop"
+        return False, (f"{desktop} gives apps no way to bring a window to the front "
+                       f"(Hyprland seen: {bool(os.environ.get('HYPRLAND_INSTANCE_SIGNATURE'))}, "
+                       f"hyprctl found: {bool(shutil.which('hyprctl'))})")
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as e:
+        return False, f"couldn't ask the window manager: {e}"
 
 
 def _raise_windows(pid):
@@ -264,9 +274,9 @@ def _raise_windows(pid):
 def _front(pid, profile):
     from core import logbook
 
-    if not _raise(pid):
-        logbook.info("window", "the %s window is already open (this desktop gives no way to bring it "
-                     "to the front)", profile)
+    done, how = _raise(pid)
+    logbook.info("window", "the %s window is already open: %s", profile,
+                 "brought to the front" if done else f"left where it is ({how})")
 
 
 def open_app(url, w, h, profile):

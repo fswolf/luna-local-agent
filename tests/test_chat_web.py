@@ -318,3 +318,220 @@ class Switcher(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MicDictates(unittest.TestCase):
+    """The chat page's mic puts your words in its text box; HOME still sends."""
+
+    def setUp(self):
+        import sys
+        import ui
+        self.ptt = mock.Mock()
+        self.ptt.mode.return_value = "auto"
+        # only this one entry: patch.dict(sys.modules) put the whole table
+        # back afterwards, dropping every module first imported meanwhile, and
+        # a later test importing one of them again failed ("cannot load
+        # module more than once per process")
+        had = sys.modules.get("voice.ptt")
+        sys.modules["voice.ptt"] = self.ptt
+        self.addCleanup(lambda: sys.modules.__setitem__("voice.ptt", had) if had is not None
+                        else sys.modules.pop("voice.ptt", None))
+        patches = [mock.patch.object(ui.view, "on_hotkey", mock.Mock()),
+                   mock.patch.object(ui.view, "loop", None)]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.start = chat_web.DICTATED["id"]
+
+    def _dictate(self, heard):
+        import threading
+        done = threading.Event()
+        def fake(mode):
+            try:
+                return heard
+            finally:
+                done.set()
+        with mock.patch("core.assistant.dictation", side_effect=fake) as dictation, \
+                mock.patch("ui.set_status"):
+            self.assertIsNone(chat_web.dictate("pg1"))
+            self.assertTrue(done.wait(2))
+            for _ in range(100):
+                if chat_web.DICTATED["id"] != self.start:
+                    break
+                time.sleep(0.01)
+        return dictation
+
+    def test_words_wait_for_the_page_and_nothing_is_answered(self):
+        with mock.patch("core.assistant.respond") as respond:
+            dictation = self._dictate("turn the lights down")
+        dictation.assert_called_once_with("auto")
+        respond.assert_not_called()
+        self.assertNotEqual(chat_web.DICTATED["id"], self.start)
+        self.assertEqual((chat_web.DICTATED["page"], chat_web.DICTATED["text"]), ("pg1", "turn the lights down"))
+        self.assertEqual(chat_web.state(wait=0)["dictated"]["text"], "turn the lights down")
+
+    def test_cancelled_is_not_nothing_heard(self):
+        self._dictate(None)
+        self.assertIsNone(chat_web.DICTATED["text"])
+
+    def test_hands_free_mode_keeps_the_button_switching_it(self):
+        import ui
+        self.ptt.mode.return_value = "open"
+        with mock.patch("core.assistant.dictation") as dictation:
+            self.assertIsNone(chat_web.dictate())
+        dictation.assert_not_called()
+        ui.view.on_hotkey.assert_called_once()
+
+    def test_a_click_while_recording_is_home(self):
+        import ui
+        from core import interrupts
+        stop = interrupts.open("voice")
+        self.addCleanup(interrupts.close, stop)
+        with mock.patch("core.assistant.dictation") as dictation:
+            chat_web.dictate()
+        dictation.assert_not_called()
+        ui.view.on_hotkey.assert_called_once()
+
+    def test_her_answer_to_typing_doesnt_block_dictation(self):
+        import ui
+        from core import interrupts
+        typed = interrupts.open("typed")
+        self.addCleanup(interrupts.close, typed)
+        self._dictate("and another thing")
+        ui.view.on_hotkey.assert_not_called()
+        self.assertFalse(typed.generating.is_set())       # her reply still finishes
+        self.assertEqual(chat_web.DICTATED["text"], "and another thing")
+
+
+class DictateRoute(unittest.TestCase):
+    def test_the_page_id_reaches_dictate_and_the_page_still_loads(self):
+        with mock.patch.object(chat_web, "dictate", return_value=None) as dictate:
+            code, _kind, _body = chat_web.handle("POST", "/dictate", b'{"page": "abc"}')
+            self.assertEqual(code, 200)
+            dictate.assert_called_once_with("abc")
+            self.assertEqual(chat_web.handle("POST", "/dictate", b"not json")[0], 200)
+        self.assertEqual(chat_web.handle("GET", "/", b"")[0], 200)
+
+
+class SayItAgain(unittest.TestCase):
+    """The speaker under her reply: says it again, holding her turn while it
+    plays, as any turn of hers does; again on it stops it."""
+
+    def setUp(self):
+        import threading
+        import ui
+        from ui.shared import _lock
+        with _lock:
+            self.saved = list(ui.conversation)
+            ui.conversation[:] = [("user", "hi"), ("luna", "Hello there. How are you?"), ("system", "note")]
+        self.addCleanup(self._restore)
+        self.epoch = ui.view.epoch
+        self.heard, self.done = [], threading.Event()
+
+        def player(stop):                              # plays until stopped, or for a second
+            p = mock.Mock(say=self.heard.append)
+            p.wait.side_effect = lambda: (stop.speaking.wait(1), self.done.set())
+            return p
+        for patch in (mock.patch("ui.conversation_pane._voice_on", return_value=True),
+                      mock.patch.object(chat_web, "_player", side_effect=player),
+                      mock.patch.object(chat_web, "REPLAY_WAIT", 0.2)):
+            patch.start()
+            self.addCleanup(patch.stop)
+        chat_web._replay.update(at=None, stop=None)
+
+    def _restore(self):
+        import ui
+        from ui.shared import _lock
+        stop = chat_web._replay["stop"]
+        if stop is not None:
+            stop.stop(speaking=True)
+        self.done.wait(2)
+        with _lock:
+            ui.conversation[:] = self.saved
+
+    def speak(self, i, e=None):
+        code, _kind, body = chat_web.handle("POST", "/speak", json.dumps({"e": self.epoch if e is None else e, "i": i}).encode())
+        return code, json.loads(body)
+
+    def test_says_her_reply_holding_her_turn(self):
+        from core import assistant
+        self.assertEqual(self.speak(1), (200, {"ok": True, "playing": True}))
+        self.assertEqual(chat_web.replaying(), [self.epoch, 1])
+        self.assertEqual(chat_web.state(wait=0)["replay"], [self.epoch, 1])
+        self.assertTrue(assistant._turn.locked())
+        chat_web._replay["stop"].stop(speaking=True)
+        self.assertTrue(self.done.wait(2))
+        for _ in range(100):
+            if not assistant._turn.locked():
+                break
+            time.sleep(0.01)
+        self.assertFalse(assistant._turn.locked())          # given back when it's done
+        self.assertEqual(" ".join(self.heard), "Hello there. How are you?")
+        self.assertIsNone(chat_web.replaying())
+
+    def test_again_on_the_same_one_stops_it(self):
+        self.speak(1)
+        stop = chat_web._replay["stop"]
+        self.assertEqual(self.speak(1), (200, {"ok": True, "playing": False}))
+        self.assertTrue(stop.speaking.is_set())
+        self.assertIsNone(chat_web.replaying())
+
+    def test_only_her_replies_still_on_screen(self):
+        self.assertEqual(self.speak(0)[0], 409)          # yours
+        self.assertEqual(self.speak(2)[0], 409)          # a system line
+        self.assertEqual(self.speak(9)[0], 409)          # gone
+        self.assertEqual(self.speak(1, e=self.epoch + 1)[0], 409)   # before a /clear
+
+    def test_not_over_her_turn(self):
+        from core import assistant
+        assistant._turn.acquire()
+        try:
+            self.assertEqual(self.speak(1)[0], 409)
+        finally:
+            assistant._turn.release()
+        self.assertEqual(self.heard, [])
+
+    def test_a_new_turn_cuts_it_short_and_goes_ahead(self):
+        from core import assistant
+        self.speak(1)
+        stop = chat_web._replay["stop"]
+        with mock.patch.object(assistant, "_respond", return_value="ok"), \
+                mock.patch.object(assistant, "_gone", return_value=None), \
+                mock.patch.object(assistant, "_plugins_hear"), mock.patch.object(assistant, "_drift_mood"):
+            self.assertEqual(assistant.respond("hi", "m"), "ok")
+        self.assertTrue(stop.speaking.is_set())
+
+    def test_a_reminder_waits_for_it(self):
+        from life import reminders
+        order = []
+        self.speak(1)
+        with mock.patch("llm.ask", side_effect=lambda *a, **k: order.append("reminder") or "ok"), \
+                mock.patch("ui.add_message"), mock.patch("ui.set_status"), mock.patch("voice.speech.speak"), \
+                mock.patch.object(reminders, "_note_away"), mock.patch.object(reminders, "_sticky"):
+            import threading
+            t = threading.Thread(target=reminders._deliver, args=("m", ["bins"]))
+            t.start()
+            t.join(0.2)
+            order.append("replay ends")
+            chat_web._replay["stop"].stop(speaking=True)
+            t.join(2)
+        self.assertEqual(order, ["replay ends", "reminder"])
+
+
+class StopShowsForAnything(unittest.TestCase):
+    """Her greeting after a restart isn't one of your turns, but Stop must
+    still show for it (and for a reminder, a reply said again...)."""
+
+    def test_a_greeting_is_stoppable_but_not_your_turn(self):
+        from core import interrupts
+        stop = interrupts.open("greeting")
+        self.addCleanup(interrupts.close, stop)
+        for st in (chat_web.state(wait=0), chat_web.state(wait=0, head=True)):
+            self.assertFalse(st["busy"])
+            self.assertTrue(st["stoppable"])
+
+    def test_nothing_going_on(self):
+        from core import interrupts
+        with mock.patch.object(interrupts, "_open", []):
+            st = chat_web.state(wait=0)
+        self.assertFalse(st["stoppable"])

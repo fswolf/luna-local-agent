@@ -18,6 +18,7 @@ blurred here). Click a long one to read all of it.
 | `calculate` | Exact sums and unit conversions: "18% of 340", "340 + 15%", "160 F to C", "5 miles in km" |
 | `set_reminder` | Schedule anything: "tomorrow at 9", "every monday" |
 | `set_alarm` | A wake-up: rings and nags until dismissed |
+| `set_task` | Something for her to do herself when it's due ("check my email every day at 6"): a full turn of hers, with the day's conversation, kept in history. One that fails partway isn't tried again (it may have sent something already) |
 | `list_reminders` / `cancel_reminder` | Read and cancel what's pending |
 | `remember_fact` / `recall_facts` | Long-term memory, written deliberately |
 | `forget_fact` / `update_fact` | Forget something for good, or update it when it changed (the old version kept as history) |
@@ -127,7 +128,8 @@ that's off, she tells you, so you know which switch to flip.
 
 **Tab twice** opens the tools pane: every tool, what it costs, and
 space to switch it on or off. At the top, **Permissions** sets read,
-write and execute (allow, ask or off; see [Files](files.md)). The total at the top moves as you go, so
+write, execute, home, email and send email (allow, ask or off; see [Files](files.md)), the
+same rows as the settings page's Permissions box. The total at the top moves as you go, so
 you can see what you're buying back.
 
 A tool shown as `--` can't be offered right now, and the line beside it

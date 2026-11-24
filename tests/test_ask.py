@@ -62,7 +62,9 @@ class Ask(unittest.TestCase):
 
     def test_not_in_the_lewd_row(self):
         with mock.patch.object(ask, "_lewd", lambda: True):
-            self.assertIn("Not now", self.run_tool("ask claude"))
+            said = self.run_tool("ask claude")
+        self.assertIn("Not sent", said)
+        self.assertIn("your own privacy rule", said)                 # not the other model refusing
         self.assertEqual(self.calls, [])
 
     def test_daily_cap(self):
@@ -236,6 +238,53 @@ class Panes(unittest.TestCase):
         from config.schema import SCHEMA
         for key in ("enabled", "provider", "auto", "auto_daily", "daily_cap"):
             self.assertIn(f"plugins.ask.{key}", SCHEMA)
+
+
+class WhyItCameBackEmpty(unittest.TestCase):
+    """The call itself (_call), against the replies Anthropic and the others send:
+    Claude thinks by default and the thinking counts toward max_tokens."""
+
+    def call(self, provider, reply):
+        with mock.patch.object(ask, "_key", return_value="k"), \
+                mock.patch.object(ask, "settings", return_value={"models": {}, "max_tokens": 4096}), \
+                mock.patch.object(ask, "_post", return_value=reply) as post:
+            try:
+                return ask._call(provider, "how do I set up a ticket system?"), post
+            except RuntimeError as e:
+                return e, post
+
+    def test_room_to_think_and_answer(self):
+        _out, post = self.call("claude", {"content": [{"type": "text", "text": "Use a bot."}], "stop_reason": "end_turn"})
+        self.assertEqual(post.call_args.args[2]["max_tokens"], 4096)
+        self.assertEqual(ask.MAX_TOKENS, 4096)
+
+    def test_thinking_only_out_of_room(self):
+        err, _ = self.call("claude", {"content": [{"type": "thinking", "thinking": "", "signature": "s"}],
+                                      "stop_reason": "max_tokens"})
+        self.assertIn("ran out of room thinking", str(err))
+        self.assertIn("plugins.ask.max_tokens", str(err))
+
+    def test_the_answer_is_kept_past_the_thinking(self):
+        out, _ = self.call("claude", {"content": [{"type": "thinking", "thinking": ""},
+                                                  {"type": "text", "text": "Use a ticket bot."}],
+                                      "stop_reason": "end_turn"})
+        self.assertEqual(out, "Use a ticket bot.")
+
+    def test_cut_off_partway_says_so(self):
+        out, _ = self.call("claude", {"content": [{"type": "text", "text": "First, make a"}], "stop_reason": "max_tokens"})
+        self.assertTrue(out.endswith("[cut off: it ran out of room partway]"))
+
+    def test_declined(self):
+        err, _ = self.call("claude", {"content": [], "stop_reason": "refusal"})
+        self.assertEqual(str(err), "it declined to answer that")
+        err, _ = self.call("grok", {"choices": [{"message": {"content": ""}, "finish_reason": "content_filter"}]})
+        self.assertEqual(str(err), "it declined to answer that")
+
+    def test_any_other_empty_says_what_came_back(self):
+        err, _ = self.call("claude", {"content": [], "stop_reason": "end_turn"})
+        self.assertIn("stopped: end_turn", str(err))
+        err, _ = self.call("openai", {"choices": [{"message": {"content": None}, "finish_reason": "length"}]})
+        self.assertIn("ran out of room", str(err))
 
 
 if __name__ == "__main__":

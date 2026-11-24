@@ -70,6 +70,18 @@ def _note_mood(text, answer, model):
         pass  # decoration; never the reason a turn fails
 
 
+def _drift_mood():
+    """After every turn of yours, typed, spoken or from a station: the dials
+    take their step home. It used to run only after typed turns (main.py),
+    so a voice evening never drifted at all, only gained."""
+    try:
+        from mind import mood
+
+        mood.note_turn()
+    except Exception:
+        pass  # decoration; never the reason a turn fails
+
+
 def _gone(text=None, model=None):
     """mood.walk_away: has she walked away? None if she's here. Otherwise
     what she says: her one leaving line the first time, then "".
@@ -162,7 +174,9 @@ def respond(text, model, source="typed", speaker=None, sink=None, approver=None,
                         _say_away(said)
                     return said
 
-                return _respond(text, model, source, stop, speaker, sink, approver, recording, attachment)
+                answer = _respond(text, model, source, stop, speaker, sink, approver, recording, attachment)
+                _drift_mood()
+                return answer
             finally:
                 _hold(None)
 
@@ -436,6 +450,42 @@ def assistant_task(model, mode=None):
     """
     with interrupts.ensure("voice") as stop:
         return _spoken_turn(model, mode, stop)
+
+
+def dictation(mode=None):
+    """The chat page's mic: record and transcribe like a spoken turn, but
+    hand the words back for its text box instead of answering them, so you
+    can fix what Whisper misheard before you send it. Runs as the caller's
+    Stop (web/chat_web.py opens a "voice" one at the click, so HOME, Stop and
+    a second click find it). Returns the words, "" for nothing heard, or
+    None when it was cancelled (Stop, HOME), so the page says nothing then."""
+    with interrupts.ensure("voice") as stop:
+        if not speech.ready():
+            ui.add_message("system", "Still loading the speech models - one moment.")
+            return None
+
+        ui.set_status("Listening..." if mode != "manual" else "Recording...")
+        try:
+            stop.recording = True
+            try:
+                filename = record_audio(mode)
+            finally:
+                stop.recording = False
+
+            if stop.generating.is_set():
+                return None
+            if filename is None:                  # the detector never heard a sentence
+                return ""
+
+            ui.set_status("Transcribing...")
+            text = transcribe(filename)
+            return None if stop.generating.is_set() else (text or "").strip()
+        except Exception as e:
+            logbook.exception("turn", "dictation failed")
+            ui.add_message("system", f"Dictation didn't work: {e}" if str(e) else f"Dictation didn't work: {type(e).__name__}")
+            return None
+        finally:
+            ui.set_status("Idle")
 
 
 def _whose_voice(filename, heard, at_desk=False):

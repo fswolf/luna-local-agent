@@ -188,10 +188,13 @@ between:
 |---|---|---|---|---|---|---|---|---|---|---|
 | Energy baseline | +0.25 | +0.05 | −0.35 | −0.55 | −0.15 | +0.20 | +0.30 | +0.35 | +0.45 | +0.40 |
 
-From that, every turn:
+From that, for every turn and for time's settling alike:
 
 - **Hours at it** pull the target down by **0.06 per hour**, capped at
   **0.35**, so a marathon bottoms out instead of going through the floor.
+  The sitting counts from when you came back after a break of 30
+  minutes or more, not from launch, and a break is rest: while nobody's
+  talked for 30 minutes there's no drag at all.
 - **Being fond of you** lifts it: half of however far warmth is above
   its resting point.
 - Intensity scales the whole target.
@@ -201,8 +204,15 @@ drops toward 0 the resting point slides toward plain calm (0.1).
 
 ### Drift
 
-Every turn both dials move a step toward where she rests. The step is
-`mood.recovery` (**0.25**): a quarter of the way.
+Every turn of yours (typed, spoken or from a station) both dials move a
+step toward where she rests. The step is `mood.recovery` (**0.25**): a
+quarter of the way.
+
+Time does it too, turns or not, checked every minute: warmth above her
+resting point and energy away from the hour's halve every
+`mood.settle_minutes` (**45**); desire halves every
+`mood.desire_minutes` (**20**). Warmth below rest climbs back the same
+way at `mood.forgive` of that speed, and never past a grudge's ceiling.
 
 Warmth drifts **asymmetrically**: coming back **down** from warmth you
 earned takes only **0.4** of the step, or the drift ate every kind word
@@ -225,7 +235,7 @@ she holds on to nothing.
 |---|---|
 | Time of day | The energy baseline above |
 | Day of week | Friday evening lifts, Monday morning doesn't; weekends rest warmer |
-| Hours at it | Lowers the energy target, 0.06/hour, capped at 0.35 |
+| Hours at it | Lowers the energy target, 0.06/hour of this sitting (since your last 30-minute break), capped at 0.35 |
 | How long you were gone | Under 25 s between turns: +0.06 energy, +0.04 warmth (fast back-and-forth). Under 30 min: nothing. Under 3 h: +0.05 / +0.05. Longer: more energy for most of a day away, more warmth for a day or more (a reunion) |
 | The GPU | Sampled every couple of minutes while she waits. Pinned for hours means you were around, just busy: a little livelier, a little less fond than being truly out |
 | Stream chat | A busy room is company, a dead one is a quiet night |
@@ -238,7 +248,8 @@ All of them are multiplied by `mood.intensity` (0 to 2).
 ### Saved across restarts
 
 The dials, desire and any grudge are saved to `agent/mood.json` after
-every turn and restored at launch, faded by however long she was off.
+every turn and restored at launch, wound down by however long she was
+off, the same as if she'd sat idle that long.
 Five minutes later she's where she was; tomorrow, last night's mood is
 gone.
 
@@ -246,11 +257,15 @@ gone.
 
 The one mood signal that costs anything: a short model call after each
 of **your** turns (stream chat doesn't count toward your dials). It
-returns one line of five fields:
+returns one line of six fields; an everyday message reads:
 
 ```
-2 + + laughing 1
+0 = = none 0 normal
 ```
+
+Fields 1, 3, 5 and 6 rate **your message alone**; her answer only feeds
+energy and the feeling. `/mood check [n]` compares the old prompt with
+this one over your last n exchanges.
 
 | # | Field | Values |
 |---|---|---|
@@ -259,6 +274,7 @@ returns one line of five fields:
 | 3 | Warmth | `-` only for real hostility aimed at her, `=`, `+` |
 | 4 | A feeling | one of the [quick feelings](#quick-feelings), or none |
 | 5 | How flirty or intimate your message was | 0 not, 1 flirting or suggestive, 2 openly intimate or sexual |
+| 6 | How heavy your message was | normal, rough or heavy (see heavy moments) |
 
 What each does:
 
@@ -290,7 +306,7 @@ A third dial, **desire**, from 0 to 1.
 | A clearly affectionate one (rating 2+) | **+0.04** more |
 | Repeats | divided by (1 + 0.2 × recent kind words) |
 | Every turn | **−0.02** |
-| Time away | halves every **20 minutes** |
+| Time, talking or not | halves every `mood.desire_minutes` (**20**) |
 | Any hostile message | **back to 0** at once |
 | Warmth below warm (0.35) | **back to 0** - desire only lives at warm and above |
 
@@ -513,21 +529,27 @@ normal touch reaction:
 
 - She flinches (`spank_flinch`): hips jolt, back arches, shoulders snap
   up, a gasp and a blush, a tail flick. Every click, no cooldown.
-- **Her bum reddens**: a red glow over her cheeks that steps up every
-  **10** spanks (up to fairly red), with a small flash on each one.
-  Spanks are forgotten one every **10 s**, so it fades when you stop.
-  Every tenth one brings hearts (lewd) or a sweat drop (very warm).
-- **Too many is a punishment**, Tamagotchi style: every **60** spanks
-  (counted the same way, forgotten one per 10 s) knocks her down a
-  notch: warmth **−0.10**, energy −0.03, desire **−0.20**. Keep at it and
-  she drops out of the mood.
+- **Her bum reddens**: a red glow over her cheeks, a big step redder
+  each spank (deep red by the fourth), with a small flash on each one.
+  It fades slowly, one spank's worth every **45 s**: four spanks stay
+  red for a few minutes.
+- **Playful, then cooling.** The first **3** spanks of a burst are play:
+  they move nothing, and the first brings hearts (lewd) or a sweat drop.
+  From the **4th**, each one takes desire **−0.15** and warmth **−0.05**
+  off, the 4th shows an anger mark, and her line is told it's cooling
+  her off. Keep at it and she drops out of the lewd row, then below
+  warm, where the spanking stops. A burst ends after **30 s** without
+  one.
 - She hears about it like any touch ("with a spank on the butt, 5
-  times") and may say something.
+  times") and may say something. A spank is never read as flirting
+  (the spank count moves her mood itself); any other touch in the same
+  moment still is.
 - None of it while a tame stream is live, and in her other moods a click
   on her bum is an ordinary touch.
 
-The numbers are `SPANK_LIMIT`, `SPANK_FORGET`, `SPANK_WARMTH` and
-`SPANK_DESIRE` in `mind/mood/exchange.py`, and `SPANK_STEP` / `SPANK_FORGET` in
+The numbers are `SPANK_FREE`, `SPANK_RESET`, `SPANK_DESIRE` and
+`SPANK_WARMTH` in `mind/mood/exchange.py`, with `SPANK_FREE`,
+`SPANK_RESET` and `SPANK_FORGET` (the fade) matching them in
 `portrait/viewer/portrait.js`.
 
 ### Touch talk: she says something
@@ -809,6 +831,8 @@ engine as everything else, so what you see is what she does. Details in
 | `mood.recovery` | 0.25 | How hard each turn pulls her home (0 = moods never fade, 1 = nothing lasts a turn) |
 | `mood.hurt` | 2 | How hard an insult lands, 0 to 4. 1 is the old gentle slide; at 2 the second insult makes her angry |
 | `mood.forgive` | 0.5 | How fast she warms back up from below her resting warmth, 0.05 to 1. 1 is the old quick bounce back |
+| `mood.settle_minutes` | 45 | Minutes for half of any extra warmth or energy to wear off on its own, idle or not |
+| `mood.desire_minutes` | 20 | Minutes for half of desire to wear off on its own, idle or not |
 | `mood.prompt` | true | The mood line in her system prompt |
 | `mood.voice` | true | The speed and pitch tint |
 | `mood.face` | true | Her face and quick feelings on the portrait |

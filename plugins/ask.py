@@ -42,7 +42,9 @@ Settings, config.json plugins.ask:
     daily_cap   30 questions a day, all providers together
     auto        false: true lets her ask on her own when stuck (/ask auto on)
     auto_daily  5 of those a day, at most
-    max_tokens  600 (Claude only; the others are kept short by the instructions)
+    max_tokens  4096 (Claude only): room to think and answer. Claude thinks by
+                default and the thinking counts toward this; the answer itself
+                is kept short by the instructions. The others get no limit.
 """
 import json
 import os
@@ -78,6 +80,10 @@ SYSTEM = ("You're answering a question from Luna, a small AI assistant running o
 ASK_WINDOW = 180            # seconds your "ask Claude" stays good for
 PER_MESSAGE = 2             # questions per message of yours (a follow-up, at most)
 MAX_QUESTION = 1000
+# Claude's room to think and answer. Current Claude models think by default and
+# the thinking counts toward max_tokens: at 600, a question worth thinking about
+# used it all up and came back as a thinking block with no answer.
+MAX_TOKENS = 4096
 
 _lock = threading.Lock()
 _running = False
@@ -92,7 +98,7 @@ def settings():
     return {"provider": str(s.get("provider") or "claude").lower(),
             "models": dict(s.get("models") or {}),
             "daily_cap": int(s.get("daily_cap", 30)),
-            "max_tokens": int(s.get("max_tokens", 600)),
+            "max_tokens": int(s.get("max_tokens", MAX_TOKENS)),
             "auto": s.get("auto") is True,
             "auto_daily": int(s.get("auto_daily", 5))}
 
@@ -135,23 +141,42 @@ def _post(url, headers, body, timeout=60):
 
 
 def _call(provider, question):
-    """The bigger model's answer, as text. Raises with a reason."""
+    """The bigger model's answer, as text. Raises with a reason: why it came
+    back empty (out of room, declined), never just "empty"."""
     key, model, limit = _key(provider), _model(provider), settings()["max_tokens"]
     if provider == "claude":
         data = _post("https://api.anthropic.com/v1/messages",
                      {"x-api-key": key, "anthropic-version": "2023-06-01"},
                      {"model": model, "max_tokens": limit, "system": SYSTEM,
                       "messages": [{"role": "user", "content": question}]})
-        text = "".join(b.get("text", "") for b in data.get("content") or [] if b.get("type") == "text")
+        blocks = [b for b in data.get("content") or [] if isinstance(b, dict)]
+        text = "".join(str(b.get("text") or "") for b in blocks if b.get("type") == "text")
+        stop = str(data.get("stop_reason") or "")
+        got = ", ".join(sorted({str(b.get("type")) for b in blocks})) or "nothing"
+        out_of_room, declined = stop == "max_tokens", stop == "refusal"
     else:
         # No token limit: the two name it differently, and a reasoning model spends it thinking.
         data = _post(PROVIDERS[provider]["url"], {"Authorization": f"Bearer {key}"},
                      {"model": model,
                       "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": question}]})
-        text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        choice = (data.get("choices") or [{}])[0] or {}
+        text = (choice.get("message") or {}).get("content") or ""
+        stop = str(choice.get("finish_reason") or "")
+        got = "text" if text else "nothing"
+        out_of_room, declined = stop == "length", stop == "content_filter"
     text = str(text).strip()
+    if stop not in ("", "end_turn", "stop", "stop_sequence"):
+        logbook.info("ask", "%s stopped: %s (sent back: %s)", provider, stop, got)
     if not text:
-        raise RuntimeError("an empty answer")
+        if out_of_room:
+            raise RuntimeError("it ran out of room thinking before it wrote an answer" +
+                               (f" (max_tokens {limit}; plugins.ask.max_tokens raises it)"
+                                if provider == "claude" else ""))
+        if declined:
+            raise RuntimeError("it declined to answer that")
+        raise RuntimeError(f"an empty answer (stopped: {stop or 'no reason given'}, sent back: {got})")
+    if out_of_room:
+        text += "\n[cut off: it ran out of room partway]"
     return text
 
 
@@ -222,7 +247,10 @@ def _why_not():
     if not turn.private or turn.speaker or turn.remote or turn.job:
         return "Only the user's own conversation can ask a bigger model."
     if _lewd():
-        return "Not now: questions to a bigger model never go out from this mood."
+        return ("Not sent: while your mood is this warm, nothing goes to an outside model. That's your "
+                "own privacy rule, so nothing from a private moment leaves this computer; the other "
+                "model never saw the question and didn't refuse anything. It works again once your "
+                "mood cools. Tell the user that plainly.")
     with _lock:
         if _asked and time.time() - _asked["at"] <= ASK_WINDOW and _asked["left"] > 0:
             return ""

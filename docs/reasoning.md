@@ -258,8 +258,15 @@ when a reply ends with a step she announced ("let me read the file and
 fix it~") but she called no tool, the turn doesn't end there. She's
 told she skipped it, and the step runs as a normal tool turn, carrying
 on from what she said. Small models announce more often than they act,
-and from outside it looked like she'd stalled. `/set
-adaptive.follow_through false` turns it off.
+and from outside it looked like she'd stalled. She's told her reply is
+already out, so she adds only what the step showed instead of retelling
+it. `/set adaptive.follow_through false` turns it off.
+
+In history a turn like that is kept as it happened: her reply, the note
+that sent her back, what she called, what she said then. Her next turns
+read it in that order. Kept as one glued reply, it read as her saying
+everything and then saying it all again, and she started doing exactly
+that.
 
 The same check runs the other way round: a reply that says something
 is done when this turn's tools don't back it. "Done and done~" or
@@ -279,8 +286,10 @@ llama-server, for your turns, never stream chat. It needs the token
 probabilities, so LM Studio gets neither the budget nor the rethink.
 
 Both passes are kept: the second look is its own row in the thought log,
-marked **rethink**, right after the turn it reconsidered. The
-**rethinks** filter lists them, and the live monitor shows the second
+right after the turn it reconsidered, marked **second look · not said**
+(checked behind the scenes, her first answer stood) or **correction ·
+said** (she said it after her first answer). The **second looks** filter
+lists them, and the live monitor shows the second
 look as it happens. Over time that answers the research question
 directly: when she was unsure, did more thinking actually help?
 

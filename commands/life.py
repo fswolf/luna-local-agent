@@ -14,6 +14,39 @@ from life import reading
 import ui
 
 
+def _mood_check(count):
+    """/mood check [n]: the exchange reader's old prompt and new one over
+    your last n exchanges (mind/mood/appraise.py check). Two model calls
+    each, so on a worker, and one message at the end."""
+    import sys
+
+    from mind.mood import appraise
+
+    model = getattr(sys.modules.get("__main__"), "MODEL", None)
+    if not model:
+        ui.add_message("system", "No model loaded to check with.")
+        return
+    try:
+        n = max(1, min(60, int(count or 20)))
+    except ValueError:
+        ui.add_message("system", "/mood check takes a number of exchanges, e.g. /mood check 30")
+        return
+    ui.add_message("system", f"Checking how the mood reader rates your last {n} exchanges, old prompt and new "
+                             f"({2 * n} small model calls)...")
+
+    def run():
+        lines = []
+        try:
+            appraise.check(model, n, say=lines.append)
+        except Exception as e:
+            logbook.exception("mood", "mood check failed")
+            lines.append(f"The check failed: {e}")
+        ui.add_message("system", "\n".join(lines))
+        logbook.info("mood", "mood check:\n%s", "\n".join(lines))
+
+    threading.Thread(target=run, daemon=True, name="mood-check").start()
+
+
 def handle(text):
     """True when text was one of these commands (and it ran)."""
     if text.startswith("/mood"):
@@ -22,6 +55,10 @@ def handle(text):
         if argument == "reset":
             mood.reset()
             ui.add_message("system", f"Mood reset - she's {mood.label()}.")
+            return True
+
+        if argument == "check" or argument.startswith("check "):
+            _mood_check(argument[5:].strip())
             return True
 
         if not config.MOOD_ENABLED:
@@ -158,9 +195,11 @@ def handle(text):
             ui.add_message("system", "Listening...")
 
             def go():
-                s = music.listen_now()
-                ui.add_message("system", music.describe() or ("She heard: " + str(s) if s else
-                               "Couldn't listen (is something playing, and is the service up?)"))
+                s = music.listen_now(wait=True)
+                if s and not music.describe():          # heard, but the player says nothing's playing now
+                    ui.add_message("system", f"She heard: {s['kind']}, {s['bpm']} BPM ({s['style'] or 'no style'})")
+                else:
+                    ui.add_message("system", music.describe() or f"Couldn't listen: {music._state['why'] or 'nothing heard'}")
             threading.Thread(target=go, daemon=True, name="music-now").start()
         else:
             ui.add_message("system", music.describe() or "Nothing she's listened to is playing. /music now to listen.")

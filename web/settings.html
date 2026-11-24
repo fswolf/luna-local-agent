@@ -47,7 +47,7 @@ section.closed .rows{display:none}
 .row{display:grid;grid-template-columns:minmax(150px,230px) 1fr auto;grid-template-areas:"name ctl reset" "help help help";gap:6px 16px;padding:10px 14px;border-top:1px solid var(--line);align-items:center}
 .row .name{grid-area:name}.row .ctl{grid-area:ctl}.row .reset{grid-area:reset}
 .row .name{font-family:ui-monospace,"Cascadia Mono",monospace;font-size:13px;word-break:break-all}
-.row .name i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-left:6px;vertical-align:middle}
+.row .name i{font-style:normal;font-family:system-ui,sans-serif;font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle}
 .row .help{grid-area:help;color:var(--dim);font-size:12.5px;margin-top:-4px}
 mark{background:#c49dff40;color:inherit;border-radius:3px;padding:0 1px}
 section>h2 .after{color:var(--warn);font-size:11.5px;font-weight:400;margin-left:8px}
@@ -72,6 +72,18 @@ section>h2 .after{color:var(--warn);font-size:11.5px;font-weight:400;margin-left
 .stationbox ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .stationbox li{display:flex;justify-content:space-between;align-items:center;font-size:13px}
 .stationbox li span{color:var(--dim)}
+#permbox .rows{border-top:1px solid var(--line)}
+#permbox>h2{cursor:default}
+.perm{display:grid;grid-template-columns:90px auto 1fr;gap:6px 14px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line)}
+.perm:last-child{border-bottom:0}
+.perm b{font-family:ui-monospace,monospace;font-weight:400;font-size:13px}
+.perm .opts{display:flex;justify-self:start;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.perm .opts button{background:none;border:0;color:var(--dim);padding:4px 12px;font:inherit;font-size:13px;cursor:pointer}
+.perm .opts button+button{border-left:1px solid var(--line)}
+.perm .opts button.on{color:#14081c;background:var(--accent)}
+.perm .opts button.on[data-v=off]{background:var(--dim)}
+.perm span{color:var(--dim);font-size:12.5px}
+@media (max-width:560px){.perm{grid-template-columns:auto 1fr}.perm span{grid-column:1/-1}}
 .sampbox{border-top:1px solid var(--line);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .sampbox .st{color:var(--dim);font-size:13px}.sampbox .st b{color:var(--text)}
 .sampbox .wrap{overflow-x:auto}
@@ -119,7 +131,8 @@ section>h2 .after{color:var(--warn);font-size:11.5px;font-weight:400;margin-left
 .row{transition:background .6s}
 .row.saved{background:#1f3a2c;transition:none}
 .row.failed{background:#3a1f26;transition:none}
-section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;margin-left:8px}
+section>h2 em{font-style:normal;color:var(--dim);font-weight:400;font-size:12px;margin-left:8px}
+section>h2 .live{font-size:12px;font-weight:400;margin-left:10px;color:var(--dim)}section>h2 .live.on{color:var(--ok)}section>h2 .live.bad{color:var(--bad)}
 .reset{background:none;border:0;color:var(--dim);cursor:pointer;font-size:15px;padding:2px 6px;visibility:hidden}
 .row.isset .reset{visibility:visible}
 .reset:hover{color:var(--pink)}
@@ -152,6 +165,8 @@ section>h2 em{font-style:normal;color:var(--ok);font-weight:400;font-size:12px;m
 <textarea id="agenttext" spellcheck="false" autocomplete="off" aria-label="agent.json"></textarea>
 <div class="bar"><button id="agentsave" disabled>Save</button><button id="agentload" title="Throw away your edits and load the file again">Reload</button><span id="agentstate"></span></div>
 </div></section>
+<section id="permbox" data-group="permissions"><h2><div>Permissions <em style="color:var(--dim)">what Luna may do on this computer</em></div> <span>saved at once</span></h2>
+<div class="rows" id="perms"></div></section>
 <div class="count" id="count"></div>
 <div id="list"></div>
 </main>
@@ -281,11 +296,28 @@ function hl(text) {
 function row(s) {
   const tag = s.live || allRestart.has(s.group) ? "" : '<span class="tag" title="takes effect after a restart">↻ restart</span>';
   return `<div class="row${s.set ? " isset" : ""}" data-row="${esc(s.path)}">
-    <div class="name" title="${esc(s.path)}">${hl(s.name)}${s.set ? '<i title="set in config.json"></i>' : ""}${tag}</div>
+    <div class="name" title="${esc(s.path)}">${hl(s.name)}${s.set ? '<i title="this value is written in config.json (↺ takes it out, back to the default)">saved</i>' : ""}${tag}</div>
     <div class="ctl">${control(s)}</div>
     <button class="reset" data-reset="${esc(s.path)}" title="Back to the default">↺</button>
     ${s.help ? `<div class="help">${hl(s.help)}</div>` : ""}</div>`;
 }
+
+// Permissions: the same four rows as the tools pane's (config.PERMISSIONS),
+// one click on a value saves it, and it applies at once
+function perms() {
+  const list = data.permissions || [];
+  $("#perms").innerHTML = list.map(p => `<div class="perm"><b>${esc(p.label)}</b>
+    <div class="opts">${p.choices.map(c => `<button data-perm="${esc(p.label)}" data-v="${esc(c)}" class="${c === p.value ? "on" : ""}">${esc(c)}</button>`).join("")}</div>
+    <span>${esc(p.note)}</span></div>`).join("");
+}
+$("#perms").addEventListener("click", async e => {
+  const b = e.target.closest("[data-perm]");
+  if (!b || b.classList.contains("on")) return;
+  const out = await send({action: "permission", label: b.dataset.perm, value: b.dataset.v});
+  if (out.permissions) { data.permissions = out.permissions; perms(); }
+  toast(out.message, !out.ok);
+  if (out.ok) load();              // the same settings in their sections follow
+});
 
 // Sampling per model (generation.sampling): a row per model name, the five
 // settings most models' cards give, "more" for the rest as name=value. Kept
@@ -409,6 +441,24 @@ async function scaleRefresh() {
   sizeHint();
 }
 
+// A plugin's state right now (data.plugins), beside its heading: the enabled
+// switch is only what happens at the next start
+function liveTag(key) {
+  const p = key.startsWith("plugins.") && (data.plugins || {})[key.slice(8)];
+  if (!p) return "";
+  const word = p.connection ? "connected" : "running";
+  if (p.running) return `<span class="live on" data-live="${esc(key)}">● ${word}${p.devices.length ? ": " + esc(p.devices.join(", ")) : ""}</span>`;
+  return `<span class="live${p.error ? " bad" : ""}" data-live="${esc(key)}"${p.error ? ` title="${esc(p.error)}"` : ""}>○ not ${word}${p.error ? " (last error: hover)" : ""}</span>`;
+}
+
+// Connecting takes a few seconds and a toy can drop: keep the headings current
+async function liveRefresh() {
+  if (document.hidden || !data || !document.querySelector("[data-live]")) return;
+  try { data.plugins = await (await fetch("api/plugins", {cache: "no-store"})).json(); } catch (e) { return; }
+  for (const el of document.querySelectorAll("[data-live]")) el.outerHTML = liveTag(el.dataset.live);
+}
+setInterval(liveRefresh, 4000);
+
 function render() {
   if (!data) return;
   const q = query.toLowerCase();
@@ -423,13 +473,15 @@ function render() {
     const changed = rows.filter(s => s.set).length;
     const after = allRestart.has(g.key) ? '<span class="after" title="every setting here takes effect after a restart">↻ after a restart</span>' : "";
     sections.push(g);
-    html += `<section class="${shut ? "closed" : ""}" data-group="${esc(g.key)}" id="s_${esc(g.key)}"><h2><div>${esc(g.title)}${changed && view !== "changed" ? `<em>${changed} set</em>` : ""}${after}</div> <span>${rows.length}</span></h2>
+    html += `<section class="${shut ? "closed" : ""}" data-group="${esc(g.key)}" id="s_${esc(g.key)}"><h2><div>${esc(g.title)}${liveTag(g.key)}${changed && view !== "changed" ? `<em title="values written in config.json">${changed} saved</em>` : ""}${after}</div> <span>${rows.length}</span></h2>
              <div class="rows">${rows.map(row).join("")}</div>${g.key === "station" ? stationBox() : ""}${g.key === "generation" && !q && view !== "changed" ? samplingBox() : ""}${g.key === "history" && !q && view !== "changed" ? scaleBox() : ""}</section>`;
   }
   $("#list").innerHTML = html || `<div class="empty">${query ? `Nothing matches "${esc(query)}".` : "Nothing set in config.json yet: everything is at its default."}</div>`;
   // presets are for browsing, not for a search or the list of your changes
   $("#presetbox").hidden = !!query || view === "changed";
   $("#agentbox").hidden = !!query || view === "changed";
+  $("#permbox").hidden = (!!query && !"permissions read write execute home email send allow ask".includes(query.toLowerCase())) || view === "changed";
+  perms();
   $("#count").textContent = query ? `${shown} setting${shown === 1 ? "" : "s"} match` : view === "changed" ? `${shown} set in config.json` : "";
   const jump = $("#jump");
   jump.hidden = view !== "all" || !!query;      // the long list is the one worth jumping around
@@ -546,6 +598,7 @@ async function save(path, value) {
   if (!out.ok) setTimeout(load, 900);
   else if (path.startsWith("station.")) setTimeout(load, 900);     // its state box follows
   else if (/^(history\.|generation\.max_tokens|tools\.)/.test(path)) scaleRefresh();   // the sum follows
+  else if (/^plugins\.[^.]+\.enabled$/.test(path)) { setTimeout(liveRefresh, 1500); setTimeout(liveRefresh, 5000); }  // connecting runs in a thread
 }
 
 $("#list").addEventListener("change", e => {

@@ -451,7 +451,7 @@ _KINDS = {
     "tools": "tools != '[]'",
     "cut": "reasoning LIKE '%[cut off - %'",
     "voice": "source = 'voice'",
-    "reminder": "source = 'reminder'",
+    "reminder": "source IN ('reminder', 'task')",
     "starred": "starred = 1",
     "flagged": "flags != '[]'",
     "scored": "n_tokens > 0",
@@ -460,7 +460,7 @@ _KINDS = {
     "introspect": "tools LIKE '%\"introspect\"%'",
     # Second looks from adaptive thinking - each sits right after the
     # turn it reconsidered.
-    "rethink": "source = 'rethink'",
+    "rethink": "source IN ('rethink', 'correction')",
 }
 
 

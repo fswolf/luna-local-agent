@@ -75,6 +75,7 @@ _HELP_SECTIONS = [
     ]),
     ("Mood", [
         ("/mood", "the current mood, and what changed it"),
+        ("/mood check [n]", "how the mood reader rates your last n exchanges, old prompt and new"),
         ("/mood reset", "back to normal for the next hour"),
         "The mood shows on the Status row (like \"Idle - sleepy\") and changes the voice slightly. It survives a restart, fading the longer you were away. It drifts with the time of day, how long you've been at it, errors, being talked over, and whether you're kind. It changes the tone only, never how much Luna helps. /set mood.enabled false turns it off.",
     ]),

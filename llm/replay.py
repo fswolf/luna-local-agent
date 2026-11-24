@@ -102,6 +102,9 @@ def _replay(message):
     example of the behaviour we want repeated. Without these the
     history only ever demonstrates talking.
     """
+    if message.get("role") == "assistant" and message.get("steps"):
+        return _replay_steps(message["steps"])
+
     calls = message.get("tools") or []
 
     if not calls:
@@ -139,6 +142,32 @@ def _replay(message):
         replayed.append({"role": message["role"], "content": _unhedged(message["role"], message["content"])})
 
     return replayed
+
+
+def _replay_steps(steps):
+    """A turn she was sent back into, as it happened: her reply (and any
+    calls before it), the note that sent her back as the message it was,
+    then what she called and said after. The order is the point: replayed
+    as one glued reply it showed her saying everything, then saying it
+    all again, and she copied that shape."""
+    out, n = [], 0
+    for step in steps:
+        if "note" in step:
+            out.append({"role": "user", "content": step["note"]})
+            continue
+        calls = step.get("tools") or []
+        if calls:
+            ids = [f"past{n + i}" for i in range(len(calls))]
+            n += len(calls)
+            out.append({"role": "assistant", "content": "", "tool_calls": [
+                {"id": i, "type": "function",
+                 "function": {"name": c.get("name", ""), "arguments": _valid_json(c.get("arguments"))}}
+                for i, c in zip(ids, calls)]})
+            out.extend({"role": "tool", "tool_call_id": i, "name": c.get("name", ""), "content": c.get("result", "")}
+                       for i, c in zip(ids, calls))
+        if step.get("content"):
+            out.append({"role": "assistant", "content": _unhedged("assistant", step["content"])})
+    return out
 
 
 def _demonstration():

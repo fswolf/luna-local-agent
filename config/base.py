@@ -97,6 +97,25 @@ def flag(value):
     return bool(value)
 
 
+def number(block, key, default, lo=None, hi=None, where="mood"):
+    """A number from a settings block, as written by hand: "45m" or null
+    says so and uses the default instead of stopping Luna at startup.
+    Clamped to lo..hi when given."""
+    raw = block.get(key, default)
+    try:
+        value = float(raw)
+        if value != value or value in (float("inf"), float("-inf")):
+            raise ValueError
+    except (TypeError, ValueError):
+        _complain(f"config.json: \"{where}.{key}\" should be a number, not {raw!r} - using {default}")
+        value = float(default)
+    if lo is not None:
+        value = max(lo, value)
+    if hi is not None:
+        value = min(hi, value)
+    return value
+
+
 def setting(key, default=None):
     """A machine setting: config.json first, then agent.json. A block
     (default {}) that's been set to something else, like null, reads as

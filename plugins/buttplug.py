@@ -156,6 +156,12 @@ def running():
     return _state["connected"]
 
 
+def live_state():
+    """For the settings page's heading: the devices Intiface reports, and the last error."""
+    names = [d["name"] for d in _state["devices"].values()]
+    return {"devices": names if _state["connected"] else [], "error": _state["error"]}
+
+
 # ---------------------------------------------------------------------------
 # The connection: one socket, a reader thread, replies matched by Id
 # ---------------------------------------------------------------------------

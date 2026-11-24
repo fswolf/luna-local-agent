@@ -142,7 +142,7 @@ def _plushie():
         return False
 
 
-def _emit(kind, **data):
+def _emit(kind, /, **data):
     try:
         from web import livefeed
 

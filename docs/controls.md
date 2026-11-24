@@ -33,11 +33,19 @@ you type in either shows up in both, her reply streams into both, and the page
 starts with the conversation as it stands.
 
 - Enter sends, Shift+Enter starts a new line. A /command works here too.
-- The mic in the text box is HOME: click it and talk, through the mic she
-  already uses on this PC. It lights up while she's listening; in manual mode
-  click it again when you're done, and while she's answering it stops her.
-  Her answer is spoken through your speakers as usual.
+- The mic in the text box dictates: click it and talk, through the mic she
+  already uses on this PC, and what you said lands in the text box (after
+  anything already typed) for you to fix and send. It lights up while it's
+  listening; in manual mode click it again when you're done. Whisper writes it
+  all out once you stop, not word by word. While she's answering, a click
+  stops her, as HOME does. In hands-free mode (`open`) it still switches
+  hands-free on and off. HOME, the tray's Talk and the terminal send what you
+  say straight to her.
 - While she's answering, the send button turns into Stop.
+- Under each of her replies: copy, **say it again** (the speaker plays that
+  reply through your speakers in her voice; click it again, or Stop, to
+  end it, and a new turn cuts it off), and the thumbs. In her replies,
+  code shows in a box with its own copy button.
 - The paperclip sends one picture (jpg, png, webp, up to 10 MB) or one text,
   Markdown or PDF file with your message. Pasting a picture or dropping a file
   on the page works too. A picture needs a model that can see.
@@ -56,10 +64,14 @@ starts with the conversation as it stands.
   the chat, handy when a tool is waiting for you), and Online, top right,
   opens what she's running on: status, mood, voice, memory, speech and
   model. It turns red and says Offline when the page can't reach her.
-- Alt+Left goes back, as in any browser. Right click gives Copy, Paste and
-  Select all (all of the conversation, or all of the text box); Shift+right
-  click gives the browser's own menu. The first Paste may ask to allow the
-  clipboard, and Firefox shows a small Paste button to confirm it.
+- Alt+Left goes back, as in any browser. Right click gives Copy and Select
+  all (all of the conversation); in the text box Cut, Copy, Paste and
+  Select all, and on a misspelt word its likely spellings at the top: click
+  one and it replaces the word (Ctrl+Z undoes it). The suggestions need
+  `pyspellchecker` (in the installer's list; `pip install pyspellchecker`
+  into Luna's venv on an older install). Shift+right click gives the
+  browser's own menu. The first Paste may ask to allow the clipboard.
+- As the text box grows, the conversation moves up with it.
 
 Like her other pages it only answers on this computer (127.0.0.1).
 

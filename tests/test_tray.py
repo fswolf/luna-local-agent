@@ -47,6 +47,12 @@ class Menu(unittest.TestCase):
         self.assertTrue(busy["stop"][3])
         self.assertTrue(busy["voice"][4])
 
+    def test_stop_for_anything_stoppable_not_only_your_turns(self):
+        greeting = {e[0]: e for e in tray.items(luna(busy=False, stoppable=True))}
+        self.assertTrue(greeting["stop"][3])
+        idle = {e[0]: e for e in tray.items(luna(busy=False, stoppable=False))}
+        self.assertFalse(idle["stop"][3])
+
     def test_actions(self):
         l = luna()
         with mock.patch.object(l, "act") as act, mock.patch.object(l, "open_chat") as chat:

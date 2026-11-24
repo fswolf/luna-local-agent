@@ -304,7 +304,6 @@ def _process(text, stop, attachment=None):
             ui.add_message("user", f"[{speaker}] {shown}" if speaker else shown)
             assistant.respond(text, MODEL, source="typed", speaker=speaker, attachment=attachment)
         ui.set_status("Idle")
-        mood.note_turn()
     except Exception as e:
         # Without this, an LM Studio error (context overflow, bad param,
         # connection drop, etc.) would kill the worker silently instead

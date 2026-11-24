@@ -303,8 +303,9 @@ def _fragments():
 
             fragments.append(("class:key" if here else "", " >" if here else "  "))
             # a switch is green when it's on, grey when it's off, wherever the
-            # value came from; • marks one you've set yourself in config.json
-            fragments.append(("class:ok" if is_set else "", " • " if is_set else "   "))
+            # value came from; a grey • marks one written in config.json (grey,
+            # so it never reads as an "on" light next to a switch)
+            fragments.append(("class:dim" if is_set else "", " • " if is_set else "   "))
             fragments.append(("class:value bold" if here else "class:value", f"{name:<24} "))
             if kind == "bool":
                 style = "class:ok" if value else "class:dim"

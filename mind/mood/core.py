@@ -31,6 +31,8 @@ class State:
         self.last_rating = None     # what the last message scored, for /mood
         self.last_feeling = None    # the last quick feeling, for /mood
         self.spanks = {"n": 0.0, "at": 0.0}
+        self.decayed_at = time.monotonic()  # when time last wound her down (drift._decay)
+        self.unsaved = 0.0          # how far time has moved her since the last save
         # Plugins live somewhere lewd isn't allowed (show.set_tame)
         self.tamed_by = set()
         # Walking away (walkaway.py)

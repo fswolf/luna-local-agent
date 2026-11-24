@@ -54,6 +54,8 @@ color:#ece6f7;cursor:pointer}
 #luna-ctx button:hover:not([disabled]){background:#2a2040}
 #luna-ctx button[disabled]{color:#5d5378;cursor:default}
 #luna-ctx kbd{font:12px system-ui,sans-serif;color:#a49bc0}
+#luna-ctx .sp{font-weight:600;color:#fff}
+#luna-ctx hr{border:0;border-top:1px solid #3a2d55;margin:5px 0}
 @media print{#luna-head,#luna-ctx{display:none}}`;
   const ICONS = {
     Chat: '<path d="M4 5h16v11H9l-5 4z"/>',
@@ -161,58 +163,146 @@ color:#ece6f7;cursor:pointer}
   }
   window.lunaHead = {update, reachable, fed: false};
 
-  // --- right click: copy, paste, select all, in her colours ------------------
+  // --- right click, in her colours -------------------------------------------
+  // Copy, select all; in a text box cut, copy, paste and, on a misspelt word,
+  // its spellings (core/spelling.py: the browser's own suggestions can't be
+  // read by a page, and its menu brings Back, Reload and Inspect along).
   // Shift + right click still gives the browser's own menu.
   const ctx = document.createElement('div');
   ctx.id = 'luna-ctx';
   const mac = /Mac/.test(navigator.platform);
   const key = k => (mac ? '⌘' : 'Ctrl+') + k;
-  ctx.innerHTML = `<button data-do=link>Copy link</button><button data-do=copy>Copy<kbd>${key('C')}</kbd></button>
+  ctx.innerHTML = `<div class=fix></div><button data-do=link>Copy link</button>
+    <button data-do=cut>Cut<kbd>${key('X')}</kbd></button><button data-do=copy>Copy<kbd>${key('C')}</kbd></button>
     <button data-do=paste>Paste<kbd>${key('V')}</kbd></button>
     <button data-do=all>Select all<kbd>${key('A')}</kbd></button>`;
   // last in the body, once the page is all there (now, the body is only this script and the header)
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', () => document.body.appendChild(ctx));
   else document.body.appendChild(ctx);
-  let field = null, link = null;      // the text box or the link right-clicked, if any
+  let field = null, link = null, word = null;   // the text box, link and misspelt word right-clicked, if any
   const editable = el => el && (el.isContentEditable ||
-    (el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && /^(text|search|url|tel|password)$/i.test(el.type)));
-  const picked = () => field && !field.isContentEditable
-    ? field.value.slice(field.selectionStart, field.selectionEnd) : String(getSelection());
+    (el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && /^(text|search|url|tel|email)$/i.test(el.type)));
+  const typed = f => f && !f.isContentEditable;   // a textarea or input: its text is .value
+  const picked = () => typed(field) ? field.value.slice(field.selectionStart, field.selectionEnd) : String(getSelection());
   const hide = () => ctx.classList.remove('on');
-  addEventListener('contextmenu', ev => {
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
+
+  // Where in the box the click was: Firefox says exactly; elsewhere the
+  // caret, which a right click moves there (unless it's inside a selection).
+  function clickedAt(f, ev) {
+    try {
+      const p = document.caretPositionFromPoint && document.caretPositionFromPoint(ev.clientX, ev.clientY);
+      if (p && p.offsetNode === f) return p.offset;
+    } catch (e) {}
+    return f.selectionStart;
+  }
+  // the word under the click in a text box: {start, end, text}, or null
+  function wordAt(f, at) {
+    const v = f.value;
+    let a = at, b = at;
+    while (a > 0 && /[A-Za-z']/.test(v[a - 1])) a--;
+    while (b < v.length && /[A-Za-z']/.test(v[b])) b++;
+    while (a < b && v[a] === "'") a++;
+    while (b > a && v[b - 1] === "'") b--;
+    return b - a >= 2 ? {start: a, end: b, text: v.slice(a, b)} : null;
+  }
+  // What each word typed into a box is known to be, asked as you type (a
+  // moment after you stop), so a right click finds the answer already here
+  // and the menu opens whole: before, it opened, then its spellings popped
+  // in a moment later.
+  const spelt = new Map();                  // word -> {known, suggestions}
+  const WORDS = /[A-Za-z][A-Za-z']*[A-Za-z]/g;
+  async function learn(words) {
+    const want = [...new Set(words)].filter(w => !spelt.has(w)).slice(-40);
+    if (!want.length) return;
+    const r = await fetch('/chat/spell?' + want.map(w => 'w=' + encodeURIComponent(w)).join('&'), {cache: 'no-store'});
+    const out = await r.json();
+    for (const [w, v] of Object.entries(out)) spelt.set(w, v);
+    if (spelt.size > 3000) for (const k of [...spelt.keys()].slice(0, 1000)) spelt.delete(k);
+  }
+  let typing = 0;
+  addEventListener('input', ev => {
+    const f = ev.target;
+    if (!editable(f) || !typed(f)) return;
+    clearTimeout(typing);
+    typing = setTimeout(() => learn(f.value.match(WORDS) || []).catch(() => {}), 350);
+  }, true);
+  // the answer for one word: known now, or asked for and waited on a moment
+  async function spelling(text) {
+    if (!spelt.has(text)) {
+      try {
+        await Promise.race([learn([text]), new Promise(res => setTimeout(res, 300))]);
+      } catch (e) {}
+    }
+    return spelt.get(text);
+  }
+
+  let opening = 0;
+  function place(ev) {
+    const w = ctx.offsetWidth, h = ctx.offsetHeight;
+    ctx.style.left = Math.min(ev.clientX, innerWidth - w - 4) + 'px';
+    ctx.style.top = Math.min(ev.clientY, innerHeight - h - 4) + 'px';
+  }
+  addEventListener('contextmenu', async ev => {
     if (ev.shiftKey) return;
     ev.preventDefault();
     field = editable(ev.target) ? ev.target : null;
     link = ev.target.closest && ev.target.closest('a[href]');
+    word = null;
+    const open = !!field && !field.readOnly && !field.disabled;
+    hide();
+    // a misspelt word: its spellings go at the top, and the menu opens once
+    // it knows (at once when typing already asked; at most 300 ms otherwise,
+    // and then without them rather than having them pop in afterwards)
+    const w = open && typed(field) && field.selectionStart === field.selectionEnd ? wordAt(field, clickedAt(field, ev)) : null;
+    const mine = ++opening;
+    const out = w ? await spelling(w.text) : null;
+    if (mine !== opening) return;                // right-clicked again meanwhile: that one opens
+    const wrong = out && !out.known;
+    word = wrong ? w : null;
+    ctx.querySelector('.fix').innerHTML = !wrong ? '' : (out.suggestions.length
+      ? out.suggestions.map(s => `<button class=sp data-do=fix data-w="${esc(s)}">${esc(s)}</button>`).join('')
+      : '<button disabled>No suggestions</button>') + '<hr>';
     ctx.querySelector('[data-do=link]').style.display = link ? '' : 'none';
+    for (const d of ['cut', 'paste']) ctx.querySelector(`[data-do=${d}]`).style.display = field ? '' : 'none';
+    ctx.querySelector('[data-do=cut]').disabled = !open || !picked();
     ctx.querySelector('[data-do=copy]').disabled = !picked();
-    ctx.querySelector('[data-do=paste]').disabled = !field || field.readOnly || field.disabled || !navigator.clipboard;
+    ctx.querySelector('[data-do=paste]').disabled = !open || !navigator.clipboard;
     ctx.classList.add('on');
-    const w = ctx.offsetWidth, h = ctx.offsetHeight;
-    ctx.style.left = Math.min(ev.clientX, innerWidth - w - 4) + 'px';
-    ctx.style.top = Math.min(ev.clientY, innerHeight - h - 4) + 'px';
+    place(ev);
   });
-  addEventListener('mousedown', ev => { if (!ctx.contains(ev.target)) hide(); }, true);
+  // a click elsewhere closes the menu, and one still waiting on its spellings
+  // doesn't open after it
+  addEventListener('mousedown', ev => { if (!ctx.contains(ev.target)) { hide(); if (ev.button !== 2) opening++; } }, true);
   addEventListener('keydown', ev => { if (ev.key === 'Escape') hide(); });
   addEventListener('blur', hide);
   addEventListener('scroll', hide, true);
   ctx.addEventListener('mousedown', ev => ev.preventDefault());   // keep the selection and the caret where they are
+  // Typing into the box the way a keyboard would: Ctrl+Z still undoes it,
+  // and the page hears an input (the chat box grows, Send lights up)
+  function put(text, start, end) {
+    field.focus();
+    if (typed(field)) field.setSelectionRange(start ?? field.selectionStart, end ?? field.selectionEnd);
+    if (!document.execCommand('insertText', false, text) && typed(field)) {
+      field.setRangeText(text, field.selectionStart, field.selectionEnd, 'end');
+      field.dispatchEvent(new Event('input', {bubbles: true}));
+    }
+  }
   ctx.addEventListener('click', async ev => {
     const b = ev.target.closest('button');
     if (!b || b.disabled) return;
     hide();
-    if (b.dataset.do === 'copy' || b.dataset.do === 'link') {
-      const text = b.dataset.do === 'link' ? link.href : picked();
-      try { await navigator.clipboard.writeText(text); } catch (e) { document.execCommand('copy'); }
-    } else if (b.dataset.do === 'paste') {
+    const what = b.dataset.do;
+    if (what === 'fix' && word) {
+      put(b.dataset.w, word.start, word.end);
+    } else if (what === 'copy' || what === 'link' || what === 'cut') {
+      const text = what === 'link' ? link.href : picked();
+      try { await navigator.clipboard.writeText(text); } catch (e) { field && field.focus(); document.execCommand('copy'); }
+      if (what === 'cut') put('');
+    } else if (what === 'paste') {
       let text = '';
       try { text = await navigator.clipboard.readText(); } catch (e) { return; }   // the browser said no
-      field.focus();
-      // insertText keeps Ctrl+Z working and fires input, so the chat box grows
-      if (!document.execCommand('insertText', false, text) && !field.isContentEditable) {
-        field.setRangeText(text, field.selectionStart, field.selectionEnd, 'end');
-        field.dispatchEvent(new Event('input', {bubbles: true}));
-      }
+      put(text);
     } else if (field) {
       field.focus();
       field.isContentEditable ? document.execCommand('selectAll') : field.select();

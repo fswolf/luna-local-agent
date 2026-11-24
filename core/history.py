@@ -249,7 +249,18 @@ def _compact_arguments(raw, limit=MAX_STORED_RESULT):
     return json.dumps(data)
 
 
-def add_message(role: str, content: str, tools=None):
+def _stored_calls(calls):
+    return [
+        {
+            "name": call.get("name", ""),
+            "arguments": _compact_arguments(call.get("arguments", "")),
+            "result": str(call.get("result", ""))[:MAX_STORED_RESULT],
+        }
+        for call in calls or []
+    ]
+
+
+def add_message(role: str, content: str, tools=None, steps=None):
     """Record a turn, and what it called to get there.
 
     `tools` is the interesting part. Storing only the prose meant the
@@ -267,14 +278,18 @@ def add_message(role: str, content: str, tools=None):
     }
 
     if tools:
-        entry["tools"] = [
-            {
-                "name": call.get("name", ""),
-                "arguments": _compact_arguments(call.get("arguments", "")),
-                "result": str(call.get("result", ""))[:MAX_STORED_RESULT],
-            }
-            for call in tools
-        ]
+        entry["tools"] = _stored_calls(tools)
+
+    if role == "assistant" and steps:
+        # A turn she was sent back into (a follow-through: llm/second_look.py)
+        # in the order it happened - her reply, the note that sent her
+        # back, what she did and said then - so llm/replay.py can show it
+        # that way. content stays everything she said, for the screen,
+        # the summary and search. Stored glued as one reply, it read as
+        # "she says it all, then says it all again", and she copied that.
+        entry["steps"] = [{"note": str(s["note"])} if "note" in s else
+                          {"content": str(s.get("content") or ""), "tools": _stored_calls(s.get("tools"))}
+                          for s in steps]
 
     if role == "assistant":
         # her words and her tool calls, never his: what he told her to forget
@@ -286,6 +301,10 @@ def add_message(role: str, content: str, tools=None):
             entry["content"] = forgetting.clean(content, tombs)
             if entry.get("tools"):
                 entry["tools"] = forgetting.clean_calls(entry["tools"], tombs)
+            for step in entry.get("steps") or []:
+                if "content" in step:
+                    step["content"] = forgetting.clean(step["content"], tombs)
+                    step["tools"] = forgetting.clean_calls(step["tools"], tombs) if step["tools"] else []
         except Exception:
             pass
 

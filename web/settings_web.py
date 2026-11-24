@@ -203,7 +203,54 @@ def listing():
                for n, p in PRESETS.items()]
 
     return {"groups": groups, "presets": presets, "station": _station_panel(), "scale": _scale(),
-            "sampling": sampling_panel()}
+            "sampling": sampling_panel(), "permissions": permissions_panel(), "plugins": plugin_states()}
+
+
+def plugin_states():
+    """Each loaded plugin as it is right now, keyed by its config name, for
+    its section's heading: the enabled switch only says what happens at the
+    next start, and /<name> on|off connects without saving it.
+    {key: {running, devices, error, connection}}; connection = it reports
+    devices (the toys), so the page says "connected" rather than "running"."""
+    import plugins
+
+    out = {}
+    for name in plugins.names():
+        plugin = plugins.get(name)
+        if plugin is None:
+            continue
+        extra, more = {}, getattr(plugin.module, "live_state", None)
+        try:
+            running = bool(plugin.running())
+            if callable(more):
+                extra = more() or {}
+        except Exception as e:
+            running, extra = False, {"error": str(e)}
+        out[plugin.config] = {"running": running, "devices": [str(d) for d in extra.get("devices") or []],
+                              "error": str(extra.get("error") or ""), "connection": callable(more)}
+    return out
+
+
+def permissions_panel():
+    """What she may do to this machine: config.PERMISSIONS, the table the
+    tools pane's Permissions group shows too. [{label, value, choices, note}]"""
+    out = []
+    for label, _path, values, _note in config.PERMISSIONS:
+        value = config.permission(label)
+        out.append({"label": label, "value": value, "choices": list(values), "note": config.permission_note(label, value)})
+    return out
+
+
+def permission_save(label, value):
+    """One permission from the page, saved and applied. (ok, message)."""
+    try:
+        saved = config.set_permission(str(label or ""), value)
+    except ValueError as e:
+        return False, str(e)
+    except OSError as e:
+        return False, f"couldn't write config.json: {e}"
+    logbook.info("settings", "web: permission %s set to %s", label, saved)
+    return True, f"{label}: {saved}"
 
 
 def sampling_panel():
@@ -451,6 +498,9 @@ def handle(method, sub, body, key=None):
     if method == "GET" and sub == "/api/scale":
         return 200, "application/json", json.dumps(_scale(fresh=True))
 
+    if method == "GET" and sub == "/api/plugins":
+        return 200, "application/json", json.dumps(plugin_states())
+
     if method == "GET" and sub == "/api/agent":
         return 200, "application/json", json.dumps(agent_text())
 
@@ -471,6 +521,10 @@ def handle(method, sub, body, key=None):
             ok, message, item = preset(str(data.get("name", "")))
         elif action == "browse":
             return 200, "application/json", json.dumps(browse(str(data.get("setting", "")), data.get("at")))
+        elif action == "permission":
+            ok, message = permission_save(data.get("label"), data.get("value"))
+            return (200 if ok else 400), "application/json", json.dumps(
+                {"ok": ok, "message": message, "permissions": permissions_panel()})
         elif action == "sampling_save":
             ok, message = sampling_save(data.get("table"))
             return (200 if ok else 400), "application/json", json.dumps(

@@ -21,7 +21,7 @@ def _short(text):
     return text if len(text) <= MAX_WORDS else text[:MAX_WORDS - 1].rsplit(" ", 1)[0] + "..."
 
 
-def _emit(kind, **data):
+def _emit(kind, /, **data):
     try:
         from web import livefeed
 

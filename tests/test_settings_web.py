@@ -105,6 +105,32 @@ class Page(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertEqual(self._file()["mood"]["intensity"], 0.5)
 
+    def test_permissions_box_matches_the_tools_pane_and_saves(self):
+        from ui import tools_pane
+
+        with mock.patch.object(config, "FILES_READ", "allow"), mock.patch.object(config, "FILES_WRITE", "ask"), \
+                mock.patch.object(config, "SHELL_ENABLED", True):
+            listed = {p["label"]: p for p in settings_web.listing()["permissions"]}
+            self.assertEqual([p[0] for p in config.PERMISSIONS], list(listed))
+            for label in listed:                                  # one table, both places
+                self.assertEqual(listed[label]["value"], tools_pane._perm_value(label))
+            self.assertEqual(listed["execute"]["choices"], ["ask", "off"])      # commands never "allow"
+
+            code, out = self._post(key=settings_web.KEY, action="permission", label="write", value="allow")
+            self.assertEqual(code, 200, out)
+            self.assertEqual(self._file()["files"]["write"], "allow")
+            self.assertEqual(config.FILES_WRITE, "allow")                     # applied at once
+            self.assertIn("still ask", next(p for p in out["permissions"] if p["label"] == "write")["note"])
+
+            code, out = self._post(key=settings_web.KEY, action="permission", label="execute", value="off")
+            self.assertEqual(code, 200, out)
+            self.assertIs(self._file()["shell"]["enabled"], False)
+
+            code, out = self._post(key=settings_web.KEY, action="permission", label="execute", value="allow")
+            self.assertEqual(code, 400)
+            code, out = self._post(key=settings_web.KEY, action="permission", label="root", value="allow")
+            self.assertEqual(code, 400)
+
     def test_background(self):
         bg = os.path.join(self.tmp, "portrait", "backgrounds")
         os.makedirs(bg)
@@ -491,3 +517,68 @@ class WhoSheIsAfterwards(unittest.TestCase):
 
         self._save("Luna", user="Sam")
         self.assertTrue(thoughtlog._scratch_opening().match("Okay, Sam wants a timer"))
+
+
+class PluginStateNow(unittest.TestCase):
+    """The heading says what a plugin is doing now, not what config.json says
+    about the next start: /intiface on connects without saving."""
+
+    def _plugin(self, config_key, running, live=None):
+        module = type(sys)("fake")
+        if live is not None:
+            module.live_state = lambda: live
+        return mock.Mock(config=config_key, module=module, running=lambda: running)
+
+    def test_connected_toy_and_its_devices(self):
+        toy = self._plugin("buttplug", True, {"devices": ["Lovense Gush"], "error": ""})
+        other = self._plugin("chess", False)
+        found = {"intiface": toy, "chess": other}
+        with mock.patch("plugins.names", return_value=list(found)), mock.patch("plugins.get", side_effect=found.get):
+            out = settings_web.plugin_states()
+        self.assertEqual(out["buttplug"], {"running": True, "devices": ["Lovense Gush"], "error": "", "connection": True})
+        self.assertEqual(out["chess"], {"running": False, "devices": [], "error": "", "connection": False})
+
+    def test_a_broken_state_reads_as_not_running(self):
+        bad = mock.Mock(config="lovense", module=type(sys)("fake"), running=mock.Mock(side_effect=RuntimeError("boom")))
+        with mock.patch("plugins.names", return_value=["lovense"]), mock.patch("plugins.get", return_value=bad):
+            out = settings_web.plugin_states()
+        self.assertEqual(out["lovense"]["running"], False)
+        self.assertEqual(out["lovense"]["error"], "boom")
+
+
+class EmailPermissions(unittest.TestCase):
+    """Email in the permissions table: reading is allow/off, sending ask/off
+    (every message still asks). Saved as the switches they are."""
+
+    def test_values_follow_the_switches(self):
+        with mock.patch.object(config, "EMAIL_ENABLED", True), mock.patch.object(config, "EMAIL_SEND", False):
+            self.assertEqual(config.permission("email"), "allow")
+            self.assertEqual(config.permission("send email"), "off")
+        with mock.patch.object(config, "EMAIL_ENABLED", False), mock.patch.object(config, "EMAIL_SEND", True):
+            self.assertEqual(config.permission("email"), "off")
+            self.assertEqual(config.permission("send email"), "ask")
+
+    def test_saved_as_true_or_false(self):
+        with mock.patch.object(config, "save_setting") as saved:
+            config.set_permission("email", "off")
+            config.set_permission("send email", "ask")
+            config.set_permission("execute", "ask")
+        self.assertEqual([c.args for c in saved.call_args_list],
+                         [("email.enabled", "false"), ("email.send", "true"), ("shell.enabled", "true")])
+        with self.assertRaises(ValueError):
+            config.set_permission("send email", "allow")      # sending always asks
+
+    def test_the_note_says_what_is_missing(self):
+        with mock.patch("tools.mail.account", return_value={}):
+            self.assertIn("no login yet", config.permission_note("email", "allow"))
+            self.assertNotIn("no login", config.permission_note("email", "off"))
+        with mock.patch("tools.mail.account", return_value={"user": "x"}), \
+                mock.patch.object(config, "EMAIL_ENABLED", False):
+            self.assertIn("email itself is off", config.permission_note("send email", "ask"))
+
+    def test_the_page_and_the_tools_pane_list_them(self):
+        labels = [p["label"] for p in settings_web.permissions_panel()]
+        self.assertEqual(labels[-2:], ["email", "send email"])
+        from ui import tools_pane
+        group = tools_pane._perm_group()
+        self.assertEqual([m[0] for m in group[1]][-2:], ["email", "send email"])

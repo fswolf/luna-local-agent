@@ -2,7 +2,7 @@
 
 A scripted day goes through everything that moves her - a cold morning,
 warming up, compliments, flirting into the lewd row, a stream that keeps
-it tame, spanks past the limit, desire fading while you're away,
+it tame, spanks past the playful ones, desire fading while you're away,
 hostility into a grudge, walking away and making up, errors, games, the
 machine busy while you're gone, the day of the week, a restart - and at
 every step writes down what she'd show: the label, the dials, desire and
@@ -196,12 +196,12 @@ def run_day(intensity):
         snap("tame: twitch live")
         mood.set_tame("twitch", False)
         snap("tame: off")
-        # spanks: up to the limit, then one too many
-        for i in range(70):
-            clock.advance(0.05)
-            over = mood.note_spank()
-            if i in (0, 59, 60, 61, 69):
-                snap(f"spank {i + 1} (too many: {over})")
+        # spanks: three playful, then each one cools her off
+        for i in range(6):
+            clock.advance(0.5)
+            cooling = mood.note_spank()
+            if i in (0, 2, 3, 5):
+                snap(f"spank {i + 1} (cooling: {cooling})")
         # away 25 minutes: desire halves
         turn(1500, 0, 0, 0, None, 0, what="back after 25 minutes")
         # a bad patch: hostility, into a grudge, then she walks away

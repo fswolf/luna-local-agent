@@ -107,9 +107,48 @@ def _set_alarm(text, when):
         reminders.add(text, due, repeat, kind="alarm")
     )
 
+# A task is the same schedule again, but it's hers to do when it comes
+# due rather than something to tell the user: its own tool, for the same
+# reason set_alarm is one (a name to match is easier than a flag to set).
+@tool(
+    "set_task",
+    "Schedule something for YOU to do yourself at a time - when it's due you "
+    "do it with your tools, with the day's conversation in front of you. For "
+    "'check my email every evening at 6 and answer Lumen', 'look at the server "
+    "logs tomorrow at 9'. Use set_reminder instead when the user just wants "
+    "telling about something. Pass the user's own timing words through "
+    "unchanged and never calculate a date yourself.",
+    {
+        "text": {
+            "type": "string",
+            "description": "What to do, step by step, as an instruction to yourself: "
+                           "'check email from lumen@example.com, read any new ones, reply'.",
+        },
+        "when": {
+            "type": "string",
+            "description": "When to do it, exactly as the user said it. Repeats are "
+                           "fine: 'every day at 6pm', 'every monday at 9'.",
+        },
+    },
+    required=("text", "when"),
+)
+def _set_task(text, when):
+    due, repeat = timeutil.parse_when(when)
+
+    if due is None:
+        return (
+            f"Couldn't read {when!r} as a time, so nothing was scheduled. "
+            "Ask the user when they want it done - do not guess a time."
+        )
+
+    if timeutil.too_frequent(repeat):
+        return _TOO_OFTEN
+
+    return "Task scheduled: " + reminders.describe(reminders.add(text, due, repeat, kind="task"))
+
 @tool(
     "list_reminders",
-    "List the user's pending reminders and alarms with their due times.",
+    "List the pending reminders, alarms and your own tasks with their due times.",
     {},
 )
 def _list_reminders():
@@ -124,7 +163,7 @@ def _list_reminders():
 
 @tool(
     "cancel_reminder",
-    "Cancel a pending reminder or alarm by its number from "
+    "Cancel a pending reminder, alarm or task by its number from "
     "list_reminders. Call list_reminders first to find the number.",
     {
         "number": {

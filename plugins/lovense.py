@@ -159,6 +159,12 @@ def running():
     return _state["connected"]
 
 
+def live_state():
+    """For the settings page's heading: the toys the Remote app reports, and the last error."""
+    names = [t.get("nickName") or t.get("name") or tid for tid, t in _state["toys"].items()]
+    return {"devices": names if _state["connected"] else [], "error": _state["error"]}
+
+
 def start(model):
     global _thread
 

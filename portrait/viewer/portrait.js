@@ -1580,12 +1580,14 @@ function react(r, zone, side) {
 }
 // Spanks. From warm up (warm, very warm, lewd) a click on her bum is a
 // spank: she flinches (spank_flinch), and her bum reddens - a glow painted
-// over her cheeks that steps up every SPANK_STEP spanks and fades as they're
-// forgotten (one every SPANK_FORGET seconds). Not while a tame stream is live.
-// Each one also goes to Luna as 'spank' (touches.py -> mood.note_spank): every
-// 60 knocks her mood down a notch.
-const SPANK_STEP = 10, SPANK_FORGET = 10;
-const spank = { n: 0, flash: 0, layers: [], built: false };
+// over her cheeks, a step redder each spank, fading slowly as they're forgotten
+// (one every SPANK_FORGET seconds). Not while a tame stream is live.
+// Each one also goes to Luna as 'spank' (touches.py -> mood.note_spank): the
+// first SPANK_FREE of a burst are playful, every one after cools her off. A
+// burst ends after SPANK_RESET quiet seconds; the same numbers as
+// mind/mood/exchange.py, so the emote turns when her mood does.
+const SPANK_FORGET = 45, SPANK_FREE = 3, SPANK_RESET = 30;   // FORGET: the glow only; her mood counts by RESET
+const spank = { n: 0, flash: 0, layers: [], built: false, burst: 0, at: -1e9 };
 function spankMode() { return !mind.tame && (mind.row === 'lewd' || ['warm', 'loving'].includes(warmthBand())); }
 function buildBumBlush() {
   spank.built = true;
@@ -1651,13 +1653,18 @@ function buildBumBlush() {
 }
 function spankHit() {
   if (!spank.built) { try { buildBumBlush(); } catch (e) { console.warn('bum blush:', e); } }
-  const before = Math.floor(spank.n / SPANK_STEP);
+  const now = clock.elapsedTime;
+  spank.burst = now - spank.at > SPANK_RESET ? 1 : spank.burst + 1;
+  spank.at = now;
   spank.n += 1;
   spank.flash = 1;
   if (moves.playing().includes('spank_flinch')) moves.stop();
   gesture('spank_flinch');
   twitch(0, 1);
-  if (Math.floor(spank.n / SPANK_STEP) > before) { emoteLast = -99; emote(mind.row === 'lewd' ? 'hearts' : 'sweat'); }
+  // the first of a burst is play (hearts in the lewd row); the first one past
+  // the playful few is where it starts cooling her off, and she shows it
+  if (spank.burst === 1) { emoteLast = -99; emote(mind.row === 'lewd' ? 'hearts' : 'sweat'); }
+  else if (spank.burst === SPANK_FREE + 1) { emoteLast = -99; emote('anger'); }
 }
 // The debug panel's preview: drag to any number of spanks and the glow holds
 // there (no fading) until you let go of it with 'fade'. Any mood, no flinch.
@@ -1665,7 +1672,7 @@ function spankSlider() {
   const row = document.createElement('div'), r = document.createElement('input'), out = document.createElement('span');
   const hit = document.createElement('button'), fade = document.createElement('button');
   row.className = 'row';
-  Object.assign(r, { type: 'range', min: 0, max: 80, step: 1, value: 0, title: 'bum redness: how many spanks' });
+  Object.assign(r, { type: 'range', min: 0, max: 10, step: 1, value: 0, title: 'bum redness: how many spanks' });
   r.style.width = '120px';
   hit.textContent = 'spank'; hit.title = 'one spank, flinch and all (any mood)';
   fade.textContent = 'fade'; fade.title = 'let it fade like it does live';
@@ -1682,7 +1689,7 @@ function spankSlider() {
   row.append(label, r, out, hit, fade);
   return row;
 }
-function spankLevel() { return Math.min(0.92, Math.floor(spank.n / SPANK_STEP) * 0.18 + Math.min(1, spank.n / SPANK_STEP) * 0.14); }
+function spankLevel() { return Math.min(0.92, spank.n * 0.24); }     // a big step redder each spank, deep red by the fourth
 function updateSpank(dt) {
   if (!spank.layers.length) return;
   if (!spank.hold) spank.n = Math.max(0, spank.n - dt / SPANK_FORGET);

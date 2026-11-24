@@ -14,6 +14,7 @@ ddgs>=9.0
 pynput>=1.7
 pint>=0.24              # calculate: unit conversions
 chess>=1.10             # the chess plugin
+pyspellchecker>=0.8     # spelling suggestions in the right-click menu (core/spelling.py)
 evdev>=1.7; sys_platform == "linux"
 dbus-fast>=2.0; sys_platform == "linux"          # her tray icon (app/tray.py)
 pystray>=0.19; sys_platform != "linux"           # her tray icon on Windows and macOS

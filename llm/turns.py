@@ -27,7 +27,7 @@ from .prompts import _calibration_note, _previous_user_text, build_generation_pa
 from .replay import _demonstration, _has_tool_example, _replay, _strip_leading_timestamps, _timestamped
 from .rounds import _generate, _log_tool_call, _tool_rounds, _why_empty
 from .second_look import (_adaptive_on, _calibrate, _ONLY_WHAT_CHANGED, _follow_through, _ground,
-                          _promised_action, _rethink, _unbacked, _vote)
+                          _promised_action, _rethink, _unbacked, _vote, turn_steps)
 from .streaming import _last_raw
 
 _window_cache = {"at": 0.0, "n": 0}
@@ -216,6 +216,8 @@ def _ask(text, model, on_text=None, on_sentence=None,
     started = time.monotonic()
     _last_raw["thinking"] = []
     _last_raw["tokens"] = []
+    _last_raw["steps"] = []           # follow-throughs, in order (second_look._note_step)
+    _last_raw["steps_said"] = ""
 
     past = [] if context is not None else history.recent()
     turn = turnctx.current()
@@ -432,7 +434,9 @@ def _ask(text, model, on_text=None, on_sentence=None,
             f"(Not from {config.USER}, and nothing new has been said: your reply ended with "
             f"\u201c{promise}\u201d but you didn't call a tool. If one of your tools does that, "
             "call it now and finish the job. If none of them does, don't reach for a different "
-            "tool - just say in a sentence that you can't do that from here.)")
+            "tool - just say in a sentence that you can't do that from here. Your reply is already "
+            "out, so don't repeat any of it: after the tool, say only what it showed, in a "
+            "sentence or two.)")
         kept_promise = True
 
     unbacked = (_unbacked(answer, _last_raw.get("exchanges"), text)
@@ -527,10 +531,11 @@ def _ask(text, model, on_text=None, on_sentence=None,
                          extra_flags=extra_flags)
 
         # The second look as a row of its own, beside the first, so the
-        # two can be compared - same question, more thinking.
+        # two can be compared - same question, more thinking. "rethink" was
+        # only checked behind the scenes; "correction" she said out loud.
         if second:
             _last_raw.update(second["second"])
-            _record_thoughts(text, second["answer"], started, "rethink",
+            _record_thoughts(text, second["answer"], started, "correction" if second["corrected"] else "rethink",
                              model=payload.get("model", ""), prompt_hash=prompt_hash)
 
     conf = None
@@ -587,7 +592,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
     if attached is not None:
         said = f"{said}\n{attached.marker()}"      # that it was sent, never the file
     history.add_message("user", said)
-    history.add_message("assistant", answer, tools=_last_raw.get("exchanges"))
+    history.add_message("assistant", answer, tools=_last_raw.get("exchanges"), steps=turn_steps(answer))
 
     # The same turns, to a file summarization never touches. core/history.py
     # deletes these once they're folded into the summary; this is what
@@ -599,10 +604,16 @@ def _ask(text, model, on_text=None, on_sentence=None,
 
     called = _last_raw.get("called") or set()
 
+    if source in ("reminder", "task"):
+        # Her own reminder or task firing. Its text names a time ("6 PM daily
+        # inbox sweep"), so the nets below read it as a new request and tried
+        # to schedule it again. It's a note she wrote, not something you said.
+        return answer
+
     if not session._tools_supported:
         longterm.extract_in_background(model, text, answer)
         reminders.extract_in_background(model, text)
-    elif not called & {"set_reminder", "list_reminders", "cancel_reminder"}:
+    elif not called & {"set_reminder", "set_alarm", "set_task", "list_reminders", "cancel_reminder"}:
         # She will sometimes say "Got it, setting that for you!" without
         # ever calling set_reminder - a small model choosing to sound
         # helpful over being helpful, and it gets likelier as the tool

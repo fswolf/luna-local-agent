@@ -15,7 +15,11 @@ in the page too, and either side can answer it.
                            head=1: only her header (status, model, busy, mic, voice);
                            tray=1 as well: the tray icon is up (app/tray.py)
     POST /chat/say         {"text"} or a form with "text" and one "file"
-    POST /chat/talk        the mic button: HOME (talk, done, or stop her)
+    POST /chat/talk        HOME from the page (talk, done, or stop her)
+    POST /chat/dictate     the mic button: your words into the text box, not sent
+    GET  /chat/spell?w=&w= {word: {"known", "suggestions"}} for the right-click menu (web/head.js)
+    POST /chat/speak       {"e", "i"}: say one of her replies again (the speaker
+                           under it); again on the same one stops it
     POST /chat/stop        stop her (and anything physical), like ai-voice-ctl stop
     POST /chat/answer      {"id", "answer": "yes" | "no" | "all"}
     POST /chat/rate        {"e", "i", "up": true|false, "better"}: the thumbs on her
@@ -24,8 +28,11 @@ in the page too, and either side can answer it.
     POST /chat/tray        {"action": "chat" | "portrait" | "settings" | "voice" | "quit"}: the
                            tray icon's menu (chat opens her window; voice flips tts.enabled)
 """
+import itertools
 import json
 import os
+import secrets
+import threading
 import time
 import urllib.parse
 
@@ -106,7 +113,8 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
         from ui.conversation_pane import _voice_on
 
         return {"v": now_version, "status": status, "name": name, "mood": mood, "rows": rows,
-                "busy": interrupts.busy(), "mic": _mic(), "can_talk": bool(ui.view.on_hotkey),
+                "busy": interrupts.busy(), "stoppable": interrupts.busy(kinds=None),
+                "mic": _mic(), "can_talk": bool(ui.view.on_hotkey),
                 "voice_on": _voice_on()}
     total = len(convo)
     # have > total is the open reply dropped empty (ui.end_message): no reset
@@ -118,9 +126,11 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
         start = max(0, min(start, total) - 2)
     return {"v": now_version, "e": now_epoch, "reset": reset, "from": start,
             "msgs": [[speaker, text] for speaker, text in convo[start:]], "total": total,
-            "streaming": streaming, "busy": interrupts.busy(), "status": status, "name": name,
+            "streaming": streaming, "busy": interrupts.busy(), "stoppable": interrupts.busy(kinds=None),
+            "status": status, "name": name,
             "mood": mood, "rows": rows, "ask": ui.pending_approval(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
-            "can_talk": bool(ui.view.on_hotkey), "rate": _rateable(now_epoch, convo)}
+            "can_talk": bool(ui.view.on_hotkey), "rate": _rateable(now_epoch, convo),
+            "dictated": dict(DICTATED), "replay": replaying()}
 
 
 def _rateable(epoch, convo):
@@ -158,6 +168,110 @@ def _rate(body):
                        "approved": n.get(kind, {}).get("approved", 0)})
 
 
+# A reply said again (the speaker button): which one, and its Stop, so a
+# second click, another reply's button, Stop, HOME or a new turn ends it
+_replay = {"at": None, "stop": None}
+_replay_lock = threading.Lock()
+REPLAY_WAIT = 2               # seconds: for her turn, while the replay just stopped lets go of it
+
+
+def replaying():
+    """[epoch, index] of the reply being said again, or None."""
+    with _replay_lock:
+        return list(_replay["at"]) if _replay["at"] else None
+
+
+def _speak(body):
+    """The speaker under her reply: say it again through the PC's speakers,
+    the way she said it (sentence by sentence, her voice and mood). A second
+    click on the same one stops it; another one's button switches to that."""
+    import ui
+    from core import assistant, interrupts
+    from ui.conversation_pane import _voice_on
+    from ui.shared import _lock
+
+    try:
+        data = json.loads(body or b"{}")
+        epoch, index = int(data.get("e")), int(data.get("i"))
+    except (ValueError, TypeError, AttributeError):
+        return _json(400, {"error": "that couldn't be read"})
+    with _lock:
+        msg = ui.conversation[index] if epoch == ui.view.epoch and 0 <= index < len(ui.conversation) else None
+    if msg is None or msg[0] in ("user", "system") or msg[0].startswith("chat:") or not str(msg[1]).strip():
+        return _json(409, {"error": "that reply has gone from the conversation"})
+
+    with _replay_lock:
+        playing, same = _replay["stop"], _replay["at"] == (epoch, index)
+        if playing is not None:
+            playing.stop(speaking=True, generating=True, listening=False)
+            _replay.update(at=None, stop=None)
+    if same:
+        _wake()                               # the button goes back to a speaker
+        return _json(200, {"ok": True, "playing": False})
+    if not _voice_on():
+        return _json(409, {"error": "her voice is off (tts.enabled)"})
+    # Her turn, held while it plays, as any turn of hers is: a reminder, a
+    # stream-chat reply or a job waits for it rather than talking over it,
+    # and a message of yours cuts it short (respond() stops whoever holds
+    # it). A moment's wait covers the replay just stopped above letting go.
+    if not assistant._turn.acquire(timeout=REPLAY_WAIT):
+        return _json(409, {"error": "she's in the middle of something - try again once she's done"})
+
+    stop = interrupts.open("replay")
+    assistant._hold(stop)
+    with _replay_lock:
+        _replay.update(at=(epoch, index), stop=stop)
+    try:
+        threading.Thread(target=_say_again, args=(msg[1], stop), daemon=True, name="replay").start()
+    except Exception:
+        assistant._hold(None)
+        assistant._turn.release()
+        raise
+    _wake()                                   # this one's button turns to stop
+    return _json(200, {"ok": True, "playing": True})
+
+
+def _player(stop):
+    """Her voice for a replay. No barge-in: talking over a replay isn't
+    talking over her."""
+    from voice import speech
+
+    return speech.Player(barge_in=False, stop=stop)
+
+
+def _say_again(words, stop):
+    """Runs holding her turn (taken in _speak), and always lets go of it at
+    the end, whatever fails on the way: an import failing outside the try
+    left her turn held for good, and every reply after it waited forever."""
+    from core import assistant, interrupts, logbook
+
+    try:
+        from llm.streaming import _Narrator
+
+        with interrupts.using(stop):
+            player = _player(stop)
+            narrator = _Narrator(on_sentence=player.say)    # the same sentences a live reply is cut into
+            narrator.feed(words)
+            narrator.finish()
+            player.wait()
+    except Exception:
+        logbook.exception("chat", "saying a reply again failed")
+    finally:
+        with _replay_lock:
+            if _replay["stop"] is stop:
+                _replay.update(at=None, stop=None)
+        assistant._hold(None)
+        assistant._turn.release()
+        _wake()
+
+
+def _wake():
+    """Wake the pages' long poll: something they show changed."""
+    from ui.shared import _refresh
+
+    _refresh()
+
+
 def _mic():
     """The mic open for you (voice/ptt.py), for the mic button. Read only if
     push to talk is loaded: importing it would load the audio stack."""
@@ -193,8 +307,63 @@ def stop():
         pass
 
 
+# The chat page's mic (dictate): the last words heard. id is new for each
+# dictation and each run of Luna (a page left open across a restart must
+# not wait for the count to pass its old one); page is the page that asked,
+# so a second chat window doesn't get the words too. text "": nothing
+# heard; None: cancelled.
+_BOOT = secrets.token_hex(3)
+DICTATED = {"id": f"{_BOOT}-0", "page": "", "text": None}
+_dictating = threading.Lock()     # a double click: one check-and-open at a time
+_count = itertools.count(1)
+
+
+def dictate(page=""):
+    """The mic button: record and transcribe on the desktop mic, then the
+    words go into the page's text box (state()'s "dictated") to fix before
+    sending. HOME, the tray and the terminal still send at once. While a
+    turn of yours is running, a click is HOME (manual mode: "done"; else
+    stop), and in hands-free mode it switches hands-free, as before: that
+    mode is a conversation, not dictation. While she answers something
+    you typed, the click dictates (her voice goes quiet so the mic doesn't
+    hear her; her reply still finishes on screen), as typing would. Returns
+    an error, or None."""
+    import sys
+
+    import ui
+    from core import interrupts
+
+    ptt = sys.modules.get("voice.ptt")
+    if ptt is None or not ui.view.on_hotkey:
+        return "push to talk isn't set up in this Luna"
+    mode = ptt.mode()
+    with _dictating:
+        if mode == "open" or interrupts.busy(kinds=("voice",)):
+            return talk()
+        # she goes quiet first, or the mic records her instead of you (as ptt does)
+        interrupts.stop_all(generating=False, listening=False)
+        stop = interrupts.open("voice")       # opened at the click: a second click finds it
+    page = str(page or "")[:40]
+
+    def run():
+        text = None
+        try:
+            from core import assistant
+
+            with interrupts.using(stop):
+                text = assistant.dictation(mode)
+        finally:
+            interrupts.close(stop)            # however it ended: an open one reads as "busy" for good
+            with ui.changes:
+                DICTATED.update(id=f"{_BOOT}-{next(_count)}", page=page, text=text)
+            ui.set_status("Idle")             # wakes the pages' long poll with the words
+
+    threading.Thread(target=run, daemon=True, name="dictation").start()
+    return None
+
+
 def talk():
-    """The mic button: what HOME does (start talking, done, or stop her),
+    """HOME from the page: what HOME does (start talking, done, or stop her),
     run on her main loop like a key. Returns an error, or None."""
     import ui
 
@@ -374,9 +543,22 @@ def handle(method, sub, body, request=None):
                                 head=bool(query.get("head"))))
     if method == "POST" and sub == "/say":
         return _say(body, headers)
+    if method == "POST" and sub == "/dictate":
+        try:
+            asker = (json.loads(body or b"{}") or {}).get("page", "")
+        except (ValueError, AttributeError):
+            asker = ""
+        error = dictate(asker)
+        return _json(503, {"error": error}) if error else _json(200, {"ok": True})
     if method == "POST" and sub == "/talk":
         error = talk()
         return _json(503, {"error": error}) if error else _json(200, {"ok": True})
+    if method == "GET" and sub == "/spell":
+        from core import spelling
+
+        return _json(200, spelling.check_many(query.get("w") or []))
+    if method == "POST" and sub == "/speak":
+        return _speak(body)
     if method == "POST" and sub == "/stop":
         stop()
         return _json(200, {"ok": True})

@@ -13,6 +13,15 @@ body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 .you{align-self:flex-start;background:var(--you);border-bottom-left-radius:5px}
 .her{align-self:center;background:var(--her);border:1px solid var(--line)}
 .her em{color:#d9b8ff}
+.her strong{color:#fff;font-weight:650}
+.her code{font:13px/1.45 ui-monospace,"Cascadia Mono",monospace;background:#0e0a16;border:1px solid var(--line);border-radius:5px;padding:0 4px}
+.her .code{margin:6px 0;border:1px solid var(--line);border-radius:9px;background:#0e0a16;overflow:hidden;white-space:normal}
+.her .code .bar{display:flex;align-items:center;justify-content:space-between;padding:3px 6px 3px 11px;background:#1b1428;border-bottom:1px solid var(--line);font:12px system-ui,sans-serif;color:var(--dim)}
+.her .code button{background:none;border:0;color:var(--dim);cursor:pointer;padding:3px 5px;border-radius:6px;display:flex}
+.her .code button:hover{color:var(--text);background:#2a2040}
+.her .code button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.her .code pre{margin:0;padding:9px 11px;overflow-x:auto;white-space:pre}
+.her .code pre code{border:0;padding:0;background:none}
 .guest{align-self:flex-start;background:#16202a;border:1px solid #2b4050;border-bottom-left-radius:5px}
 .who{display:block;font-size:12px;color:var(--dim);margin-bottom:2px}
 .sys{align-self:flex-end;max-width:62%;color:#e9d9a6;background:#272012;border:1px solid #5a4a22;border-radius:12px;
@@ -69,7 +78,10 @@ border-radius:12px;font-size:13px;color:var(--dim);align-self:flex-start;max-wid
 #chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #chip button{background:none;border:0;color:var(--dim);cursor:pointer;font-size:16px}
 #err{max-width:860px;margin:0 auto;padding:0 16px;color:#ff8fa3;font-size:13px;min-height:0}
-#down{position:fixed;right:20px;bottom:86px;display:none;width:38px;height:38px}
+#toast{position:fixed;left:50%;bottom:calc(var(--foot, 70px) + 16px);z-index:20;transform:translate(-50%,6px);max-width:min(90vw,560px);padding:8px 14px;border-radius:10px;
+  background:#241a38;border:1px solid #ff8fa366;color:#ffc2cd;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#down{position:fixed;right:20px;bottom:calc(var(--foot, 70px) + 16px);display:none;width:38px;height:38px}
 .rate{display:flex;gap:2px;justify-content:flex-end;align-items:center;margin:2px -7px -6px 0;opacity:0;transition:opacity .15s}
 .msg.her:hover .rate,.rate.open,.rate:focus-within{opacity:1}
 .rate.done{opacity:.55}
@@ -93,13 +105,14 @@ body.drag #log{outline:2px dashed var(--accent);outline-offset:-8px}
 <button class="round" id=down title="newest">↓</button>
 <footer>
   <div id=err></div>
+  <div id=toast role=status aria-live=polite></div>
   <div id=bar>
     <button class=round id=clip title="attach a picture or a file">📎</button>
     <input type=file id=file>
     <div class=box>
       <div id=chip><span id=chipname></span><button id=unclip title="remove">×</button></div>
       <div class=line><textarea id=text rows=1 placeholder="Say something" autocomplete=off></textarea>
-      <button id=mic title="talk to Luna (the same as HOME)"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/>
+      <button id=mic title="dictate into the box"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/>
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/></svg></button></div>
     </div>
     <button class=round id=send title="send (Enter)">➤</button>
@@ -109,7 +122,8 @@ body.drag #log{outline:2px dashed var(--accent);outline-offset:-8px}
 const BOOT = __BOOT__;
 const $ = s => document.querySelector(s);
 const log = $('#log'), list = $('#list'), typing = $('#typing'), text = $('#text'), send = $('#send'), down = $('#down');
-let offline = false, base = 0, msgs = [], els = [], v = null, e = null, busy = false, streaming = null, attached = null, askId = null, askEl = null;
+let offline = false, base = 0, msgs = [], els = [], v = null, e = null, busy = false, stoppable = false, streaming = null, attached = null, askId = null, askEl = null;
+let replay = null;  // her reply being said again (the speaker button), by conversation index
 let rates = {};   // her replies the thumbs can keep: conversation index -> "" | "up" | "down"
 
 // her header (web/head.js, above this) is fed from these updates
@@ -122,14 +136,50 @@ function show(fn) {
   const stick = atBottom();
   fn();
   if (stick) log.scrollTop = log.scrollHeight;
-  down.style.display = atBottom() ? 'none' : 'block';
+  pinned = atBottom();
+  down.style.display = pinned ? 'none' : 'block';
 }
-log.addEventListener('scroll', () => { down.style.display = atBottom() ? 'none' : 'block'; });
+log.addEventListener('scroll', () => { pinned = atBottom(); down.style.display = pinned ? 'none' : 'block'; });
 down.onclick = () => { log.scrollTop = log.scrollHeight; };
+
+// The box under the conversation grows as you type (up to 40% of the window),
+// and a picked file adds its chip: the conversation's window gets shorter,
+// and when you were at the bottom its last lines went under the box rather
+// than moving up. Whether you were at the bottom is kept from before the
+// change (after it, you aren't any more), and the buttons that float above
+// the box move up with it.
+let pinned = true;
+new ResizeObserver(() => {
+  document.body.style.setProperty('--foot', $('footer').offsetHeight + 'px');
+  if (pinned) log.scrollTop = log.scrollHeight;
+}).observe($('footer'));
 
 function esc(s) { return s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
 // her *actions* in italics; everything else exactly as written
-function styled(s) { return esc(s).replace(/(^|[\s(])\*([^*\n]{1,200})\*(?=$|[\s.,!?;:)])/g, '$1<em>*$2*</em>'); }
+// Her words as shown: ```code``` in a box of its own with a copy button
+// (an unclosed one while it streams in shows as code already), `inline
+// code`, **bold**, and *actions* kept in their asterisks, tinted.
+function styled(s) {
+  let out = '', at = 0;
+  // a language only when the fence's line has nothing else on it: "```ls -la```"
+  // on one line is a short block, not a block in language "ls" eating the rest
+  const fence = /```(?:([\w+#.-]*)[ \t]*\n)?([\s\S]*?)(```|$)/g;
+  for (const m of s.matchAll(fence)) {
+    out += inline(s.slice(at, m.index).replace(/\n$/, ''));
+    const lang = m[1] || '', code = m[2].replace(/\n$/, '');
+    out += `<div class=code><div class=bar><span>${esc(lang || 'code')}</span>` +
+           `<button class=copycode title="copy">${ICON.copy}</button></div><pre><code>${esc(code)}</code></pre></div>`;
+    at = m.index + m[0].length;
+    if (s[at] === '\n') at++;                // the box is a block: no blank line under it
+  }
+  return out + inline(s.slice(at));
+}
+function inline(s) {
+  // `code` first, so nothing inside it turns bold or tinted
+  return s.split(/(`[^`\n]+`)/).map((part, i) => i % 2 ? `<code>${esc(part.slice(1, -1))}</code>` :
+    esc(part).replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+             .replace(/(^|[\s(])\*([^*\n]{1,200})\*(?=$|[\s.,!?;:)])/g, '$1<em>*$2*</em>')).join('');
+}
 
 function draw(el, speaker, words) {
   el.onclick = null;
@@ -170,7 +220,9 @@ function apply(s) {
     const hint = list.querySelector('.hint');
     if (hint && msgs.length) hint.remove();
     busy = s.busy; streaming = s.streaming;
+    stoppable = s.stoppable ?? s.busy;      // anything Stop can end: a greeting, a reminder, a reply said again too
     rates = s.rate || {};
+    replay = s.replay && s.replay[0] === e ? s.replay[1] : null;
     thumbs();
     // dots from your message until her first words (not while she's speaking a finished reply)
     const last = [...msgs].reverse().find(([who, words]) => who !== 'system' && words);
@@ -189,7 +241,8 @@ function apply(s) {
   mic.title = s.voice_mode === 'open'
     ? (s.mic ? 'hands-free is on - click to turn it off' : 'turn hands-free on (the same as HOME)')
     : s.mic ? (s.voice_mode === 'manual' ? 'listening - click when you\'re done' : 'listening - it stops when you go quiet')
-    : 'talk to Luna (the same as HOME)';
+    : 'dictate into the box: you send it (HOME still talks to Luna straight away)';
+  dictated(s.dictated);
   buttons();
 }
 
@@ -202,6 +255,8 @@ const ICON = {
   up: '<svg viewBox="0 0 24 24"><path d="M7 10v11"/><path d="M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 7a2 2 0 0 1-1.9 1.4H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3l3.9-7.4a1.9 1.9 0 0 1 4.1 1.3z"/></svg>',
   down: '<svg viewBox="0 0 24 24"><g transform="matrix(1 0 0 -1 0 24)"><path d="M7 10v11"/><path d="M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 7a2 2 0 0 1-1.9 1.4H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3l3.9-7.4a1.9 1.9 0 0 1 4.1 1.3z"/></g></svg>',
   done: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+  speak: '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+  hush: '<svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></svg>',     // pause: two bars, like the speaker it replaces
 };
 function thumbs() {
   els.forEach((el, at) => {
@@ -209,12 +264,15 @@ function thumbs() {
     if (idx === streaming || !el.classList.contains('her')) { if (bar) bar.remove(); return; }
     // rates[idx]: "" | up | fix | down (keepable), "tools" (a tool turn put right afterwards: can't be kept), missing (from before Luna started)
     const st = rates[idx] === undefined ? 'old' : rates[idx];
-    if (bar && bar.dataset.st === st) return;
+    const key = st + (replay === idx ? ' playing' : '');
+    if (bar && bar.dataset.st === key) return;
     if (bar) bar.remove();
     const can = st !== 'old' && st !== 'tools';     // thumbs only where they work; copy on every reply
-    const b = document.createElement('div'); b.className = 'rate' + (st === 'up' || st === 'fix' || st === 'down' ? ' done' : ''); b.dataset.st = st;
+    const b = document.createElement('div'); b.className = 'rate' + (st === 'up' || st === 'fix' || st === 'down' ? ' done' : ''); b.dataset.st = key;
     b.innerHTML = `<span class=said>${st === 'up' ? 'kept as a good example' : st === 'fix' ? 'kept your version' : st === 'down' ? 'kept as a bad one' : ''}</span>
-      <button class=copy data-r=copy title="copy" aria-label="copy">${ICON.copy}</button>${can
+      <button class=copy data-r=copy title="copy" aria-label="copy">${ICON.copy}</button>${replay === idx
+        ? `<button data-r=speak title="stop" aria-label="stop">${ICON.hush}</button>`
+        : `<button data-r=speak title="say it again" aria-label="say it again">${ICON.speak}</button>`}${can
         ? `<button data-r=up aria-label="good reply">${ICON.up}</button><button data-r=down aria-label="bad reply">${ICON.down}</button>` : ''}`;
     if (can) {
       const up = b.querySelector('[data-r=up]'), dn = b.querySelector('[data-r=down]');
@@ -226,6 +284,7 @@ function thumbs() {
       dn.onclick = ev => { ev.stopPropagation(); better(el, b, idx); };
     }
     b.querySelector('[data-r=copy]').onclick = ev => { ev.stopPropagation(); copy(msgs[at] ? msgs[at][1] : '', ev.currentTarget); };
+    b.querySelector('[data-r=speak]').onclick = ev => { ev.stopPropagation(); post('speak', {e, i: idx}); };
     el.appendChild(b);
   });
 }
@@ -237,6 +296,14 @@ async function copy(words, btn) {
   }
   btn.innerHTML = ICON.done; setTimeout(() => { btn.innerHTML = ICON.copy; }, 1200);
 }
+// a code box's copy button: its code only, as written (one listener for every
+// box, since her bubble is redrawn while she writes)
+list.addEventListener('click', ev => {
+  const btn = ev.target.closest('.copycode');
+  if (!btn) return;
+  ev.stopPropagation();
+  copy(btn.closest('.code').querySelector('pre').textContent, btn);
+});
 function better(el, bar, idx) {
   if (el.querySelector('.better')) return;
   bar.classList.add('open');
@@ -251,16 +318,24 @@ function better(el, bar, idx) {
   f.onclick = ev => ev.stopPropagation();
   el.appendChild(f); ta.focus();
 }
+// Something that didn't work, said for a few seconds and gone; the line
+// above the box (#err) is only for "can't reach Luna", which lasts
+let toastTimer = 0;
+function toast(words) {
+  const t = $('#toast');
+  t.textContent = words; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
 async function rate(idx, up, better) {
   try {
     const r = await fetch('rate', {method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({e, i: idx, up, better})});
     const out = await r.json().catch(() => ({}));
-    if (!r.ok) { $('#err').textContent = out.error || ('error ' + r.status); return false; }
-    $('#err').textContent = '';
+    if (!r.ok) { toast(out.error || ('error ' + r.status)); return false; }
     rates[idx] = out.rated; thumbs();
     return true;
-  } catch (err) { $('#err').textContent = "can't reach Luna - is it running?"; return false; }
+  } catch (err) { toast("can't reach Luna - is it running?"); return false; }
 }
 
 // --- a tool asking first --------------------------------------------------
@@ -312,15 +387,14 @@ async function post(path, body, form) {
     const r = await fetch(path, form ? {method: 'POST', body: form}
       : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})});
     const out = await r.json().catch(() => ({}));
-    if (!r.ok) { $('#err').textContent = out.error || ('error ' + r.status); return false; }
-    $('#err').textContent = '';
+    if (!r.ok) { toast(out.error || ('error ' + r.status)); return false; }
     return true;
-  } catch (err) { $('#err').textContent = "can't reach Luna - is it running?"; return false; }
+  } catch (err) { toast("can't reach Luna - is it running?"); return false; }
 }
 
 function buttons() {
   const typed = text.value.trim() || attached;
-  const stopping = busy && !typed;
+  const stopping = stoppable && !typed;
   send.classList.toggle('stop', stopping);
   send.textContent = stopping ? '■' : '➤';
   send.title = stopping ? 'stop' : 'send (Enter)';
@@ -330,7 +404,7 @@ async function go() {
   if (send.classList.contains('stop')) { post('stop'); return; }
   const words = text.value.trim();
   if (!words && !attached) return;
-  if (words.length > BOOT.max) { $('#err').textContent = `keep it under ${BOOT.max} characters`; return; }
+  if (words.length > BOOT.max) { toast(`keep it under ${BOOT.max} characters`); return; }
   send.disabled = true;
   let ok;
   if (attached) {
@@ -342,7 +416,24 @@ async function go() {
   buttons(); text.focus();
 }
 send.onclick = go;
-$('#mic').onclick = () => post('talk');
+// The mic's words land here, once each (DICTATED in web/chat_web.py), after
+// anything already typed, for you to fix and send; only in the page whose
+// mic was clicked. The first state a page gets only notes the id: an old
+// dictation isn't pasted into a new page.
+const PAGE = Math.random().toString(36).slice(2, 10);
+$('#mic').onclick = () => post('dictate', {page: PAGE});
+let heardId = null;
+function dictated(d) {
+  if (!d || d.id === heardId) return;
+  const first = heardId === null;
+  heardId = d.id;
+  if (first || d.page !== PAGE || d.text === null) return;   // old, another page's, or stopped
+  if (!d.text) { toast("didn't catch anything"); return; }
+  const before = text.value;
+  text.value = before + (before && !/\s$/.test(before) ? ' ' : '') + d.text;
+  grow(); buttons(); text.focus();
+  text.setSelectionRange(text.value.length, text.value.length);
+}
 text.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); go(); }
 });
@@ -357,13 +448,13 @@ $('#file').onchange = () => { if ($('#file').files[0]) attach($('#file').files[0
 $('#unclip').onclick = unattach;
 function attach(f) {
   const img = images.includes(f.type), cap = img ? (files.images || {}).max_bytes : (files.documents || {}).max_bytes;
-  if (img && (files.images || {}).can_see === false) { $('#err').textContent = "the model can't see pictures right now"; return; }
-  if (cap && f.size > cap) { $('#err').textContent = `that's too big (up to ${Math.round(cap / 1048576)} MB)`; return; }
+  if (img && (files.images || {}).can_see === false) { toast("the model can't see pictures right now"); return; }
+  if (cap && f.size > cap) { toast(`that's too big (up to ${Math.round(cap / 1048576)} MB)`); return; }
   attached = f;
   const chip = $('#chip'); chip.querySelector('img')?.remove();
   if (img) { const i = document.createElement('img'); i.src = URL.createObjectURL(f); chip.prepend(i); }
   $('#chipname').textContent = f.name || 'pasted picture';
-  chip.classList.add('on'); $('#err').textContent = ''; buttons(); text.focus();
+  chip.classList.add('on'); buttons(); text.focus();
 }
 function unattach() { attached = null; $('#chip').classList.remove('on'); $('#chip').querySelector('img')?.remove(); buttons(); }
 text.addEventListener('paste', ev => {

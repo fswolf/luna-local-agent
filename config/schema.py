@@ -141,6 +141,8 @@ SCHEMA = {
     "mood.recovery": ("float", "How quickly moods fade (0 = never, 1 = after one reply)"),
     "mood.hurt": ("float", "How much an insult hurts (0 to 4; at 2, two insults make Luna angry)"),
     "mood.forgive": ("float", "How quickly Luna gets over being hurt (0.05 to 1, higher is faster)"),
+    "mood.settle_minutes": ("float", "Minutes for half of any extra warmth or energy to wear off on its own, idle or not"),
+    "mood.desire_minutes": ("float", "Minutes for half of the lewd row's desire to wear off on its own, idle or not"),
     "mood.voice": ("bool", "Let the mood change the voice a little (sleepy sounds slower and lower)"),
     "mood.affection": ("bool", "Notice when you're kind (adds one small model call after each reply)"),
     "mood.prompt": ("bool", "Tell the model what mood Luna is in"),
@@ -319,6 +321,7 @@ SCHEMA = {
     "email.enabled": ("bool", "Let Luna read your email (login details in ~/.config/ai-voice/email.json)"),
     "email.send": ("bool", "Let Luna send email (each message still asks first)"),
     "email.max": ("int", "Most messages one check or search returns"),
+    "email.no_ask_to": ("list", "Addresses Luna may email without asking, comma separated (each one is logged and shown when you're back). Anyone else still asks"),
 
     # --- Web search ---------------------------------------------------------
     "web_search.enabled": ("bool", "Let Luna search the web"),
@@ -496,7 +499,7 @@ SCHEMA = {
     "plugins.ask.daily_cap": ("int", "Most questions a day, all providers together"),
     "plugins.ask.auto": ("bool", "Let Luna ask by itself when it's stuck on a script or server problem"),
     "plugins.ask.auto_daily": ("int", "Most questions a day Luna can ask by itself"),
-    "plugins.ask.max_tokens": ("int", "Longest answer from the bigger model (tokens)"),
+    "plugins.ask.max_tokens": ("int", "Claude's room to think and answer (tokens); its thinking counts toward this"),
 
     # --- Plugins: Home Assistant --------------------------------------------
     "plugins.kiwix.enabled": ("bool", "Connect to the offline library (kiwix-serve) at startup"),

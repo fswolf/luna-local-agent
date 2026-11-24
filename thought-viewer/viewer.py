@@ -511,7 +511,7 @@ PAGE = r"""<!DOCTYPE html>
     <button data-kind="flagged">flagged</button>
     <button data-kind="scored" title="turns recorded on llama-server, with token confidence">confidence</button>
     <button data-kind="introspect" title="turns where she looked at her own numbers">introspected</button>
-    <button data-kind="rethink" title="second looks: the same question again with more thinking, because the first answer was shaky">rethinks</button>
+    <button data-kind="rethink" title="second looks: the same question asked again behind the scenes because the first answer was shaky. Only a correction was said out loud">second looks</button>
   </div>
 </header>
 
@@ -543,6 +543,19 @@ function el(tag, cls, text) {
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
+}
+// Where a turn came from. A second look (adaptive: rethink or vote) is an
+// answer checked behind the scenes and never said unless she corrected
+// herself, so it says which, or it reads like a reply that went missing.
+const SOURCES = {
+  rethink: ["second look · not said", "the same question asked again behind the scenes because the first answer was shaky; she kept her first answer, so this was never said"],
+  correction: ["correction · said", "a second look that disagreed on a fact: she said it out loud after her first answer"],
+};
+function srcPill(source) {
+  const [text, title] = SOURCES[source] || [source, ""];
+  const p = el("span", "pill src", text);
+  if (title) p.title = title;
+  return p;
 }
 function marked(text) {
   const frag = document.createDocumentFragment();
@@ -655,7 +668,7 @@ function item(r) {
   const l1 = el("div", "l1");
   l1.appendChild(el("span", "t", r.timestamp.slice(11, 16)));
   if (r.starred) l1.appendChild(el("span", "pill star", "★"));
-  if (r.source && r.source !== "typed") l1.appendChild(el("span", "pill src", r.source));
+  if (r.source && r.source !== "typed") l1.appendChild(srcPill(r.source));
   for (const t of r.tools.slice(0, 3)) l1.appendChild(el("span", "pill tool", t));
   if (r.tools.length > 3) l1.appendChild(el("span", "pill tool", "+" + (r.tools.length - 3)));
   if (r.flags.length) l1.appendChild(el("span", "pill flag", r.flags.length === 1 ? r.flags[0].split(":")[0] : r.flags.length + " flags"));
@@ -695,7 +708,7 @@ function detail(r) {
     star.textContent = r.starred ? "★" : "☆"; await api("star", {id: r.id, on: r.starred}); list(); };
   head.appendChild(star);
   head.appendChild(el("span", "when", r.timestamp.replace("T", "  ")));
-  if (r.source && r.source !== "typed") head.appendChild(el("span", "pill src", r.source));
+  if (r.source && r.source !== "typed") head.appendChild(srcPill(r.source));
   if (r.mood_e || r.mood_w) head.appendChild(el("span", "pill", [r.mood_e, r.mood_w].filter(Boolean).join(" · ")));
   const tk = tokens(r), over = S.budget && tk > S.budget * 0.6;
   const tp = el("span", "pill" + (over ? " warn" : ""), `~${k(tk)} tok` + (S.budget ? ` of ${k(S.budget)}` : ""));

@@ -90,6 +90,105 @@ def _nudge(energy=0.0, warmth=0.0, why=""):
     show._announce()
 
 
+# ---------------------------------------------------------------------------
+# Winding down with time
+#
+# Every other change happens in a turn. Without this, an idle Luna stayed
+# exactly as worked up as she was left, and the next turn's drift (a step
+# per turn) was smaller than what the turn added back. Time does it now:
+# desire and anything above her resting point halve every so many minutes,
+# whether or not anyone speaks. Checked every minute (_tick) and at the
+# start of every turn, by how long it actually was.
+# ---------------------------------------------------------------------------
+def _minutes(name, default):
+    try:
+        return max(1.0, float(getattr(config, name, default)))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def settle_minutes():
+    """mood.settle_minutes: warmth above her resting point and energy away
+    from where it heads (_energy_target), halved this often. Warmth below rest (hurt) comes back
+    up slower, by mood.forgive."""
+    return _minutes("MOOD_SETTLE_MINUTES", 45)
+
+
+def desire_minutes():
+    """mood.desire_minutes: desire halved this often, talking or not."""
+    return _minutes("MOOD_DESIRE_MINUTES", 20)
+
+
+SITTING_GAP = 1800        # seconds: a pause this long ends a sitting (_energy_target)
+
+
+def _energy_target(now=None):
+    """Where energy heads, for the turn's step and time's alike. Caller
+    holds _lock.
+
+    Hours at the keyboard wear her down - capped, so a marathon session
+    bottoms out rather than going through the floor. This belongs in the
+    target, not as its own subtraction: taken off every turn it
+    compounded, and six hours in energy pinned near -0.94 with nothing
+    able to lift it again for the rest of the session.
+
+    Being fond of the company takes some of the edge off being tired.
+    Enough to move a cell, never enough to fake wide awake at five in
+    the morning."""
+    now = time.monotonic() if now is None else now
+    # The sitting is counted from when you last came back after a break
+    # (note_turn moves S.started), and a break itself is rest: idle for
+    # SITTING_GAP or more, there's no keyboard to be worn down by. It used
+    # to count from launch, so a Luna left running for days sat 0.35 under
+    # her hour's energy for good, and time's settling would hold her there.
+    idle = S.last_turn is None or now - S.last_turn >= SITTING_GAP
+    drag = 0.0 if idle else min(0.35, max(0.0, now - S.started) / 3600.0 * 0.06)
+    lift = max(0.0, S.warmth - _warmth_baseline()) * 0.5
+    return _clamp((_energy_baseline() - drag + lift) * min(1.0, _intensity()))
+
+
+def _decay(now=None):
+    """Wind her down by the time since the last call. Caller holds _lock.
+    Returns how far the dials moved, all together."""
+    now = time.monotonic() if now is None else now
+    seconds = max(0.0, now - S.decayed_at)
+    S.decayed_at = now
+    if not seconds:
+        return 0.0
+    before = (S.energy, S.warmth, S.desire)
+    settle = 0.5 ** (seconds / 60.0 / settle_minutes())
+
+    S.desire *= 0.5 ** (seconds / 60.0 / desire_minutes())
+
+    home = min(_warmth_baseline(), _ceiling()) if _grudging() else _warmth_baseline()
+    if S.warmth > home:
+        S.warmth = home + (S.warmth - home) * settle
+    else:
+        # hurt heals with time too, at mood.forgive's pace
+        S.warmth = home - (home - S.warmth) * 0.5 ** (seconds / 60.0 / (settle_minutes() / _forgive()))
+
+    rest = _energy_target(now)        # the same place the turn's step heads for
+    S.energy = rest + (S.energy - rest) * settle
+
+    _settle()
+    return sum(abs(a - b) for a, b in zip(before, (S.energy, S.warmth, S.desire)))
+
+
+def _tick():
+    """Once a minute: time's share, shown if it moved anything visible,
+    saved now and then so a crash doesn't bring back an old high."""
+    with _lock:
+        moved = _decay()
+        S.unsaved += moved
+        save = S.unsaved >= 0.02
+        if save:
+            S.unsaved = 0.0
+    if moved >= 0.005:
+        show._announce()
+    if save:
+        saving._save()
+
+
 def note_turn():
     """One exchange finished. Applies the drift, then reads the tempo."""
 
@@ -99,7 +198,10 @@ def note_turn():
     now = time.monotonic()
 
     with _lock:
+        _decay(now)
         gap = None if S.last_turn is None else now - S.last_turn
+        if gap is None or gap >= SITTING_GAP:
+            S.started = now               # a new sitting: back after a break
         S.last_turn = now
         S.clean_run += 1
 
@@ -107,23 +209,8 @@ def note_turn():
         # baseline rather than an argument with the last one.
         pull = max(0.0, min(1.0, float(getattr(config, "MOOD_RECOVERY", 0.25))))
 
-        # Hours at the keyboard wear her down - capped, so a marathon
-        # session bottoms out rather than going through the floor. This
-        # belongs in the drift *target*, not as its own subtraction:
-        # taken off every turn it compounded, and six hours in energy
-        # pinned near -0.94 with nothing able to lift it again for the
-        # rest of the session.
-        hours = (now - S.started) / 3600.0
-        drag = min(0.35, hours * 0.06)
-
-        # Being fond of the company takes some of the edge off being
-        # tired. Enough to move a cell, never enough to fake wide awake
-        # at five in the morning.
-        lift = max(0.0, S.warmth - _warmth_baseline()) * 0.5
-
         k = _intensity()
-        target = _clamp((_energy_baseline() - drag + lift) * min(1.0, k))
-        S.energy += (target - S.energy) * pull
+        S.energy += (_energy_target(now) - S.energy) * pull
 
         # Warmth drifts home asymmetrically. Coming back DOWN from warmth
         # you earned is slow, because otherwise the pull eats every kind
@@ -137,11 +224,9 @@ def note_turn():
         home = min(_warmth_baseline(), _ceiling()) if _grudging() else _warmth_baseline()
         S.warmth += (home - S.warmth) * (pull * 0.4 if S.warmth > home else pull * _forgive())
 
-        # Desire fades on its own: a little every turn, and halves for
-        # every twenty minutes you were gone.
+        # Desire fades a little every turn too; time does the rest
+        # (_decay, mood.desire_minutes), gap or no gap.
         S.desire = max(0.0, S.desire - exchange.DESIRE_FADE)
-        if gap:
-            S.desire *= 0.5 ** (gap / 1200.0)
 
         # A long stretch where nothing broke is its own small signal.
         # Only counted in runs of ten so it can't outpace the drift.
@@ -398,7 +483,8 @@ def reset():
         S.warmth = _warmth_baseline()
         S.desire = 0.0
         S.grudge_until = 0.0
-        S.started = time.monotonic()
+        S.spanks = {"n": 0.0, "at": 0.0}
+        S.started = S.decayed_at = time.monotonic()
         S.clean_run = 0
         S.recent.clear()
 
@@ -410,16 +496,23 @@ def reset():
     show._announce()
 
 
-def _watch_machine(interval=120):
-    """Sample the GPU every couple of minutes, for as long as we run.
+def _watch_machine(interval=60):
+    """Every minute, for as long as we run: time winds her down (_tick),
+    and every other minute the GPU is sampled.
 
-    A thread rather than sampling on each turn, because the whole point
-    is to know what happened during the hours when there were no turns.
+    A thread rather than doing it on each turn, because the whole point
+    is what happens during the hours when there are no turns.
     """
+    beat = 0
     while True:
         if config.MOOD_ENABLED:
-            _sample_machine()
-
+            try:
+                _tick()
+            except Exception:
+                pass                # a mood is never worth the thread dying
+            if beat % 2 == 0:
+                _sample_machine()
+        beat += 1
         time.sleep(interval)
 
 

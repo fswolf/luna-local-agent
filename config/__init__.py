@@ -187,6 +187,8 @@ SETTINGS = {
     "mood.intensity":             ("MOOD_INTENSITY",               True),
     "mood.hurt":                  ("MOOD_HURT",                    True),
     "mood.forgive":               ("MOOD_FORGIVE",                 True),
+    "mood.settle_minutes":        ("MOOD_SETTLE_MINUTES",          True),
+    "mood.desire_minutes":        ("MOOD_DESIRE_MINUTES",          True),
     "mood.prompt":                ("MOOD_PROMPT",                  True),
     "mood.face":                  ("MOOD_FACE",                    True),
     "mood.gestures":              ("MOOD_GESTURES",                True),
@@ -589,6 +591,86 @@ def save_any(path, raw):
     _store(path, value)
 
     return value, applies_now(path)
+
+
+# What she may do to your machine, one table for both places that show it:
+# the tools pane's Permissions group and the settings page's Permissions box.
+# (label, the setting it's saved as, its values in the order space cycles
+# them, what it covers). Execute is shell.enabled: a command always asks
+# when it's on, so it has no "allow". Home is the home plugin's ask_all:
+# "allow" still asks for locks, doors, alarms and valves (its ask_domains).
+PERMISSIONS = (
+    ("read", "files.read", ("allow", "ask", "off"), "list and read files"),
+    ("write", "files.write", ("ask", "allow", "off"), "create and edit files"),
+    ("execute", "shell.enabled", ("ask", "off"), "run commands - each one asks"),
+    ("home", "plugins.home.ask_all", ("ask", "allow"), "smart-home changes - locks and doors always ask"),
+    ("email", "email.enabled", ("allow", "off"), "read your email"),
+    ("send email", "email.send", ("ask", "off"), "send email as you - each one asks, showing all of it"),
+)
+
+
+def permission(label):
+    """A permission's value now: allow, ask or off ("" for no such one)."""
+    for name, path, values, _note in PERMISSIONS:
+        if name != label:
+            continue
+        if name == "home":
+            return "ask" if plugin_settings("home").get("ask_all", False) else "allow"
+        raw = globals().get(SETTINGS[path][0])
+        if isinstance(raw, bool):
+            return values[0] if raw else "off"           # a switch: on is its first choice
+        raw = str(raw or "").lower()
+        return raw if raw in values else values[0]
+    return ""
+
+
+def permission_note(label, value):
+    """A permission's line, with what its value means right now: the same
+    words on the settings page and in the tools pane."""
+    note = next((n for name, _p, _v, n in PERMISSIONS if name == label), "")
+    if label == "write" and value == "allow":
+        note += " - Luna's folder, ~/.config and ~/.local still ask"
+    if label in ("email", "send email") and value != "off":
+        try:
+            from tools import mail
+
+            if not mail.account():
+                note += " - no login yet: ~/.config/ai-voice/email.json (docs/email.md)"
+        except Exception:
+            pass
+    if label == "send email" and value != "off" and not EMAIL_ENABLED:
+        note += " - email itself is off"
+    if label == "send email" and value != "off":
+        try:
+            from tools import mail
+
+            unasked = mail.no_ask_to()
+            if unasked:
+                note += f" - except {', '.join(sorted(unasked))} (email.no_ask_to)"
+        except Exception:
+            pass
+    return note
+
+
+def set_permission(label, value):
+    """Save a permission (applies at once). Returns the value saved; ValueError
+    for a permission or value that doesn't exist."""
+    entry = next((p for p in PERMISSIONS if p[0] == label), None)
+    if entry is None:
+        raise ValueError(f"no permission called {label!r}")
+    _name, path, values, _note = entry
+    value = str(value or "").lower()
+    if value not in values:
+        raise ValueError(f"{label} can be {', '.join(values)}, not {value!r}")
+    if label == "home":
+        # a plugin setting, so _store rather than save_setting (which also
+        # refreshes the block the plugin reads on its next call)
+        _store(path, value == "ask")
+    elif isinstance(globals().get(SETTINGS[path][0]), bool):
+        save_setting(path, "true" if value != "off" else "false")     # a switch (shell.enabled, email.*)
+    else:
+        save_setting(path, value)
+    return value
 
 
 def applies_now(path):

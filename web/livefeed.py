@@ -123,8 +123,11 @@ def _put_filtered(q, only, event):
         logbook.debug("monitor", "a filtered stream skipped a %s event: %s", event.get("t"), e)
 
 
-def emit(kind, **data):
-    """One event to every open page. Safe from any thread; never raises."""
+def emit(kind, /, **data):
+    """One event to every open page. Safe from any thread; never raises.
+    kind is positional-only, so an event can carry a field called "kind"
+    of its own (music's: music, speech or mixed); before, that was a
+    TypeError in the caller, and the music event never left life/music.py."""
     event = dict(data, t=kind, at=round(time.time(), 3))
 
     if kind not in _SNAPSHOT_KINDS and not _subs and not _filtered:

@@ -216,6 +216,7 @@ def _follow_through(payload, base_messages, answer, model, on_text, on_sentence,
         {"role": "assistant", "content": answer},
         {"role": "user", "content": nudge},
     ]
+    before = list(_last_raw.get("exchanges") or [])
 
     if prefix:
         say = _Narrator(on_text, on_sentence)
@@ -231,7 +232,40 @@ def _follow_through(payload, base_messages, answer, model, on_text, on_sentence,
         say.feed("\n\n" + more + " ")
         say.finish()
 
-    return f"{answer}\n\n{prefix} {more}".replace("\n\n ", "\n\n").strip()
+    full = f"{answer}\n\n{prefix} {more}".replace("\n\n ", "\n\n").strip()
+    _note_step(answer, before, nudge, f"{prefix} {more}".strip(), list(_last_raw.get("exchanges") or []), full)
+    return full
+
+
+def _note_step(answer, before, nudge, more, calls, full):
+    """Keep the turn in the order it happened, for history (turn_steps):
+    what she'd said (with the calls made before it), the note that sent her
+    back, then what she called and said after. A second follow-through in
+    the same turn carries on from the first; anything said in between (a
+    hedge line) joins the step before it."""
+    steps = _last_raw.setdefault("steps", [])
+    said = _last_raw.get("steps_said", "")
+    if not steps:
+        steps.append({"content": answer, "tools": before})
+    elif answer.startswith(said) and answer[len(said):].strip():
+        steps[-1]["content"] = (steps[-1]["content"] + " " + answer[len(said):].strip()).strip()
+    steps.append({"note": nudge})
+    steps.append({"content": more, "tools": calls})
+    _last_raw["steps_said"] = full
+
+
+def turn_steps(answer):
+    """This turn's steps for history, or None when she wasn't sent back.
+    Whatever was added after the last one (calibration's hedge line, a
+    grounding hedge) joins the last step, so the steps say what she said."""
+    steps = _last_raw.get("steps")
+    if not steps:
+        return None
+    steps = [dict(s) for s in steps]
+    said = _last_raw.get("steps_said", "")
+    if answer.startswith(said) and answer[len(said):].strip():
+        steps[-1]["content"] = (steps[-1]["content"] + " " + answer[len(said):].strip()).strip()
+    return steps
 
 
 # A tool call written out as text, which a model falls back to when the

@@ -39,7 +39,7 @@ RAVE = ("Techno", "House", "Trance", "Dubstep", "Drum n Bass", "Jungle", "Hardst
         "Juke", "Footwork", "Phonk", "Donk", "Hard Dance", "Eurodance", "Hands Up")
 
 _state = {"track": None, "title": "", "since": 0.0, "asked": False, "answer": None, "at": None,
-          "playing": False, "thread": None, "cache": {}, "sent": None}
+          "playing": False, "thread": None, "cache": {}, "sent": None, "why": ""}
 _lock = threading.Lock()
 _listening = threading.Lock()  # one recording at a time
 
@@ -116,14 +116,34 @@ def as_wav(raw):
     return buf.getvalue()
 
 
+def service():
+    """music.url as the service's address. It's meant to be the address alone
+    (http://host:8795), but one of its own paths pasted in from a browser
+    test - .../health, .../listen - made every clip go to .../health/listen,
+    a 404, and she never heard a song. So a trailing path of the service's
+    own is taken off."""
+    url = str(getattr(config, "MUSIC_URL", "") or "").strip().rstrip("/")
+    for path in ("/health", "/listen"):
+        if url.lower().endswith(path):
+            url = url[: -len(path)].rstrip("/")
+    return url
+
+
 def ask(wav):
     """The service's answer (a dict) for a WAV clip. Raises on failure."""
     import json
+    import urllib.error
 
-    url = config.MUSIC_URL.rstrip("/") + "/listen"
+    url = service() + "/listen"
     req = urllib.request.Request(url, data=wav, headers={"Content-Type": "audio/wav"}, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise RuntimeError(f"{url} isn't the listening service (404): music.url should be its address, "
+                               f"like http://host:8795 - it's {config.MUSIC_URL!r}") from None
+        raise
 
 
 def style_name(label):
@@ -174,7 +194,7 @@ def summary(answer, started):
             "bass": float(answer.get("bass", 0)), "energetic": energetic, "rave": rave}
 
 
-def _emit(kind, **data):
+def _emit(kind, /, **data):       # /: the event has a "kind" of its own (music, speech, mixed)
     try:
         from web import livefeed
 
@@ -193,10 +213,16 @@ def _send(s):
         _emit("music", on=False)
 
 
-def listen_now():
-    """Record and ask now (the track's one look, or /music now). The summary, or None."""
+def listen_now(wait=False):
+    """Record and ask now (the track's one look, or /music now). The summary,
+    or None with _state["why"] saying why not. wait: when a listen is already
+    under way (the track's own, ten seconds in), wait for it and give its
+    answer - /music now said "couldn't listen" whenever it landed on one."""
     if not _listening.acquire(blocking=False):
-        return None                                    # already listening
+        if not wait:
+            return None                                # already listening
+        with _listening:                               # its result, not a second recording
+            return _state["answer"] if _state["answer"] else None
     try:
         return _listen()
     finally:
@@ -206,14 +232,17 @@ def listen_now():
 def _listen():
     key = _state["track"]
     started = time.time()
+    _state["why"] = ""
     raw = record(float(getattr(config, "MUSIC_SECONDS", 8)))
     if not raw:
-        logbook.warn("music", "couldn't record what's playing (needs parec or ffmpeg)")
+        _state["why"] = "couldn't record what's playing (needs parec or ffmpeg)"
+        logbook.warn("music", _state["why"])
         return None
     try:
         answer = ask(as_wav(raw))
     except Exception as e:
-        logbook.warn("music", "the listening service didn't answer: %s", e)
+        _state["why"] = f"the listening service didn't answer: {e}"
+        logbook.warn("music", "%s", _state["why"])
         return None
     s = summary(answer, started)
     with _lock:

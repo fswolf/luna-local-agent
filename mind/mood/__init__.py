@@ -143,6 +143,8 @@ from mind.mood.drift import (  # noqa: F401
     _BY_HOUR,
     _chat_shape,
     _day_shape,
+    _decay,
+    _tick,
     _energy_baseline,
     _machine_shape,
     _nudge,
@@ -156,8 +158,10 @@ from mind.mood.drift import (  # noqa: F401
     note_play,
     note_thanks,
     note_turn,
+    desire_minutes,
     reset,
     set_mood,
+    settle_minutes,
     start,
 )
 from mind.mood.exchange import (  # noqa: F401
@@ -166,8 +170,8 @@ from mind.mood.exchange import (  # noqa: F401
     DESIRE_FLIRT,
     HOSTILE_HIT,
     SPANK_DESIRE,
-    SPANK_FORGET,
-    SPANK_LIMIT,
+    SPANK_FREE,
+    SPANK_RESET,
     SPANK_WARMTH,
     _apply_exchange,
     _compliment,
@@ -178,6 +182,7 @@ from mind.mood.exchange import (  # noqa: F401
     note_affection,
     note_exchange,
     note_spank,
+    spanking,
 )
 from mind.mood.walkaway import (  # noqa: F401
     _back,

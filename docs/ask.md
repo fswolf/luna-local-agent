@@ -18,8 +18,12 @@ works on a turn where your own message says "ask Claude", "ask Grok", "ask ChatG
 one follow-up. The one exception is asking on her own, below, which you switch on.
 
 It never runs for a guest or a stranger, stream chat, Discord, a scheduled job or a
-game, or while she's in the lewd row. There's a daily limit too, 30 questions by
-default, for all providers together.
+game, or while she's in the lewd row (her privacy rule: nothing from a private moment
+goes to an outside model; she says so, and it works again once her mood cools). There's
+a daily limit too, 30 questions by default, for all providers together.
+
+When an answer comes back empty, she says why: the model ran out of room before it
+wrote anything (raise `max_tokens`), or it declined. The log has the stop reason.
 
 ## On her own, if you switch it on
 
@@ -90,7 +94,7 @@ never becomes a patch example, so a bigger model's words never train her.
 | `daily_cap` | `30` | questions a day, all providers together |
 | `auto` | `false` | let her ask on her own when stuck (`/ask auto on`) |
 | `auto_daily` | `5` | questions a day she may ask on her own |
-| `max_tokens` | `600` | answer length for Claude; the others are kept short by their instructions |
+| `max_tokens` | `4096` | Claude's room to think and answer. Claude thinks by default and the thinking counts toward this, so a low limit can leave no room for the answer itself; the answer is kept short by its instructions. The others get no limit |
 
 Default models: `claude-haiku-5-5`, `grok-4.7` and `gpt-5.4-mini`. A question costs a
 fraction of a cent on Haiku, a little more on the others.

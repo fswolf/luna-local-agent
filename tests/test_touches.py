@@ -16,10 +16,64 @@ import config  # noqa: E402
 from life import touches  # noqa: E402
 
 
+class Spanks(unittest.TestCase):
+    """Three playful, then cooling: her line hears it, and the flirt reading
+    never sees a spank (mood.note_spank moves her itself)."""
+
+    def setUp(self):
+        touches._pending.clear()
+        touches._state.update(model="m", timer=None, last=0.0, cooling=False)
+        self.addCleanup(touches._pending.clear)
+        self.addCleanup(lambda: touches._state["timer"] and touches._state["timer"].cancel())
+
+    def test_the_fourth_spank_tells_her_line_its_cooling_her_off(self):
+        with mock.patch("mind.mood.note_spank", side_effect=[False, False, False, True]), \
+                mock.patch.object(touches, "_answer") as answer, \
+                mock.patch.object(config, "PORTRAIT_TOUCH_TALK", True, create=True):
+            for _ in range(4):
+                touches.note("spank")
+            touches._state["timer"].cancel()
+            touches._fire()
+        answer.assert_called_once_with({"spank": 4}, True)
+        self.assertIn("cooling you off", touches._note("with a spank on the butt", True))
+        self.assertNotIn("cooling", touches._note("with a spank on the butt", False))
+        self.assertFalse(touches._state["cooling"])           # used up by that one answer
+
+    def test_with_touch_talk_off_nothing_is_left_waiting(self):
+        """It used to stay set and tell a later, unrelated touch line it was cooling her off."""
+        with mock.patch("mind.mood.note_spank", return_value=True), \
+                mock.patch.object(config, "PORTRAIT_TOUCH_TALK", False, create=True):
+            self.assertFalse(touches.note("spank"))
+        self.assertFalse(touches._state["cooling"])
+
+    def _answered(self, touched):
+        from core import assistant
+        with mock.patch.object(touches, "_quiet_now", return_value=True), \
+                mock.patch.object(touches, "_request", return_value="Hey!"), \
+                mock.patch("llm.turn_prompt", return_value=("sys", "")), \
+                mock.patch("llm.with_live", side_effect=lambda live, note: note), \
+                mock.patch("core.history.get_messages_full", return_value=[]), \
+                mock.patch("core.history.add_message"), mock.patch("core.history.save"), \
+                mock.patch("core.transcript.add"), mock.patch("ui.add_message"), \
+                mock.patch("ui.begin_message"), mock.patch("ui.extend_message"), mock.patch("ui.end_message"), \
+                mock.patch("voice.speech.Player"), mock.patch.object(assistant, "_hold"), \
+                mock.patch("mind.mood.note_exchange") as read:
+            touches._answer(touched)
+        return read
+
+    def test_a_spank_alone_is_never_read_as_flirting(self):
+        self._answered({"spank": 3}).assert_not_called()
+
+    def test_other_touches_with_it_still_are(self):
+        read = self._answered({"spank": 2, "head": 1})
+        read.assert_called_once()
+        self.assertEqual(read.call_args[0][0], "*touches you on the head*")
+
+
 class Gathering(unittest.TestCase):
     def setUp(self):
         touches._pending.clear()
-        touches._state.update(model="m", timer=None, last=0.0)
+        touches._state.update(model="m", timer=None, last=0.0, cooling=False)
         self.saved = config.PORTRAIT_TOUCH_TALK
         config.PORTRAIT_TOUCH_TALK = True
 
@@ -36,7 +90,7 @@ class Gathering(unittest.TestCase):
                 touches.note(zone)
             touches._state["timer"].cancel()
             touches._fire()
-        answer.assert_called_once_with({"head": 2, "nose": 1})
+        answer.assert_called_once_with({"head": 2, "nose": 1}, False)
         self.assertEqual(touches.describe({"head": 2, "nose": 1}), "on the head, 2 times and on the nose")
         self.assertEqual(touches.describe({"tummy": 1}), "on the tummy")
 

@@ -93,7 +93,8 @@ def items(luna):
            ("sep2", "", "sep", True, False)]
     if luna.get("can_talk"):
         out.append(("talk", "Done talking" if luna.get("mic") else "Talk (push to talk)", "item", True, False))
-    out.append(("stop", "Stop", "item", bool(luna.get("busy")), False))
+    # anything Stop can end (a greeting, a reminder), not only your own turns
+    out.append(("stop", "Stop", "item", bool(luna.get("stoppable", luna.get("busy"))), False))
     out.append(("voice", "Voice", "check", True, bool(luna.get("voice_on", True))))
     out += [("sep3", "", "sep", True, False),
             ("quit", f"Quit {name}", "item", True, False)]
