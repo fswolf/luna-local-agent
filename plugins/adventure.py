@@ -132,6 +132,35 @@ def game(name):
 #         logbook.info("adventure", "couldn't move %s to %s: %s", old, new, e)
 
 
+def carry_over():
+    """Once, at startup: settings from the old /zork or /starcross plugins
+    (gone since the library) become the library's, so an update doesn't
+    quietly switch off a game you had on, or lose how you'd tuned it. Only
+    while there's no "adventure" block yet; the old block stays where it
+    is. Returns the game carried over, or "". """
+    plugins = config.settings.get("plugins") if isinstance(config.settings.get("plugins"), dict) else {}
+    if NAME in plugins:
+        return ""
+    for old in OLD_PLUGINS:
+        block = plugins.get(old)
+        if not isinstance(block, dict) or not block:
+            continue
+        try:
+            for key in ("enabled", *_zgame.DEFAULTS):
+                if key in block:
+                    config.save_any(f"plugins.{NAME}.{key}", block[key])
+            config.save_any(f"plugins.{NAME}.game", old)
+        except (ValueError, OSError) as e:
+            logbook.info("adventure", "couldn't carry the %s settings over: %s", old, e)
+            return ""
+        logbook.info("adventure", "the old %s settings are the library's now (plugins.adventure)", old)
+        return old
+    return ""
+
+
+OLD_PLUGINS = ("zork", "starcross")     # had plugins of their own before the library; zork first
+
+
 def _picked():
     name = str(config.plugin_settings(NAME).get("game") or "").strip().lower()
     return name if name in dict(library()) else ""

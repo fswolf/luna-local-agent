@@ -108,5 +108,28 @@ class Library(unittest.TestCase):
         cmd.assert_called_once_with("stop playing")
 
 
+class CarryOver(unittest.TestCase):
+    """An update keeps the old /zork or /starcross settings: they become the library's."""
+
+    def run_with(self, plugins):
+        saved = {}
+        with mock.patch.dict(adventure.config.settings, {"plugins": plugins}), \
+                mock.patch.object(adventure.config, "save_any", side_effect=lambda k, v: saved.update({k: v})):
+            return adventure.carry_over(), saved
+
+    def test_the_old_zork_block_becomes_the_librarys(self):
+        got, saved = self.run_with({"zork": {"enabled": True, "step_seconds": 10, "speak": False, "port": 1}})
+        self.assertEqual(got, "zork")
+        self.assertEqual(saved, {"plugins.adventure.enabled": True, "plugins.adventure.step_seconds": 10,
+                                 "plugins.adventure.speak": False, "plugins.adventure.game": "zork"})
+
+    def test_starcross_when_theres_no_zork(self):
+        self.assertEqual(self.run_with({"starcross": {"enabled": True}})[0], "starcross")
+
+    def test_once_and_never_over_a_library_block(self):
+        self.assertEqual(self.run_with({"adventure": {}, "zork": {"enabled": True}}), ("", {}))
+        self.assertEqual(self.run_with({}), ("", {}))
+
+
 if __name__ == "__main__":
     unittest.main()

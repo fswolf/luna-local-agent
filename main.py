@@ -80,11 +80,13 @@ reminders.load()
 # the first time someone types its name.
 plugins.load()
 
-# the game folders from before agent/games/ (agent/chess, agent/zork...) move into it, once
+# the game folders from before agent/games/ (agent/chess, agent/zork...) move into it,
+# and the old /zork or /starcross settings become the library's, once
 try:
-    from plugins import _game
+    from plugins import _game, adventure
 
     _game.tidy()
+    adventure.carry_over()
 except Exception:
     logbook.exception("games", "tidying the game folders failed")
 
