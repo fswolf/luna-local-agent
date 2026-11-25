@@ -113,7 +113,7 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
         from ui.conversation_pane import _voice_on
 
         return {"v": now_version, "status": status, "name": name, "mood": mood, "rows": rows,
-                "busy": interrupts.busy(), "stoppable": interrupts.busy(kinds=None),
+                "busy": interrupts.busy(), "stoppable": _stoppable(),
                 "mic": _mic(), "can_talk": bool(ui.view.on_hotkey),
                 "voice_on": _voice_on()}
     total = len(convo)
@@ -126,7 +126,7 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
         start = max(0, min(start, total) - 2)
     return {"v": now_version, "e": now_epoch, "reset": reset, "from": start,
             "msgs": [[speaker, text] for speaker, text in convo[start:]], "total": total,
-            "streaming": streaming, "busy": interrupts.busy(), "stoppable": interrupts.busy(kinds=None),
+            "streaming": streaming, "busy": interrupts.busy(), "stoppable": _stoppable(),
             "status": status, "name": name,
             "mood": mood, "rows": rows, "ask": ui.pending_approval(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
             "can_talk": bool(ui.view.on_hotkey), "rate": _rateable(now_epoch, convo),
@@ -179,6 +179,15 @@ def replaying():
     """[epoch, index] of the reply being said again, or None."""
     with _replay_lock:
         return list(_replay["at"]) if _replay["at"] else None
+
+
+def _stoppable():
+    """Anything the Send button turns into Stop for. Not a reply said again:
+    its own speaker button stops it, and you may well type while it plays
+    (sending cuts it short, as any message of yours does)."""
+    from core import interrupts
+
+    return interrupts.busy(kinds=None, but=("replay",))
 
 
 def _speak(body):

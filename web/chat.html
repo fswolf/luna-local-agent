@@ -220,7 +220,7 @@ function apply(s) {
     const hint = list.querySelector('.hint');
     if (hint && msgs.length) hint.remove();
     busy = s.busy; streaming = s.streaming;
-    stoppable = s.stoppable ?? s.busy;      // anything Stop can end: a greeting, a reminder, a reply said again too
+    stoppable = s.stoppable ?? s.busy;      // anything Stop can end: a greeting, a reminder (a reply said again has its own stop)
     rates = s.rate || {};
     replay = s.replay && s.replay[0] === e ? s.replay[1] : null;
     thumbs();

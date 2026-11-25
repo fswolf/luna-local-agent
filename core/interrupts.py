@@ -137,11 +137,12 @@ def home():
     stop_all(kinds=YOURS)
 
 
-def busy(kinds=YOURS):
+def busy(kinds=YOURS, but=()):
     """Is one of your turns running? kinds: these kinds instead, None for
-    anything at all (a reminder speaking, an alarm, a chat reply...)."""
+    anything at all (a reminder speaking, an alarm, a chat reply...); but:
+    kinds that don't count."""
     with _lock:
-        return any(kinds is None or s.kind in kinds for s in _open)
+        return any((kinds is None or s.kind in kinds) and s.kind not in but for s in _open)
 
 
 def recording():

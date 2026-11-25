@@ -458,6 +458,7 @@ class SayItAgain(unittest.TestCase):
         self.assertEqual(self.speak(1), (200, {"ok": True, "playing": True}))
         self.assertEqual(chat_web.replaying(), [self.epoch, 1])
         self.assertEqual(chat_web.state(wait=0)["replay"], [self.epoch, 1])
+        self.assertFalse(chat_web.state(wait=0)["stoppable"])   # Send stays Send: its speaker button stops it
         self.assertTrue(assistant._turn.locked())
         chat_web._replay["stop"].stop(speaking=True)
         self.assertTrue(self.done.wait(2))
