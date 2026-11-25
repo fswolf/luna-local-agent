@@ -152,6 +152,9 @@ folder with someone, check those two keys (and
 }
 ```
 
+A walkthrough, from key login to a weekly backup copy, is in
+[Scheduled jobs](jobs.md).
+
 Ask for one in plain words: *"every weekday at 8, check disk and VRAM
 and note anything low in ~/luna-jobs/disk.md"*. She calls
 `schedule_job`, and **you approve it in the popup** before it's saved.

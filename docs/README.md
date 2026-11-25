@@ -31,6 +31,7 @@ Everything the README only touches on, one subject per page.
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
 - [Learning from herself](learning.md): lessons, episodes, fact cleanup, calibration
 - [Skills (recipes)](skills.md): jobs she saves the steps of, and a walkthrough turning a script of yours into "check vm health"
+- [Scheduled jobs](jobs.md): work she does on a timer, and a walkthrough copying a web server's backups to a NAS every week
 - [Patches](patches.md) (experimental): collecting examples, training a patch (LoRA) for her model, loading it, changing models
 - [The companion](companion.md): the whole companion side in one place - persona, every mood and the exact numbers, the lewd and grudge rows, touches, gestures, sounds, settings, recipes
 - [Moods](moods.md): the moods file, intensity, quick feelings she shows for a moment

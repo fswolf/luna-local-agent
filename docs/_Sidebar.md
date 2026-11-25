@@ -21,6 +21,7 @@
 - [Her reasoning](reasoning.md)
 - [Learning from herself](learning.md)
 - [Skills (recipes)](skills.md)
+- [Scheduled jobs](jobs.md)
 - [Patches (experimental)](patches.md)
 - [The companion](companion.md)
 - [Moods](moods.md)

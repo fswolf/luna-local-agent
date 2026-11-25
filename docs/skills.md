@@ -187,7 +187,7 @@ if anything failed."* The popup shows the whole script; approve it once
 and the scheduler runs exactly that text each time, with no popup at
 4am, and she reads you what it printed. Change the script and it won't
 run until you approve the new text. See
-[Plugins: a job that runs a script](plugins.md#a-job-that-runs-a-script).
+[Scheduled jobs](jobs.md#walkthrough-weekly-backups-to-the-nas).
 
 ## Your controls
 
