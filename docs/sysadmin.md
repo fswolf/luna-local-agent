@@ -195,7 +195,8 @@ by its full path (`bash ~/ai-voice/agent/jobs/vm-health.sh`, wherever
 Luna lives: a command runs from your home folder unless she picks
 another), then tell her to remember how she
 did it: she saves a recipe, and "check the VM's health" finds it from
-then on. Each run is still a `run_command` you approve.
+then on. Each run is still a `run_command` you approve. The whole
+thing, step by step: [Skills (recipes)](skills.md#walkthrough-check-vm-health).
 
 `agent/jobs/` can't be a `job_write_dirs` folder (nothing inside
 Luna's own folder can), and that's deliberate here too: a scheduled job

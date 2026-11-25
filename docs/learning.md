@@ -180,6 +180,8 @@ Recipes you've saved for jobs like this:
 
 Stored in `agent/skills.db` (gitignored). Following a recipe still goes
 through every normal approval: a step that runs a command still asks.
+[Skills (recipes)](skills.md) walks through setting one up for a
+script of your own.
 
 ## Ongoing projects
 
