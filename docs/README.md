@@ -24,6 +24,7 @@ Everything the README only touches on, one subject per page.
 - [Relay stations](stations.md): talk to her from another room on a phone or tablet, with the [Android app](https://github.com/fswolf/luna-station-android) or in the browser
 - [Station API](station-api.md): for app developers, what a station app sends and gets back
 - [Reminders and alarms](reminders.md)
+- [Calendar](calendar.md): your Google Calendar, calcurse or any iCal feed, read-only: what's on, in her day, and reminder offers
 - [Offers](offers.md): things she notices on her own (a full disk, a date coming up) and offers to help with
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
@@ -93,6 +94,7 @@ Everything the README only touches on, one subject per page.
 - [Conclusions](memory.md#conclusions) she draws from reading back your conversations while idle, each marked said or inferred, with the exchanges behind it
 - Permanent SQLite fact store that retires what stops being true, with a browser editor
 - Reminders in plain language, with repeats, retry and DST-safe schedules
+- Your calendars (Google Calendar, calcurse, any iCal feed), read-only
 - Alarms that ring, nag and snooze until you're actually up
 - [Notices things on her own](offers.md), like a disk filling up or a birthday coming, and offers to help: only acts if you say yes
 - Writes and edits your files, with every change approved on screen first

@@ -17,6 +17,7 @@ You:  sure
 |---|---|---|
 | Machine | A disk nearly full, a service that failed | To look into it: `system_health`, then a command to find what's using the space |
 | Dates | Something she remembers about you with a date coming up in the next two weeks ("Shannon's birthday is November 2"), with no reminder near it | To set a reminder, maybe the day before |
+| Calendar | An event on your [calendar](calendar.md) in the next two days with no reminder of yours before it and no alarm of its own | To remind you beforehand |
 
 Dates come from her memory: anything with a month and a day ("March 3",
 "the 2nd of Nov") or a full date ("2026-11-30"). One without a year, or
@@ -39,7 +40,7 @@ round, like a birthday.
 Yes means she does it with her normal tools, and anything that changes
 your machine still asks first. "Don't bring that up again" mutes it for
 good (her `stop_offering` tool); for a date, that's the date every year,
-not just this one. Saying no just means not now.
+not just this one, and for a repeating calendar event, every time it comes round. Saying no just means not now.
 
 ## Commands and settings
 
@@ -58,6 +59,7 @@ not just this one. Saying no just means not now.
 | `offers.machine` | `true` | watch disks and services |
 | `offers.dates` | `true` | watch dates in what she remembers |
 | `offers.days_ahead` | `14` | how far ahead a date gets an offer |
+| `offers.calendar` | `true` | watch your calendar's next two days |
 
 The watchers look every ten minutes in the background, so a turn never
 waits for them. What she's offered and what you've muted is kept in her

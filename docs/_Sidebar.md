@@ -14,6 +14,7 @@
 - [People in the house](people.md)
 - [Relay stations](stations.md)
 - [Reminders and alarms](reminders.md)
+- [Calendar](calendar.md)
 - [Offers](offers.md)
 - [Knowledge](knowledge.md)
 - [Memory](memory.md)

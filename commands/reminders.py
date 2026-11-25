@@ -1,4 +1,4 @@
-"""Time: /reminders, /cancel, /alarms, /alarm, /snooze, /when, /repair.
+"""Time: /reminders, /cancel, /alarms, /alarm, /snooze, /when, /repair, /calendar.
 
 Part of the commands package; see commands/__init__.py.
 """
@@ -15,6 +15,11 @@ from . import ctx
 
 def handle(text):
     """True when text was one of these commands (and it ran)."""
+    if text == "/calendar" or text.startswith("/calendar "):
+        threading.Thread(target=_calendar, args=(text[len("/calendar"):].strip().lower(),),
+                         daemon=True, name="calendar-cmd").start()      # a slow server mustn't freeze the screen
+        return True
+
     if text == "/reminders":
         items = reminders.pending()
 
@@ -206,3 +211,26 @@ def handle(text):
         return True
 
     return False
+
+
+def _calendar(word):
+    """/calendar: the next seven days and how each calendar stands; /calendar refresh reads them again."""
+    from datetime import date
+
+    from senses import calendars
+
+    try:
+        if word == "refresh":
+            calendars.refresh(wait=True)
+            ui.add_message("system", calendars.status())
+            return
+        if word:
+            ui.add_message("system", "/calendar shows the next seven days; /calendar refresh reads them again.")
+            return
+        if calendars.enabled() and calendars.available():
+            ui.add_message("system", calendars.agenda(date.today(), 7) + "\n\n" + calendars.status())
+        else:
+            ui.add_message("system", calendars.status() + "\n(See docs/calendar.md.)")
+    except Exception as e:
+        logbook.exception("calendar", "/calendar failed")
+        ui.add_message("system", f"calendar: {e}")

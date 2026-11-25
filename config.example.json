@@ -60,7 +60,15 @@
         "gap_minutes": 120,
         "machine": true,
         "dates": true,
-        "days_ahead": 14
+        "days_ahead": 14,
+        "calendar": true
+    },
+    "calendar": {
+        "enabled": false,
+        "google": "",
+        "ics": [],
+        "calcurse": false,
+        "refresh_minutes": 30
     },
     "files": {
         "enabled": true,

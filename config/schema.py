@@ -46,6 +46,7 @@ SECTIONS = {
     "knowledge": "Knowledge base",
     "reminders": "Reminders",
     "alarms": "Alarms",
+    "calendar": "Calendar",
     "mcp": "MCP servers",
     "history": "History",
     "long_term_memory": "Long-term memory",
@@ -160,16 +161,23 @@ SCHEMA = {
     "situation.machine": ("bool", "Include CPU, memory and GPU load"),
     "situation.plugins": ("bool", "Include which plugins are running"),
     "situation.reminders": ("bool", "Include the next reminder"),
+    "situation.calendar": ("bool", "Include what's on your calendar today (calendar.* sets the calendars up)"),
     "situation.hands": ("bool", "Include what the avatar is holding, like a coffee or a book"),
     "situation.clothes": ("bool", "Include what the avatar is wearing, when some of it is off (human models only)"),
 
     # --- Offers -------------------------------------------------------------
+    "calendar.enabled": ("bool", "Let Luna read your calendars (read-only): what's on, in her live details, and reminder offers"),
+    "calendar.google": ("secret", "Google Calendar's secret iCal address (its settings: Integrate calendar, Secret address in iCal format)"),
+    "calendar.ics": ("list", "Other calendars to read: iCal links or .ics files (a holidays feed, a shared calendar)"),
+    "calendar.calcurse": ("bool", "Read calcurse on this computer"),
+    "calendar.refresh_minutes": ("float", "How often the calendars are read again while Luna is in use (minutes)"),
     "offers.enabled": ("bool", "Let Luna notice things by itself (a full disk, a date coming up) and offer to help once, next time you talk"),
     "offers.per_day": ("int", "Most offers in a day"),
     "offers.gap_minutes": ("int", "Least time between two offers (minutes)"),
     "offers.machine": ("bool", "Watch the computer: a disk filling up, a service that failed"),
     "offers.dates": ("bool", "Offer reminders for dates Luna remembers about you"),
     "offers.days_ahead": ("int", "How many days before a remembered date to offer a reminder"),
+    "offers.calendar": ("bool", "Offer reminders for calendar events coming up in the next two days"),
 
     # --- Portrait -----------------------------------------------------------
     "portrait.model": ("text", "The avatar: a .vrm or Live2D file in portrait/models (space steps through them)"),

@@ -15,6 +15,7 @@ blurred here). Click a long one to read all of it.
 |------|--------------|
 | `get_datetime` | Date, time, weekday and timezone, so it stops guessing |
 | `time_until` | How far away a date is, without counting days in its head |
+| `calendar` | Your [calendar](calendar.md), read-only: a day, a week, or when something is. Yours alone |
 | `calculate` | Exact sums and unit conversions: "18% of 340", "340 + 15%", "160 F to C", "5 miles in km" |
 | `set_reminder` | Schedule anything: "tomorrow at 9", "every monday" |
 | `set_alarm` | A wake-up: rings and nags until dismissed |

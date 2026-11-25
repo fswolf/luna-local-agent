@@ -242,6 +242,7 @@ Around you right now:
 | Machine | CPU load, free RAM, and the GPU's load and VRAM |
 | Running | plugins that are on |
 | Next reminder | the soonest one, and how many more |
+| Calendar | what's still on today from your [calendar](calendar.md), or the next thing |
 
 Anything that can't be read is left out, never guessed. It's cached for
 a few seconds and costs roughly 60 to 100 tokens. Stream chat never gets
@@ -255,7 +256,7 @@ in `config.json`. `/situation` shows exactly what she'd see right now.
 "situation": {
     "enabled": true,
     "window": true, "music": true, "machine": true,
-    "plugins": true, "reminders": true
+    "plugins": true, "reminders": true, "calendar": true
 }
 ```
 

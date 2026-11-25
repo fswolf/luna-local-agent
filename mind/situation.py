@@ -9,6 +9,7 @@ starting blind each time:
     - Machine: CPU 18%, RAM 21.4 of 31.2 GB free, GPU 34% busy (VRAM 11.2/16 GB)
     - Running: minecraft, zork
     - Next reminder: tomorrow 09:00 - take the bins out (in 18 hours)
+    - Calendar today: 15:00-16:00: dentist (Main St); 19:00: stream
     - In your hands: your morning coffee in your mug, 3 sips in
 
 Every line is optional and each source is cheap; anything that can't be
@@ -18,12 +19,12 @@ because a turn builds its prompt more than once.
 
 Never on a stream-chat turn: the focused window's title and what's
 playing are his business. On someone else's turn (a housemate, a guest)
-his window and his reminders stay out; the rest is the room's.
+his window, his reminders and his calendar stay out; the rest is the room's.
 
     "situation": {
         "enabled": true,
         "window": true, "music": true, "machine": true,
-        "plugins": true, "reminders": true, "hands": true
+        "plugins": true, "reminders": true, "calendar": true, "hands": true
     }
 
 /set situation.enabled false turns it off; /situation shows what she'd
@@ -46,7 +47,7 @@ _cache = {"at": 0.0, "found": []}     # [(source name, line)]
 # Left out on someone else's turn (a housemate, a guest, a stranger): his
 # screen and his reminders are his business. The music, the machine and
 # what she's holding are the room's.
-OWNER_ONLY = ("window", "reminders")
+OWNER_ONLY = ("window", "reminders", "calendar")
 
 
 def enabled():
@@ -177,6 +178,14 @@ def _reminders():
     return line
 
 
+def _calendar():
+    """Today's events still to come, or the next one (senses/calendars.py). Read
+    from what's already fetched: a turn never waits on a calendar server."""
+    from senses import calendars
+
+    return calendars.situation_line()
+
+
 def _hands():
     """What she's holding or doing on her portrait: her coffee (life/coffee.py), a book
     (life/reading.py), her plushie (life/plushie.py), or she's dozed off under her
@@ -203,7 +212,8 @@ def _clothes():
 
 
 SOURCES = (("window", _window), ("music", _music), ("machine", _machine),
-           ("plugins", _plugins), ("reminders", _reminders), ("hands", _hands), ("clothes", _clothes))
+           ("plugins", _plugins), ("reminders", _reminders), ("calendar", _calendar), ("hands", _hands),
+           ("clothes", _clothes))
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +240,7 @@ def _read():
             line = ""
 
         if line:
-            out.append((name, line[:700 if name == "hands" else 200]))   # a book needs a few words
+            out.append((name, line[:700 if name == "hands" else 400 if name == "calendar" else 200]))   # a book needs a few words
 
     return out
 

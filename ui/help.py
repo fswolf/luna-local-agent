@@ -61,6 +61,7 @@ _HELP_SECTIONS = [
         ("/reminders", "what's scheduled, numbered, with how long until each"),
         ("/cancel N", "cancel one by its number (alarms are in the same list)"),
         ("/when ...", "test how a time is understood, without scheduling anything"),
+        ("/calendar", "the next seven days from your calendars, read-only (/calendar refresh reads them again)"),
         "Repeats work too: \"every Monday at 9\", \"daily at 7:30\", \"every 30 minutes\", \"weekdays at 8\". Say them or type them.",
     ]),
     ("Alarms", [

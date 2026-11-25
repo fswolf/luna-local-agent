@@ -131,5 +131,5 @@ SELF_CONCLUSIONS = flag(_self_cfg.get("conclusions", True))
 _situation_cfg = setting("situation", {})
 SITUATION_ENABLED = flag(_situation_cfg.get("enabled", True))
 SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
-                   for k in ("window", "music", "machine", "plugins", "reminders", "hands", "clothes")}
+                   for k in ("window", "music", "machine", "plugins", "reminders", "calendar", "hands", "clothes")}
 

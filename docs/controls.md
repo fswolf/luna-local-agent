@@ -114,6 +114,7 @@ Slash commands:
 | `/wake` | Wake word status and live scores |
 | `/hear` | Whether her model gets the recording of what you said |
 | `/reminders` | List what's scheduled, with countdowns |
+| `/calendar` | The next seven days from your calendars, read-only ([calendar.md](calendar.md)); `/calendar refresh` reads them again |
 | `/cancel N` | Cancel reminder N |
 | `/when ...` | Test how a time phrase is read, without scheduling it |
 | `/alarm ...` | Set a wake-up: `/alarm 7:30am`, `/alarm every weekday at 6` |

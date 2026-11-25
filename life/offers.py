@@ -6,6 +6,8 @@ find becomes an offer, never an action:
     machine   a disk nearly full, a service that failed
     dates     a fact she remembers with a date coming up ("Shannon's
               birthday is March 3") and no reminder for it
+    calendar  an event on your calendar in the next two days (senses/calendars.py)
+              with no reminder of yours before it and none of its own
 
 The next time you talk to her (typed, spoken or from a relay station),
 or she says hello when you come back, one offer rides along in her prompt: she can bring it up once, briefly,
@@ -28,16 +30,18 @@ import hashlib
 import re
 import threading
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import config
 from core import logbook
 
-DEFAULTS = {"enabled": True, "per_day": 3, "gap_minutes": 120, "machine": True, "dates": True, "days_ahead": 14}
+DEFAULTS = {"enabled": True, "per_day": 3, "gap_minutes": 120, "machine": True, "dates": True, "days_ahead": 14,
+            "calendar": True}
 SCAN_EVERY = 600
 SOURCES = ("typed", "voice", "station", "greeting")      # your own turns, and her hello to you
 STATE_KEY = "offers"
-DATE_ASKS = 2                                # a date is offered at most twice
+DATE_ASKS = 2                                # a date (or a calendar event) is offered at most twice
+CALENDAR_HOURS = (1, 48)                     # an event this many hours ahead gets an offer
 
 _lock = threading.Lock()
 _state_lock = threading.Lock()                 # what she's asked and muted: read, change, write as one
@@ -148,7 +152,43 @@ def watch_dates(today=None):
     return found
 
 
-WATCHERS = {"machine": watch_machine, "dates": watch_dates}
+def _reminded_before(start):
+    """Is there a reminder of yours in the day before this event starts (or at it)?"""
+    try:
+        from life import reminders
+        for r in reminders.pending():
+            due = datetime.fromisoformat(str(r.get("due_at", ""))[:19])
+            if start - timedelta(days=1) <= due <= start:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def watch_calendar(now=None):
+    """Timed events in the next couple of days with no reminder before them.
+    One with an alarm of its own (Google's, your phone's) is left alone: you'll
+    hear about it already. All-day events aren't offered: there's no time to
+    remind you before."""
+    from senses import calendars
+
+    if not calendars.enabled() or not calendars.available():
+        return []
+    now = now or datetime.now()
+    lo, hi = CALENDAR_HOURS
+    found = []
+    for e in calendars.events(now, now + timedelta(hours=hi)):
+        if e["all_day"] or e["alarm"] or not now + timedelta(hours=lo) <= e["start"] or _reminded_before(e["start"]):
+            continue
+        tag = hashlib.sha1((e["uid"] or e["title"]).encode()).hexdigest()[:8]
+        found.append({"key": f"cal:{tag}:{e['start']:%Y%m%d%H%M}", "kind": "date", "cooldown": 24 * 3600,
+                      "label": f"{calendars.describe(e)} (on your calendar, no reminder yet)",
+                      "text": f"their calendar has {calendars.describe(e)}, and there's no reminder for it. "
+                              "Offer to remind them beforehand (set_reminder)."})
+    return found
+
+
+WATCHERS = {"machine": watch_machine, "dates": watch_dates, "calendar": watch_calendar}
 
 
 def scan():
@@ -201,8 +241,9 @@ def _save(st):
 
 
 def _mute_key(key):
-    """What "don't bring that up again" mutes: a date's fact for every year, anything else as is."""
-    return key.rsplit(":", 1)[0] if key.startswith("date:") else key
+    """What "don't bring that up again" mutes: a date's fact for every year, a
+    calendar event every time it repeats, anything else as is."""
+    return key.rsplit(":", 1)[0] if key.startswith(("date:", "cal:")) else key
 
 
 def _muted(st, key):

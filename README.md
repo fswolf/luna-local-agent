@@ -62,6 +62,7 @@ What she does:
 - **Knows who's talking:** tells the people in your house apart by voice or face, uses their name and pronouns, and keeps each person's memories to themselves ([below](#she-knows-who-shes-talking-to))
 - **Talk from another room:** a phone or tablet becomes a relay station, paired by QR code. On Android, the [Luna Station app](https://github.com/fswolf/luna-station-android) makes it a room device: her portrait full screen, a mic and a speaker. Any other device works in its browser. Dedicated voice devices (ESPHome satellites) are experimental ([details](docs/stations.md))
 - **Reminders and real alarms:** she wakes you up, and nags until you're up
+- **Your calendar:** Google Calendar, calcurse or any iCal feed, read-only: she knows what's on and offers reminders
 - **Email:** checks, reads and searches your inbox; sends only with your OK ([details](docs/email.md))
 - **Files and commands:** writes and edits files and runs commands, every one shown and approved first, with read/write/execute permissions you set in the tools pane. A fresh install starts with the everyday tools on and the far-reaching ones (shell, network scans, email, desktop control) off until you switch them on
 - **Hard to steer:** a web page, an email or a stranger in chat can't quietly get her to read your files, send things out or switch something on
@@ -292,6 +293,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Who she's talking to](docs/who.md): how every turn is matched to a person, the face check, privacy
 - [Relay stations](docs/stations.md): talk to her from another room on a phone or tablet, with the Android app or in the browser
 - [Reminders and alarms](docs/reminders.md)
+- [Calendar](docs/calendar.md)
 - [Knowledge](docs/knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](docs/memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](docs/reasoning.md): thought log, token confidence, adaptive thinking, introspection
