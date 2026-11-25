@@ -4,7 +4,20 @@ bar's fields, /clear. All thread-safe; all just repaint.
 
 Part of the ui package (it was one ui.py); see ui/__init__.py.
 """
-from .shared import _lock, _refresh, conversation, state, view
+from contextlib import contextmanager
+
+from .shared import Asked, _asking, _lock, _refresh, conversation, state, view
+
+
+@contextmanager
+def answering():
+    """While a /command runs: the system lines it adds are its answer (Asked)."""
+    before = getattr(_asking, "on", False)
+    _asking.on = True
+    try:
+        yield
+    finally:
+        _asking.on = before
 
 
 def set_status(status: str):
@@ -61,6 +74,9 @@ def add_message(speaker: str, text: str):
     her answer - and putting them after would leave the open message
     no longer last, which is what extend_message relies on.
     """
+
+    if speaker == "system" and getattr(_asking, "on", False):
+        text = Asked(text)
 
     with _lock:
         if view.streaming is not None and 0 <= view.streaming < len(conversation):

@@ -31,6 +31,15 @@ state = {
 }
 conversation = []  # list of (speaker, text) tuples
 
+
+class Asked(str):
+    """A system line someone asked for - a /command's answer, like /skills or
+    /cron. Still a plain str everywhere; the chat page shows it open, where
+    a long line it wasn't asked for (a tool's log) starts folded."""
+
+
+_asking = threading.local()   # .on: this thread is answering a typed /command
+
 # Which overlay can be up: None, "launch", "tools" or "settings". Tab
 # cycles through them and back to the conversation.
 _panes = (None, "launch", "tools", "settings")

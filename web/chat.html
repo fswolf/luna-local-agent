@@ -181,13 +181,14 @@ function inline(s) {
              .replace(/(^|[\s(])\*([^*\n]{1,200})\*(?=$|[\s.,!?;:)])/g, '$1<em>*$2*</em>')).join('');
 }
 
-function draw(el, speaker, words) {
+function draw(el, speaker, words, asked) {
   el.onclick = null;
   if (speaker === 'user') {
     el.className = 'msg you'; el.textContent = words;
   } else if (speaker === 'system') {
     el.className = 'sys'; el.replaceChildren(Object.assign(document.createElement('span'), {textContent: words}));
-    if (words.split('\n').length > 2 || words.length > 240) el.classList.add('long');
+    // long lines fold (a tool's log); a /command's answer is what you asked for, so it starts open
+    if (words.split('\n').length > 2 || words.length > 240) el.classList.add(asked ? 'open' : 'long');
     el.onclick = () => { if (getSelection().toString()) return; if (el.classList.contains('long') || el.classList.contains('open')) { el.classList.toggle('open'); el.classList.toggle('long'); } };
   } else if (speaker.startsWith('chat:')) {
     el.className = 'msg guest'; el.innerHTML = `<span class=who>${esc(speaker.slice(5))}</span>${esc(words)}`;
@@ -207,12 +208,12 @@ function apply(s) {
   show(() => {
     // redraw only what changed: a tool line you opened stays open, and text
     // you're selecting in an earlier message isn't swapped out under you
-    s.msgs.forEach(([speaker, words], i) => {
+    s.msgs.forEach(([speaker, words, asked], i) => {
       const at = keep + i, old = msgs[at];
       if (old && old[0] === speaker && old[1] === words) return;
       let el = els[at];
       if (!el) { el = document.createElement('div'); list.insertBefore(el, typing); els[at] = el; }
-      draw(el, speaker, words);
+      draw(el, speaker, words, asked);
       msgs[at] = [speaker, words];
     });
     for (const el of els.splice(keep + s.msgs.length)) el.remove();

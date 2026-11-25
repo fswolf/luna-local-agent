@@ -31,9 +31,9 @@ The package, one job per file:
 A submodule never takes the name of something ui exports: importing
 ui.conversation (a module) would replace ui.conversation (the list).
 """
-from .shared import changes, conversation, state, view  # noqa: F401
+from .shared import Asked, changes, conversation, state, view  # noqa: F401
 from .messages import (  # noqa: F401
-    add_message, begin_message, clear, drop_empty_message, end_message, extend_message, init,
+    add_message, answering, begin_message, clear, drop_empty_message, end_message, extend_message, init,
     mouse_enabled, render, replace_message, set_controls, set_memory, set_mode, set_model, set_mood,
     set_status, set_voice, set_voice_server, toggle_mouse,
 )

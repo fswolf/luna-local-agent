@@ -125,7 +125,9 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
         start = have if streaming is None else min(have, streaming)
         start = max(0, min(start, total) - 2)
     return {"v": now_version, "e": now_epoch, "reset": reset, "from": start,
-            "msgs": [[speaker, text] for speaker, text in convo[start:]], "total": total,
+            # a third 1: a /command's answer, shown open (ui.Asked)
+            "msgs": [[speaker, text, 1] if isinstance(text, ui.Asked) else [speaker, text]
+                     for speaker, text in convo[start:]], "total": total,
             "streaming": streaming, "busy": interrupts.busy(), "stoppable": _stoppable(),
             "status": status, "name": name,
             "mood": mood, "rows": rows, "ask": ui.pending_approval(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),

@@ -32,7 +32,15 @@ def setup(model, socket_path=None):
 
 def handle(text):
     """True if text was a command (it has run). Never for a plain message."""
+    import ui
+
+    with ui.answering():        # what it prints is what you asked for: shown open
+        return _handle(text)
+
+
+def _handle(text):
     from . import app, life, memory, patches, people, plugins, portrait, reminders, settings, voice
+    import ui
 
     for area in (app, reminders, settings, voice, life, portrait, memory, people, patches, plugins):
         try:
@@ -43,7 +51,6 @@ def handle(text):
             # other ways in (a remote, a plugin) so a failing command is a
             # line in the conversation, never a traceback over the screen.
             from core import logbook
-            import ui
 
             logbook.exception("commands", "%s failed", text.split()[0] if text.split() else text)
             ui.add_message("system", f"{(text.split() or [text])[0]} failed: {e}")
