@@ -488,7 +488,7 @@ def tool(name, description, properties, required=(), available=None, why=None):
     tools pane without the core having to know this plugin exists."""
     def decorator(fn):
         tools.register_external(name, description, properties, required, run=fn,
-                                group="Jobs", available=available, why=why)
+                                group="Jobs", available=available, why=why, schedules=True)
         return fn
 
     return decorator

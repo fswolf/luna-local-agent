@@ -62,13 +62,18 @@ _EXTERNAL_GROUPS = {}   # tool name -> group, for tools registered at run time
 
 
 def register_external(name, description, properties, required=(), run=None, group="Other",
-                      available=None, why=None, outside=False):
+                      available=None, why=None, outside=False, schedules=False):
     """A tool that isn't in this package - an MCP server's, say. Same
     shape as @tool, registered at run time, grouped as given. outside:
     what it returns was written by someone else (an MCP server, a game's
-    chat), so a turn that calls it counts as having read outside content."""
+    chat), so a turn that calls it counts as having read outside content.
+    schedules: it deals with something timed (a plugin's scheduled jobs),
+    so a turn that calls it isn't a reminder she forgot to set."""
     tool(name, description, properties, required, available, why)(run)
     _EXTERNAL_GROUPS[name] = group
+
+    if schedules:
+        SCHEDULES.add(name)
 
     if outside:
         OUTSIDE.add(name)
@@ -80,6 +85,11 @@ def register_external(name, description, properties, required=(), run=None, grou
 # turn is marked (turnctx: the turn's `seen`) and file reads, and web requests
 # after a file read, ask first - see tools/files.py and tools/web.py.
 OUTSIDE = {"web_search", "read_page", "research"}
+
+# Tools that handle something timed. A turn that called one dealt with the
+# time it named, so the reminder safety net (llm/turns.py) leaves it alone:
+# "every Sunday at 4am, run the backup job" isn't a reminder she forgot.
+SCHEDULES = {"set_reminder", "set_alarm", "set_task", "list_reminders", "cancel_reminder"}
 
 # Tools that exist for the machinery, not as features: never listed in
 # the tools pane, never switched off, only sent when routing needs them.

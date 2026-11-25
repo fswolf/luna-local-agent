@@ -613,7 +613,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
     if not session._tools_supported:
         longterm.extract_in_background(model, text, answer)
         reminders.extract_in_background(model, text)
-    elif not called & {"set_reminder", "set_alarm", "set_task", "list_reminders", "cancel_reminder"}:
+    elif not called & tools.SCHEDULES:
         # She will sometimes say "Got it, setting that for you!" without
         # ever calling set_reminder - a small model choosing to sound
         # helpful over being helpful, and it gets likelier as the tool

@@ -230,25 +230,19 @@ _looks_like_reminder = looks_like_reminder
 
 
 _PROMPT = """You extract reminder requests. Do NOT do any arithmetic and do
-NOT convert times - only report what was said.
+NOT convert times - copy the time words exactly as they were said.
 
 Reply with ONLY one of these:
 
 NONE
-  - the message does not ask to be reminded of anything later.
+  - the message does not ask to be reminded of anything later. Asking for a
+    job to be scheduled, a script to run or a task done on a timer is NONE
+    too: that's work, not a reminder.
 
-{"kind":"in","amount":<number>,"unit":"seconds|minutes|hours|days|weeks","text":"<what to remind about>"}
-  - a delay was given, e.g. "in 10 minutes", "in an hour" -> amount 1, unit hours.
-
-{"kind":"at","time":"HH:MM","day":"today|tomorrow","text":"<what to remind about>"}
-  - a clock time was given. Use 24-hour time. "5pm" -> "17:00". "tonight"
-    with no time -> "20:00" today. "tomorrow morning" -> "09:00" tomorrow.
-
-{"kind":"every","amount":<number>,"unit":"minutes|hours|days","text":"<what>"}
-  - a repeating interval, e.g. "every 30 minutes".
-
-{"kind":"daily","time":"HH:MM","text":"<what>"}
-  - repeats at the same clock time each day, e.g. "every morning at 8".
+{"when":"<the time words, copied as said>","text":"<what to remind about>"}
+  - e.g. "remind me in 10 minutes to stretch" -> {"when":"in 10 minutes","text":"stretch"}
+    "every Sunday at 4am remind me to check the backups" -> {"when":"every Sunday at 4am","text":"check the backups"}
+    "tomorrow morning, the dentist" -> {"when":"tomorrow morning","text":"the dentist"}
 
 The text field is the thing to be reminded about, in plain words, without
 "remind me to".
@@ -304,6 +298,14 @@ def phrase_from(data):
 
     if not str(data.get("text", "")).strip():
         return None
+
+    # The time words as you said them, for timeutil to read: the extractor
+    # doing its own conversion is how "4am every Sunday" became "16:00 every
+    # day". The kinds below are the older answer shape, still understood.
+    when = " ".join(str(data.get("when") or "").split())
+
+    if when:
+        return when
 
     if kind in ("in", "every"):
         prefix = "every" if kind == "every" else "in"
