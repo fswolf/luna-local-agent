@@ -11,13 +11,26 @@ with /reflect:
              flags, low token confidence, the ones where the next thing
              he said was "no, ..." - and writes a few one-line lessons
              about her own behaviour. They ride in her prompt from then
-             on. Once every self.reflect_every_hours, while idle.
-  tidy       looks for remembered facts that say the same thing twice,
-             or contradict each other, and merges or retires them.
+             on. It starts the night batch: the chores below with a
+             "(night)", once a night while idle, in her quiet hours
+             (self.dream_hours; her bedtime, portrait.dozing.from-to, by
+             default). A machine that's off at night gets it after 36
+             hours anyway, whenever she's idle. "any" is the old way:
+             every self.reflect_every_hours.
+  tidy       (night) looks for remembered facts that say the same thing
+             twice, or contradict each other, and merges or retires them.
              A retired fact stays in /facts retired.
+  conclusions  reads back the conversations since last time, one person
+             at a time, and notes what she concludes about them - said or
+             inferred, with the exchanges behind it (mind/conclusions.py).
+             In the batch, and between batches whenever a person has a
+             handful of new exchanges waiting. Then (night) she dreams
+             over all of them: merges duplicates, sets aside the older of
+             two that contradict, lets guesses nothing backed up fade.
   pages,     after the tidy: a short note per subject she knows a lot
   profiles   about (mind/pages.py), and a short profile of you and of each
-             person she knows (mind/profiles.py).
+             person she knows (mind/profiles.py), written from the facts
+             and those conclusions.
 
 Plus the startup part: the previous session is summarised before
 anything else, so the first thing she says can pick up where it left
@@ -158,13 +171,23 @@ def _yield():
         raise Interrupted()
 
 
-_tcache = {"key": None, "size": 0, "entries": []}
+_tcache = {"key": None, "size": 0, "entries": [], "file": None}
+_tlock = threading.Lock()
 
 
 def _transcript():
     """The transcript's entries, re-reading only what was appended since
     last time. It's checked every two minutes and can be 20 MB; parsing
-    all of it each time would be a lot of work to find nothing new."""
+    all of it each time would be a lot of work to find nothing new.
+
+    Locked: the background passes call it, and so does /conclusions why
+    from a turn - two readers at once would both append the same new
+    lines and move the offset twice."""
+    with _tlock:
+        return _read_transcript()
+
+
+def _read_transcript():
     import json
     import os
 
@@ -180,8 +203,13 @@ def _transcript():
     if _tcache["key"] == (st.st_size, st.st_mtime_ns):
         return _tcache["entries"]
 
-    if st.st_size < _tcache["size"] or not _tcache["entries"]:
-        _tcache.update(size=0, entries=[])  # trimmed or first read - start over
+    # Trimmed, or a forget rewrote it (mind/forgetting.py: a new file put in
+    # its place, maybe grown past the old size since): start over. Carrying
+    # on from the old offset would keep the forgotten lines and read the new
+    # file from the middle of a line.
+    file = (st.st_dev, st.st_ino)
+    if st.st_size < _tcache["size"] or not _tcache["entries"] or _tcache["file"] != file:
+        _tcache.update(size=0, entries=[], file=file)
 
     try:
         with open(path, "rb") as f:
@@ -643,9 +671,17 @@ def _pairs(facts, done, since_id=0):
 
 def tidy_facts(model, report=None, limit=6):
     """Merge duplicates, retire the losing side of a contradiction.
-    Returns what changed, as lines."""
+    Returns what changed, as lines. Its changes are logged as the tidy pass's."""
     if not getattr(config, "SELF_TIDY_FACTS", True):
         return []
+
+    from mind import factstore
+
+    with factstore.acting("tidy"):
+        return _tidy_facts(model, report, limit)
+
+
+def _tidy_facts(model, report, limit):
 
     from mind import factstore
     from mind import longterm
@@ -721,7 +757,7 @@ def tidy_facts(model, report=None, limit=6):
                 factstore.set_row(b[0], merged, b[2] or a[2])
                 if sure:
                     factstore.confirm_row(b[0])
-                factstore.retire_row(a[0])
+                factstore.retire_row(a[0], f"merged into #{b[0]}")
                 touched.update((a[0], b[0]))
                 changes.append(f"merged \"{a[1]}\" + \"{b[1]}\" → \"{merged}\"")
         elif side and factstore.is_sure(a[0] if side == "B" else b[0]) and \
@@ -730,11 +766,11 @@ def tidy_facts(model, report=None, limit=6):
             # the guess marked (not sure), and she asks
             continue
         elif side == "A":
-            factstore.retire_row(b[0])
+            factstore.retire_row(b[0], f"contradicted by #{a[0]}")
             touched.update((a[0], b[0]))
             changes.append(f"retired \"{b[1]}\" (contradicted by \"{a[1]}\")")
         elif side == "B":
-            factstore.retire_row(a[0])
+            factstore.retire_row(a[0], f"superseded by #{b[0]}")
             touched.update((a[0], b[0]))
             changes.append(f"retired \"{a[1]}\" (superseded by \"{b[1]}\")")
 
@@ -767,6 +803,41 @@ def write_pages(model, report=None):
     if written:
         logbook.info("reflect", "pages written: %s", ", ".join(written))
     return written
+
+
+def write_conclusions(model, report=None):
+    """What she concludes about each person from the conversations since last
+    time (mind/conclusions.py). Returns its result ({"read", "new", "failed"})."""
+    from mind import conclusions
+
+    if not conclusions.enabled():
+        return {"read": 0, "new": [], "failed": False}
+    done = conclusions.write(lambda prompt: _ask(_model(model), prompt, think=512, max_tokens=400),
+                             _transcript(), yield_=_yield, report=report)
+    if done["read"]:
+        logbook.info("reflect", "conclusions: read %d exchange(s), %d new", done["read"], len(done["new"]))
+    return done
+
+
+def dream_conclusions(model, report=None):
+    """Over everything she's concluded (mind/conclusions.py): merge, settle
+    contradictions, fade old guesses. Returns its result."""
+    from mind import conclusions
+
+    if not conclusions.enabled():
+        return {"faded": [], "merged": [], "contradicted": [], "failed": False}
+    done = conclusions.dream(lambda prompt: _ask(_model(model), prompt, think=512, max_tokens=500),
+                             yield_=_yield, report=report)
+    if done["faded"] or done["merged"] or done["contradicted"]:
+        logbook.info("reflect", "conclusions dreamt over: %d merged, %d contradicted, %d faded",
+                     len(done["merged"]), len(done["contradicted"]), len(done["faded"]))
+    return done
+
+
+def _conclusions_due():
+    from mind import conclusions
+
+    return conclusions.due(_transcript())
 
 
 def _profiles_missing():
@@ -802,6 +873,8 @@ def run_all(model, report=None):
             feel_about_games(model, report)
             dream(model, report)
             tidy_facts(model, report)
+            write_conclusions(model, report)
+            dream_conclusions(model, report)
             write_pages(model, report)
             write_profiles(model, report)
         except Interrupted:
@@ -809,27 +882,93 @@ def run_all(model, report=None):
                 report("Paused - you started talking. The rest happens next time she's idle.")
 
 
-def _dream_due():
+NIGHT_AGAIN_HOURS = 12        # one night batch per night: not again within this
+NIGHT_LATEST_HOURS = 36       # a machine that's off at night gets it anyway after this long
+_bad_hours = {"said": None}
+
+
+def _quiet_hours():
+    """(from, to) hours of her night, or None for "any time" (every
+    self.reflect_every_hours, the old way). self.dream_hours: "" for her
+    bedtime (portrait.dozing.from-to, 22-6), "2-6", or "any"."""
+    raw = str(getattr(config, "SELF_DREAM_HOURS", "") or "").strip().lower()
+    if raw in ("any", "anytime", "always"):
+        return None
+    if raw:
+        m = re.fullmatch(r"(\d{1,2})\s*-\s*(\d{1,2})", raw)
+        if m and int(m.group(1)) == 0 and int(m.group(2)) == 24:
+            return None                     # all day is any time
+        if m and int(m.group(1)) < 24 and int(m.group(2)) <= 24 and int(m.group(1)) != int(m.group(2)) % 24:
+            return int(m.group(1)), int(m.group(2)) % 24
+        if _bad_hours["said"] != raw:
+            _bad_hours["said"] = raw
+            logbook.warn("reflect", "self.dream_hours %r isn't like \"2-6\" or \"any\": her bedtime instead", raw)
+    lo = int(safe.number(getattr(config, "PORTRAIT_DOZING_FROM", 22), 22, lo=0, hi=23))
+    hi = int(safe.number(getattr(config, "PORTRAIT_DOZING_TO", 6), 6, lo=0, hi=23))
+    return (lo, hi) if lo != hi else (22, 6)
+
+
+def _in_hours(hours, hour):
+    lo, hi = hours
+    return lo <= hour < hi if lo < hi else (hour >= lo or hour < hi)
+
+
+def _dream_due(now=None):
+    """Time for the night batch? Once a night in her quiet hours (or after
+    NIGHT_LATEST_HOURS whatever the hour), or every self.reflect_every_hours
+    when dream_hours is "any". Never within an hour of a failed one."""
+    now = now or datetime.now()
     failed = notebook.get("dream_failed")
 
     try:
-        if failed and datetime.now() - datetime.fromisoformat(failed) < timedelta(hours=1):
+        if failed and now - datetime.fromisoformat(failed) < timedelta(hours=1):
             return False  # the server was down - don't retry every two minutes
     except (ValueError, TypeError):
         pass
 
-    last = notebook.get("dream_at")
+    if _resting("night"):
+        return False
+
+    # when the batch last ran; dream_at (the lessons' own "read up to") before night_at existed
+    last = notebook.get("night_at") or notebook.get("dream_at")
 
     if not last:
         return True
 
-    # Clamped: a hand-edited 1e999 made timedelta() overflow every two minutes
-    hours = safe.number(getattr(config, "SELF_REFLECT_HOURS", 20), 20, lo=0, hi=24 * 365)
-
     try:
-        return datetime.now() - datetime.fromisoformat(last) >= timedelta(hours=hours)
+        since = now - datetime.fromisoformat(last)
     except (ValueError, TypeError):
         return True
+
+    hours = _quiet_hours()
+
+    if hours is None:
+        # Clamped: a hand-edited 1e999 made timedelta() overflow every two minutes
+        every = safe.number(getattr(config, "SELF_REFLECT_HOURS", 20), 20, lo=0, hi=24 * 365)
+        return since >= timedelta(hours=every)
+
+    if since >= timedelta(hours=NIGHT_LATEST_HOURS):
+        return True
+
+    return _in_hours(hours, now.hour) and since >= timedelta(hours=NIGHT_AGAIN_HOURS)
+
+
+def _night(model, show):
+    """The night batch. Marked done (night_at) only when it ran through: a
+    failed model call rests it an hour and it goes again."""
+    report = _shout(show)
+    failed_before = notebook.get("dream_failed")
+    dream(model, report=report)
+    tidy_facts(model, report=report)
+    read = write_conclusions(model, report=report)
+    dreamt = dream_conclusions(model, report=report)
+    write_pages(model, report=report)
+    write_profiles(model, report=report)
+    if notebook.get("dream_failed") != failed_before or read["failed"] or dreamt["failed"]:
+        _job_failed("night")
+    else:
+        _job_ok("night")
+        notebook.put("night_at", datetime.now().isoformat(timespec="seconds"))
 
 
 def _busy():
@@ -960,6 +1099,8 @@ def _shout(show):
             show(line)
         elif line.startswith("Dream pass failed"):
             show(line)
+        elif line.startswith("Conclusions dreamt over:"):
+            show(line + "\n  (/conclusions to review, /conclusions wrong <n> to drop one)")
 
     return report
 
@@ -1037,15 +1178,19 @@ def _loop(model, show):
                     feel_about_games(model)
 
                 if idle_seconds() >= 600 and _dream_due():
-                    dream(model, report=_shout(show))
-                    tidy_facts(model, report=_shout(show))
-                    write_pages(model, report=_shout(show))
-                    write_profiles(model, report=_shout(show))
-                elif idle_seconds() >= 600 and not _resting("profiles") and _profiles_missing():
-                    if write_profiles(model, report=_shout(show)):
-                        _job_ok("profiles")
-                    else:
-                        _job_failed("profiles")        # the server's down, or she wrote nothing: an hour's rest
+                    _night(model, show)
+                elif idle_seconds() >= 600:
+                    # between batches: someone's conversations waiting to be read back
+                    if not _resting("conclusions") and _conclusions_due():
+                        if write_conclusions(model, report=_shout(show))["failed"]:
+                            _job_failed("conclusions")     # the server's down: an hour's rest
+                        else:
+                            _job_ok("conclusions")
+                    if not _resting("profiles") and _profiles_missing():
+                        if write_profiles(model, report=_shout(show)):
+                            _job_ok("profiles")
+                        else:
+                            _job_failed("profiles")        # the server's down, or she wrote nothing: an hour's rest
         except Interrupted:
             pass
         except Exception:
@@ -1056,7 +1201,7 @@ def start(model, show=None):
     """Called once at startup. show(line) puts a line on screen."""
     if not any(getattr(config, k, True) for k in
                ("SELF_EPISODES", "SELF_LESSONS", "SELF_TIDY_FACTS", "SELF_GREET", "SELF_PAGES",
-                "SELF_PROFILES")):
+                "SELF_PROFILES", "SELF_CONCLUSIONS")):
         return
 
     threading.Thread(target=_loop, args=(model, show), daemon=True,

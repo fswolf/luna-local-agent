@@ -4,7 +4,8 @@
 
 opens a small page on http://127.0.0.1:8790 with three tabs. About you:
 view, search, add, edit, confirm, retire, restore and delete facts
-(agent/facts.db). (Your preferences used to be edited here too; they live
+(agent/facts.db), and what she's concluded about you and the people she
+knows (mark one wrong, or bring it back). (Your preferences used to be edited here too; they live
 in agent.json now, under Who she is on the settings page.) Her notebook
 (agent/notebook.db): how she feels about the games she's played, and her
 notes on past conversations and game sessions. Her lessons: what she's
@@ -48,8 +49,11 @@ def _ready():
 # ---------------------------------------------------------------------------
 # One state blob for the page
 # ---------------------------------------------------------------------------
+HISTORY = 500          # the newest changes the History tab shows
+
+
 def state():
-    active, retired, warning, forgotten = [], [], "", 0
+    active, retired, warning, forgotten, history = [], [], "", 0, []
 
     if _ready():
         store = _factstore()
@@ -69,6 +73,9 @@ def state():
             for i, fact, subject, created, when in old
         ]
         forgotten = store.forgotten_count()
+        history = [{"at": at[:16].replace("T", " "), "action": action, "id": fact_id, "fact": text,
+                    "detail": detail, "by": by}
+                   for _e, at, action, fact_id, text, detail, by in store.events(limit=HISTORY)]
     else:
         warning = "agent/facts.db can't be opened - the assistant's log says why."
 
@@ -76,6 +83,7 @@ def state():
         "active": active,
         "retired": retired,
         "forgotten": forgotten,
+        "history": history,
         "warning": warning,
         "notebook": notebook_state(),
     }
@@ -104,15 +112,39 @@ def notebook_state():
                          for e in nb.episodes(100000)],
             "lessons": [lesson(l) for l in nb.lessons()],
             "retired_lessons": [lesson(l) for l in nb.lessons(retired=True)],
+            **conclusions_state(),
         }
     except Exception:
         return None
+
+
+def conclusions_state():
+    """What she's concluded about each person (mind/conclusions.py)."""
+    from mind import conclusions
+
+    try:
+        conclusions.rows(limit=1)
+    except Exception:
+        return {"conclusions": [], "retired_conclusions": []}     # the rest of the notebook still shows
+    row = lambda r: {"id": r["id"], "person": conclusions.label(r["person"]), "text": r["text"],
+                     "kind": r["kind"], "from": len(r["sources"]), "created": str(r["created"])[:10],
+                     "why": r["why"], "backed": str(r["backed"])[:10]}
+    return {"conclusions": [row(r) for r in conclusions.rows()],
+            "retired_conclusions": [row(r) for r in conclusions.rows(retired=True, limit=500)]}
 
 
 # ---------------------------------------------------------------------------
 # Edits
 # ---------------------------------------------------------------------------
 def apply(action, body):
+    """One edit from the page. Fact changes go in her memory's log as the memory page's."""
+    from mind import factstore
+
+    with factstore.acting("memory page"):
+        _apply(action, body)
+
+
+def _apply(action, body):
     fact = str(body.get("fact", "")).strip()
     subject = str(body.get("subject", "")).strip()
 
@@ -132,6 +164,14 @@ def apply(action, body):
             nb.retire_lesson(int(body.get("id", -1)))
         elif action == "nb_lesson_restore":
             nb.restore_lesson(int(body.get("id", -1)))
+        elif action == "nb_conclusion_wrong":
+            from mind import conclusions
+
+            conclusions.mark_wrong(int(body.get("id", -1)), "on the memory page")
+        elif action == "nb_conclusion_restore":
+            from mind import conclusions
+
+            conclusions.restore(int(body.get("id", -1)))
         else:
             raise ValueError(f"unknown action {action!r}")
         return
@@ -349,7 +389,7 @@ PAGE = r"""<!DOCTYPE html>
             color: var(--ok); opacity: 0; transition: opacity .3s; }
   .empty { color: var(--dim); font-size: 13px; padding: 8px 2px; }
   .meta-note { color: var(--dim); font-size: 13px; }
-  #epsearch {
+  #epsearch, #hsearch {
     width: 100%; padding: 9px 12px; border-radius: 8px;
     border: 1px solid var(--line); background: var(--panel);
     color: var(--text); font-size: 14px; outline: none;
@@ -371,6 +411,7 @@ PAGE = r"""<!DOCTYPE html>
   <a href="#facts" data-tab="facts">About you <span id="n-facts"></span></a>
   <a href="#notebook" data-tab="notebook">Her notebook <span id="n-notebook"></span></a>
   <a href="#lessons" data-tab="lessons">Her lessons <span id="n-lessons"></span></a>
+  <a href="#history" data-tab="history">History</a>
 </nav>
 
 <section data-tab="facts">
@@ -392,6 +433,15 @@ PAGE = r"""<!DOCTYPE html>
 
 <h2 id="retired-h">Retired</h2>
 <div id="retired"></div>
+
+<div id="nb-conclusions">
+<h2>What she's concluded</h2>
+<div class="meta-note">Read back from your conversations while she's idle: <b>said</b> is something you told her, <b>inferred</b> her own read of you (from two or more exchanges). Overnight she merges duplicates, sets aside the older of two that contradict, and lets guesses nothing has backed up fade. Mark one wrong and she won't conclude it again. <code>/conclusions why &lt;n&gt;</code> in the app shows the conversation behind one.</div>
+<input id="csearch" placeholder="filter..." oninput="renderNotebook()">
+<div id="conclusions"></div>
+<h2>Set aside</h2>
+<div id="rconclusions"></div>
+</div>
 
 <h2>Preferences</h2>
 <div class="meta-note">What she calls you, nicknames and what to avoid are in agent.json now, as <code>user_preferences</code>: the settings page, <a href="/settings/">Who she is</a>.</div>
@@ -421,6 +471,13 @@ PAGE = r"""<!DOCTYPE html>
 <h2 id="rlessons-h">Retired lessons</h2>
 <div id="rlessons"></div>
 </div>
+</section>
+
+<section data-tab="history" hidden>
+<div class="meta-note">Every change to what she knows about you, newest first: what changed, when, and who did it (her own tools, the background extractor, the tidy pass, this page). A forgotten fact's words are gone from here too; only the date it was forgotten stays.</div>
+<h2>Changes to the facts</h2>
+<input id="hsearch" placeholder="filter..." oninput="renderHistory()">
+<div id="history"></div>
 </section>
 
 <div id="status"></div>
@@ -460,6 +517,18 @@ async function refresh(keepPrefs) {
   // if (!keepPrefs) document.getElementById("prefs").value = S.prefs;    // moved to agent.json
   render();
   renderNotebook();
+  renderHistory();
+}
+
+// The change log: text a model wrote, so textContent only
+function renderHistory() {
+  const q = document.getElementById("hsearch").value.toLowerCase();
+  fill("history", (S.history || [])
+    .filter(h => !q || [h.fact, h.detail, h.action, h.by].join(" ").toLowerCase().includes(q))
+    .map(h => nbRow((h.id != null ? "#" + h.id + " " : "") + h.action + (h.fact ? ": " + h.fact
+                    : h.action === "forgotten" ? ": (the words were forgotten)" : ""),
+                    [["subject", h.detail], ["game", h.by], ["date", h.at]], [])),
+    "no changes yet");
 }
 
 // Her notebook: rows built with textContent, never innerHTML - it's text
@@ -517,7 +586,7 @@ function editFeeling(row, f) {
 // the address (#notebook), so a reload or a link lands on the same one.
 function showTab() {
   const want = (location.hash || "#facts").slice(1);
-  const tab = ["facts", "notebook", "lessons"].includes(want) ? want : "facts";
+  const tab = ["facts", "notebook", "lessons", "history"].includes(want) ? want : "facts";
   document.querySelectorAll("section[data-tab]").forEach(s => s.hidden = s.dataset.tab !== tab);
   document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
 }
@@ -528,7 +597,7 @@ function count(id, n) { document.getElementById(id).textContent = n ? `(${n})` :
 
 function renderNotebook() {
   const N = S.notebook;
-  for (const id of ["nb", "nb-lessons"]) document.getElementById(id).style.display = N ? "" : "none";
+  for (const id of ["nb", "nb-lessons", "nb-conclusions"]) document.getElementById(id).style.display = N ? "" : "none";
   document.querySelectorAll(".nb-missing").forEach(el => el.style.display = N ? "none" : "");
   count("n-facts", S.active.length);
   count("n-notebook", N ? N.episodes.length + N.feelings.length : 0);
@@ -563,6 +632,22 @@ function renderNotebook() {
   fill("rlessons", N.retired_lessons.map(l => nbRow(l.text, tags(l), [
     ["restore", "", async () => { await api("nb_lesson_restore", {id: l.id}); refresh(true); }],
   ], true)), "none retired");
+
+  // whose, said or her read, how many exchanges it came from, when
+  const cq = document.getElementById("csearch").value.toLowerCase();
+  const ctags = c => [["subject", c.person], ["game", c.kind],
+                      ["date", `#${c.id} · from ${c.from} · ${c.created}` + (c.backed ? ` · seen again ${c.backed}` : "")]];
+  fill("conclusions", N.conclusions
+    .filter(c => !cq || (c.text + " " + c.person + " " + c.kind).toLowerCase().includes(cq))
+    .map(c => nbRow(c.text, ctags(c), [
+      ["wrong", "", async () => { await api("nb_conclusion_wrong", {id: c.id}); refresh(true); }],
+    ])), "none yet - she reads back conversations while idle");
+  // one the pass outdated can still be marked wrong, so it never comes back
+  fill("rconclusions", N.retired_conclusions.map(c => nbRow(c.text + (c.why ? "  (" + c.why + ")" : ""), ctags(c), [
+    ...(c.why.startsWith("marked wrong") ? [] :
+        [["wrong", "", async () => { await api("nb_conclusion_wrong", {id: c.id}); refresh(true); }]]),
+    ["restore", "", async () => { await api("nb_conclusion_restore", {id: c.id}); refresh(true); }],
+  ], true)), "none set aside");
 }
 
 function factRow(f, retired) {

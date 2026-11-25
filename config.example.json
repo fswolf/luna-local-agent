@@ -323,6 +323,7 @@
         "lessons_in_prompt": 4,
         "max_lessons": 40,
         "reflect_every_hours": 20,
+        "dream_hours": "",
         "episodes": true,
         "episodes_in_prompt": 2,
         "idle_minutes": 30,

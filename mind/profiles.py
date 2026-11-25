@@ -4,7 +4,9 @@ Her facts are single lines, and only the ones that match your message go
 in the prompt. A profile is the other half: a few sentences she wrote herself,
 while idle, from everything she has on you - who you are to her, what you
 do, what matters to you, how you like to be helped - so the gist is always
-there even when the message doesn't touch it.
+there even when the message doesn't touch it. Beside the facts it's written
+from what she's concluded from talking to you (mind/conclusions.py), marked
+as hers, and a fact wins over it.
 
     Ryan runs Luna on his Fedora desktop and an Unraid server he's moving
     her model onto. He builds her himself, prefers plain talk to fuss,
@@ -175,11 +177,26 @@ def _sources(facts):
 # ---------------------------------------------------------------------------
 # Writing (from the idle dream pass)
 # ---------------------------------------------------------------------------
-def _prompt(person, facts):
+def _conclusions(person):
+    """Her conclusions about them (mind/conclusions.py), marked said or her read."""
+    try:
+        from mind import conclusions
+
+        return conclusions.lines(person) if conclusions.enabled() else []
+    except Exception:
+        logbook.exception("profiles", "couldn't read her conclusions about %s", label(person))
+        return []
+
+
+def _prompt(person, facts, read=()):
     who = label(person)
     owner = _owner_name()
     lines = [f"Everything you have saved about {who}:", ""]
     lines += [f"- {f}" for f in facts]
+    if read:
+        lines += ["", f"What you've concluded from talking to {who} (\"they told you\" is theirs; \"your read\" "
+                      "is your own impression, less sure - use it lightly, and never against a fact above):", ""]
+        lines += [f"- {c}" for c in read]
     lines += ["",
               f"Write yourself a short profile of {who}: who they are"
               + ("" if person == OWNER else f" (to you and to {owner})")
@@ -208,14 +225,15 @@ def write(ask, yield_=lambda: None, report=None, limit=PER_PASS):
     for person, facts in wanted.items():               # yours first
         if len(written) >= limit:
             break
-        sources = _sources(facts)
+        read = _conclusions(person)
+        sources = _sources(facts + list(read))
         if have.get(person) == sources:
             continue
         yield_()
         try:
             from mind import forgetting
 
-            text = forgetting.clean(_clean(ask(_prompt(person, facts))))
+            text = forgetting.clean(_clean(ask(_prompt(person, facts, read))))
         except Exception as e:
             logbook.warn("profiles", "writing %s's profile failed: %s", label(person), e)
             break

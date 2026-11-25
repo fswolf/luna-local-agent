@@ -56,7 +56,8 @@ def ready():
 
         try:
             if isinstance(old, list) and old and not factstore.meta("memory_json_imported"):
-                moved = factstore.import_facts(old) if _was_on_json() else 0
+                with factstore.acting("import"):
+                    moved = factstore.import_facts(old) if _was_on_json() else 0
                 factstore.set_meta("memory_json_imported", moved)
 
                 if moved:
@@ -748,7 +749,8 @@ def extract_in_background(model, user_text, answer, asked=False):
         # Its own thread: a locked facts.db or a full disk here printed a
         # traceback over the screen, once per turn.
         try:
-            with turnctx.begin(source="extract", private=True, speaker=speaker):
+            with turnctx.begin(source="extract", private=True, speaker=speaker), \
+                    factstore.acting("extractor"):
                 _extract_fact(model, user_text, answer, asked)
         except Exception:
             logbook.exception("longterm", "fact extraction failed")

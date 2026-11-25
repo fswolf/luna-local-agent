@@ -9,8 +9,8 @@ forget now does three things:
     1. a tombstone: a fingerprint of the fact, kept in facts.db
        (factstore.bury). Never the words: a hash of each word that
        matters, so it can be recognised again without being readable.
-    2. a sweep: every store above has the sentences that carry it taken
-       out, now (scrub_everywhere).
+    2. a sweep: every store above, and the memory's own change log, has
+       the sentences that carry it taken out, now (scrub_everywhere).
     3. a guard: whatever she writes from then on (her replies, summaries,
        episode notes, pages, profiles) goes through clean(), and a new
        fact that matches a tombstone isn't saved (factstore.add/replace).
@@ -235,8 +235,10 @@ def forget(fact, wait=False):
         return False
     factstore.bury(tomb)
     # the sweep (and the vector drop, which may ask the embedding server its
-    # model name) bound now, not when the thread gets to it
-    work = (scrub_everywhere, _drop_vectors, [tomb], [fact])
+    # model name) bound now, not when the thread gets to it; and who asked,
+    # for the log (the thread doesn't inherit it)
+    who = factstore._by.get()
+    work = (scrub_everywhere, _drop_vectors, [tomb], [fact], f"{who}, forgetting" if who else "forgetting")
     if wait:
         _sweep(*work)
     else:
@@ -244,10 +246,13 @@ def forget(fact, wait=False):
     return True
 
 
-def _sweep(sweep, drop, tombs, texts):
+def _sweep(sweep, drop, tombs, texts, who="forgetting"):
+    from mind import factstore
+
     try:
-        drop(texts)
-        sweep(tombs)
+        with factstore.acting(who):
+            drop(texts)
+            sweep(tombs)
     except Exception:
         logbook.exception("forgetting", "sweep failed")
 
@@ -255,8 +260,9 @@ def _sweep(sweep, drop, tombs, texts):
 def scrub_everywhere(tombs):
     """Take the sentences carrying these out of every store. {store: count}."""
     done = {}
-    for name, fn in (("facts", _facts), ("conversation", _history), ("transcript", _transcript), ("episodes", _episodes),
-                     ("lessons", _lessons), ("pages", _pages), ("profiles", _profiles), ("thoughts", _thoughts)):
+    for name, fn in (("facts", _facts), ("memory log", _log), ("conversation", _history), ("transcript", _transcript),
+                     ("episodes", _episodes), ("lessons", _lessons), ("pages", _pages), ("profiles", _profiles),
+                     ("conclusions", _conclusions), ("thoughts", _thoughts)):
         try:
             done[name] = fn(tombs)
         except Exception:
@@ -278,6 +284,16 @@ def _facts(tombs):
                 gone.append(fact)
     _drop_vectors(gone)
     return len(gone)
+
+
+def _log(tombs):
+    """The memory's own change log: rows still carrying it (a reworded or
+    corrected copy whose fact row went some other way, an old "was: ..."),
+    words emptied. The deleted rows' own log rows were emptied as they went."""
+    from mind import factstore
+
+    return factstore.scrub_events(lambda text: bool(text) and any(
+        same_fact(marks(part), t) for t in tombs for part in _SENTENCE.split(text) + [text]))
 
 
 def _history(tombs):
@@ -396,6 +412,12 @@ def _pages(tombs):
 
 def _profiles(tombs):
     return _keyed("profiles", "person", tombs)
+
+
+def _conclusions(tombs):
+    from mind import conclusions
+
+    return conclusions.scrub(tombs)
 
 
 def _thoughts(tombs):

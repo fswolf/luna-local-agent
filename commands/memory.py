@@ -43,6 +43,14 @@ def _real(detail, lead="; "):
     return lead + ", ".join(notes) if notes else ""
 
 
+def _event_line(event):
+    """One row of the audit log: "  11-24 09:12  #42 corrected by her tools: <fact> (was: ...)"."""
+    _id, at, action, fact_id, fact, detail, by = event
+    what = f"#{fact_id} " if fact_id is not None else ""
+    words = f": {fact}" if fact else (": (the words were forgotten)" if action != "unforgotten" else "")
+    return f"  {at[5:16].replace('T', ' ')}  {what}{action} by {by}{words}" + (f"  ({detail})" if detail else "")
+
+
 def handle(text):
     """True when text was one of these commands (and it ran)."""
     if text.startswith("/facts"):
@@ -71,6 +79,19 @@ def handle(text):
             )
             return True
 
+        if argument == "log" or argument.startswith("log "):
+            # the audit log: every change, newest first; "/facts log 42" is one fact's history
+            what = argument[3:].strip().lstrip("#")
+            fact_id = int(what) if what.isdigit() else None
+            listing = factstore.events(limit=40, fact_id=fact_id)
+            shown = "\n".join(_event_line(e) for e in reversed(listing)) or "  (nothing yet)"
+            ui.add_message(
+                "system",
+                (f"Fact #{fact_id}, every change:" if fact_id is not None else
+                 "Her memory's last changes, oldest of these first (/facts log <number> for one fact's whole history):")
+                + f"\n{shown}")
+            return True
+
         if argument == "unsure":
             listing = [r for r in factstore.rows(limit=2000) if not factstore.is_sure(r[0])]
             shown = "\n".join(f"  ? {fact}" for _i, fact, _s, _c, _w in reversed(listing)) or "  (none)"
@@ -97,7 +118,8 @@ def handle(text):
             f"Memory: {active} active, {retired} retired"
             + (f", {factstore.forgotten_count()} forgotten for good" if factstore.forgotten_count() else "")
             + f". Newest {min(active, limit)}:\n{shown}{more}"
-            "\n/facts retired shows what's been superseded, /facts unsure what she isn't sure of.",
+            "\n/facts retired shows what's been superseded, /facts unsure what she isn't sure of, "
+            "/facts log every change and who made it.",
         )
         return True
 
@@ -372,6 +394,10 @@ def handle(text):
             ui.add_message("system", "\n".join(lines))
         return True
 
+    if text == "/conclusions" or text.startswith("/conclusions "):
+        ui.add_message("system", _conclusions(text[len("/conclusions"):].strip()))
+        return True
+
     if text == "/episodes" or text.startswith("/episodes "):
         from mind import notebook
 
@@ -403,3 +429,58 @@ def handle(text):
         return True
 
     return False
+
+
+def _conclusions(word):
+    """/conclusions [name|me | why <n> | wrong <n> | restore <n>]"""
+    from mind import conclusions
+
+    verb, _, rest = word.partition(" ")
+    verb = verb.lower()
+    if verb in ("why", "wrong", "restore"):
+        if not rest.strip().lstrip("#").isdigit():
+            return f"/conclusions {verb} <number> - the numbers are in /conclusions <name>."
+        cid = int(rest.strip().lstrip("#"))
+        found = conclusions.get(cid)
+        if not found:
+            return f"No conclusion #{cid}."
+        if verb == "wrong":
+            return (f"Set aside: {found['text']}\n(she won't conclude it again; /conclusions restore {cid} undoes it)"
+                    if conclusions.mark_wrong(cid) else f"#{cid} is already marked wrong.")
+        if verb == "restore":
+            return f"Back: {found['text']}" if conclusions.restore(cid) else f"#{cid} wasn't set aside."
+        lines = [f"#{cid} ({found['kind']}, {found['created'][:10]}): {found['text']}"]
+        if found["retired"]:
+            lines.append(f"  set aside {found['retired'][:10]}: {found['why']}")
+        behind = conclusions.sources_text(cid, reflect._transcript())
+        for at, said, answered in behind:
+            lines.append(f"  {at[:16].replace('T', ' ')}  {conclusions.label(found['person'])}: {conclusions._short(said, 160)}")
+            lines.append(f"  {' ' * 16}  her: {conclusions._short(answered, 120)}")
+        if len(behind) < len(found["sources"]):
+            lines.append(f"  ({len(found['sources']) - len(behind)} of the exchanges it came from aren't in the "
+                         "transcript any more)")
+        return "\n".join(lines)
+    if word:
+        person = conclusions.find_person(word)
+        if person is None:
+            return f"No conclusions about {word}. /conclusions lists who she has some for."
+        if not conclusions.rows(person, limit=1) and not conclusions.rows(person, retired=True, limit=1):
+            return f"No conclusions about {conclusions.label(person)} yet."
+        lines = [f"#{r['id']} {'said    ' if r['kind'] == 'said' else 'inferred'} {r['created'][5:10]}  {r['text']}"
+                 + (f"  (from {len(r['sources'])}, seen again {r['backed'][5:10]})" if r["backed"] else "")
+                 for r in conclusions.rows(person)]
+        old = conclusions.rows(person, retired=True, limit=10)
+        if old:
+            lines.append("Set aside:")
+            lines += [f"#{r['id']} {r['text']}  ({r['why']})" for r in old]
+        lines.append("/conclusions why <n> shows the conversation it came from; wrong <n> sets one aside.")
+        return "\n".join(lines)
+    have = conclusions.counts()
+    lines = [f"{conclusions.label(p)}: {n} - newest: {conclusions.rows(p, limit=1)[0]['text']}"
+             for p, n in have.items()] or ["No conclusions yet."]
+    if not conclusions.enabled():
+        lines.append("Conclusions are off (self.conclusions).")
+    lines.append("While she's idle she reads back her conversations, one person at a time, and notes what she "
+                 "concludes about them: said (you told her) or inferred (her read). /conclusions <name> (or me) "
+                 "lists them; why <n>, wrong <n>, restore <n>.")
+    return "\n".join(lines)

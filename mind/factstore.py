@@ -37,6 +37,16 @@ The schema is the design:
     embedding      reserved, unused - the column exists so adding
                    semantic search later is an UPDATE, not a migration
 
+Every change is written down too (fact_events): when, what (added,
+confirmed, dated, replaced, retired, restored, corrected, edited,
+forgotten, imported, unforgotten), which fact, the words then, and who
+did it: her own tools, the background extractor, the tidy pass, the
+memory page, the import, a forget's sweep (acting(), below). It costs
+nothing in her prompt; /facts log and the memory page's History tab read
+it. A forget empties the words from every row about that fact, here and
+in the sweep (mind/forgetting.py): what stays is "something was forgotten
+on <date>", or the log would be where the forgotten fact lives on.
+
 FTS5 runs as an external-content index over that table, kept in sync by
 triggers - including on UPDATE, because a fixed mistake rewrites fact text
 and an unsynced rewrite quietly corrupts search weeks before anyone
@@ -48,6 +58,8 @@ Older installs kept a capped list in agent/memory.json instead. Those
 facts are read in once (import_facts, from longterm.py) and the file is
 never written again.
 """
+import contextlib
+import contextvars
 import os
 import re
 import sqlite3
@@ -84,6 +96,18 @@ CREATE TABLE IF NOT EXISTS forgotten (
     marks  TEXT PRIMARY KEY,
     at     TEXT NOT NULL
 );
+
+-- every change to a fact: the audit log (record(), events())
+CREATE TABLE IF NOT EXISTS fact_events (
+    id       INTEGER PRIMARY KEY,
+    at       TEXT NOT NULL,
+    action   TEXT NOT NULL,
+    fact_id  INTEGER,
+    fact     TEXT NOT NULL DEFAULT '',
+    detail   TEXT NOT NULL DEFAULT '',
+    by       TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS fact_events_fact ON fact_events(fact_id);
 
 -- small bookkeeping: what's been done once and mustn't be done again
 CREATE TABLE IF NOT EXISTS meta (
@@ -123,6 +147,76 @@ END;
 
 def _now():
     return datetime.now().isoformat(timespec="seconds")
+
+
+# ---------------------------------------------------------------------------
+# The audit log: who changed what
+# ---------------------------------------------------------------------------
+# Who's making the changes on this thread: "her tools", "extractor", "tidy",
+# "memory page", "import", "forget". Set by whoever drives the change, with
+# acting(); a context variable, so two threads (her turn and the background
+# extractor) never mix each other's name up.
+_by = contextvars.ContextVar("factstore_by", default="")
+KEEP_EVENTS = 50000        # the log is trimmed to the newest this many
+
+
+@contextlib.contextmanager
+def acting(who):
+    """with factstore.acting("extractor"): ...  - the changes inside are its."""
+    token = _by.set(str(who or ""))
+    try:
+        yield
+    finally:
+        _by.reset(token)
+
+
+def _record(db, action, fact_id=None, fact="", detail=""):
+    """One row in the log, inside the caller's transaction (both or neither)."""
+    db.execute("INSERT INTO fact_events(at, action, fact_id, fact, detail, by) VALUES (?, ?, ?, ?, ?, ?)",
+               (_now(), action, fact_id, str(fact or ""), str(detail or ""), _by.get() or "unknown"))
+
+
+def _scrub_events(db, fact_ids):
+    """A fact being forgotten: every row about it loses its words. The rows
+    stay, so the log still says that something changed and when."""
+    for fact_id in fact_ids:
+        db.execute("UPDATE fact_events SET fact = '', detail = '' WHERE fact_id = ?", (fact_id,))
+
+
+def events(limit=200, fact_id=None):
+    """[(id, at, action, fact_id, fact, detail, by)], newest first."""
+    db = _connect()
+    if db is None:
+        return []
+    with _lock:
+        if fact_id is None:
+            return db.execute("SELECT id, at, action, fact_id, fact, detail, by FROM fact_events "
+                              "ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
+        return db.execute("SELECT id, at, action, fact_id, fact, detail, by FROM fact_events "
+                          "WHERE fact_id = ? ORDER BY id DESC LIMIT ?", (int(fact_id), int(limit))).fetchall()
+
+
+def scrub_events(test):
+    """Empty the words test(text) says carry something forgotten, from every
+    log row: a reworded copy whose fact row went some other way, or old words
+    kept in a correction's "was: ...". Only the part that has it: a fact
+    corrected away from it keeps its new words. Returns how many rows changed."""
+    db = _connect()
+    if db is None:
+        return 0
+    with _lock:
+        rows = db.execute("SELECT id, fact, detail FROM fact_events WHERE fact != '' OR detail != ''").fetchall()
+        hit = [(i, test(fact), test(detail)) for i, fact, detail in rows]
+        hit = [h for h in hit if h[1] or h[2]]
+        with db:
+            for i, in_fact, in_detail in hit:
+                db.execute("UPDATE fact_events SET fact = CASE WHEN ? THEN '' ELSE fact END, "
+                           "detail = CASE WHEN ? THEN '' ELSE detail END WHERE id = ?", (in_fact, in_detail, i))
+    return len(hit)
+
+
+def _trim_events(db):
+    db.execute("DELETE FROM fact_events WHERE id <= (SELECT max(id) FROM fact_events) - ?", (KEEP_EVENTS,))
 
 
 _DATE = re.compile(r"^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$")
@@ -518,22 +612,33 @@ def add(fact, subject="", since="", sure=True, again=False):
             # known already: a second hearing confirms a guess, and a date
             # he's now given for it is still worth keeping
             changed = 0
+            ids = [r[0] for r in db.execute("SELECT id FROM facts WHERE fact = ? AND superseded_at IS NULL", (fact,))]
             with db:
                 if dupe[0] != "confirmed":
-                    changed += db.execute("UPDATE facts SET trust = 'confirmed' WHERE fact = ? "
-                                          "AND superseded_at IS NULL", (fact,)).rowcount
+                    n = db.execute("UPDATE facts SET trust = 'confirmed' WHERE fact = ? "
+                                   "AND superseded_at IS NULL", (fact,)).rowcount
+                    changed += n
+                    for i in ids if n else ():
+                        _record(db, "confirmed", i, fact, "heard again")
                 if when(since):
-                    changed += db.execute(
+                    n = db.execute(
                         "UPDATE facts SET valid_from = ? WHERE fact = ? AND superseded_at IS NULL "
                         "AND valid_from IS NULL", (when(since), fact)).rowcount
+                    changed += n
+                    for i in ids if n else ():
+                        _record(db, "dated", i, fact, f"true since {when(since)}")
             return changed > 0
 
         with db:    # commits, or rolls back on an error (locked, disk full)
-            db.execute(
+            cursor = db.execute(
                 "INSERT INTO facts(fact, subject, created_at, valid_from, trust) VALUES (?, ?, ?, ?, ?)",
                 (fact, str(subject or "").strip().lower(), _now(), when(since) or None,
                  "confirmed" if sure else "unconfirmed"),
             )
+            _record(db, "added", cursor.lastrowid, fact,
+                    ", ".join(x for x in ("not sure" if not sure else "",
+                                          f"true since {when(since)}" if when(since) else "") if x))
+            _trim_events(db)
 
     return True
 
@@ -550,6 +655,9 @@ def _allowed(fact, again):
         logbook.info("factstore", "not saved, he asked for it to be forgotten: %r", fact)
         return False
     unbury(hit)
+    db = _connect()
+    with _lock, db:
+        _record(db, "unforgotten", None, fact, "asked for it back")
     return True
 
 
@@ -595,6 +703,10 @@ def replace(old_fact, new_fact, subject="", since="", sure=True):
                 "valid_to = coalesce(?, valid_to) WHERE id = ?",
                 (_now(), cursor.lastrowid, since, old_id),
             )
+            _record(db, "replaced", cursor.lastrowid, new_fact,
+                    f"was #{old_id}" + (f", changed {since}" if since else "") + ("" if sure else ", not sure"))
+            _record(db, "retired", old_id, str(old_fact or "").strip(), f"replaced by #{cursor.lastrowid}")
+            _trim_events(db)
 
     return True
 
@@ -602,11 +714,16 @@ def replace(old_fact, new_fact, subject="", since="", sure=True):
 def confirm(fact):
     """He said it's right: an unconfirmed fact becomes a confirmed one."""
     db = _connect()
+    fact = str(fact or "").strip()
 
     with _lock:
+        ids = [r[0] for r in db.execute("SELECT id FROM facts WHERE fact = ? AND superseded_at IS NULL "
+                                        "AND trust != 'confirmed'", (fact,))]
         with db:
             cursor = db.execute("UPDATE facts SET trust = 'confirmed' WHERE fact = ? AND superseded_at IS NULL "
-                                "AND trust != 'confirmed'", (str(fact or "").strip(),))
+                                "AND trust != 'confirmed'", (fact,))
+            for i in ids:
+                _record(db, "confirmed", i, fact)
 
     return cursor.rowcount > 0
 
@@ -616,9 +733,14 @@ def confirm_row(fact_id):
 
     with _lock:
         with db:
-            cursor = db.execute("UPDATE facts SET trust = 'confirmed' WHERE id = ?", (int(fact_id),))
+            # only one that wasn't confirmed yet is a change worth a log row
+            cursor = db.execute("UPDATE facts SET trust = 'confirmed' WHERE id = ? AND trust != 'confirmed'",
+                                (int(fact_id),))
+            if cursor.rowcount:
+                _record(db, "confirmed", int(fact_id), _text(db, fact_id))
+            found = db.execute("SELECT 1 FROM facts WHERE id = ?", (int(fact_id),)).fetchone()
 
-    return cursor.rowcount > 0
+    return found is not None
 
 
 def set_since(fact, since):
@@ -629,11 +751,16 @@ def set_since(fact, since):
         return False
     db = _connect()
 
+    fact = str(fact or "").strip()
+
     with _lock:
+        ids = [r[0] for r in db.execute("SELECT id FROM facts WHERE fact = ? AND superseded_at IS NULL", (fact,))]
         with db:
             cursor = db.execute(
                 "UPDATE facts SET valid_from = ? WHERE fact = ? AND superseded_at IS NULL",
-                (since, str(fact or "").strip()))
+                (since, fact))
+            for i in ids:
+                _record(db, "dated", i, fact, f"true since {since}")
 
     return cursor.rowcount > 0
 
@@ -644,14 +771,18 @@ def update(old_fact, new_fact):
     if not _allowed(str(new_fact or ""), False):
         return False
     db = _connect()
+    old, new = str(old_fact or "").strip(), str(new_fact or "").strip()
 
     with _lock:
+        ids = [r[0] for r in db.execute("SELECT id FROM facts WHERE fact = ? AND superseded_at IS NULL", (old,))]
         with db:
             cursor = db.execute(
                 "UPDATE facts SET fact = ? "
                 "WHERE fact = ? AND superseded_at IS NULL",
-                (str(new_fact or "").strip(), str(old_fact or "").strip()),
+                (new, old),
             )
+            for i in ids:
+                _record(db, "corrected", i, new, f"was: {old}")
 
     return cursor.rowcount > 0
 
@@ -661,14 +792,28 @@ def remove(fact):
     asking for something to be forgotten is the one case where keeping
     a retired copy would be doing the opposite of what they asked."""
     db = _connect()
+    fact = str(fact or "").strip()
 
     with _lock:
+        ids = [r[0] for r in db.execute("SELECT id FROM facts WHERE fact = ?", (fact,))]
         with db:
-            cursor = db.execute(
-                "DELETE FROM facts WHERE fact = ?", (str(fact or "").strip(),)
-            )
+            cursor = db.execute("DELETE FROM facts WHERE fact = ?", (fact,))
+            _forgot(db, ids)
 
     return cursor.rowcount > 0
+
+
+def _forgot(db, ids):
+    """Rows deleted (every delete is a forget): their log loses its words,
+    and a wordless row says that one was forgotten, and when."""
+    _scrub_events(db, ids)
+    for i in ids:
+        _record(db, "forgotten", i)
+
+
+def _text(db, fact_id):
+    row = db.execute("SELECT fact FROM facts WHERE id = ?", (int(fact_id),)).fetchone()
+    return row[0] if row else ""
 
 
 # ---------------------------------------------------------------------------
@@ -681,19 +826,25 @@ def remove(fact):
 # ---------------------------------------------------------------------------
 def set_row(fact_id, fact, subject):
     db = _connect()
+    fact, subject = str(fact or "").strip(), str(subject or "").strip().lower()
 
     with _lock:
+        before = db.execute("SELECT fact, subject FROM facts WHERE id = ?", (int(fact_id),)).fetchone()
         with db:
             cursor = db.execute(
                 "UPDATE facts SET fact = ?, subject = ? WHERE id = ?",
-                (str(fact or "").strip(), str(subject or "").strip().lower(),
-                 int(fact_id)),
+                (fact, subject, int(fact_id)),
             )
+            if before and before != (fact, subject):
+                was = [f"was: {before[0]}"] if before[0] != fact else []
+                if before[1] != subject:
+                    was.append(f"subject {before[1] or '(none)'} -> {subject or '(none)'}")
+                _record(db, "edited", int(fact_id), fact, "; ".join(was))
 
     return cursor.rowcount > 0
 
 
-def retire_row(fact_id):
+def retire_row(fact_id, why=""):
     db = _connect()
 
     with _lock:
@@ -703,6 +854,8 @@ def retire_row(fact_id):
                 "WHERE id = ? AND superseded_at IS NULL",
                 (_now(), int(fact_id)),
             )
+            if cursor.rowcount:
+                _record(db, "retired", int(fact_id), _text(db, fact_id), why)
 
     return cursor.rowcount > 0
 
@@ -714,11 +867,14 @@ def restore_row(fact_id):
         with db:
             cursor = db.execute(
                 "UPDATE facts SET superseded_at = NULL, superseded_by = NULL, valid_to = NULL "
-                "WHERE id = ?",
+                "WHERE id = ? AND superseded_at IS NOT NULL",
                 (int(fact_id),),
             )
+            if cursor.rowcount:
+                _record(db, "restored", int(fact_id), _text(db, fact_id))
+            found = db.execute("SELECT 1 FROM facts WHERE id = ?", (int(fact_id),)).fetchone()
 
-    return cursor.rowcount > 0
+    return found is not None
 
 
 def delete_row(fact_id):
@@ -727,6 +883,8 @@ def delete_row(fact_id):
     with _lock:
         with db:
             cursor = db.execute("DELETE FROM facts WHERE id = ?", (int(fact_id),))
+            if cursor.rowcount:
+                _forgot(db, [int(fact_id)])
 
     return cursor.rowcount > 0
 
@@ -782,7 +940,10 @@ def unbury_all():
     db = _connect()
 
     with _lock, db:
-        return db.execute("DELETE FROM forgotten").rowcount
+        n = db.execute("DELETE FROM forgotten").rowcount
+        if n:
+            _record(db, "unforgotten", None, "", f"everything forgotten may be learned again ({n})")
+        return n
 
 
 # ---------------------------------------------------------------------------
@@ -833,11 +994,12 @@ def import_facts(facts):
             ).fetchone()
 
             if not known and not _forgotten_here(db, fact):
-                db.execute(
+                cursor = db.execute(
                     "INSERT INTO facts(fact, subject, created_at) "
                     "VALUES (?, '', ?)",
                     (fact, _now()),
                 )
+                _record(db, "imported", cursor.lastrowid, fact, "from memory.json")
                 added += 1
 
     return added

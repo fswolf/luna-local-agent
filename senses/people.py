@@ -54,7 +54,8 @@ MEET_WINDOW = 600.0        # seconds an unknown face or voice stays meetable
 # and the owner get the full list, as before.
 GUEST_TOOLS = frozenset({"get_datetime", "time_until", "calculate", "web_search",
                          "system_status", "read_manual", "meet_guest"})
-GUEST_MEMORY_TOOLS = frozenset({"remember_fact", "recall_facts", "forget_fact", "update_fact"})
+GUEST_MEMORY_TOOLS = frozenset({"remember_fact", "recall_facts", "forget_fact", "update_fact",
+                                "ask_memory"})   # (mind/recall.py: only their own, on their turn)
 
 _session = {}              # guests met this session: name -> {"name", "face", "voice", "facts"}
 _unknown = {}              # kind -> (vector, monotonic time): the latest print nobody matched
@@ -130,6 +131,12 @@ def forget(name, kind=None):
                 os.remove(_path(name))
             except OSError:
                 return False
+            try:
+                from mind import conclusions
+
+                conclusions.forget_person(person.get("name") or name)   # what she worked out about them goes too
+            except Exception:
+                pass
             return True
         if kind not in person:
             return False

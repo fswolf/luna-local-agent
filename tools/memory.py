@@ -4,11 +4,22 @@ The editing tools take a loose description rather than an index,
 for the same reason set_reminder takes words: the model is good
 at repeating what was said and bad at bookkeeping.
 """
+import functools
+
 import config
 from mind import factstore, longterm
 from core import transcript
 
 from . import tool
+
+
+def _hers(fn):
+    """Changes made through her tools are logged as hers (factstore's audit log)."""
+    @functools.wraps(fn)        # (the tool call checks the arguments against its signature)
+    def run(*args, **kwargs):
+        with factstore.acting("her tools"):
+            return fn(*args, **kwargs)
+    return run
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +50,7 @@ from . import tool
     },
     required=("fact",),
 )
+@_hers
 def _remember_fact(fact, since="", again=False):
     if longterm.add_fact(fact, since=since, again=_yes(again)):
         return f"Saved: {fact}" + _date_note(since)
@@ -135,6 +147,7 @@ def _then_and_now(f):
     },
     required=("about",),
 )
+@_hers
 def _forget_fact(about):
     removed, candidates = longterm.forget_fact(about)
 
@@ -163,6 +176,7 @@ def _forget_fact(about):
     },
     required=("about",),
 )
+@_hers
 def _confirm_fact(about):
     done, candidates = longterm.confirm_fact(about)
 
@@ -206,6 +220,7 @@ def _confirm_fact(about):
     },
     required=("about", "corrected"),
 )
+@_hers
 def _update_fact(about, corrected, since="", mistake=False):
     mistake = _yes(mistake)
     changed, candidates = longterm.update_fact(about, corrected, since=since, mistake=mistake)
@@ -264,6 +279,32 @@ def _search_history(about):
         "coincidence. If none of them actually answers the question, "
         "say you don't recall rather than stretching one to fit.)"
     )
+
+
+@tool(
+    "ask_memory",
+    "Ask your own memory a question and get one answer: it searches your facts, what you've "
+    "concluded about people, your notes on past conversations and the conversations themselves "
+    "together. Use it for anything about the person you're talking to (or someone they know) "
+    "that isn't already in front of you - 'how does Ryan take his coffee?', 'what did Shannon "
+    "say about her trip?' - before saying you don't know.",
+    {
+        "question": {
+            "type": "string",
+            "description": "The question, as you'd ask yourself, e.g. 'how does Ryan take his coffee?'.",
+        },
+        "about": {
+            "type": "string",
+            "description": "Someone else it's about, by name, when it isn't the person you're "
+                           "talking to. Optional.",
+        },
+    },
+    required=("question",),
+)
+def _ask_memory(question, about=""):
+    from mind import recall
+
+    return recall.answer(question, about)
 
 
 # ---------------------------------------------------------------------------

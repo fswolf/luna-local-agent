@@ -110,9 +110,10 @@ forget, not hide:
 
 * **It's taken out of everything.** The fact row goes, and so do the
   sentences carrying it in the conversation summary, the transcript she
-  searches, her episode notes, lessons, pages and profiles, the thought
-  log and the cached embeddings. Pages and profiles are rewritten from
-  what's left.
+  searches, her episode notes, lessons, pages, profiles and conclusions,
+  the thought log, the cached embeddings and her memory's own change log
+  (below).
+  Pages and profiles are rewritten from what's left.
 * **It isn't learned again.** facts.db keeps a fingerprint of it: a
   hash of each word that matters, never the words. A new fact that
   matches (the same words, or them plus a couple more, "used to work at
@@ -128,6 +129,28 @@ Matching is by meaning words, with names and small words left out:
 both. A one-word fact ("likes anime") only takes sentences about a
 person, so she can still talk about anime.
 
+## Every change is written down
+
+Each change to a fact is a row in facts.db's change log: what happened
+(added, confirmed, dated, corrected, replaced, retired, restored, edited,
+forgotten, imported, unforgotten), to which fact, the words then, when,
+and who did it:
+
+| Who | When it changes something |
+|---|---|
+| her tools | she saved, corrected, confirmed or forgot something in conversation |
+| extractor | the background pass that picks facts out of a conversation |
+| tidy | her idle pass that merges duplicates and retires the losing side of a contradiction |
+| memory page | you, on the memory page |
+| import | an old install's memory.json read in |
+
+So "why does she think I have two cats?" has an answer: `/facts log`
+shows the newest changes, `/facts log 42` one fact's whole history, and
+the memory page has a **History** tab. It costs nothing in her prompt.
+A forget empties the words from every row about that fact: the log keeps
+only that something was forgotten, and when, or it would be where the
+forgotten fact lives on. The log keeps the newest 50,000 changes.
+
 `/facts` shows what's stored, and `memory-manager/` is the editor:
 
 <img width="900" alt="The memory page, About you tab: the facts, with add, edit, retire and delete" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-manager.png" />
@@ -141,11 +164,12 @@ search, add, edit, confirm, retire, restore and delete (forget) facts. It's safe
 while she's running: an edit is in her next prompt. Your preferences
 (what she calls you, nicknames, what to avoid) aren't here: they're
 `user_preferences` in agent.json, under **Who she is** on the settings
-page ([Companion](companion.md#who-she-is-agentjson)). The page has three
+page ([Companion](companion.md#who-she-is-agentjson)). The page has four
 tabs: **About you** (the facts), **Her notebook** (how she feels about
 each game she's played, her notes on past conversations and game
-sessions, game ones marked) and **Her lessons** (what she's learned, with
-retired ones below), each row with a forget, retire or edit button. The
+sessions, game ones marked), **Her lessons** (what she's learned, with
+retired ones below), each row with a forget, retire or edit button, and
+**History** (every change to the facts, newest first, with who made it). The
 tab is in the address, so `/memory/#lessons` opens straight to it. Facts
 are about you; the notebook is about her (see [learning](learning.md)).
 
@@ -208,7 +232,8 @@ that censor an idea, and streams as a VTuber.
 
 - **Who gets one:** you, once you have 3 or more facts, and each person
   she knows by voice or face (see [people](people.md)), from their own
-  facts.
+  facts, plus what she's [concluded](#conclusions) from talking to them,
+  marked as hers.
 - **Whose profile she sees:** on your turns, yours. On someone else's turn,
   theirs, and never yours. A stranger, or someone she met this session,
   gets none.
@@ -229,6 +254,100 @@ that censor an idea, and streams as a VTuber.
 `/set self.profiles false` switches them off. A profile adds about 100 tokens
 to every prompt; if she does well with it, `long_term_memory.context_facts`
 can go down to win them back. Kept in `agent/notebook.db`, beside the pages.
+
+## Conclusions
+
+A fact is one thing you said. A conclusion is what a friend takes away
+from a lot of conversations. While she's idle, she reads back what was
+said since she last looked, one person at a time, and writes down what
+she concludes about them:
+
+```
+> /conclusions me
+#14 inferred 11-24  Ryan wants the reason a thing broke, not a workaround.
+#15 inferred 11-24  Ryan would rather she just did it than asked which option.
+#16 said     11-25  Ryan runs Luna on his own machines, never a cloud.
+```
+
+- **Said or inferred.** *Said* is something you told her about yourself.
+  *Inferred* is her own read, from how you talk and what you do, and it
+  needs two or more exchanges behind it. Nothing about health or state
+  of mind, no passing moods, no one-off tasks, nothing a fact already
+  says.
+- **Where it came from.** Each one keeps the exchanges it was drawn from
+  and the date. `/conclusions why 14` shows them.
+- **Wrong ones.** `/conclusions wrong 14` (or *wrong* on the memory page)
+  sets it aside, and she's shown it each time as one not to conclude
+  again. When later conversations show one no longer holds, the pass
+  sets it aside itself ("outdated by what was said 11-25"); that one can
+  come back if it turns true again, unless you mark it wrong too.
+- **Whose.** Your conversations are yours. A guest's lines are theirs,
+  for someone she knows by voice or face. A stranger, someone met only
+  this session, and her own reminders and tasks are never read.
+- **Seen again.** When a later conversation shows one she has again, the
+  exchanges are added to it and it's marked seen again: that's what keeps
+  a guess alive.
+- **When.** In the night batch, after the facts are tidied, and between
+  nights whenever someone has six new exchanges waiting (or fewer, once
+  they've been quiet a day). The first time she reads back the last 30
+  days, not the whole archive. `/reflect` runs it now.
+- **Dreaming over them.** Once a night, in her quiet hours (her bedtime by
+  default, see [learning](learning.md#lessons-the-dream-pass)), she goes
+  over everything she's concluded about each person whose conclusions
+  changed: ones that say the same thing become one (keeping every
+  exchange behind them; a guess that matches something you said folds into
+  your words, never the other way round), and of two that can't both be
+  true, what you said beats her guess, and otherwise the one seen more
+  recently stays. A guess nothing has backed up in 45 days fades, and
+  one that was backed up fades 180 days after it was last seen. Said ones
+  never fade. Faded, merged and contradicted ones are set aside, not
+  deleted, and can come back. One you bring back (`/conclusions restore`)
+  counts as seen again, so it doesn't fade the same night. When you say
+  outright something she'd only guessed, it becomes said.
+- **Where they go.** Into the profile she writes of each person, beside
+  the facts and marked as hers; a fact wins. They're not in her prompt
+  on their own.
+- **Forgetting.** A forgotten fact takes every conclusion carrying it.
+  `/people forget <name>` takes everything she concluded about them.
+
+```
+/conclusions                 who she has conclusions about, and the newest
+/conclusions <name>          that person's, numbered (/conclusions me for yours)
+/conclusions why <n>         the exchanges it came from
+/conclusions wrong <n>       set it aside; she won't conclude it again
+/conclusions restore <n>     bring it back
+```
+
+`/set self.conclusions false` switches it off. Kept in `agent/notebook.db`.
+
+## Asking her memory
+
+Her memory is in four places: facts, her [conclusions](#conclusions), her
+notes on past conversations and the transcript. Each has its own tool, and
+each hands back raw lines. `ask_memory` asks all four at once and comes
+back with one answer, saying how she knows:
+
+```
+ask_memory("how does Ryan take his coffee?")
+Black with two sugars: he told you, and it came up again on Nov 12.
+(from: 1 fact, 1 conclusion, 2 past exchanges)
+```
+
+- **Only what bears on it.** Lines are matched on what the question is
+  about, by meaning when the embedding server is up and by words
+  otherwise. Names don't count, since every fact about you says your name.
+  A question about nobody but a person ("what do you know about
+  Shannon?") gets the newest of what she has on them.
+- **One short model call** reads those lines and answers in a sentence
+  or three. What you told her outranks her own read, newer outranks
+  older, and "I don't know" is an answer. If the call fails she gets the
+  lines themselves, labelled.
+- **Whose memory.** On your turns, everything, plus what she has on
+  someone you name. On someone else's turn, only what's theirs: their
+  facts, her conclusions about them and the exchanges they were in.
+  Never your facts, your notes or the rest of the transcript. Someone met
+  this session gets their facts only. Strangers and stream chat get
+  nothing.
 
 ## How it reaches her prompt
 

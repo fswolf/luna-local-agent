@@ -97,6 +97,9 @@ SELF_LESSONS = flag(_self_cfg.get("lessons", True))
 SELF_LESSONS_IN_PROMPT = int(_self_cfg.get("lessons_in_prompt", 4))
 SELF_MAX_LESSONS = int(_self_cfg.get("max_lessons", 40))
 SELF_REFLECT_HOURS = float(_self_cfg.get("reflect_every_hours", 20))
+# Her quiet hours for the night batch (mind/reflect.py): "" for her bedtime
+# (portrait.dozing.from-to), "2-6", or "any" (every reflect_every_hours).
+SELF_DREAM_HOURS = str(_self_cfg.get("dream_hours", "") or "")
 SELF_EPISODES = flag(_self_cfg.get("episodes", True))
 SELF_EPISODES_IN_PROMPT = int(_self_cfg.get("episodes_in_prompt", 2))
 SELF_IDLE_MINUTES = int(_self_cfg.get("idle_minutes", 30))
@@ -118,6 +121,9 @@ SELF_PAGES = flag(_self_cfg.get("pages", True))
 SELF_PAGES_IN_PROMPT = int(_self_cfg.get("pages_in_prompt", 2))
 # Profiles (mind/profiles.py): a short summary of each person, from their facts.
 SELF_PROFILES = flag(_self_cfg.get("profiles", True))
+# Conclusions (mind/conclusions.py): what she's worked out about each person
+# from talking to them, said or inferred, with the exchanges behind each.
+SELF_CONCLUSIONS = flag(_self_cfg.get("conclusions", True))
 
 # The situation block (mind/situation.py): focused window, music, machine load,
 # running plugins, next reminder, what's in her hands - a few live lines in

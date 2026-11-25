@@ -11,7 +11,8 @@ or switch it off.
 | Episodic memory | a few sentences of her own notes on each conversation, and on each time she played a game | `/episodes` |
 | Fact cleanup | merges facts that say the same thing twice, retires the losing side of a contradiction | `/facts retired` |
 | Pages | a short joined-up note on each subject she knows a lot about (a person, your hardware), brought along when you talk about it ([memory.md](memory.md#pages)) | `/pages` |
-| Profiles | a few sentences on you, and on each person she knows, written from their facts and always in her prompt when she talks to them ([memory.md](memory.md#profiles)) | `/profile` |
+| Conclusions | what she's worked out about each person from reading back her conversations while idle: said or inferred, with the exchanges behind it ([memory.md](memory.md#conclusions)) | `/conclusions` |
+| Profiles | a few sentences on you, and on each person she knows, written from their facts and her conclusions, and always in her prompt when she talks to them ([memory.md](memory.md#profiles)) | `/profile` |
 | Calibration | says so out loud when her token probabilities say she didn't know | the thought log's **overconfident** flag |
 | Startup greeting | after a break, opens by picking up where you left off | the first thing she says |
 | Recipes (skill library) | saves the steps of a multi-step job that went right, and brings them back for similar jobs | `/skills` |
@@ -24,8 +25,8 @@ situation block).
 
 ## Lessons: the dream pass
 
-Once a day (`self.reflect_every_hours`), when she's been idle for ten
-minutes, she reads back her own recent turns that went wrong. That
+Once a night, in her quiet hours, when she's been idle for ten minutes,
+she reads back her own recent turns that went wrong. That
 means turns with a review flag, turns where her measured confidence was
 low, and turns where the next thing you said started with "no", "wrong"
 or "actually". She writes at most three lessons. Each one is about her
@@ -38,6 +39,15 @@ of working it out. (#212, #230)
 ```
 
 <img width="900" alt="Her lessons on the memory page: how many turns each rode along on, and the ones she noted herself" src="https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/memory-lessons.png" />
+
+Her quiet hours are `self.dream_hours`. Left blank they're her bedtime,
+the hours she dozes off in (`portrait.dozing.from` and `.to`, 22 to 6), so
+she dreams while you sleep. `"2-6"` sets them yourself, and `"any"` is the
+old way: every `self.reflect_every_hours`, whatever the time. A PC that's
+off at night still gets it after a day and a half, whenever she's idle.
+The same night batch tidies your facts, reads back her conversations and
+dreams over what she's [concluded](memory.md#conclusions) about each
+person, then rewrites pages and profiles.
 
 The lessons most relevant to what you just said ride in her prompt
 (`self.lessons_in_prompt`, 4 by default; all of them while there are
@@ -328,7 +338,7 @@ wasn't given is refused before it runs.
 ```json
 "self": {
     "lessons": true, "lessons_in_prompt": 4, "max_lessons": 40,
-    "reflect_every_hours": 20,
+    "reflect_every_hours": 20, "dream_hours": "",
     "episodes": true, "episodes_in_prompt": 2, "idle_minutes": 30,
     "tidy_facts": true,
     "calibration": true, "hedge_below": 0.6,
