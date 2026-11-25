@@ -1,0 +1,8 @@
+{
+    "title": "The Hitchhiker's Guide to the Galaxy",
+    "goal": "400 points: get through the worst day of Arthur Dent's life",
+    "intro": "You're playing The Hitchhiker's Guide to the Galaxy, Infocom's 1984 game written by Douglas Adams, with your hhgg tools. You're Arthur Dent, waking up in the dark with a hangover on the worst day of your life. It's famously tricky and silly: replies that look like errors are often jokes and clues, so read them, try odd things, and come back to what didn't work. 400 points is a perfect score. FOOTNOTE 1 reads a footnote when the game mentions one. Don't panic.",
+    "examples": "'look', 'inventory', 'examine bed'",
+    "feel": "it's absurd and unfair and very British; laugh at it",
+    "start_at": "your bed"
+}

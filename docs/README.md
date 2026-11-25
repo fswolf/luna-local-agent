@@ -43,7 +43,7 @@ Everything the README only touches on, one subject per page.
 - [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](plugins.md): how they work, writing your own, scheduled jobs and Discord
 - [Stream chat](chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
-- [Games](games.md): chess, Minecraft, Zork, Vibe City, REALITI, Game Boy, playing on her own
+- [Games](games.md): chess, Minecraft, her text adventure library (Zork I to III, Starcross, Planetfall, The Hitchhiker's Guide), Vibe City, REALITI, Game Boy, playing on her own
 - [Home and devices](devices.md): Home Assistant, Lovense, toys of most brands through Intiface Central
 - [Development](development.md): project structure, extras
 
@@ -103,7 +103,7 @@ Everything the README only touches on, one subject per page.
 - Scheduled jobs she runs on her own, approved once, with writes fenced to folders you pick
 - Remote access from Discord for the owner only, off until you switch it on, with approvals answered right in the chat
 - Plays Minecraft: joins your world, works towards a goal, asks when something's unclear
-- Plays Zork I, the classic text adventure, on her own or with you calling the moves
+- Plays a library of classic text adventures (Zork I to III, Starcross, Planetfall, The Hitchhiker's Guide, or any Z-machine game you drop in `games/`), on her own or with you calling the moves ([games](games.md#text-adventures))
 - Plays mayor in Vibe City, building the town in your open game window while you watch
 - Plays chess against you on a board page, saying a sentence or two about each move
 - Lives in a REALITI city of AI agents, walking, talking and remembering

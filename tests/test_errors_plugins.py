@@ -377,6 +377,59 @@ class Servers(unittest.TestCase):
         self.assertIsNot(game.out, old)
         self.assertTrue(game.out.empty())
 
+    def test_a_game_waiting_for_a_key_gets_one(self):
+        """The Hitchhiker's Guide's SCORE says "Hit RETURN or ENTER when ready"
+        and waits: unanswered, her next command was eaten as the keypress."""
+        import importlib.util
+
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        spec = importlib.util.spec_from_file_location(
+            "zork_server_k", os.path.join(here, "games", "zork", "zork_server.py"))
+        try:
+            with mock.patch.object(sys, "argv", ["zork_server.py"]):
+                server = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(server)
+        except ImportError:
+            self.skipTest("pip install mcp")
+        game = server.Game()
+        game.proc = mock.Mock()
+        replies = iter(["We are about to give you your score. Put on your peril-sensitive sunglasses now. "
+                        "(Hit RETURN or ENTER when ready.) >", "Your score is 0 of a possible 400.\n>"])
+        with mock.patch.object(server.Game, "_read", side_effect=lambda: next(replies)):
+            text = game._send("score")
+        self.assertIn("Your score is 0", text)
+        self.assertEqual(game.proc.stdin.write.call_args_list[-1], mock.call(b"\n"))
+        self.assertIsNone(server.PRESS_ON.search("You press the red button. Nothing happens.\n>"))
+
+    def test_zork_saves_keep_their_names(self):
+        """dfrotz 2.54 cut save names short under -R <saves folder>
+        (old-20261028-1530 saved as old-20261, autosave.qzl as auto): it runs
+        in the saves folder with -R ., and the bare name is what's typed."""
+        import importlib.util
+
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        spec = importlib.util.spec_from_file_location(
+            "zork_server_r", os.path.join(here, "games", "zork", "zork_server.py"))
+        try:
+            with mock.patch.object(sys, "argv", ["zork_server.py", "--saves", "/tmp/somewhere/agent/zork"]):
+                server = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(server)
+        except ImportError:
+            self.skipTest("pip install mcp")
+        game = server.Game()
+        with mock.patch.object(server, "find_dfrotz", return_value="/bin/true"), \
+                mock.patch.object(server.os.path, "exists", side_effect=lambda p: not p.endswith(".qzl")), \
+                mock.patch.object(server.os, "makedirs"), \
+                mock.patch.object(server.subprocess, "Popen") as popen, \
+                mock.patch.object(server.threading, "Thread"), \
+                mock.patch.object(server.Game, "_read", return_value="West of House\n>"), \
+                mock.patch.object(server, "transcript"):
+            game.start()
+        args, kwargs = popen.call_args
+        self.assertEqual(args[0][args[0].index("-R") + 1], ".")
+        self.assertEqual(kwargs["cwd"], "/tmp/somewhere/agent/zork")
+        self.assertEqual(server.Game._typed("old-20261028-1530"), b"old-20261028-1530.qzl\n")
+
     def test_gameboy_dead_emulator_answers_at_once(self):
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         sys.path.insert(0, os.path.join(here, "games", "gameboy"))

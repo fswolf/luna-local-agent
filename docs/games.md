@@ -1,7 +1,7 @@
 # Games
 
-She can play: Minecraft through an MCP bot, Zork I through a real
-interpreter, mayor in your open Vibe City window, and resident in
+She can play: Minecraft through an MCP bot, Zork I, Starcross and a
+whole library of other text adventures through a real interpreter, mayor in your open Vibe City window, and resident in
 REALITI Relax, a world of rooms made for AI agents, chess against
 you on a board you drag the pieces around on, and Game Boy games you
 own through an emulator. Each one keeps its own
@@ -83,28 +83,37 @@ leftovers (flying, jumping, recipe browsing) stay off.
 The tools only exist while the plugin is on, so they cost nothing the
 rest of the time. `speak: true` reads each step aloud.
 
-## Zork
+## Text adventures
 
 ```
-/zork on        load the game          /zork play      she plays on her own
-/zork pause     stop playing           /zork off       put it away (saved)
-/zork watch     a terminal window showing the game as she plays
-/zork new       start over (the old game is kept as a save named old-<date>)
-/zork           score and what she's been up to
+/adventure games          her library, numbered
+/adventure game <n|name>  pick one: /adventure game 2, /adventure game zork
+/adventure on             load it                /adventure play     she plays on her own
+/adventure pause          stop playing           /adventure off      put it away (saved)
+/adventure watch          a terminal window showing the game as she plays
+/adventure new            start that game over (the old game is kept as a save named old-<date>)
+/adventure                what's loaded, score, what she's been up to
 ```
 
 [![Luna plays Zork for 72 minutes](https://img.youtube.com/vi/Cd8UUsFD_js/maxresdefault.jpg)](https://www.youtube.com/watch?v=Cd8UUsFD_js)
 
 *Luna plays Zork for 72 minutes (part 1, until the PC froze).*
 
-She plays [Zork I](https://en.wikipedia.org/wiki/Zork_I), the 1980
-Infocom text adventure. Microsoft released Zork I, II and III under the
-MIT licence in 2025, so the game ships with Luna in `games/zork/`
-(`zork1.z3`, with its licence beside it).
+She has a library of text adventures: [Zork I](https://en.wikipedia.org/wiki/Zork_I),
+the 1980 Infocom classic, [Starcross](https://en.wikipedia.org/wiki/Starcross_(video_game)),
+and any other Infocom or Z-machine game you add (`.z3`, `.z5`, `.z8`).
 
-The game runs in `games/zork/zork_server.py`, a small MCP server around
+A game is a folder in `games/` with one story file in it
+(`games/zork/zork1.z3`), and the folder's name is its name everywhere:
+her tools (`zork_command`, `zork_status`...), her saves
+(`agent/adventures/zork/`), her notes (`agent/knowledge/zork/`) and its
+project. Drop a folder in and it's in the library. She plays one game at
+a time: starting one pauses any other.
+
+The games run in `games/zork/zork_server.py`, a small MCP server around
 **dfrotz**, the plain-text build of the Frotz interpreter. It's a normal
-MCP server, so Claude Desktop or any other MCP client can play it too.
+MCP server, so Claude Desktop or any other MCP client can play them too
+(`--story` picks the game, `--name` its tools' prefix).
 
 ```bash
 brew install frotz          # macOS
@@ -116,23 +125,66 @@ If your system's frotz package has no `dfrotz`, build it from
 [the Frotz source](https://gitlab.com/DavidGriffith/frotz) with
 `make dumb` and set `"interpreter"` to the binary's path.
 
+### The games that ship
+
+- **Zork I, II and III** in `games/zork/`, `games/zork2/` and
+  `games/zork3/`. Microsoft released the trilogy under the MIT licence in
+  2025 (each licence is beside its game).
+- **Starcross** in `games/starcross/`, Infocom's 1982 science fiction
+  adventure: a black hole prospector, a mass detector ringing, and
+  something huge out there. The game came with a printed star chart that
+  the course to each mass is read from; her notes in
+  `agent/knowledge/starcross/` have it.
+- **Planetfall** in `games/planetfall/`, Infocom's 1983 science fiction
+  comedy: a lowly Stellar Patrol ensign, and Floyd.
+- **The Hitchhiker's Guide to the Galaxy** in `games/hhgg/`, Infocom's
+  1984 game written by Douglas Adams.
+
+Starcross, Planetfall and The Hitchhiker's Guide were never released as
+open source: the rights went from Infocom to Activision and now
+Microsoft, and they come out if asked. Every game has notes in
+`agent/knowledge/<game>/`: how to play it and, for Zork II and III, a map
+of the rooms near the start. No walkthroughs.
+
+### Telling her about a game
+
+An `about.json` beside the story file tells her about the game for each
+turn. All of it is optional; without one she's told it's a classic text
+adventure:
+
+```json
+{
+    "title": "Planetfall",
+    "goal": "what she's aiming for, for her project",
+    "intro": "You're playing Planetfall... (the first lines of each turn)",
+    "examples": "'north', 'take kit'",
+    "feel": "what she might feel about it",
+    "start_at": "Deck Nine"
+}
+```
+
+Notes in `agent/knowledge/<game>/` (see [Knowledge](knowledge.md)) reach
+her room by room: each turn she sees what they say about the room on the
+game's status line. Games whose status line shows a clock instead of
+moves (Planetfall's `Time:`) work the same.
+
 ### Her tools
 
 | Tool | |
 |------|--|
-| `zork_command` | type one command: `north`, `open mailbox`, `take lamp` |
-| `zork_status` | LOOK, INVENTORY and SCORE in one call |
-| `zork_save` / `zork_restore` | named saves; `autosave` is kept for her |
-| `zork_restart` | a new game from the start |
-| `play_zork` | start or stop playing on her own ("go play some Zork") |
+| `<game>_command` | type one command: `north`, `open mailbox`, `take lamp` |
+| `<game>_status` | LOOK, INVENTORY and SCORE in one call |
+| `<game>_save` / `<game>_restore` | named saves; `autosave` is kept for her |
+| `<game>_restart` | a new game from the start |
+| `play_adventure` | start or stop playing on her own ("go play some Zork") |
 
-While the plugin is on these are hers in conversation too: "what's in
+While a game is loaded these are hers in conversation too: "what's in
 the mailbox?", "try going north", "how many points have you got?". The
-tools only exist while it's on.
+tools only exist while it's loaded.
 
 ### Playing on her own
 
-`/zork play` hands her the controls, one move at a time. Whenever
+`/adventure play` hands her the controls, one move at a time. Whenever
 nobody has spoken for `step_seconds` (8) she takes a turn: she reads the
 game screen (her last command and what the game answered), makes **one**
 move, and talks about what she did and why. The next turn she sees what
@@ -140,7 +192,7 @@ that move did before choosing another, the way a person plays. A command
 the game didn't understand ("I don't know the word...") doesn't use up
 her move: nothing happened, so she can say it another way.
 Like Minecraft, a turn is a job: fresh context, nothing in your history,
-only her Zork tools, the screen, her notes, and her last twenty moves
+only that game's tools, the screen, her notes, and her last twenty moves
 with the game's answer to each as her memory of the game. Talking to her
 pauses play until you stop. After `max_steps` (200) moves she pauses and
 says so.
@@ -150,28 +202,31 @@ every job and game), and a turn that runs past `turn_seconds` (150) is
 cut short and the next one starts, so a turn where she thinks in
 circles doesn't stall the game.
 
-The game **autosaves** every five commands and when the plugin stops,
-and picks the autosave back up next time, so a playthrough survives
-restarts. Saves live in `agent/zork/` (gitignored), and dfrotz can't
-read or write anywhere else.
+The game **autosaves** every five commands and when it's put away, and
+picks the autosave back up next time, so a playthrough survives
+restarts. Saves live in `agent/adventures/<game>/` (gitignored), and
+dfrotz can't read or write anywhere else. (Saves from the old `/zork`
+and `/starcross` in `agent/zork/` and `agent/starcross/` move there
+the first time the game is loaded.)
 
 ### Watching her play
 
-`/zork watch` opens a terminal window that shows the game the way a
+`/adventure watch` opens a terminal window that shows the game the way a
 player sees it: her commands in purple after a `>`, the game's replies
-underneath, live. It follows `agent/zork/transcript.txt`, which the
+underneath, live. It follows the game's `transcript.txt`, which the
 server writes as she plays, so closing the window doesn't touch the
 game. It finds kitty, foot, alacritty, wezterm, konsole, gnome-terminal
 or xterm (Terminal.app or kitty on a Mac); `"terminal"` picks one, and
-`"watch": true` opens it every time you `/zork play`. Without Luna:
+`"watch": true` opens it every time you `/adventure play`. Without Luna:
 
 ```bash
-python games/zork/watch.py agent/zork
+python games/zork/watch.py agent/adventures/zork
 ```
 
 ```json
-"zork": {
+"adventure": {
     "enabled": false,
+    "game": "",
     "step_seconds": 8,
     "max_steps": 200,
     "speak": true,
@@ -181,9 +236,10 @@ python games/zork/watch.py agent/zork
 }
 ```
 
-Zork is hard for a small model: it has to map the place in its head,
-remember what it's carrying, and survive the dark. The live view and
-the thought viewer show every command she types, which is half the fun.
+Text adventures are hard for a small model: it has to map the place in
+its head, remember what it's carrying, and survive the dark. The live
+view and the thought viewer show every command she types, which is half
+the fun.
 
 ## Vibe City
 
@@ -531,7 +587,7 @@ first time she plays.
 - It's a normal project too: `/projects` shows it, and in conversation
   she sees it alongside your other projects, so "how's Zork going?" has
   an answer without her checking.
-- `/zork new` marks the old playthrough done and starts a fresh
+- `/adventure new` marks the old playthrough done and starts a fresh
   project. The old one is retired, not deleted: `/projects restore <n>`.
 - In Zork, REALITI and Game Boy games with a reader that knows where
   she is (Pokemon's towns and routes), she also gets back her older
@@ -607,7 +663,7 @@ If that means she finds a walkthrough and wins, she wins. Each game has
 the switch, on by default:
 
 ```json
-"zork": { "web": false }
+"adventure": { "web": false }
 ```
 
 Only the web tools join a game's list. Files, the shell, email and
@@ -615,7 +671,7 @@ your memory stay out of game turns either way.
 
 ## Reading a game back
 
-Every game (Minecraft, Zork, Vibe City, REALITI, chess, Game Boy) writes what she says on each of
+Every game (Minecraft, the text adventures, Vibe City, REALITI, chess, Game Boy) writes what she says on each of
 her turns to a text file, one per game per day:
 
 ```
@@ -624,8 +680,8 @@ agent/playlogs/vibecity-2026-10-11.txt
 ```
 
 Each turn is stamped with its number and the time, followed by her
-narration and her one-line report, as she said them. For Zork her words
-also go into the game's own `agent/zork/transcript.txt`, between the
+narration and her one-line report, as she said them. For a text adventure her words
+also go into the game's own `agent/adventures/<game>/transcript.txt`, between the
 commands and the game's replies, so the watch window and the file show
 the whole playthrough: what she typed, what the game answered, and what
 she made of it. The Game Boy keeps the same kind of record, every press

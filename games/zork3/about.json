@@ -1,0 +1,8 @@
+{
+    "title": "Zork III: The Dungeon Master",
+    "goal": "7 points of potential: prove yourself worthy to the Dungeon Master",
+    "intro": "You're playing Zork III: The Dungeon Master, the end of the Zork trilogy, with your Zork III tools. A dream told you this is the final test, and to seek the old man when you feel worthy. You wake at the bottom of the Endless Stair with your brass lantern. Zork III doesn't count treasure: SCORE shows your potential, 7 at most, and it rises as you prove yourself.",
+    "examples": "'south', 'take lamp', 'turn on lamp'",
+    "feel": "it's lonely and strange down here; the old man is a mystery",
+    "start_at": "Endless Stair"
+}

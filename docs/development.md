@@ -105,7 +105,8 @@ ai-voice/
 │   ├── cron.py       # scheduled jobs - /cron, agent/cron.json
 │   ├── minecraft.py  # she joins your world and plays towards a goal
 │   ├── home.py       # your smart home, through a local Home Assistant
-│   ├── zork.py       # she plays Zork I - /zork, saves in agent/zork/
+│   ├── adventure.py  # her library of text adventures (games/<name>/: Zork, Starcross...) - /adventure
+│   ├── _zgame.py     # what the text adventures share: server, turns, watch window
 │   ├── vibecity.py   # she plays mayor in an open Vibe City window (its AI Player server)
 │   ├── chessgame.py  # chess against her on a board page - /chess
 │   ├── realiti.py    # she lives in a REALITI city of AI agents
@@ -173,7 +174,8 @@ ai-voice/
 ├── reminders/
 │   └── reminders.json
 │
-├── games/zork/       # Zork I (MIT): zork1.z3 and zork_server.py, an MCP server around dfrotz
+├── games/zork/       # Zork I (MIT): zork1.z3, and zork_server.py, the MCP server around dfrotz every text adventure runs on
+├── games/<name>/     # the other text adventures, one story file (and about.json) each: zork2, zork3, starcross, planetfall, hhgg
 ├── tts/              # experimental speech servers, each self-contained
 │   ├── chatterbox/
 │   └── qwen3/

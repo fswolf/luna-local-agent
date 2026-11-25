@@ -108,7 +108,7 @@ credential; that stays in `config.json` with the rest of the behaviour.
 | Page | What's on it |
 |------|--------------|
 | [Stream chat](chat.md) | pomf.tv, Twitch, YouTube and IRC: answering your stream's chat, flood defences, what viewers can reach |
-| [Games](games.md) | Minecraft, Zork, Vibe City, REALITI, chess, Game Boy: playing on her own, her notes, watching her play |
+| [Games](games.md) | Minecraft, the text adventures (`/adventure`), Vibe City, REALITI, chess, Game Boy: playing on her own, her notes, watching her play |
 | [Home and devices](devices.md) | Home Assistant, Lovense, Intiface Central toys |
 | [Asking a bigger model](ask.md) | Claude, Grok and ChatGPT: she asks one a question when you tell her to, or on her own when stuck if you switch that on |
 | [Offline library](library.md) | Kiwix: Wikipedia and other reference books on your own disks, searched and read with no internet |

@@ -32,6 +32,7 @@ import { clothesAsked, clothesActed } from './clothes_talk.js';
 import { createGestures, GESTURES, IDLE, NAMES as GESTURE_NAMES, FAILED as GESTURE_FAILED, KEYWORDS as GESTURE_KEYWORDS } from './gestures.js';
 import { bindFaceLayers, blush, drool, tears, updateBlush, updateBrows, updateTears } from './face_layers.js';
 import { bindDebugPanel, debugPanel } from './debug_panel.js';
+import { fingers } from './gestures/_pose.js';
 
 bindDebugPanel({
   get blink() { return blink; },
@@ -847,16 +848,15 @@ function heldPose(g) {
 // row, and her hands are free (the glow sticks don't count).
 // ---------------------------------------------------------------------------
 const music = { on: false, bpm: 0, beatAt: 0, energetic: false, rave: false, next: 0, run: 0, raved: false, raveTried: false };
-const DANCES = ['dance', 'peace_dance'];
-function musicBeat(now = Date.now() / 1000) {       // 0..1 through the current beat, or -1 with no beat
-  if (!music.on || !music.bpm || !music.beatAt) return -1;
-  const p = 60 / music.bpm, x = ((now - music.beatAt) / p) % 1;
-  return x < 0 ? x + 1 : x;
+const DANCES = ['dance', 'peace_dance'];        // open hands and peace signs: without the glow sticks
+const RAVE_DANCES = ['glowstick_dance'];         // fists round them: with
+function handsFull() {                              // her coffee, book or plushie (the glow sticks don't count)
+  return !!props?.names().some(n => props.held(n) && !props.PROPS[n].free);
 }
 function musicFree() {                              // can she move to it right now?
   if (!music.on || doze.on || mind.hold || mind.stage !== 'idle') return false;
   if (mind.row === 'lewd' || mind.row === 'grudge' || warmthBand() === 'cool') return false;
-  return !props?.names().some(n => props.held(n) && !props.PROPS[n].free);
+  return !handsFull();
 }
 function musicEvent(ev) {
   const was = music.on;
@@ -876,10 +876,6 @@ function musicEvent(ev) {
 // called from idleMoves: dance in runs of a few, with short breaks of bobbing
 function musicDance(now) {
   if (!music.energetic || music.danceOff || !musicFree() || moves.busy() || now < music.next) return false;
-  const name = DANCES[Math.floor(Math.random() * DANCES.length)], g = GESTURES[name];
-  let speed = g?.bpm ? music.bpm / g.bpm : 1;
-  while (speed > 1.35) speed /= 2;
-  while (speed && speed < 0.7) speed *= 2;
   // the rave set: decided once a song, as she starts to dance (60% for rave styles)
   if (!music.raveTried) {
     music.raveTried = true;
@@ -889,17 +885,38 @@ function musicDance(now) {
       propEvent({ name: 'glowstick_pink', on: true });
     }
   }
+  // glow sticks out (hers for this song, or /rave): the dance that's made for them.
+  // propWanted, not props.held: a stick shown a moment ago is still loading.
+  const sticks = propWanted.glowstick_pink, pool = (sticks ? RAVE_DANCES : DANCES).filter(n => GESTURES[n]);
+  if (!pool.length) return false;
+  const name = pool[Math.floor(Math.random() * pool.length)], g = GESTURES[name];
+  let speed = g?.bpm ? music.bpm / g.bpm : 1;
+  while (speed > 1.35) speed /= 2;
+  while (speed && speed < 0.7) speed *= 2;
   if (!gesture(name, false, speed || 1)) return false;
   music.run++;
   const left = (lengthOf(g) || 8) / (speed || 1);
   music.next = now + left + (music.run % 3 === 0 ? rand(6, 14) : rand(0.3, 1.5));   // every few, a breather
   return true;
 }
-// the head nod on the beat while music plays and she isn't dancing
-function musicBob() {
-  if (!musicFree() || moves?.busy()) return 0;
-  const b = musicBeat();
-  return b < 0 ? 0 : 0.035 * Math.pow(1 - b, 3);
+// The head nod on the beat while music plays and she isn't dancing: down on
+// the beat and smoothly back up (a raised cosine), never a jump. How deep it
+// goes eases in and out over a moment (bob.amp), so starting, stopping, or a
+// gesture taking her head doesn't snap it, and what comes out is smoothed once
+// more (bob.v), so even the beat moving under it (a new song's) can't jerk it.
+// Fast songs nod every other beat.
+const BOB = { depth: 0.08, rate: 2.5, follow: 25, halfOver: 140 };
+const bob = { amp: 0, phase: 0, v: 0 };
+function musicBob(dt) {
+  const on = music.on && !music.danceOff && music.bpm > 0 && music.beatAt > 0 && musicFree() && !moves?.busy();
+  if (on) {
+    const per = music.bpm > BOB.halfOver ? 2 : 1;            // beats to a nod
+    const x = ((Date.now() / 1000 - music.beatAt) * music.bpm / 60 / per) % 1;
+    bob.phase = x < 0 ? x + 1 : x;
+  }                                       // (off: it stays where it was and fades, no jump)
+  bob.amp = damp(bob.amp, on ? BOB.depth : 0, BOB.rate, dt);
+  bob.v = damp(bob.v, bob.amp * (0.5 + 0.5 * Math.cos(2 * Math.PI * bob.phase)), BOB.follow, dt);
+  return bob.v;
 }
 
 let noteToken = 0;
@@ -914,6 +931,19 @@ function noteEvent(ev) {
   const token = ++noteToken;                         // a newer note owns the prop from here on
   setTimeout(() => token === noteToken && props.show('note'), (+g.prop_at || 0) * 1000);
   setTimeout(() => token === noteToken && props.hide('note'), (+g.prop_off || g.dur) * 1000);
+}
+
+// A prop with no pickup gesture that's gripped (the glow sticks, grip: how
+// far her fingers curl): her fist closed round it, and its pair's in the other
+// hand, for as long as it's out. A firm hold: dances and waves move her arms
+// but keep her fingers shut, or the stick floats out of an open hand.
+function gripPose(name) {
+  const out = {};
+  for (const n of [name, props.PROPS[name]?.pair]) {
+    const p = props.PROPS[n];
+    if (p?.grip && p.hand) Object.assign(out, fingers(p.hand, +p.grip));
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 // What each prop should be doing now. The pickup shows it and sets her hold
@@ -940,7 +970,13 @@ function propEvent(ev) {
       return;
     }
     const g = GESTURES[p.pickup || ev.name + '_pickup'];
-    if (!g) { props.show(ev.name); if (p.pair) props.show(p.pair); return; }
+    if (!g) {
+      props.show(ev.name);
+      if (p.pair) props.show(p.pair);
+      const grip = gripPose(ev.name);
+      if (grip) moves.hold(grip, true);
+      return;
+    }
     gesture(p.pickup || ev.name + '_pickup');
     setTimeout(still(() => props.show(ev.name)), (+g.prop_at || 0) * 1000);
     setTimeout(still(() => moves.hold(heldPose(g))), Math.max(0, g.dur - (g.fade?.[1] ?? 0.4)) * 1000);
@@ -977,7 +1013,7 @@ function idleMoves(now, talking) {
     return;
   }
   if (!moves || moves.busy()) return;
-  if (moves.holding()) return;     // her hands are full (the mug): she sips instead
+  if (moves.holding() && handsFull()) return;     // her hands are full (the mug): she sips instead (glow sticks: carry on)
   if (mind.stage === 'idle' && now > idle.next) {
     let pick;
     // half the time, something that suits her mood (agent/moods.json "idle"),
@@ -1263,7 +1299,7 @@ function animate() {
                      + doze.v * 0.3 + doze.nod, L.thinking ? 2.5 : 4, dt);
     headRot.z = damp(headRot.z, tilt.v + Math.sin(now * 0.45) * 0.02 + doze.v * 0.14, 3, dt);
     const head = bone('head'), neck = bone('neck');
-    const nod = headRot.x + (music.on && !music.danceOff ? musicBob() : 0);   // a nod on every beat
+    const nod = headRot.x + musicBob(dt);   // a nod on every beat (eases in and out by itself)
     if (head) head.rotation.set(fx * nod * 0.6, headRot.y * 0.6, fx * headRot.z * 0.6);
     if (neck) neck.rotation.set(fx * nod * 0.4, headRot.y * 0.4, fx * headRot.z * 0.4);
 

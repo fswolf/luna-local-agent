@@ -286,7 +286,7 @@ PACKAGES = {
 }
 OPTIONAL_LINUX = {"grim": "screenshots for vision (Wayland)", "slurp": "picking a screen region",
                   "wl-clipboard": "the clipboard tool (Wayland)", "unrar": "importing .rar Live2D models",
-                  "frotz": "playing Zork (its dfrotz interpreter)"}
+                  "frotz": "playing her text adventures, Zork and the rest (their dfrotz interpreter)"}
 # the command that shows an optional package is already there, when it isn't the package's name
 _PROVIDES = {"frotz": "dfrotz", "wl-clipboard": "wl-copy"}
 

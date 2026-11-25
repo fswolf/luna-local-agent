@@ -36,6 +36,10 @@ agent/cron.json
 agent/minecraft.json
 # Zork saves (plugins/zork.py), and any made running the server by hand.
 agent/zork/
+# Starcross saves (plugins/starcross.py)
+agent/starcross/
+# Saves for the rest of her text adventure library (plugins/adventure.py)
+agent/adventures/
 # What she said on each game turn - see docs/plugins.md
 agent/playlogs/
 agent/backups/

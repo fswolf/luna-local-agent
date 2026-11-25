@@ -290,7 +290,7 @@ def prompt_block(query=""):
 # ---------------------------------------------------------------------------
 # Games: one project per game, her memory of the playthrough
 # ---------------------------------------------------------------------------
-GAME_TITLES = {"zork": "Zork playthrough", "vibecity": "Vibe City as mayor",
+GAME_TITLES = {"zork": "Zork playthrough", "starcross": "Starcross playthrough", "vibecity": "Vibe City as mayor",
                "minecraft": "Minecraft world", "realiti": "REALITI visits"}
 
 

@@ -1,0 +1,8 @@
+{
+    "title": "Starcross",
+    "goal": "400 points: reach the artifact the mass detector found, get inside and learn its secrets",
+    "intro": "You're playing Starcross, Infocom's 1982 science fiction text adventure, with your Starcross tools. You're a black hole prospector alone on your ship, the Starcross, and your mass detector has just found something. Reach it, get inside, and work out what it is: 400 points is a perfect score. On the ship the ways are port, starboard and out, as the rooms say. The course to a mass comes from the star chart printed with the game: your notes on Starcross have it.",
+    "examples": "'starboard', 'examine detector', 'take tape'",
+    "feel": "space is huge and strange; a find like this could make your fortune",
+    "start_at": "your bunk"
+}

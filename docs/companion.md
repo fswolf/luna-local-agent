@@ -592,6 +592,7 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 | `explain` | - | 2.4 s | - | - | any |
 | `face_me` | turning back to face you, giving you her attention: the view swings back to her front | turn (0°) | - | - | any |
 | `giggle` | amused, tickled, a little embarrassed: covers her mouth and giggles, shoulders bobbing | 2.4 s | - | tummy | warm, loving, lewd |
+| `glowstick_dance` | raving, hyped, music: dancing with glow sticks, pumping them overhead to the beat | 7.5 s | - | - | any |
 | `hands_on_chest` | - | 4.0 s | - | - | any |
 | `huff` | annoyed, grumpy, offended: arms crossed tight, chin up, looks away with a huff | 3.0 s | - | head, tummy, arms | grudge |
 | `hug` | affectionate, comforting, glad you're here, missing you: arms open, then wraps you in a hug, head on your shoulder | 4.6 s | - | - | any |

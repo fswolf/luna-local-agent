@@ -63,6 +63,7 @@ export const PROPS = {
     at: [-0.055, -0.022, 0],     // through her fist, along the way her thumb points
     turn: [Math.PI / 2, 0, 0],
     scale: 1,
+    grip: 0.95,                  // her fingers closed round it while it's out, whatever she's doing (portrait.js propEvent)
   },
   glowstick_blue: {
     file: 'props/glowstick_blue.glb',
@@ -72,6 +73,7 @@ export const PROPS = {
     at: [-0.055, -0.022, 0],     // through her fist, along the way her thumb points
     turn: [Math.PI / 2, 0, 0],
     scale: 1,
+    grip: 0.95,                  // her fingers closed round it while it's out, whatever she's doing (portrait.js propEvent)
   },
   note: {
     make: 'note',                // a sticky note made in code, the reminder's words on it (noteText)

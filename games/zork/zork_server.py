@@ -1,6 +1,9 @@
-"""Zork as an MCP server: one game of Zork I behind a few tools.
+"""Zork as an MCP server: one game of Zork I behind a few tools. Any other
+Infocom-style Z-machine game works the same way (Luna's Starcross runs on
+it): --story picks the game, --name the tools' prefix, --title its name.
 
     python games/zork/zork_server.py [--story FILE] [--saves DIR] [--interpreter PATH]
+                                     [--name zork] [--title "Zork I"]
 
 Speaks MCP over stdio, so anything that talks MCP can play - Luna's zork
 plugin starts it for her, but Claude Desktop or any other client works
@@ -15,7 +18,7 @@ reply comes back on stdout. Install it with
                     git clone https://gitlab.com/DavidGriffith/frotz
                     cd frotz && make dumb         -> ./dfrotz)
 
-Tools:
+Tools (named for --name: starcross_command...):
     zork_command(command)   type one command, get the game's reply
     zork_status()           look + inventory + score in one call
     zork_save(slot) / zork_restore(slot)
@@ -28,8 +31,8 @@ the saves folder, so you can watch a game as it's played:
 
 The game autosaves every few commands and when the server stops, and
 picks the autosave back up on the next start, so a game survives Luna
-restarting. Saves live in --saves, and dfrotz is restricted to that
-folder (-R): SAVE, RESTORE and SCRIPT can't touch anything else.
+restarting. Saves live in --saves, and dfrotz runs in that folder,
+restricted to it (-R .): SAVE, RESTORE and SCRIPT can't touch anything else.
 
 Zork I is MIT-licensed (Microsoft, 2025) - see LICENSE-zork1.
 """
@@ -52,12 +55,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 AUTOSAVE = "autosave"
 AUTOSAVE_EVERY = 5          # commands
 MAX_COMMAND = 120
+# a game waiting for a keypress, not a command: the last thing it said
+PRESS_ON = re.compile(r"\b(?:hit|press)\s+(?:return|enter|any\s+key)\b[^\n]*$", re.IGNORECASE)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--story", default=os.path.join(HERE, "zork1.z3"))
 ap.add_argument("--saves", default=os.path.join(HERE, "saves"))
 ap.add_argument("--interpreter", default="")
+ap.add_argument("--name", default="zork")          # the tools' prefix: zork_command
+ap.add_argument("--title", default="Zork I")       # what the tools call the game
 ARGS, _ = ap.parse_known_args()
+P = "".join(c for c in ARGS.name.lower() if c.isalnum() or c == "_") or "zork"
+TITLE = ARGS.title
 
 
 def transcript(text):
@@ -109,8 +118,13 @@ class Game:
         # marker (and anything it said last) would otherwise be read as
         # this one's intro, and every reply after it lands one late.
         self.out = queue.Queue()
+        # -R . rather than -R <the saves folder>: it's the same folder (cwd),
+        # and dfrotz 2.54 mangles save names that are between half and the
+        # whole length of the -R path (autosave.qzl -> "auto", and
+        # old-20261028-1530 -> "old-20261" under agent/zork). With "." every
+        # name is kept whole, and ../ or a full path still lands in here.
         self.proc = subprocess.Popen(
-            [dfrotz, "-m", "-p", "-q", "-w", "200", "-R", ARGS.saves, ARGS.story],
+            [dfrotz, "-m", "-p", "-q", "-w", "200", "-R", ".", ARGS.story],
             cwd=ARGS.saves, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, bufsize=0)
         threading.Thread(target=self._pump, args=(self.proc, self.out), daemon=True).start()
@@ -183,10 +197,24 @@ class Game:
             self.proc.stdin.write(b"\n")       # take the default, inside -R
             self.proc.stdin.flush()
             text += self._read()
+        # "Hit RETURN when ready" (The Hitchhiker's Guide's SCORE): the game
+        # waits for a key, and would eat her next command as it. Press it.
+        for _ in range(3):
+            if not PRESS_ON.search(text[-300:]):
+                break
+            self.proc.stdin.write(b"\n")
+            self.proc.stdin.flush()
+            text += "\n" + self._read()
         return text
 
     def _path(self, slot):
         return os.path.join(ARGS.saves, f"{slot}.qzl")
+
+    @staticmethod
+    def _typed(slot):
+        """What's typed at the filename prompt: the bare name, which dfrotz
+        (run in the saves folder, -R .) keeps in there."""
+        return (f"{slot}.qzl\n").encode()
 
     def _save(self, slot):
         self.proc.stdin.write(b"save\n")
@@ -195,7 +223,7 @@ class Game:
         if re.search(r":\s*$", text):
             if os.path.exists(self._path(slot)):
                 os.remove(self._path(slot))    # no "overwrite?" question
-            self.proc.stdin.write((self._path(slot) + "\n").encode())
+            self.proc.stdin.write(self._typed(slot))
             self.proc.stdin.flush()
             text += self._read()
         self.since_save = 0
@@ -206,7 +234,7 @@ class Game:
         self.proc.stdin.flush()
         text = self._read()
         if re.search(r":\s*$", text):
-            self.proc.stdin.write((self._path(slot) + "\n").encode())
+            self.proc.stdin.write(self._typed(slot))
             self.proc.stdin.flush()
             text += self._read()
         return text
@@ -217,7 +245,7 @@ class Game:
 
 
 game = Game()
-mcp = FastMCP("zork")
+mcp = FastMCP(P)
 
 
 def clean(text):
@@ -235,12 +263,7 @@ def _slot(name):
     return name or "slot1"
 
 
-@mcp.tool()
 def zork_command(command: str) -> str:
-    """Type one command into Zork, the way a player would: 'look', 'north',
-    'open mailbox', 'take lamp', 'inventory', 'turn on lamp', 'attack troll
-    with sword'. Short verb-noun commands work best. Returns what the game
-    says back."""
     command = " ".join(str(command or "").split())[:MAX_COMMAND].lstrip("\\")
     if not command:
         return "No command given."
@@ -256,14 +279,11 @@ def zork_command(command: str) -> str:
 
     transcript(f"> {command}\n{clean(reply)}")
     hint = ("\n[The game is over or you died. RESTORE goes back to the last save "
-            "(zork_restore), RESTART starts again.]" if game.over else "")
+            f"({P}_restore), RESTART starts again.]" if game.over else "")
     return clean(reply) + hint
 
 
-@mcp.tool()
 def zork_status() -> str:
-    """Where you are, what you're carrying, and the score, in one call
-    (LOOK, INVENTORY and SCORE). Use it when you've lost track."""
     with game.lock:
         game.ensure()
         look = clean(game._send("look"))
@@ -274,18 +294,14 @@ def zork_status() -> str:
     return text
 
 
-@mcp.tool()
 def zork_save(slot: str = "slot1") -> str:
-    """Save the game to a named slot before something risky."""
     with game.lock:
         game.ensure()
         transcript(f"[saved to {_slot(slot)}]")
         return clean(game._save(_slot(slot)))
 
 
-@mcp.tool()
 def zork_restore(slot: str = AUTOSAVE) -> str:
-    """Go back to a saved game. 'autosave' is the one kept every few moves."""
     slot = _slot(slot)
     with game.lock:
         game.ensure()
@@ -299,15 +315,27 @@ def zork_restore(slot: str = AUTOSAVE) -> str:
         return text
 
 
-@mcp.tool()
 def zork_restart() -> str:
-    """Start a brand new game from the beginning (the autosave is dropped)."""
     with game.lock:
         game.stop()
         if os.path.exists(game._path(AUTOSAVE)):
             os.remove(game._path(AUTOSAVE))
         game.over = False
         return clean(game.start())
+
+
+# Registered under the game's own names (starcross_command for Starcross),
+# described for the game they're playing.
+for _fn, _about in (
+        (zork_command, f"Type one command into {TITLE}, the way a player would: 'look', 'north', "
+                       "'open door', 'take it', 'inventory'. Short verb-noun commands work best. "
+                       "Returns what the game says back."),
+        (zork_status, f"Where you are in {TITLE}, what you're carrying, and the score, in one call "
+                      "(LOOK, INVENTORY and SCORE). Use it when you've lost track."),
+        (zork_save, f"Save {TITLE} to a named slot before something risky."),
+        (zork_restore, f"Go back to a saved game of {TITLE}. 'autosave' is the one kept every few moves."),
+        (zork_restart, f"Start a brand new game of {TITLE} from the beginning (the autosave is dropped).")):
+    mcp.tool(name=P + _fn.__name__[len("zork"):], description=_about)(_fn)
 
 
 if __name__ == "__main__":

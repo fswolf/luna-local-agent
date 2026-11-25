@@ -76,7 +76,7 @@ What she does:
 - **Learns from herself:** daily lessons from her own mistakes, notes on every conversation, fact cleanup, saying so when she's unsure ([details](docs/learning.md#learning-from-herself))
 - **Patches (experimental):** keep the replies you like with `/good`, or correct one with `/fix`, then train a small patch (a LoRA) for her model that teaches her those habits. Her model server loads only the patches made for the model it's running. Linux and AMD cards for now, and not yet tried on a real training run ([details](docs/patches.md))
 - **Streams with you:** answers pomf.tv, Twitch, YouTube and IRC chat out loud ([details](docs/chat.md))
-- **Plays games:** chess against you on a board you drag the pieces around on, and Minecraft, Zork, Vibe City, REALITI and Game Boy games you own (Pokemon Red and Blue and The Final Fantasy Legend come to her as text too) on her own when you go quiet; she remembers how she felt about them ([details](docs/games.md))
+- **Plays games:** chess against you on a board you drag the pieces around on, and Minecraft, Zork I to III, Starcross, Planetfall, The Hitchhiker's Guide, Vibe City, REALITI and Game Boy games you own (Pokemon Red and Blue and The Final Fantasy Legend come to her as text too) on her own when you go quiet; she remembers how she felt about them ([details](docs/games.md))
 - **Runs your home:** lights, plugs, sensors and the thermostat through Home Assistant on your own network; locks and garage doors always ask first ([details](docs/home.md))
 - **Adult toys (18+):** Lovense, and most other brands through Intiface Central (Buttplug.io), so she can use them in a roleplay, with limits you set ([details](docs/devices.md#lovense))
 - **From your phone:** Discord, with approvals answered right in the chat, and scheduled jobs ([details](docs/sysadmin.md))
@@ -307,7 +307,7 @@ The installer asks before anything that touches your system, and can be run agai
 - [Sysadmin](docs/sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
 - [Plugins](docs/plugins.md): how they work, writing your own, scheduled jobs and Discord
 - [Stream chat](docs/chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
-- [Games](docs/games.md): chess, Minecraft, Zork, Vibe City, REALITI, Game Boy, playing on her own
+- [Games](docs/games.md): chess, Minecraft, her text adventure library, Vibe City, REALITI, Game Boy, playing on her own
 - [Home and devices](docs/devices.md): Home Assistant, Lovense, toys of most brands through Intiface Central
 - [Development](docs/development.md): project structure, extras
 
@@ -344,8 +344,11 @@ same license.
 Versions released before November 20, 2026 were under the MIT License, and
 they stay that way.
 
-Third-party parts keep their own licenses: Zork I in `games/zork/` is MIT
-(see `games/zork/LICENSE-zork1`), the bundled three.js, three-vrm, pixi.js
+Third-party parts keep their own licenses: Zork I, II and III in
+`games/zork/`, `games/zork2/` and `games/zork3/` are MIT (see the
+`LICENSE-zork` file beside each), Starcross, Planetfall and The
+Hitchhiker's Guide to the Galaxy in `games/` are Infocom's games (the
+rights are Microsoft's now, through Activision) and come out on request, the bundled three.js, three-vrm, pixi.js
 and pixi-live2d-display in `portrait/viewer/vendor/` are MIT, and the models
 and Live2D's Cubism Core that she downloads come under their publishers'
 licenses.

@@ -140,7 +140,7 @@ Slash commands:
 | `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>`, `wrong <note>`, `unplan <n>` |
 | `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder, what's in her hands, clothes that are off) |
 | `/outfit` | Her clothes on a human model: `dressed`, `underwear`, `off <piece>`, `on <piece>`; alone, what she's wearing |
-| `/rave` | The rave set: a pacifier and a glow stick in each hand (pink and blue). `on`, `off`, or alone to swap. The sticks swing with her hands, dances included |
+| `/rave` | The rave set: a pacifier and a glow stick in each hand (pink and blue). `on`, `off`, or alone to swap. Her fists stay closed round the sticks whatever she's doing, and music gets the glow stick dance |
 | `/blanket` | A blanket round her shoulders: `on`, `off`, or alone to swap. It's rigged, so it moves with her arms, and it fits the human and robot models |
 | `/portrait sounds` | The sounds some gestures make: `on`, `off`, or a volume like `50%` |
 | `/portrait clothes <mode>` | How the conversation changes her clothes: `gestures` (follow the gesture setting), `tags`, `keywords`, `off` |
@@ -157,7 +157,7 @@ Slash commands:
 | `/plugins` | What's installed, then `/<name> on`, `off`, or status |
 | `/allow` | Whether file changes are asking; `/allow off` ends a session allow-all |
 | `/minecraft ...` | `on`, `off`, `goal <what>`, `pause`, `resume`: see [Games](games.md#minecraft) |
-| `/zork ...` | `on`, `off`, `play`, `pause`: she plays Zork I, see [Games](games.md#zork) |
+| `/adventure ...` | `games`, `game <name>`, `on`, `off`, `play`, `pause`: her library of text adventures (Zork, Starcross...) in `games/`, see [Games](games.md#text-adventures) |
 | `/vibecity ...` | `on`, `off`, `play`, `pause`, `goal <what>`: she plays mayor in your open Vibe City window, see [Games](games.md#vibe-city) |
 | `/ask ...` | `on`, `off`, `use claude`, `auto on`/`off`, or a question: asking a bigger model, see [Asking a bigger model](ask.md) |
 | `/home ...` | `on`, `off`, `refresh`: your smart home through Home Assistant, see [Home automation](home.md) |

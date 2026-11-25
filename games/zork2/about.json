@@ -1,0 +1,8 @@
+{
+    "title": "Zork II: The Wizard of Frobozz",
+    "goal": "400 points: the treasures below, and the secret of the Wizard of Frobozz",
+    "intro": "You're playing Zork II: The Wizard of Frobozz, the sequel to Zork I, with your Zork II tools. You start inside a barrow with an Elvish sword and a brass lantern on the ground. 400 points is a perfect score. Explore, pick up anything useful, read what you find, and keep your light on underground. The Wizard of Frobozz lives down here.",
+    "examples": "'south', 'take lamp', 'turn on lamp'",
+    "feel": "the Wizard is unsettling; treasure is exciting",
+    "start_at": "Inside the Barrow"
+}

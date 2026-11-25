@@ -148,6 +148,7 @@ export function createGestures(THREE, vrm, view = () => 0) {
   const qt = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0);
   let exprNow = {};
   let held = null;      // a pose she keeps between gestures (holding her mug): hold()
+  let firm = null;      // ...and the part of it no gesture undoes (her fists round the glow sticks)
 
   // the tail: spring bones, so it can't be posed; it wags by swinging
   // the gravity its joints feel from side to side
@@ -268,8 +269,10 @@ export function createGestures(THREE, vrm, view = () => 0) {
     wag(level, sweep = 1) { wag.target = level; wag.sweep = sweep; },
     // A pose that replaces the rest pose for the bones it names, until
     // hold(null): her arm stays round the mug between sips. Gestures still
-    // play over it and come back to it.
-    hold(pose) { held = pose || null; },
+    // play over it and come back to it. firm: it stays on top of them too
+    // (her fingers closed round the glow sticks while she dances and waves,
+    // or the sticks float out of an open hand).
+    hold(pose, isFirm = false) { held = pose || null; firm = held && isFirm ? held : null; },
     holding() { return held; },
 
     // The natural rest pose; called every frame before update(), so a
@@ -400,6 +403,15 @@ export function createGestures(THREE, vrm, view = () => 0) {
         touched.add(name.slice(1));
         euler(v[0] * k, v[1] * k, v[2] * k);
         b.quaternion.multiply(qa.setFromEuler(e));
+      }
+
+      // a firm hold, last: whatever the gestures did to those bones
+      if (firm) for (const [n, v] of Object.entries(firm)) {
+        const b = n === 'hips' || n.startsWith('+') ? null : bone(n);
+        if (!b) continue;
+        euler(v[0], v[1], v[2]);
+        b.quaternion.setFromEuler(e);
+        if (v.length > 3) b.quaternion.multiply(qt.setFromAxisAngle(X, fx * v[3]));
       }
 
       for (let i = active.length - 1; i >= 0; i--) if (active[i].gone) active.splice(i, 1);

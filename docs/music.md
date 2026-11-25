@@ -4,7 +4,8 @@ Play a song and Luna can hear what kind it is and where its beat falls. She
 can talk about it ("ooh, dub techno"), dance to energetic music on her
 portrait in time with it, bob her head to calm songs, and sometimes bring
 out her rave set (pacifier and glow sticks) for rave styles. The glow sticks
-pulse on the beat.
+pulse on the beat, and with them out she dances the glow stick dance, made
+for them.
 
 Optional and off by default. The listening runs as a small service on her
 server (or the same PC), the way her model server does. Her desktop only
@@ -30,8 +31,8 @@ The clip is sent once and thrown away. Nothing leaves your network.
 | She hears | She does |
 |---|---|
 | Energetic music (fast, or a rave style) | Dances when she's idle and in the mood, matched to the song's tempo, with short breaks where she just nods on the beat |
-| Rave styles (techno, house, trance, dubstep, DnB, hardstyle, trap...) | Sometimes puts on her rave set; it comes off when the music stops |
-| A calm song | Nods her head on the beat |
+| Rave styles (techno, house, trance, dubstep, DnB, hardstyle, trap...) | Sometimes puts on her rave set; it comes off when the music stops. While the glow sticks are out (hers or `/rave`), she dances `glowstick_dance`: fists pumping, sticks up and swaying overhead, arms crossing and flung wide |
+| A calm song | Nods her head on the beat, a smooth nod that eases in and out (every other beat on songs over 140 bpm) |
 | Talking (a vlog, a podcast) | Nothing: it isn't music |
 
 She doesn't dance while you're talking to her, while she's asleep or holding

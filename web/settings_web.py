@@ -83,7 +83,7 @@ PICKERS = {
     "knowledge.folders": ("folder", ()),
     "files.job_write_dirs": ("folder", ()),
     "alarms.tone": ("file", (".wav",)),
-    "plugins.zork.interpreter": ("file", ()),
+    "plugins.adventure.interpreter": ("file", ()),
     "plugins.gameboy.rom": ("file", (".gb", ".gbc")),
     "plugins.gameboy.roms": ("folder", ()),
     "plugins.gameboy.saves": ("folder", ()),

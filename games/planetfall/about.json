@@ -1,0 +1,8 @@
+{
+    "title": "Planetfall",
+    "goal": "80 points: make it through what's coming, and find a way home",
+    "intro": "You're playing Planetfall, Infocom's 1983 science fiction comedy, with your Planetfall tools. You're a lowly Ensign Seventh Class in the Stellar Patrol, scrubbing decks aboard the Feinstein, and the title says where this is going. 80 points is a perfect score. On a ship the ways are port, starboard, fore, aft, up and down, as the rooms say. The game keeps time (the status line shows it, not your moves): you get tired and hungry, so check DIAGNOSE now and then.",
+    "examples": "'starboard', 'examine card', 'diagnose'",
+    "feel": "the Patrol is a grind and Blather is awful; anything could happen out here",
+    "start_at": "Deck Nine"
+}

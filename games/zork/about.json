@@ -1,0 +1,8 @@
+{
+    "title": "Zork I",
+    "goal": "350 points: every treasure in the trophy case",
+    "intro": "You're playing Zork I, the classic text adventure, with your Zork tools. The goal is treasure and points: 350 is a perfect score. Explore, pick up anything useful, read what you find, and keep a light source once you go underground - the dark has a grue in it.",
+    "examples": "'north', 'open mailbox', 'take lamp'",
+    "feel": "grues are scary; treasure is exciting",
+    "start_at": "West of House"
+}

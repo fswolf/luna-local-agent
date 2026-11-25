@@ -1,6 +1,6 @@
-"""Watch Luna play Zork: the game's screen, live, in a terminal.
+"""Watch Luna play Zork (or Starcross): the game's screen, live, in a terminal.
 
-    python games/zork/watch.py [saves folder]      (default: agent/zork)
+    python games/zork/watch.py [saves folder] [title]   (default: agent/zork, "Luna plays Zork")
 
 Follows transcript.txt as zork_server.py writes it and tidies it for
 reading: the game's status line (room, score, moves) becomes one short
@@ -19,12 +19,14 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 SAVES = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "..", "agent", "zork")
 PATH = os.path.join(SAVES, "transcript.txt")
+TITLE = sys.argv[2] if len(sys.argv) > 2 else "Luna plays Zork"
 
 PURPLE, PINK, DIM, BOLD, ITALIC, RESET = ("\033[38;5;183m", "\033[38;5;218m", "\033[2m",
                                           "\033[1m", "\033[3m", "\033[0m")
 
-# dfrotz's status line: the room on the left, score and moves far right
-STATUS = re.compile(r"^\s*(\S.*?)\s{2,}Score:\s*(-?\d+)\s+Moves:\s*(\d+)\s*$")
+# dfrotz's status line: the room on the left, score and moves (or a game's
+# clock: Planetfall's Time) far right
+STATUS = re.compile(r"^\s*(\S.*?)\s{2,}Score:\s*(-?\d+)\s+(Moves|Turns|Time):\s*(\d+)\s*$")
 SPEAKER = re.compile(r"^\[([A-Za-z][\w .'-]{0,30})\]\s?(.*)$")
 
 _state = {"blank": True, "speaking": False}
@@ -63,8 +65,8 @@ def show(raw):
     speaker = SPEAKER.match(line)
 
     if status:
-        room, score, moves = status.groups()
-        label = f" {room}  ·  score {score}  ·  move {moves} "
+        room, score, kind, n = status.groups()
+        label = f" {room}  ·  score {score}  ·  {'time' if kind == 'Time' else 'move'} {n} "
         out(f"{DIM}{'─' * 2}{RESET}{BOLD}{label}{RESET}{DIM}{'─' * max(2, width() - len(label) - 2)}{RESET}")
     elif line.startswith("> "):
         _state["speaking"] = False
@@ -87,7 +89,7 @@ def show(raw):
 
 
 def main():
-    sys.stdout.write(f"\033]0;Luna plays Zork\007{DIM}Luna plays Zork - watching {PATH}\n"
+    sys.stdout.write(f"\033]0;{TITLE}\007{DIM}{TITLE} - watching {PATH}\n"
                      f"Ctrl+C closes this window; the game keeps going.{RESET}\n\n")
 
     while not os.path.exists(PATH):

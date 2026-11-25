@@ -335,7 +335,7 @@ class Browse(unittest.TestCase):
             self.assertIn(kind, ("file", "folder"), path)
 
     def test_any_file_when_no_kinds_are_named(self):
-        out = settings_web.browse("plugins.zork.interpreter", self.dir)
+        out = settings_web.browse("plugins.adventure.interpreter", self.dir)
         self.assertEqual(len(out["files"]), 3)
 
     def test_needs_the_key(self):

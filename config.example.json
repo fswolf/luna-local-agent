@@ -159,8 +159,9 @@
             "max_steps": 60,
             "speak": true
         },
-        "zork": {
+        "adventure": {
             "enabled": false,
+            "game": "",
             "step_seconds": 10,
             "max_steps": 200,
             "speak": true,

@@ -156,11 +156,15 @@ class OlderNotesAboutHere(unittest.TestCase):
 
 class ZorkRoom(unittest.TestCase):
     def test_the_room_comes_from_the_status_line(self):
-        from plugins import zork
+        from plugins import _zgame
         screen = ("> north\nNorth of House   Score: 0   Moves: 3\n\nYou are facing the north side.\n"
                   "> east\nBehind House   Score: 0   Moves: 4\n\nA window is slightly ajar.")
-        self.assertEqual(zork._room(screen), "Behind House")
-        self.assertEqual(zork._room("(nothing yet - a new game)"), "")
+        self.assertEqual(_zgame.room(screen), "Behind House")
+        self.assertEqual(_zgame.room("(nothing yet - a new game)"), "")
+
+    def test_a_game_with_a_clock_too(self):
+        from plugins import _zgame          # Planetfall: Score and Time, not Moves
+        self.assertEqual(_zgame.room("> port\nDeck Nine   Score: 0   Time: 4498\n\nA corridor."), "Deck Nine")
 
 
 class MinecraftGuide(unittest.TestCase):
