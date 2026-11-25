@@ -7,7 +7,7 @@ and anything else that publishes iCal.
                                 #   your calendar -> Integrate calendar); a password, kept masked
         "ics": [],              # any other iCal links or files: a holidays feed, a shared
                                 #   family calendar, ~/cal/work.ics...
-        "calcurse": false,      # read calcurse on this PC (calcurse -x ical)
+        "calcurse": false,      # read calcurse on this PC (calcurse --export=ical)
         "refresh_minutes": 30   # how often they're read again, while she's in use
     }
 
@@ -140,15 +140,18 @@ def _fetch_calcurse():
     exe = shutil.which("calcurse")
     if not exe:
         raise FileNotFoundError("calcurse isn't installed (or isn't on the PATH)")
-    last = ""
-    for args in (["--read-only", "-x", "ical"], ["-x", "ical"]):     # older calcurse has no --read-only
+    first = ""
+    # --export=ical, not "-x ical": -x's format is an optional argument, so a
+    # separate word is read as something else and calcurse refuses the lot
+    # ("invalid argument combination"). Older calcurse has no --read-only.
+    for args in (["--read-only", "--export=ical"], ["--export=ical"]):
         r = subprocess.run([exe, *args], capture_output=True, text=True, timeout=TIMEOUT,
                            stdin=subprocess.DEVNULL)
         if r.returncode == 0 and "BEGIN:VCALENDAR" in r.stdout:
             return r.stdout
-        last = (r.stderr or r.stdout or f"exit {r.returncode}").strip().splitlines()[-1:] or [""]
-        last = last[0]
-    raise RuntimeError(f"calcurse said: {last[:200]}")
+        said = (r.stderr or r.stdout or f"exit {r.returncode}").strip().splitlines()
+        first = first or (said[-1] if said else "")
+    raise RuntimeError(f"calcurse said: {first[:200]}")
 
 
 def _parse(text):

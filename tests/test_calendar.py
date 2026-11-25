@@ -122,7 +122,7 @@ class Reading(Base):
                 mock.patch.object(calendars.subprocess, "run", side_effect=run):
             found = calendars.events(NOW, NOW + timedelta(days=1), wait=True)
         self.assertEqual(self.titles(found), ["Standup"])
-        self.assertEqual(runs, [["--read-only", "-x", "ical"], ["-x", "ical"]])
+        self.assertEqual(runs, [["--read-only", "--export=ical"], ["--export=ical"]])
 
     def test_read_again_only_when_asked_and_at_most_every_half_hour(self):
         self.ics("c.ics", calendar("C"))
@@ -323,6 +323,24 @@ class Edges(Base):
         with mock.patch("requests.get", return_value=Reply()):
             found = calendars.events(NOW, NOW + timedelta(days=1), wait=True)
         self.assertEqual(self.titles(found), ["Café ☕"])
+
+
+@unittest.skipUnless(HAVE and shutil.which("calcurse"), "calcurse isn't installed here")
+class RealCalcurse(Base):
+    """The real calcurse, on a data folder of its own: the arguments it takes."""
+
+    def test_reads_an_appointment(self):
+        data = os.path.join(self.dir, "data", "calcurse")
+        os.makedirs(data)
+        at = NOW + timedelta(hours=3)
+        with open(os.path.join(data, "apts"), "w") as f:
+            f.write(f"{at:%m/%d/%Y @ %H:%M} -> {(at + timedelta(hours=1)):%m/%d/%Y @ %H:%M} |Dentist\n")
+        self.conf["calcurse"] = True
+        with mock.patch.dict(os.environ, {"HOME": self.dir, "XDG_DATA_HOME": os.path.join(self.dir, "data"),
+                                          "XDG_CONFIG_HOME": os.path.join(self.dir, "config")}):
+            found = calendars.events(NOW, NOW + timedelta(days=1), wait=True)
+        self.assertEqual(calendars.errors(), [])
+        self.assertEqual([(e["title"], e["start"]) for e in found], [("Dentist", at)])
 
 
 if __name__ == "__main__":

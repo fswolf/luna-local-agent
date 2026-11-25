@@ -28,7 +28,7 @@ and never appears in her logs or status lines. If it ever leaks, Google's
 **Reset** button next to it makes a new one.
 
 **calcurse.** Set `calendar.calcurse` to `true`. She reads it with
-`calcurse --read-only -x ical`, so whatever you add in calcurse shows up
+`calcurse --read-only --export=ical`, so whatever you add in calcurse shows up
 for her on the next read.
 
 **Anything else.** `calendar.ics` takes a list of iCal links or `.ics`
