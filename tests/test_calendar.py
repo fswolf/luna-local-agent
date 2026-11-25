@@ -223,6 +223,8 @@ class Tool(Base):
         import tools
         self.assertEqual(tools.group_of("calendar"), "Time")
         self.assertEqual(tools.group_of("ask_memory"), "Memory")
+        for name in ("note_lesson", "save_skill"):       # "remember how you did that" always has its tool
+            self.assertEqual(tools.group_of(name), "Memory")
 
     def test_owner_only_in_the_situation(self):
         from mind import situation

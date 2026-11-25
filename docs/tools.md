@@ -52,6 +52,7 @@ blurred here). Click a long one to read all of it.
 | `self_status` | How she's doing, measured: model, context, mood, today's confidence and flags, what she's learned |
 | `recall_episodes` | Search her own notes on past conversations |
 | `note_lesson` | Write down a lesson about her own behaviour: **you approve it on screen** |
+| `save_skill` | Save how she just did a multi-step job as a recipe ("remember how you did that"): **you approve it on screen** |
 | `reflect_now` | Run her reflection pass now instead of waiting for the daily one |
 
 `calculate` parses the sum rather than running it, so only numbers,
@@ -61,8 +62,11 @@ without it the math still works and a conversion says pint is missing
 instead of guessing. Something like grams to cups of flour is refused:
 that needs the ingredient's density.
 
-The last five are the *Self* group: see [Her reasoning](reasoning.md#her-reasoning)
-and [Learning from herself](learning.md#learning-from-herself). None of them are
+`introspect`, `self_status`, `recall_episodes` and `reflect_now` are the
+*Self* group; `note_lesson` and `save_skill` are in Memory, so they always
+go along ("remember how you did that" is a memory request). See
+[Her reasoning](reasoning.md#her-reasoning) and
+[Learning from herself](learning.md#learning-from-herself). None of them are
 offered to stream chat.
 
 ## Routing: she picks per turn

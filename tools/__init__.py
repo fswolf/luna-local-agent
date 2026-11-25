@@ -177,8 +177,13 @@ _GROUPS = (
     ("Math", ("calculate",)),
     ("Reminders", ("set_reminder", "set_alarm", "set_task", "list_reminders",
                    "cancel_reminder")),
+    # note_lesson and save_skill are here, not in Self: "remember how you did
+    # that" is a memory request, and Memory always travels. Routed with Self,
+    # a "remember how" turn was sent Memory and Shell instead, and she faked
+    # saving the recipe with an echo through run_command.
     ("Memory", ("remember_fact", "recall_facts", "forget_fact",
-                "update_fact", "confirm_fact", "ask_memory", "search_history", "meet_guest", "stop_offering")),
+                "update_fact", "confirm_fact", "ask_memory", "search_history", "meet_guest", "stop_offering",
+                "note_lesson", "save_skill")),
     ("Files", ("list_files", "read_file", "write_file", "edit_file")),
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",
                  "focus_window")),
@@ -190,8 +195,7 @@ _GROUPS = (
     ("Email", ("check_email", "read_email", "search_email", "mark_email", "send_email")),
     ("Knowledge", ("search_docs",)),
     ("Textures", ("make_texture",)),
-    ("Self", ("introspect", "self_status", "recall_episodes", "note_lesson",
-              "reflect_now", "save_skill")),
+    ("Self", ("introspect", "self_status", "recall_episodes", "reflect_now")),
     ("Projects", ("start_project", "update_project", "project_notes")),
     ("Games", ("game_note",)),
     ("Help", ("read_manual",)),
