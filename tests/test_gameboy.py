@@ -505,5 +505,61 @@ class Emulator(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(d, "saves", "autosave.state")))
 
 
+class Folders(unittest.TestCase):
+    """Your ROMs and her saves live beside the emulator: games/gameboy/roms and
+    games/gameboy/saves, gitignored. The old default saves move there once."""
+
+    def setUp(self):
+        from plugins import gameboy
+
+        self.g = gameboy
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir)
+        self.roms, self.saves = os.path.join(self.dir, "roms"), os.path.join(self.dir, "saves")
+        self.old = os.path.join(self.dir, "old")
+        os.makedirs(self.roms)
+        for name, value in (("ROMS", self.roms), ("SAVES", self.saves), ("OLD_SAVES", self.old), ("_moved", [])):
+            p = mock.patch.object(gameboy, name, value)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def use(self, **values):
+        return mock.patch.object(self.g, "settings", return_value=dict(self.g.DEFAULTS, **values))
+
+    def test_the_rom_folder_by_default(self):
+        fake_rom(os.path.join(self.roms, "Pokemon-Red.gb"))
+        with self.use():
+            self.assertEqual(self.g._roms_folder(), self.roms)
+            self.assertIn("1. Pokemon-Red.gb", self.g.command("games"))
+        gone = os.path.join(self.dir, "moved-away", "red.gb")         # a game picked by a path that's gone
+        with self.use(rom=gone):
+            self.assertEqual(self.g._roms_folder(), self.roms)
+        with self.use(roms=self.dir):                                 # yours, when you set one
+            self.assertEqual(self.g._roms_folder(), self.dir)
+
+    def test_saves_beside_the_emulator_and_the_old_ones_move_once(self):
+        rom = fake_rom(os.path.join(self.roms, "Pokemon-Red.gb"))
+        os.makedirs(os.path.join(self.old, "Pokemon-Red"))
+        open(os.path.join(self.old, "Pokemon-Red", "autosave.state"), "wb").close()
+        with self.use(rom=rom):
+            self.assertEqual(self.g._saves(), os.path.join(self.saves, "Pokemon-Red"))
+        self.assertTrue(os.path.isfile(os.path.join(self.saves, "Pokemon-Red", "autosave.state")))
+        self.assertFalse(os.path.exists(self.old))
+
+    def test_saves_already_there_are_kept_and_set_ones_are_left_alone(self):
+        rom = fake_rom(os.path.join(self.roms, "red.gb"))
+        os.makedirs(os.path.join(self.old, "red"))
+        os.makedirs(os.path.join(self.saves, "red"))
+        with self.use(rom=rom):
+            self.g._saves()
+        self.assertTrue(os.path.isdir(os.path.join(self.old, "red")))     # not over saves already there
+        self.g._moved.clear()
+        shutil.rmtree(self.saves)
+        mine = os.path.join(self.dir, "mine")
+        with self.use(rom=rom, saves=mine):
+            self.assertEqual(self.g._saves(), os.path.join(mine, "red"))
+        self.assertTrue(os.path.isdir(self.old))                          # "saves" set: nothing moved
+
+
 if __name__ == "__main__":
     unittest.main()

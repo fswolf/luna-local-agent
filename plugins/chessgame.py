@@ -30,7 +30,7 @@ Moving by voice: tell her ("knight to f3", "e4", "castle kingside") and
 she plays it for you with chess_user_move. /chess e4 does the same
 without her.
 
-A finished game is written to agent/chess/games/ as a PGN file, which
+A finished game is written to agent/games/chess/games/ as a PGN file, which
 any chess program (or lichess's analysis board) opens.
 
 Needs python-chess (pip install chess) and the live monitor
@@ -69,7 +69,7 @@ SUMMARY = "play chess against her on a board you can drag pieces on"
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(HERE, "games", "chess", "board.html")
-SAVES = os.path.join(HERE, "agent", "chess")
+SAVES = os.path.join(HERE, "agent", "games", "chess")      # (agent/chess/ before: plugins/_game.py tidy moves it)
 GAME_FILE = os.path.join(SAVES, "game.json")
 
 DEFAULTS = {"side": "white", "speak": True, "open": True, "think_seconds": 1.5, "turn_seconds": 90}

@@ -106,7 +106,7 @@ and any other Infocom or Z-machine game you add (`.z3`, `.z5`, `.z8`).
 A game is a folder in `games/` with one story file in it
 (`games/zork/zork1.z3`), and the folder's name is its name everywhere:
 her tools (`zork_command`, `zork_status`...), her saves
-(`agent/adventures/zork/`), her notes (`agent/knowledge/zork/`) and its
+(`agent/games/zork/`), her notes (`agent/knowledge/zork/`) and its
 project. Drop a folder in and it's in the library. She plays one game at
 a time: starting one pauses any other.
 
@@ -204,10 +204,12 @@ circles doesn't stall the game.
 
 The game **autosaves** every five commands and when it's put away, and
 picks the autosave back up next time, so a playthrough survives
-restarts. Saves live in `agent/adventures/<game>/` (gitignored), and
-dfrotz can't read or write anywhere else. (Saves from the old `/zork`
-and `/starcross` in `agent/zork/` and `agent/starcross/` move there
-the first time the game is loaded.)
+restarts. Saves live in `agent/games/<game>/` (gitignored), and dfrotz
+can't read or write anywhere else. Every game's saves are in
+`agent/games/`, chess included. (Folders from before it, `agent/zork/`,
+`agent/starcross/`, `agent/chess/` and `agent/adventures/<game>/`, move
+there the next time Luna starts. Saves already in `agent/games/` are
+never overwritten: a clash is left where it is and logged.)
 
 ### Watching her play
 
@@ -220,7 +222,7 @@ or xterm (Terminal.app or kitty on a Mac); `"terminal"` picks one, and
 `"watch": true` opens it every time you `/adventure play`. Without Luna:
 
 ```bash
-python games/zork/watch.py agent/adventures/zork
+python games/zork/watch.py agent/games/zork
 ```
 
 ```json
@@ -443,7 +445,7 @@ game ends she says something about it.
 Expect her to play like an enthusiastic beginner: a 9B model hangs
 pieces and misses mates. The fun is the commentary.
 
-Finished games are saved in `agent/chess/games/` as PGN files, which any
+Finished games are saved in `agent/games/chess/games/` as PGN files, which any
 chess program or lichess's analysis board can open.
 
 ```json
@@ -481,8 +483,10 @@ written in Python. Install it with the installer's `gameboy` extra, or
 `pip install pyboy mcp pillow` (Pillow saves the screen she looks at). The game is yours: Luna never ships or
 downloads one, you point her at a `.gb` or `.gbc` file you have.
 
-**Picking a game.** The first time, give the path to a ROM. After that
-the folder it's in is your ROM folder: `/gameboy games` lists what's
+**Picking a game.** Put your ROMs in `games/gameboy/roms/` (gitignored,
+so they never get pushed) and `/gameboy games` finds them. Or give the
+path to a ROM anywhere once, and the folder it's in is your ROM folder
+from then on. `/gameboy games` lists what's
 there and `/gameboy game 2` or `/gameboy game fantasy` picks one, by
 number or any part of its name. Drop a new game in the folder and it's
 on the list. `"roms"` sets the folder yourself. On the settings page
@@ -545,15 +549,16 @@ dump the save before you change its battery: the save lives on that
 battery and is gone the moment it comes out.
 
 **Saves.** Her autosave (every few presses, and when it's put away) and
-her own `gb_save` slots go in `~/.local/share/ai-voice/gameboy/<game>/`,
-outside the repo; `"saves"` moves them.
+her own `gb_save` slots go in `games/gameboy/saves/<game>/`, beside the
+emulator and gitignored; `"saves"` moves them. (Saves from the old
+default, `~/.local/share/ai-voice/gameboy/`, move there the first time.)
 
 ```json
 "gameboy": {
     "enabled": false,
     "rom": "",              // the game: a .gb or .gbc file
-    "roms": "",             // your ROM folder; "" = the folder of the last game picked by path
-    "saves": "",            // "" = ~/.local/share/ai-voice/gameboy
+    "roms": "",             // your ROM folder; "" = the last game's folder, else games/gameboy/roms
+    "saves": "",            // "" = games/gameboy/saves
     "step_seconds": 6,      // quiet needed before her next turn
     "max_steps": 300,       // turns per /gameboy play, then she pauses
     "speak": true,          // narrate each turn out loud
@@ -681,7 +686,7 @@ agent/playlogs/vibecity-2026-10-11.txt
 
 Each turn is stamped with its number and the time, followed by her
 narration and her one-line report, as she said them. For a text adventure her words
-also go into the game's own `agent/adventures/<game>/transcript.txt`, between the
+also go into the game's own `agent/games/<game>/transcript.txt`, between the
 commands and the game's replies, so the watch window and the file show
 the whole playthrough: what she typed, what the game answered, and what
 she made of it. The Game Boy keeps the same kind of record, every press

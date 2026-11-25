@@ -187,6 +187,22 @@ tower?" becomes `ssh root@tower docker ps` in a popup, and you approve
 it. SSH uses your key on its own. She can't read `~/.ssh` herself,
 and doesn't need to.
 
+For a check you ask for often, put the commands in a script of your
+own in `agent/jobs/` (gitignored, so your host names stay yours), say
+`agent/jobs/vm-health.sh` that SSHes in and prints uptime, memory,
+disks, failed services and errors since boot. Ask her once to run it
+by its full path (`bash ~/ai-voice/agent/jobs/vm-health.sh`, wherever
+Luna lives: a command runs from your home folder unless she picks
+another), then tell her to remember how she
+did it: she saves a recipe, and "check the VM's health" finds it from
+then on. Each run is still a `run_command` you approve.
+
+`agent/jobs/` can't be a `job_write_dirs` folder (nothing inside
+Luna's own folder can), and that's deliberate here too: a scheduled job
+that reads the web shouldn't be able to rewrite a script you'll later
+approve without reading. Reports from scheduled jobs go in a folder of
+their own outside it.
+
 ## From your phone
 
 With [Discord](plugins.md#discord-remote-access) on, the same questions

@@ -80,6 +80,14 @@ reminders.load()
 # the first time someone types its name.
 plugins.load()
 
+# the game folders from before agent/games/ (agent/chess, agent/zork...) move into it, once
+try:
+    from plugins import _game
+
+    _game.tidy()
+except Exception:
+    logbook.exception("games", "tidying the game folders failed")
+
 MODEL = lmstudio.probe()
 
 if not MODEL:

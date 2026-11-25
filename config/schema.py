@@ -566,8 +566,8 @@ SCHEMA = {
 
     "plugins.gameboy.enabled": ("bool", "Turn the Game Boy on at startup"),
     "plugins.gameboy.rom": ("text", "The game: a .gb or .gbc file you own (/gameboy game sets it)"),
-    "plugins.gameboy.roms": ("text", "Your ROM folder, for /gameboy games. Empty uses the folder of the last game"),
-    "plugins.gameboy.saves": ("text", "Where Game Boy saves go. Empty is ~/.local/share/ai-voice/gameboy"),
+    "plugins.gameboy.roms": ("text", "Your ROM folder, for /gameboy games. Empty uses the folder of the last game, else games/gameboy/roms"),
+    "plugins.gameboy.saves": ("text", "Where Game Boy saves go. Empty is games/gameboy/saves"),
     "plugins.gameboy.step_seconds": ("float", "Pause between Luna's turns (seconds)"),
     "plugins.gameboy.max_steps": ("int", "How many turns per /gameboy play before Luna stops"),
     "plugins.gameboy.speak": ("bool", "Read each turn out loud"),

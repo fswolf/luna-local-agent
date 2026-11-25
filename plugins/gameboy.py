@@ -37,8 +37,8 @@ your game. pip install pyboy (and mcp).
     "gameboy": {
         "enabled": false,
         "rom": "",              # the game: a .gb or .gbc file
-        "roms": "",             # your ROM folder; "" = the folder of the last game picked by path
-        "saves": "",            # where her saves go; "" = ~/.local/share/ai-voice/gameboy
+        "roms": "",             # your ROM folder; "" = the folder of the last game picked by path, else games/gameboy/roms
+        "saves": "",            # where her saves go; "" = games/gameboy/saves (both gitignored)
         "step_seconds": 6,      # quiet needed before her next turn
         "max_steps": 300,       # turns per /gameboy play, then she pauses
         "speak": true,          # narrate each turn out loud
@@ -58,6 +58,7 @@ import re
 import sys
 
 import config
+from core import logbook
 
 from plugins import _game, _notecheck
 
@@ -69,6 +70,11 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_SCRIPT = os.path.join(HERE, "games", "gameboy", "gb_server.py")
 READERS = os.path.join(HERE, "games", "gameboy")
 WATCH_PAGE = os.path.join(HERE, "games", "gameboy", "watch.html")
+# Your games and her saves, beside the emulator (both gitignored: a ROM is yours,
+# and its states are nobody else's business)
+ROMS = os.path.join(HERE, "games", "gameboy", "roms")
+SAVES = os.path.join(HERE, "games", "gameboy", "saves")
+OLD_SAVES = os.path.join(os.path.expanduser("~"), ".local", "share", "ai-voice", "gameboy")   # before games/gameboy/saves
 
 DEFAULTS = {"rom": "", "roms": "", "saves": "", "step_seconds": 6, "max_steps": 300, "speak": True, "web": True,
             "pictures": "auto", "guide": True, "live": True, "window": False, "sound": False,
@@ -102,7 +108,7 @@ def _roms_folder():
     folder = os.path.expanduser(str(settings()["roms"] or "").strip())
     if not folder:
         rom = os.path.expanduser(str(settings()["rom"] or "").strip())
-        folder = os.path.dirname(rom) if rom else ""
+        folder = os.path.dirname(rom) if rom and os.path.isdir(os.path.dirname(rom)) else ROMS
     return folder if folder and os.path.isdir(folder) else ""
 
 
@@ -128,7 +134,8 @@ def _match(name):
     ("red", "final fantasy"): (path, "") or ("", why not)."""
     games = _games()
     if not games:
-        return "", "no ROM folder yet: pick a game by its path once (/gameboy game ~/roms/red.gb), or set plugins.gameboy.roms"
+        return "", ("no games yet: put your ROMs in games/gameboy/roms/, pick one by its path once "
+                    "(/gameboy game ~/roms/red.gb), or set plugins.gameboy.roms")
     if name.isdigit():
         n = int(name)
         return (games[n - 1], "") if 1 <= n <= len(games) else ("", f"there's no game {n} (/gameboy games)")
@@ -152,11 +159,36 @@ def _list_games():
     return "\n".join(lines)
 
 
+_moved = []
+
+
+def _move_old_saves():
+    """Once: saves from the old default (~/.local/share/ai-voice/gameboy) move
+    to games/gameboy/saves, unless that already has some. Only when you
+    haven't set "saves" yourself."""
+    if _moved:
+        return
+    _moved.append(True)
+    if not os.path.isdir(OLD_SAVES) or (os.path.isdir(SAVES) and os.listdir(SAVES)):
+        return
+    try:
+        os.makedirs(os.path.dirname(SAVES), exist_ok=True)
+        if os.path.isdir(SAVES):
+            os.rmdir(SAVES)                     # empty: the old folder takes its place
+        os.replace(OLD_SAVES, SAVES)
+        logbook.info("gameboy", "moved her saves from %s to %s", OLD_SAVES, SAVES)
+    except OSError as e:                        # another drive: shutil would copy, but a half copy is worse
+        logbook.info("gameboy", "couldn't move %s to %s (%s): set plugins.gameboy.saves to the old folder, "
+                     "or move it yourself", OLD_SAVES, SAVES, e)
+
+
 def _saves():
-    """Her saves, outside the repo (a ROM's states are nobody else's business),
-    a folder per game."""
-    base = os.path.expanduser(str(settings()["saves"] or "").strip()) or os.path.join(
-        os.path.expanduser("~"), ".local", "share", "ai-voice", "gameboy")
+    """Her saves, a folder per game: games/gameboy/saves/<game>/ (gitignored)
+    unless "saves" says otherwise."""
+    base = os.path.expanduser(str(settings()["saves"] or "").strip())
+    if not base:
+        _move_old_saves()
+        base = SAVES
     rom = _rom()
     game = re.sub(r"[^A-Za-z0-9_-]+", "-", os.path.splitext(os.path.basename(rom))[0]).strip("-") or "game"
     return os.path.join(base, game)

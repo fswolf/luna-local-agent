@@ -1,6 +1,6 @@
 """Watch Luna play Zork (or Starcross): the game's screen, live, in a terminal.
 
-    python games/zork/watch.py [saves folder] [title]   (default: agent/zork, "Luna plays Zork")
+    python games/zork/watch.py [saves folder] [title]   (default: agent/games/zork, "Luna plays Zork")
 
 Follows transcript.txt as zork_server.py writes it and tidies it for
 reading: the game's status line (room, score, moves) becomes one short
@@ -17,7 +17,7 @@ import textwrap
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SAVES = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "..", "agent", "zork")
+SAVES = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "..", "agent", "games", "zork")
 PATH = os.path.join(SAVES, "transcript.txt")
 TITLE = sys.argv[2] if len(sys.argv) > 2 else "Luna plays Zork"
 

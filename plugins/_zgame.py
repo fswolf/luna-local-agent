@@ -114,7 +114,7 @@ class ZGame:
         self.start_at, self.missing = start_at, missing
         self._story = story
         self.server = name
-        self.saves = saves or os.path.join(HERE, "agent", name)      # gitignored, like her other state
+        self.saves = saves or os.path.join(HERE, "agent", "games", name)      # gitignored, like her other state
         self.config = config or name
         self.play_tool = play or f"play_{name}"
         self.cmd = cmd or name              # the command she's driven with: /zork, /adventure

@@ -16,10 +16,59 @@ it that game: its prompt, its tools, its rules.
 A helper for the game plugins (the leading underscore keeps the loader
 from treating it as a plugin).
 """
+import os
 import threading
 
 import config
 from core import logbook
+
+# Every game's saves are in agent/games/<name>/ (gitignored): chess, zork,
+# planetfall... (plugins/chessgame.py, plugins/_zgame.py, plugins/adventure.py).
+# Where saves lived before agent/games/, oldest first: agent/<name>/, only
+# for the three games that ever saved there (the old /zork, /starcross and
+# chess: agent/ holds her people, knowledge and jobs too, which a game named
+# "people" must never take), then agent/adventures/<name>/ (the library's
+# first days), for any game.
+_ROOT_GAMES = ("chess", "zork", "starcross")
+
+
+def tidy(agent=None):
+    """Once, at startup: the game folders from before agent/games/ move
+    into it, so agent/ holds her own state and not a folder per game.
+    Never over saves that are already there: a clash is left as it is and
+    logged. Empty leftovers go. Returns what moved, as [(old, new)]."""
+    agent = agent or os.path.join(config.BASE_DIR, "agent")
+    games = os.path.join(agent, "games")
+    names = set(_ROOT_GAMES)
+    try:
+        names |= {n for n in os.listdir(os.path.join(agent, "adventures"))
+                  if os.path.isdir(os.path.join(agent, "adventures", n))}
+    except OSError:
+        pass
+    moved = []
+    for name in sorted(names):
+        new = os.path.join(games, name)
+        for where in ([""] if name in _ROOT_GAMES else []) + ["adventures"]:
+            old = os.path.join(agent, where, name)
+            if not os.path.isdir(old) or os.path.islink(old):
+                continue
+            try:
+                if not os.listdir(old):
+                    os.rmdir(old)                       # an empty leftover (the old /starcross made one)
+                elif os.path.exists(new):
+                    logbook.info("games", "%s and %s both have saves: %s left where it is", old, new, old)
+                else:
+                    os.makedirs(games, exist_ok=True)
+                    os.replace(old, new)
+                    moved.append((old, new))
+                    logbook.info("games", "moved %s to %s", old, new)
+            except OSError as e:
+                logbook.info("games", "couldn't tidy %s: %s", old, e)
+    try:
+        os.rmdir(os.path.join(agent, "adventures"))     # only if it's empty now
+    except OSError:
+        pass
+    return moved
 
 # When a game's "web" is on: stuck on a puzzle or a recipe, she can look
 # it up. If that means she reads a walkthrough and wins, she wins.

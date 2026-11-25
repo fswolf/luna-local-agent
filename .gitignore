@@ -38,17 +38,24 @@ agent/minecraft.json
 agent/zork/
 # Starcross saves (plugins/starcross.py)
 agent/starcross/
-# Saves for the rest of her text adventure library (plugins/adventure.py)
+# Saves for the rest of her text adventure library (plugins/adventure.py), before agent/games/
 agent/adventures/
+# Every game's saves now: chess, zork, planetfall... (plugins/_game.py tidy moves the old folders here)
+agent/games/
 # What she said on each game turn - see docs/plugins.md
 agent/playlogs/
 agent/backups/
+# Your own scripts for her to run (docs/sysadmin.md): host names and paths, yours alone
+agent/jobs/
 # Face and voice prints of the people she knows (people.py). Personal: never commit.
 agent/people/
 agent/coffee.json
 # Examples for her patches (training/dataset.py): her whole prompt, your facts included.
 agent/dataset/
 games/zork/saves/
+# Your Game Boy ROMs and her saves of them (plugins/gameboy.py): yours, never pushed
+games/gameboy/roms/
+games/gameboy/saves/
 
 # llama.cpp is built in place by server/llama/install.sh; only the scripts and
 # the settings file are ours.

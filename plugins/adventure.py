@@ -13,7 +13,7 @@ Z-machine game, played the way she plays Zork.
 
 A game is a folder in games/ with one story file in it (.z3, .z5, .z8...):
 games/planetfall/planetfall.z3. Its folder name is its name everywhere: her
-tools (planetfall_command...), her saves (agent/adventures/planetfall/),
+tools (planetfall_command...), her saves (agent/games/planetfall/),
 her notes (agent/knowledge/planetfall/), its project. Drop a folder in and
 it's in the library; nothing to register.
 
@@ -25,8 +25,9 @@ adventure"):
      "examples": "'north', 'take kit'", "feel": "...", "start_at": "Deck Nine"}
 
 Zork I (games/zork/, MIT) and Starcross (games/starcross/) ship in it.
-Saves from before the library (agent/zork/, agent/starcross/: the old
-/zork and /starcross) move into agent/adventures/ the first time.
+Saves from before (agent/zork/, agent/starcross/: the old /zork and
+/starcross; agent/adventures/<game>/: the library's first days) move into
+agent/games/ at startup (plugins/_game.py tidy).
 
 She asks for one herself with play_adventure ("go play some Planetfall").
 She plays one text adventure at a time: starting one pauses the others.
@@ -49,7 +50,7 @@ NAME = "adventure"
 SUMMARY = "her library of text adventures (Zork, Starcross, Planetfall...): /adventure games"
 
 GAMES = os.path.join(_zgame.HERE, "games")
-SAVES = os.path.join(_zgame.HERE, "agent", "adventures")      # gitignored, one folder per game
+SAVES = os.path.join(_zgame.HERE, "agent", "games")      # gitignored, one folder per game (chess's too)
 
 _on = {"model": None, "running": False}
 
@@ -93,7 +94,7 @@ def game(name):
         return None
     if name in _zgame.REGISTRY:
         return _zgame.REGISTRY[name]
-    _move_old_saves(name)
+    # _move_old_saves(name)       # (plugins/_game.py tidy does it for every game, at startup)
     a = _about(folder)
     title = str(a.get("title") or folder.replace("_", " ").replace("-", " ").title())
     return _zgame.ZGame(
@@ -112,21 +113,23 @@ def game(name):
         cmd=NAME)
 
 
-OLD_SAVES = ("zork", "starcross")      # games that had plugins (and agent/<name>/ saves) of their own
-
-
-def _move_old_saves(name):
-    """agent/zork/ -> agent/adventures/zork/, once: a playthrough from the
-    old /zork carries on. Only those two: agent/ holds much else."""
-    old, new = os.path.join(_zgame.HERE, "agent", name), os.path.join(SAVES, name)
-    if name not in OLD_SAVES or not os.path.isdir(old) or os.path.exists(new):
-        return
-    try:
-        os.makedirs(SAVES, exist_ok=True)
-        os.replace(old, new)
-        logbook.info("adventure", "moved %s's saves to %s", name, new)
-    except OSError as e:
-        logbook.info("adventure", "couldn't move %s to %s: %s", old, new, e)
+# Replaced by plugins/_game.py tidy(), which moves every game's old folder
+# into agent/games/ at startup instead of one game at a time when picked.
+# OLD_SAVES = ("zork", "starcross")      # games that had plugins (and agent/<name>/ saves) of their own
+#
+#
+# def _move_old_saves(name):
+#     """agent/zork/ -> agent/adventures/zork/, once: a playthrough from the
+#     old /zork carries on. Only those two: agent/ holds much else."""
+#     old, new = os.path.join(_zgame.HERE, "agent", name), os.path.join(SAVES, name)
+#     if name not in OLD_SAVES or not os.path.isdir(old) or os.path.exists(new):
+#         return
+#     try:
+#         os.makedirs(SAVES, exist_ok=True)
+#         os.replace(old, new)
+#         logbook.info("adventure", "moved %s's saves to %s", name, new)
+#     except OSError as e:
+#         logbook.info("adventure", "couldn't move %s to %s: %s", old, new, e)
 
 
 def _picked():
