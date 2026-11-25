@@ -501,6 +501,7 @@ SCHEMA = {
     # --- Plugins: scheduled jobs --------------------------------------------
     "plugins.cron.enabled": ("bool", "Run scheduled jobs from agent/cron.json"),
     "plugins.cron.job_tools": ("list", "The only tools scheduled jobs can use"),
+    "plugins.cron.script_timeout": ("int", "Longest a scheduled job's script may run before it is stopped (seconds)"),
 
     # --- Plugins: asking a bigger model -------------------------------------
     "plugins.ask.enabled": ("bool", "Let Luna ask a bigger model (Claude, Grok, ChatGPT) when you tell it to"),

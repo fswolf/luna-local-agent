@@ -147,7 +147,8 @@ folder with someone, check those two keys (and
     "job_tools": ["get_datetime", "time_until", "system_status", "system_health",
                   "last_boot", "web_search",
                   "read_page", "list_files", "read_file", "write_file",
-                  "edit_file", "recall_facts"]
+                  "edit_file", "recall_facts"],
+    "script_timeout": 3600
 }
 ```
 
@@ -199,6 +200,46 @@ A job firing is a turn of its own, not one of yours:
   you, and a slow job isn't fired again on top of itself.
 * **It's echoed** as `Job: disk-check` in the conversation and in the
   logbook. `/cron` shows the last result of each.
+
+### A job that runs a script
+
+A job turn can't run commands: `run_command` asks every time, and at
+4am nobody answers. Shell work on a timer goes in a script of yours in
+`agent/jobs/` instead, and the job names it:
+
+> *"Every Sunday at 4, run backups-to-nas.sh, and tell me if anything
+> failed."*
+
+```json
+{"name": "nas-backups", "schedule": "0 4 * * 0", "script": "backups-to-nas.sh",
+ "script_sha256": "(set when you approve it)",
+ "task": "If any line says FAILED, say what. Otherwise one line: how many were copied and cleaned up.",
+ "speak": false}
+```
+
+* **You read and approve the whole script** in the `schedule_job`
+  popup, and that exact text is pinned by its hash.
+* **The scheduler runs it, not her.** At each firing it runs the
+  approved text with `bash` from your home folder, with nothing on its
+  input, then her job turn gets what it printed (labelled untrusted)
+  and the task. She never picks a command.
+* **A changed script doesn't run.** Edit it and the next firing skips
+  it and tells you why. Ask her to approve the script for that job
+  (`approve_job_script`) and the popup shows the new text for a yes or
+  no. A `script` written into `cron.json` by hand waits for that
+  approval too. `/cron` shows each script as approved, changed or not
+  approved.
+* **Only plain files directly in `agent/jobs/`**, no symlinks, 64 KB at
+  most: a script you can read in a popup. Nothing inside Luna's folder
+  can be a `job_write_dirs` folder, so no job can rewrite one.
+* **`script_timeout`** (seconds, default 3600) stops a script that
+  hangs, along with anything it started. She gets the last 6000
+  characters it printed, where the summary is.
+* **A job can't approve a script.** `approve_job_script` is never in a
+  job's tools, like `schedule_job`.
+
+The script runs as you, so it can do anything you can: read it before
+you approve it, and keep it to the one job.
 
 ### Writing without asking: `job_write_dirs`
 

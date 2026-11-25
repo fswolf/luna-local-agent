@@ -186,5 +186,7 @@ turns the plugin's `approval` setting decides: ask in the chat (the
 default), run straight through (`auto`), or the desk popup. See the
 Discord section in [Plugins](plugins.md).
 Scheduled jobs only get it if you add `run_command` to `job_tools`.
+For shell work on a timer, a job can instead run a script you approved,
+byte for byte (see [Plugins](plugins.md#a-job-that-runs-a-script)).
 `/set shell.enabled false`, or the **Shell** group in the tools pane,
 takes it away.

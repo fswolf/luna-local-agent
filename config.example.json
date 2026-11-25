@@ -156,7 +156,8 @@
                 "write_file",
                 "edit_file",
                 "recall_facts"
-            ]
+            ],
+            "script_timeout": 3600
         },
         "minecraft": {
             "enabled": false,

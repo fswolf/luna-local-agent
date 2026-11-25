@@ -154,30 +154,28 @@ she sees one, since remembering it may not stick.
 
 ## Checking other machines
 
-A job can't run commands unattended. `run_command` asks every time, a
-job firing at night has nobody to ask, and it times out as a no. That's
-deliberate, and the way around it is simple:
+A job turn can't run commands: `run_command` asks every time, and a
+job firing at night has nobody to ask. So the shell part goes in a
+script of yours in `agent/jobs/`, and the job runs that script: you
+read and approve the whole text once, the scheduler runs exactly that
+text at each firing, and her job turn reads what it printed and tells
+you what matters. She never picks a command, and a script that changes
+doesn't run until you've approved the new text
+([details](plugins.md#a-job-that-runs-a-script)).
 
-**Let the system do the shell part, and let Luna read the result.**
-
-Your normal crontab (`crontab -e`) runs the commands and drops plain
-text into `~/luna-jobs`. Her job reads that text and tells you what
-matters. She never gets an unattended shell, and you wrote every
-command that runs.
-
-For an Unraid server or any other box you can reach with SSH keys:
+For an Unraid server or any other box you can reach with SSH keys, a
+script like `agent/jobs/tower-check.sh`:
 
 ```bash
-# crontab -e on your desktop: every 30 minutes, what's running and how full it is
-*/30 * * * * ssh -o BatchMode=yes root@tower 'docker ps -a --format "{{.Names}}\t{{.Status}}"' > ~/luna-jobs/tower-containers.txt 2>&1
-*/30 * * * * ssh -o BatchMode=yes root@tower 'df -h /mnt/user /mnt/cache' > ~/luna-jobs/tower-disk.txt 2>&1
+#!/usr/bin/env bash
+T=root@tower
+ssh -o BatchMode=yes -o ConnectTimeout=5 $T 'docker ps -a --format "{{.Names}}\t{{.Status}}"; df -h /mnt/user /mnt/cache' \
+    || echo "FAILED: can't reach the tower"
 ```
 
-```json
-{"name": "tower-check", "schedule": "0 */4 * * *",
- "task": "Read ~/luna-jobs/tower-containers.txt and ~/luna-jobs/tower-disk.txt. If a container that should be up has exited, or a share is over 90% full, tell me which. If the files are older than an hour, say the checks stopped running. Otherwise stay quiet.",
- "speak": true}
-```
+Then: *"every 4 hours, run tower-check.sh. If a container that should
+be up has exited, or a share is over 90% full, tell me which.
+Otherwise stay quiet."* Approve the popup, script and all.
 
 `BatchMode=yes` makes SSH fail instead of hanging on a password
 prompt. Swap in your own host and the containers you care about.
@@ -198,11 +196,13 @@ did it: she saves a recipe, and "check the VM's health" finds it from
 then on. Each run is still a `run_command` you approve. The whole
 thing, step by step: [Skills (recipes)](skills.md#walkthrough-check-vm-health).
 
+The same script can run on a timer too: name it in a scheduled job
+and approve it once, as above.
+
 `agent/jobs/` can't be a `job_write_dirs` folder (nothing inside
 Luna's own folder can), and that's deliberate here too: a scheduled job
-that reads the web shouldn't be able to rewrite a script you'll later
-approve without reading. Reports from scheduled jobs go in a folder of
-their own outside it.
+that reads the web shouldn't be able to rewrite a script you approved.
+Reports from scheduled jobs go in a folder of their own outside it.
 
 ## From your phone
 
@@ -229,9 +229,12 @@ on `auto`. `!stop` in Discord ends a turn that's going wrong.
   See [Files and commands](files.md#running-commands).
 - **Run a command without you.** No allow-all and no "safe list". On
   Discord, only `auto` skips the question, and only because you set it.
+  A scheduled job's script runs on its own, but it's text you read and
+  approved, byte for byte, and she never chooses it.
 - **Touch the deny list.** `~/.ssh`, `~/.gnupg`, keys, shell startup
   files and her own credentials are refused, reading included.
-- **Let a job make jobs.** `schedule_job` is never in a job's tools.
+- **Let a job make jobs,** or approve a script: `schedule_job` and
+  `approve_job_script` are never in a job's tools.
 - **Catch up.** Runs missed while Luna was closed are skipped.
 
 Job reports show in the conversation, the logbook and `/cron`, and are

@@ -181,11 +181,13 @@ copy around.
 
 ## Asked for, or on a timer
 
-A recipe is for when you ask. A check that runs at 3am has nobody to
-approve a command, so scheduled jobs can't run one. For that, your own
-crontab runs the script and writes its report to a folder, and a
-scheduled job reads the report and only speaks up when something's
-wrong. See [Sysadmin: checking other machines](sysadmin.md#checking-other-machines).
+A recipe is for when you ask. For a timer, name the same script in a
+scheduled job: *"every Sunday at 4, run backups-to-nas.sh and tell me
+if anything failed."* The popup shows the whole script; approve it once
+and the scheduler runs exactly that text each time, with no popup at
+4am, and she reads you what it printed. Change the script and it won't
+run until you approve the new text. See
+[Plugins: a job that runs a script](plugins.md#a-job-that-runs-a-script).
 
 ## Your controls
 
