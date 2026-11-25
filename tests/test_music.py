@@ -180,6 +180,83 @@ class Service(unittest.TestCase):
         self.assertEqual(listen.kind_of([], [0.2, 0.3], labels, 1.0), "mixed")
         self.assertEqual(listen.kind_of(None, None, None, 3.5), "music")
 
+    def test_yamnet_decides_what_is_music(self):
+        """With YAMNet's shares (talking, music) the Discogs styles don't get a
+        say in music or not: they called a cartoon's dialogue and effects
+        "experimental" music."""
+        labels = ["Non-Music---Story", "Electronic---Experimental"]
+        experimental = [0.02, 0.22]                       # what the cartoon got from the styles
+        k = lambda talk, tune: listen.kind_of([], experimental, labels, 4.6, (talk, tune))
+        self.assertEqual(k(0.8, 0.0), "speech")           # a podcast
+        self.assertEqual(k(0.7, 0.5), "mixed")            # a cartoon: dialogue over its score
+        self.assertEqual(k(0.1, 0.95), "music")           # a song (singing isn't talk)
+        self.assertEqual(k(0.3, 0.3), "mixed")            # a little of both
+        self.assertEqual(k(0.0, 0.1), "speech")           # effects and crowd noise: not music
+        self.assertEqual(listen.kind_of([], experimental, labels, 4.6), "music")   # no YAMNet: the styles, as before
+
+    def test_heard_counts_the_frames(self):
+        import numpy as np
+
+        scores = np.zeros((4, 521), np.float32)
+        scores[0, 0] = 0.9            # Speech
+        scores[1, 3] = 0.6            # Narration, monologue
+        scores[2, 132] = 0.8          # Music
+        scores[3, 132] = 0.4          # unsure music: not counted
+
+        class Session:
+            def run(self, _out, feed):
+                self.fed = next(iter(feed.values()))
+                return [scores]
+
+        s = Session()
+        with mock.patch.object(listen, "_yamnet", (s, "waveform", [0, 1, 2, 3, 5], 132)):
+            self.assertEqual(listen.heard(np.zeros(16000, np.float64)), (0.5, 0.25))
+        self.assertEqual(s.fed.dtype, np.float32)
+        with mock.patch.object(listen, "_yamnet", None):
+            self.assertIsNone(listen.heard(np.zeros(16000)))
+
+    def test_yamnet_loads_from_its_class_list(self):
+        import tempfile
+
+        d = tempfile.mkdtemp()
+        try:
+            self.assertIsNone(listen.load_yamnet(d))          # nothing there: off, no error
+            with open(os.path.join(d, listen.YAMNET), "wb") as f:
+                f.write(b"x")
+            with open(os.path.join(d, listen.YAMNET_CLASSES), "w") as f:
+                f.write('index,mid,display_name\n0,/m/09x0r,Speech\n1,/m/0ytgt,"Child speech, kid speaking"\n'
+                        '2,/m/02qldy,"Narration, monologue"\n3,/m/04rlf,Music\n')
+            fake = mock.MagicMock()
+            fake.InferenceSession.return_value.get_inputs.return_value = [mock.Mock(name="in")]
+            # only this one entry, not patch.dict(sys.modules): that puts the whole
+            # table back and drops modules first imported meanwhile
+            had = sys.modules.get("onnxruntime")
+            sys.modules["onnxruntime"] = fake
+            try:
+                got = listen.load_yamnet(d)
+            finally:
+                if had is None:
+                    sys.modules.pop("onnxruntime", None)
+                else:
+                    sys.modules["onnxruntime"] = had
+            self.assertEqual((got[2], got[3]), ([0, 1, 2], 3))
+        finally:
+            listen._yamnet = None
+            import shutil
+            shutil.rmtree(d)
+
+    def test_a_clip_led_by_a_non_music_style_isnt_music(self):
+        """What Ryan's log showed: a narrated story video and a sports ad came
+        back as music (120 and 146 BPM) with "story" and "radioplay" as their
+        top styles. A top Non-Music style that still came back as music means
+        it scored under the old fixed 0.3 bar. The numbers here are made up in
+        that shape (the log didn't keep scores; it does now)."""
+        labels = ["Non-Music---Story", "Non-Music---Radioplay", "Pop---Dance-pop", "Hip Hop---Trap"]
+        self.assertEqual(listen.kind_of([], [0.24, 0.05, 0.12, 0.06], labels, 2.6), "speech")   # narration, a bed under it
+        self.assertEqual(listen.kind_of([], [0.05, 0.18, 0.16, 0.04], labels, 3.1), "mixed")    # an ad: voice over music
+        self.assertEqual(listen.kind_of([], [0.04, 0.03, 0.31, 0.10], labels, 3.2), "music")    # a song
+        self.assertEqual(listen.kind_of([], [0.01, 0.0, 0.02, 0.0], labels, 1.0), "speech")     # no opinion: the beat
+
     def test_reads_wav_and_bass(self):
         import numpy as np
 

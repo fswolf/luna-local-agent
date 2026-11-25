@@ -4,8 +4,9 @@ what it is. Runs on her server (or the same machine), beside llama.cpp.
     POST /listen   a WAV clip (16-bit PCM, any rate, mono or stereo), ~10 s
                    -> {"kind": "music"|"speech"|"mixed", "styles": [[name, score], ...],
                        "bpm": 128.0, "beats": [0.41, 0.88, ...], "beat_conf": 3.1,
-                       "loud": -14.2, "bass": 0.38, "secs": 10.0, "model": true}
-    GET  /health   -> {"ok": true, "model": true|false}
+                       "loud": -14.2, "bass": 0.38, "secs": 10.0, "talk": 0.1, "tune": 0.9,
+                       "model": true, "yamnet": true}
+    GET  /health   -> {"ok": true, "model": true|false, "yamnet": true|false}
 
 The style model is MTG's Discogs-EffNet (400 Discogs styles, among them a
 "Non-Music" family: spoken word, interviews...), run with onnxruntime. Its
@@ -15,6 +16,14 @@ answers tempo, loudness and bass, and guesses music from the beat.
 The model is CC BY-NC-SA 4.0 (MTG): fine for personal and open-source use,
 not for selling; it's downloaded by install.sh (to ~/.local/share/luna-listen/models), never
 shipped with Luna.
+
+Whether it's music at all is Google's YAMNet's call (AudioSet's 521 everyday
+sounds: Speech, Music, laughter, engines..., Apache 2.0), also an ONNX file
+install.sh fetches. The Discogs model only knows records, so a cartoon or a
+game video (dialogue, effects, a score) came back as "experimental" music.
+YAMNet scores each 0.96 s of the clip for speech and for music; the share of
+the clip that's talking against the share that's music decides. Without it,
+the Discogs styles decide as before.
 
     python3 listen.py [--host 0.0.0.0] [--port 8795] [--models DIR]
 """
@@ -41,6 +50,9 @@ TOP = 5                           # styles sent back
 
 _es = None                        # essentia.standard, loaded once
 _model = None                     # (session, input name, transpose, output index, labels) or None
+YAMNET = "yamnet.onnx"            # waveform in (16 kHz mono float32), [frames, 521] scores out
+YAMNET_CLASSES = "yamnet_class_map.csv"
+_yamnet = None                    # (session, input name, speech class indexes, music class index) or None
 
 
 def _essentia():
@@ -71,6 +83,44 @@ def load_model(folder):
         labels = json.load(f)["classes"]
     _model = (s, inp.name, transpose, out, labels)
     return _model
+
+
+def load_yamnet(folder):
+    """YAMNet, or None when it isn't there: then the Discogs styles say what's music."""
+    global _yamnet
+    path, cpath = os.path.join(folder, YAMNET), os.path.join(folder, YAMNET_CLASSES)
+    if not (os.path.isfile(path) and os.path.isfile(cpath)):
+        _yamnet = None
+        return None
+    import csv
+
+    import onnxruntime as ort
+    with open(cpath, encoding="utf-8", newline="") as f:
+        names = [row["display_name"] for row in csv.DictReader(f)]
+    # AudioSet's Speech and its own kinds (not singing, shouting or laughing: those are voices, not talk)
+    talk = [names.index(n) for n in ("Speech", "Child speech, kid speaking", "Conversation",
+                                      "Narration, monologue", "Speech synthesizer") if n in names]
+    s = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
+    _yamnet = (s, s.get_inputs()[0].name, talk, names.index("Music"))
+    return _yamnet
+
+
+# A 0.96 s frame counts as talking, or as music, when YAMNet gives it this much
+FRAME_SURE = 0.5
+
+
+def heard(x16):
+    """(share of the clip that's talking, share that's music), each 0-1, from
+    16 kHz audio; None without YAMNet."""
+    if _yamnet is None:
+        return None
+    s, name, talk, music = _yamnet
+    scores = s.run(None, {name: np.ascontiguousarray(x16, dtype=np.float32)})[0]
+    if not len(scores):
+        return None
+    t = float((scores[:, talk].max(axis=1) >= FRAME_SURE).mean())
+    m = float((scores[:, music] >= FRAME_SURE).mean())
+    return round(t, 2), round(m, 2)
 
 
 def read_wav(data):
@@ -126,15 +176,49 @@ def color(x, rate):
     return round(loud, 1), round(float(spec[f < 150].sum()) / total, 3)
 
 
-def kind_of(found, act, labels, conf):
-    """music, speech or mixed: the Non-Music styles against the rest, else the beat."""
-    if found is None:
-        return "music" if conf >= 3.0 else "speech" if conf < 1.5 else "mixed"     # rough: the beat alone
-    talk = max((a for a, l in zip(act, labels) if l.startswith("Non-Music")), default=0.0)
-    tune = max((a for a, l in zip(act, labels) if not l.startswith("Non-Music")), default=0.0)
-    if talk >= 0.3 and talk > tune:
+# How far ahead the best Non-Music style (spoken word, story, radioplay...)
+# must be of the best music style to call it talking, and how close behind
+# to call it talking over music. Measured against each other, not against a
+# fixed level: a narrated story video and a sports ad came back as music
+# with "story" and "radioplay" as their strongest labels, which means those
+# scored under the old fixed 0.3 bar for talking.
+SPEECH_OVER = 1.5
+MIXED_FROM = 0.6
+QUIET = 0.05            # both under this: the model has no opinion, the beat decides
+
+
+# With YAMNet: talking through half the clip or more is speech, or mixed if
+# there's music under it too (a cartoon with its score, an ad); otherwise music
+# through most of it is music (singing is music to YAMNet, not talk); a little
+# of either is mixed; neither (effects, silence) isn't music.
+TALK_SHARE = 0.5
+MUSIC_SHARE = 0.6
+QUIET_SHARE = 0.25
+
+
+def kind_of(found, act, labels, conf, voice=None):
+    """music, speech or mixed. voice: (talk share, music share) from YAMNet,
+    which decides when it's sure; else the best Non-Music style against the
+    best music one."""
+    if voice is not None:
+        talk_s, music_s = voice
+        if talk_s >= TALK_SHARE:
+            return "speech" if music_s < QUIET_SHARE else "mixed"
+        if music_s >= MUSIC_SHARE:
+            return "music"
+        if talk_s >= QUIET_SHARE or music_s >= QUIET_SHARE:
+            return "mixed"
+        # neither talking nor music most of the time (effects, crowds, silence): not
+        # music either, so she leaves it be. Asking the styles here is what called a
+        # cartoon's sound effects "experimental" music.
         return "speech"
-    if talk >= 0.15 and conf < 2.0:
+    talk = max((a for a, l in zip(act, labels) if l.startswith("Non-Music")), default=0.0) if found is not None else 0.0
+    tune = max((a for a, l in zip(act, labels) if not l.startswith("Non-Music")), default=0.0) if found is not None else 0.0
+    if found is None or max(talk, tune) < QUIET:
+        return "music" if conf >= 3.0 else "speech" if conf < 1.5 else "mixed"     # rough: the beat alone
+    if talk >= tune * SPEECH_OVER:
+        return "speech"
+    if talk >= tune * MIXED_FROM:
         return "mixed"
     return "music"
 
@@ -146,11 +230,13 @@ def listen(data):
     x16, x44 = resample(x, rate, 16000), resample(x, rate, 44100)
     got = styles(x16)
     found, act, labels = got if got else (None, None, None)
+    voice = heard(x16)
     bpm, beats, conf = rhythm(x44)
     loud, bass = color(x, rate)
-    return {"kind": kind_of(found, act, labels, conf), "styles": found, "bpm": round(bpm, 1), "beats": beats,
+    return {"kind": kind_of(found, act, labels, conf, voice), "styles": found, "bpm": round(bpm, 1), "beats": beats,
             "beat_conf": round(conf, 2), "loud": loud, "bass": bass, "secs": round(len(x) / rate, 2),
-            "model": _model is not None}
+            "talk": voice[0] if voice else None, "tune": voice[1] if voice else None,   # YAMNet's shares
+            "model": _model is not None, "yamnet": _yamnet is not None}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -166,7 +252,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.split("?")[0] == "/health":
-            return self._send(200, {"ok": True, "model": _model is not None})
+            return self._send(200, {"ok": True, "model": _model is not None, "yamnet": _yamnet is not None})
         self._send(404, {"error": "not here"})
 
     def do_POST(self):
@@ -199,7 +285,9 @@ def main(argv=None):
     a = p.parse_args(argv)
     _essentia()
     have = load_model(a.models) is not None
-    print(f"listening on {a.host}:{a.port}; style model: {'yes' if have else 'not found in ' + a.models + ' (tempo only)'}", flush=True)
+    ears = load_yamnet(a.models) is not None
+    print(f"listening on {a.host}:{a.port}; style model: {'yes' if have else 'not found in ' + a.models + ' (tempo only)'}; "
+          f"YAMNet: {'yes' if ears else 'not found (the styles say what is music)'}", flush=True)
     ThreadingHTTPServer((a.host, a.port), Handler).serve_forever()
 
 

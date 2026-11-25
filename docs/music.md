@@ -20,7 +20,8 @@ records a short clip and asks.
    card's monitor, never the microphone, and not while she's talking.
 3. She sends the clip to the listening service, which answers in about half
    a second:
-   - music, talking, or talking over music
+   - music, talking, or talking over music (Google's YAMNet, which knows
+     everyday sounds: speech, music, effects, crowds)
    - the style, from 400 Discogs styles (techno, dubstep, drum and bass, trap...)
    - the tempo, where the beats fall, and how heavy the bass is
 4. That's one look per track. A song that comes back within half an hour
@@ -34,6 +35,8 @@ The clip is sent once and thrown away. Nothing leaves your network.
 | Rave styles (techno, house, trance, dubstep, DnB, hardstyle, trap...) | Sometimes puts on her rave set; it comes off when the music stops. While the glow sticks are out (hers or `/rave`), she dances `glowstick_dance`: fists pumping, sticks up and swaying overhead, arms crossing and flung wide |
 | A calm song | Nods her head on the beat, a smooth nod that eases in and out (every other beat on songs over 140 bpm) |
 | Talking (a vlog, a podcast) | Nothing: it isn't music |
+| Talking over music (a cartoon with its score, an ad) | Nods on the beat, no dancing |
+| Neither (game sounds, a crowd, effects) | Nothing |
 
 She doesn't dance while you're talking to her, while she's asleep or holding
 her coffee, book or plushie, or in the lewd or grudge moods.
@@ -58,6 +61,11 @@ type into Luna:
 Use `--no-service` to run it yourself instead, `--port` for another port, and
 `remove` to take the service away again. To run it on the same PC as Luna,
 use the same steps and `/set music.url http://127.0.0.1:8795`.
+
+To update it, copy the new `server/music/` over (`listen.py` and
+`install.sh`) and run `install.sh` again: it keeps what it already
+downloaded, fetches anything new (YAMNet, the first time) and restarts the
+service.
 
 On the desktop she needs `playerctl`, plus `parec` (PipeWire or PulseAudio)
 or `ffmpeg` to record.
@@ -85,3 +93,24 @@ alone.
 
 It knows Discogs' styles, so a very new or niche genre is named by its
 nearest one (phonk, for example, isn't a Discogs style yet).
+
+## Music or not: YAMNet
+
+The style model only knows records: its "Non-Music" styles are spoken-word
+albums, not a cartoon or a game video, so dialogue with sound effects and a
+score came back as "experimental" music. Whether a clip is music at all is
+YAMNet's call: Google's model of 521 everyday sounds from AudioSet, Apache
+2.0, an ONNX export the installer fetches (pinned to one version and
+checked against its checksum). It scores every second of the clip for
+speech and for music:
+
+- talking through half the clip or more: speech, or mixed when there's
+  music under it too
+- otherwise music through most of it: music (singing counts as music, not
+  talk)
+- a little of either: mixed
+- neither: not music
+
+Her log shows the shares for each track ("talking 70% of it, music 40%")
+next to the styles, so a wrong call can be checked. Without YAMNet the
+styles decide, as before.

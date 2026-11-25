@@ -9,7 +9,10 @@
 # Everything goes in ~/.local/share/luna-listen (venv, model), not the repo.
 # The style model is MTG's Discogs-EffNet, CC BY-NC-SA 4.0: personal and
 # open-source use only, never sold. Without it the listener still finds the
-# tempo and beat. Needs python3 with venv; sudo only for the systemd service.
+# tempo and beat. Google's YAMNet (Apache 2.0, an ONNX export of it) tells
+# music from talking; without it the styles do. Needs python3 with venv;
+# sudo only for the systemd service. Running it again updates it: anything
+# already downloaded is kept, the service is restarted.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOME_DIR="${LISTEN_HOME:-$HOME/.local/share/luna-listen}"
@@ -62,6 +65,23 @@ else
     echo "    couldn't download it: she'll still hear the tempo and beat, not the style. Run this again later."
 fi
 
+say "YAMNet, for music or talking (Google, Apache 2.0)"
+# An ONNX export of google/yamnet v1 (a straight tf2onnx conversion, weights
+# untouched), pinned to one revision and checked against its sha256, so the
+# file can't change under us. The class list is Google's own.
+YAM_REV=f25b741c2f0bdc6d7e6db24b5fddda23347dbafd
+YAM_SHA=d3835ffbbd4a1bb3e777f0ca217b5007907f5171dd5d17c4236b95b2af8f908e
+if get yamnet.onnx "https://huggingface.co/audiomagic/yamnet-onnx/resolve/$YAM_REV/yamnet.onnx" \
+   && get yamnet_class_map.csv "https://raw.githubusercontent.com/tensorflow/models/master/research/audioset/yamnet/yamnet_class_map.csv" \
+                               "https://huggingface.co/audiomagic/yamnet-onnx/resolve/$YAM_REV/yamnet_class_map.csv"; then
+    if [ "$(sha256sum "$MODELS/yamnet.onnx" | cut -d' ' -f1)" != "$YAM_SHA" ]; then
+        rm -f "$MODELS/yamnet.onnx"
+        echo "    yamnet.onnx isn't the file it should be (checksum): removed. The styles will say what's music."
+    fi
+else
+    echo "    couldn't download it: the styles will say what's music. Run this again later."
+fi
+
 say "Self-test: a made-up 128 BPM beat"
 "$VENV/bin/python" - "$HERE" "$MODELS" <<'PY'
 import io, sys, wave
@@ -69,6 +89,7 @@ import numpy as np
 sys.path.insert(0, sys.argv[1])
 import listen
 listen.load_model(sys.argv[2])
+listen.load_yamnet(sys.argv[2])
 rate = 22050; x = np.zeros(rate * 8)
 for b in np.arange(0.2, 8, 60 / 128):
     i = int(b * rate); n = int(0.12 * rate); t = np.arange(n) / rate
@@ -77,7 +98,8 @@ buf = io.BytesIO()
 with wave.open(buf, "wb") as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes((x * 20000).astype("<i2").tobytes())
 r = listen.listen(buf.getvalue())
-print(f"    tempo {r['bpm']} BPM (should be ~128), style model {'loaded' if r['model'] else 'missing'}")
+print(f"    tempo {r['bpm']} BPM (should be ~128), style model {'loaded' if r['model'] else 'missing'}, "
+      f"YAMNet {'loaded' if r['yamnet'] else 'missing'}")
 if not 120 < r["bpm"] < 136:
     sys.exit("    the tempo is off: something's wrong with Essentia here")
 PY
@@ -103,7 +125,8 @@ RestartSec=5
 WantedBy=multi-user.target
 UNITEOF
     sudo systemctl daemon-reload
-    sudo systemctl enable --now luna-listen
+    sudo systemctl enable luna-listen
+    sudo systemctl restart luna-listen     # (running already: picks up a new listen.py and models)
     sleep 2
     if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null; then say "Running, and it starts on boot."
     else echo "    it didn't answer yet: sudo journalctl -u luna-listen -n 30"; fi

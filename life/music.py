@@ -253,7 +253,11 @@ def _listen():
                 for k in [k for k, (_, at) in c.items() if t - at > RECENT]:
                     del c[k]
                 c[key] = (s, t)
-    logbook.info("music", "%s: %s %s BPM (%s)", _state["title"] or "?", s["kind"], s["bpm"], s["style"] or "no style")
+    top = ", ".join(f"{style_name(l)} {sc:.2f}" for l, sc in (answer.get("styles") or [])[:3])
+    ears = (f"; talking {answer['talk']:.0%} of it, music {answer['tune']:.0%}"
+            if isinstance(answer.get("talk"), (int, float)) and isinstance(answer.get("tune"), (int, float)) else "")
+    logbook.info("music", "%s: %s %s BPM (%s; beat %s%s)", _state["title"] or "?", s["kind"], s["bpm"],
+                 top or "no style", answer.get("beat_conf", "?"), ears)     # the scores: why it was called what it was
     if _state["track"] == key and _state["playing"]:
         _send(s)
         _state["sent"] = key
