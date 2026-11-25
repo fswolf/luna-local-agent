@@ -174,7 +174,11 @@ class Starcross(unittest.TestCase):
                 self.assertEqual(_zgame.find_story("starcross", "starcross.z3"), story)   # the only one there
                 open(os.path.join(tmp, "games", "starcross", "other.z5"), "wb").close()
                 self.assertEqual(_zgame.find_story("starcross", "starcross.z3"), "")      # two: which?
-            with mock.patch.object(_zgame, "dfrotz", return_value="/usr/bin/dfrotz"):
+            # mcp and dfrotz as if installed (CI has neither): it's the story file being asked about
+            from core import mcpclient
+
+            with mock.patch.object(_zgame, "dfrotz", return_value="/usr/bin/dfrotz"), \
+                    mock.patch.object(mcpclient, "available", return_value=True):
                 self.assertIn("games/starcross/", STARCROSS.why_unavailable())
         finally:
             shutil.rmtree(tmp)
