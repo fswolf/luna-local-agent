@@ -1,9 +1,9 @@
 # Patches: teaching her habits
 
 > **Experimental.** Collecting examples works and is safe to use every day. Training a
-> patch is new: the scripts are written and tested piece by piece, but a full training
-> run on a real graphics card hasn't been done yet. Expect some fiddling the first time,
-> and keep the [limits](#limits-and-known-gaps) in mind.
+> patch is new: the first full run, start to finish, was done in November 2026 on an
+> RX 7900 XT in a Debian VM, and her model server loaded the patch. What it ran into is
+> in [The first run](#the-first-run); keep the [limits](#limits-and-known-gaps) in mind.
 
 A patch (a LoRA) is a small file that sits on top of her model and changes how it
 writes, not what it knows. Her personality, moods and memory stay where they are. A
@@ -128,8 +128,9 @@ run on the same day adds the time, so the first one is kept.
 - **The first run takes longest.** It builds the trainer image (PyTorch for ROCm,
   several GB) and downloads the full-size model (`BASE`, about 18 GB for a 9B) into
   `~/.cache/huggingface`. Both happen once.
-- **Start it in `tmux`** (or `screen`). If your SSH connection drops, the run goes with
-  it; in `tmux`, Ctrl+B then D leaves it running and `tmux attach` comes back to it.
+- **Start it in `screen`** (or `tmux`). If your SSH connection drops, the run goes with
+  it. `screen -S train` starts one, Ctrl+A then D leaves it running, and `screen -r train`
+  comes back to it (in `tmux`: Ctrl+B then D, and `tmux attach`).
 - **Let it finish.** Nothing is saved partway, so a stopped run starts over. Keep the
   machine from sleeping or rebooting.
 
@@ -217,15 +218,24 @@ plain `python3`.
 3. **Docker or podman.** With Docker, your user has to be in the `docker` group:
    `sudo usermod -aG docker <you>`, then log in again (`docker ps` should list nothing,
    not "permission denied").
-4. **`tmux`** for leaving it running: `sudo apt install tmux` on Debian.
-5. **Stop her model server**, then check and run:
+4. **Memory.** Loading the full-size 9B to pack it into 4 bits goes through the
+   computer's memory first, about 15 GB at the peak. A VM with 16 GB or less needs swap
+   or the run is killed while loading (`dmesg` says "Out of memory"):
+
+   ```
+   sudo fallocate -l 16G /swapfile && sudo chmod 600 /swapfile
+   sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   ```
+5. **`screen`** (or `tmux`) for leaving it running: `sudo apt install screen` on Debian.
+6. **Stop her model server**, then check and run:
 
    ```
    cd ~/luna && training/train.sh habit --check
-   tmux new -s train
+   screen -S train
    cd ~/luna && training/train.sh habit
    ```
-6. **Start her model server again.** It loads the new patch by itself.
+7. **Start her model server again.** It loads the new patch by itself.
 
 **Memory and disk.** A 9B loaded in 4 bits (`LOAD_4BIT=1`) takes 5 to 6 GB of the card,
 and training a patch adds the room for the examples on top, so a 16 to 20 GB card has
@@ -235,6 +245,32 @@ disk needs about 18 GB for the full-size 9B and a few GB for the trainer image.
 From Luna on your desktop, `/patches` shows the patches the server has loaded ("loaded
 on her model server") and `/patches <name> 0.5` changes their strength, the same as on
 one machine.
+
+### The first run
+
+Fourteen examples, two passes, `LOAD_4BIT=1`, on an RX 7900 XT (20 GB) in a Debian VM
+with Docker. What it ran into, all handled in the scripts now:
+
+| What happened | Why, and the fix |
+|---------------|------------------|
+| `permission denied` on the Docker socket | not in the `docker` group: `sudo usermod -aG docker <you>`, log in again |
+| `unable to find group render` | the group exists on the host, not in the container: `train.sh` passes the `video` and `render` groups by number |
+| `getpwuid(): uid not found: 1000` | your user doesn't exist in the container: `train.sh` sets `USER` and `LOGNAME` |
+| killed while loading the model | out of memory (`dmesg`): 16 GB of swap, above |
+| `unexpected keyword argument 'warmup_ratio'` | Transformers 5 dropped it: `train.py` passes `warmup_steps` and only the settings the installed version takes |
+| `AssertionError: expected size ... stride ...` in `_scaled_dot_product_flash_attention_backward` on the first step | PyTorch's compiler got the attention step's memory layout wrong on ROCm. Off for training by default now; `COMPILE=1` in `train.env` tries it again |
+| `FileNotFoundError` writing the `.gguf` | `server/llama` was a link to `~/luna/llama`, outside the folder the container sees. `train.sh` mounts the link's real folder now |
+| 7 of 14 examples left out | longer than `MAX_LEN` (8192 tokens) |
+| `causal_conv1d is not installed` | a warning only: part of Qwen3.5 uses PyTorch's slower, correct fallback |
+
+If the conversion fails after training, run the same command again the same day: a
+run folder that already holds a trained patch is converted without training again.
+
+Container versions that worked: Unsloth 2026.11.12, Transformers 5.17, PyTorch
+2.9.1 with ROCm 6.4, which knows the 7900 XT (gfx1100) without `HSA_OVERRIDE_GFX_VERSION`.
+
+Fourteen examples is far too few to change how she writes; that run proved the route,
+from a thumbs-up to a patch her server loads.
 
 ## Using a patch
 
@@ -254,7 +290,10 @@ file) and restart.
 
 A patch only fits the model it was trained on. Change `MODEL` in `server.env` and the old
 patches stay out by themselves; nothing breaks, and `/patches` says they're for another
-model. Train new ones for the new model from the same examples, with `BASE` set to its
+model. It goes by the GGUF's file name, so another quant of the same model (Q8_0 instead
+of Q4_K_S) counts as another model too. The patch does fit it, since both come from the
+same full-size model: set `"for"` in the patch's `.json` to that file's name (without
+`.gguf`) to load it there. Train new ones for the new model from the same examples, with `BASE` set to its
 safetensors version.
 
 The examples are what matters. They're plain conversations, not tied to a model, so
@@ -272,9 +311,8 @@ they carry over to every model you use.
 
 ## Limits and known gaps
 
-- **Not yet run on a real card.** The scripts, the export, the masking and the loading
-  are tested, but no full training run has been done. It's Linux only, on an AMD card
-  through ROCm for now.
+- **One real run so far**, on an RX 7900 XT ([The first run](#the-first-run)). It's
+  Linux only, on an AMD card through ROCm for now.
 - **Luna's own model server only.** Patches are loaded by `server/llama/start.sh` (llama.cpp's
   server). LM Studio and other servers don't load them; `/patches` can only change the
   strength on llama.cpp's server.

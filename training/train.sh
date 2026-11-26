@@ -72,12 +72,23 @@ fi
 # the GPU's device files belong to the video and render groups; SELinux
 # (Fedora) would otherwise refuse the container them. Your repo's own
 # labels are left alone (no :z relabelling).
-groups_arg=(--group-add video --security-opt label=disable)
-getent group render >/dev/null 2>&1 && groups_arg+=(--group-add render)
+# By number, not name: docker looks a name up inside the container, which has
+# no "render" group ("unable to find group render"), while the device files
+# belong to this machine's numbers.
+groups_arg=(--security-opt label=disable)
+for g in video render; do
+    gid="$(getent group "$g" 2>/dev/null | cut -d: -f3)"
+    [ -n "$gid" ] && groups_arg+=(--group-add "$gid")
+done
 [ "$ENGINE" = podman ] && groups_arg=(--group-add keep-groups --security-opt label=disable)
 # docker runs as root unless told: the patch and the run folder would end up
 # root's. Podman (rootless) is you already.
-[ "$ENGINE" = docker ] && groups_arg+=(--user "$(id -u):$(id -g)" -e HOME=/tmp)
+# That user has no name inside the container, and anything asking for it
+# (PyTorch picking its cache folder: "getpwuid(): uid not found: 1000") falls
+# over, so it's given a name and a cache up front; Python reads USER first.
+[ "$ENGINE" = docker ] && groups_arg+=(--user "$(id -u):$(id -g)" -e HOME=/tmp
+                                        -e USER="$(id -un)" -e LOGNAME="$(id -un)"
+                                        -e TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor)
 
 # the base: a folder is mounted in, an id is downloaded into the HF cache
 base_mount=() base_in="$BASE"
@@ -86,6 +97,10 @@ if [ -d "$BASE" ]; then
     base_in=/base
 fi
 mkdir -p "$HOME/.cache/huggingface" server/llama/patches
+# server/llama is often a link to the model server's folder (~/luna/llama), and a
+# link pointing outside /work leads nowhere in the container: mount its real
+# folder at /llama instead.
+LLAMA="$(realpath server/llama)"
 
 # --- the examples -----------------------------------------------------------
 "$PY" -m training.export "$KIND" || lack "No approved $KIND examples to train on yet."
@@ -118,32 +133,46 @@ mkdir -p "$RUN"
 
 tty_arg=()
 [ -t 0 ] && tty_arg=(-it)          # left to run overnight (nohup), there's no terminal
+# PyTorch's compiler (Unsloth compiles each layer for speed) got the attention
+# step's memory layout wrong on ROCm: "AssertionError: expected size 4==4, stride
+# 1038336==256 ... _scaled_dot_product_flash_attention_backward", on the first
+# step. Off by default: slower, and right. COMPILE=1 in train.env to try it.
+COMPILE="${COMPILE:-0}"
+compile_arg=()
+[ "$COMPILE" = 1 ] || compile_arg=(-e TORCHDYNAMO_DISABLE=1 -e UNSLOTH_COMPILE_DISABLE=1)
+
 run() {
     $ENGINE run --rm "${tty_arg[@]}" --device /dev/kfd --device /dev/dri "${groups_arg[@]}" \
         --security-opt seccomp=unconfined --ipc=host \
-        -v "$ROOT:/work" -v "$HOME/.cache/huggingface:/hf" -e HF_HOME=/hf "${base_mount[@]}" \
-        -w "/work/$RUN" \
+        -v "$ROOT:/work" -v "$LLAMA:/llama" -v "$HOME/.cache/huggingface:/hf" -e HF_HOME=/hf "${base_mount[@]}" \
+        -w "/work/$RUN" "${compile_arg[@]}" \
         ${HSA_OVERRIDE_GFX_VERSION:+-e HSA_OVERRIDE_GFX_VERSION="$HSA_OVERRIDE_GFX_VERSION"} \
         "$IMAGE" "$@"
 }
 
 # --- train ------------------------------------------------------------------
-echo "training $NAME on $N examples (rank $RANK, $EPOCHS passes)..."
-run python3 /work/training/train.py --kind "$KIND" --base "$base_in" --train "/work/$TRAIN" \
-    --out "/work/$RUN" --rank "$RANK" --epochs "$EPOCHS" --lr "$LR" --max-len "$MAX_LEN" --load-4bit "$LOAD_4BIT"
+# A finished run with no GGUF yet (the conversion failed): convert it again
+# without training it again. Same day, same examples, same name.
+if [ -f "$RUN/luna-patch.json" ] && [ -f "$RUN/adapter_model.safetensors" ]; then
+    echo "$RUN is already trained: converting it again"
+else
+    echo "training $NAME on $N examples (rank $RANK, $EPOCHS passes)..."
+    run python3 /work/training/train.py --kind "$KIND" --base "$base_in" --train "/work/$TRAIN" \
+        --out "/work/$RUN" --rank "$RANK" --epochs "$EPOCHS" --lr "$LR" --max-len "$MAX_LEN" --load-4bit "$LOAD_4BIT"
+fi
 
 # --- into a GGUF patch ------------------------------------------------------
 # llama.cpp's own converter: the copy server/llama/install.sh built from, or a
 # fresh one fetched into agent/dataset/ just for this.
-CONV=server/llama/llama.cpp
-if [ ! -f "$CONV/convert_lora_to_gguf.py" ]; then
-    CONV=agent/dataset/llama.cpp
-    [ -f "$CONV/convert_lora_to_gguf.py" ] || git clone --depth 1 https://github.com/ggml-org/llama.cpp "$CONV"
+CONV=/llama/llama.cpp
+if [ ! -f server/llama/llama.cpp/convert_lora_to_gguf.py ]; then
+    CONV=/work/agent/dataset/llama.cpp
+    [ -f agent/dataset/llama.cpp/convert_lora_to_gguf.py ] || git clone --depth 1 https://github.com/ggml-org/llama.cpp agent/dataset/llama.cpp
 fi
 base_arg=(--base "$base_in")
 [ -d "$BASE" ] || base_arg=(--base-model-id "$BASE")
-run env PYTHONPATH="/work/$CONV/gguf-py" python3 "/work/$CONV/convert_lora_to_gguf.py" \
-    "${base_arg[@]}" --outtype f16 --outfile "/work/server/llama/patches/$NAME.gguf" "/work/$RUN"
+run env PYTHONPATH="$CONV/gguf-py" python3 "$CONV/convert_lora_to_gguf.py" \
+    "${base_arg[@]}" --outtype f16 --outfile "/llama/patches/$NAME.gguf" "/work/$RUN"
 
 "$PY" - "$RUN/luna-patch.json" "server/llama/patches/$NAME.json" "$FOR_MODEL" <<'PY'
 import json, sys

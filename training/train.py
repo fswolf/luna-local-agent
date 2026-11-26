@@ -85,6 +85,29 @@ def encode(tok, messages, prefix, max_len, tools=None):
     return {"input_ids": ids, "labels": labels}
 
 
+def _settings(a, n):
+    """The trainer's settings, kept to the ones this transformers has: version 5
+    dropped warmup_ratio ("unexpected keyword argument"), and the image takes
+    whatever version is current when it's built. The warm-up is given in steps,
+    which every version takes: 5% of the run, at least one."""
+    import inspect
+    import math
+
+    from transformers import TrainingArguments
+
+    steps = max(1, math.ceil(n / max(1, a.accum)) * math.ceil(a.epochs))
+    want = dict(per_device_train_batch_size=1, gradient_accumulation_steps=a.accum,
+                num_train_epochs=a.epochs, learning_rate=a.lr, lr_scheduler_type="cosine",
+                warmup_steps=max(1, round(steps * 0.05)), weight_decay=0.01, logging_steps=5,
+                optim="adamw_torch", output_dir=os.path.join(a.out, "checkpoints"), save_strategy="no",
+                report_to="none", seed=3407, remove_unused_columns=False)
+    known = inspect.signature(TrainingArguments.__init__).parameters
+    dropped = sorted(k for k in want if k not in known)
+    if dropped:
+        print(f"(this transformers has no {', '.join(dropped)}: left at its default)")
+    return {k: v for k, v in want.items() if k in known}
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--kind", required=True)
@@ -138,11 +161,7 @@ def main():
     trainer = Trainer(
         model=model, train_dataset=Dataset.from_list(rows),
         data_collator=DataCollatorForSeq2Seq(tok, padding=True, label_pad_token_id=-100),
-        args=TrainingArguments(per_device_train_batch_size=1, gradient_accumulation_steps=a.accum,
-                               num_train_epochs=a.epochs, learning_rate=a.lr, lr_scheduler_type="cosine",
-                               warmup_ratio=0.05, weight_decay=0.01, logging_steps=5, optim="adamw_torch",
-                               output_dir=os.path.join(a.out, "checkpoints"), save_strategy="no",
-                               report_to="none", seed=3407, remove_unused_columns=False))
+        args=TrainingArguments(**_settings(a, len(rows))))
     stats = trainer.train()
 
     model.save_pretrained(a.out)
