@@ -6,6 +6,8 @@ about it.
 
 Part of the commands package; see commands/__init__.py.
 """
+import os
+
 import ui
 
 
@@ -81,14 +83,23 @@ def handle(text):
             ui.add_message("system", "/patches  or  /patches <name or id> <strength 0-1>")
             return True
         model, found, live = patches.current_model(), patches.local(), patches.loaded()
-        lines = [f"Her patches (server/llama/patches/) - model: {model or 'not started by server/llama/start.sh yet'}"]
-        if not found:
+        # Her model server can be another machine (a server, a VM with the card):
+        # then the patch files are there, not here, and only what it reports
+        # loaded can be shown. The strength still changes from here.
+        here = {p["name"] for p in found}
+        away = [r for r in live or [] if os.path.basename(r["path"])[:-5] not in here]
+        where = model or ("her model server" if away else "not started by server/llama/start.sh yet")
+        lines = [f"Her patches (server/llama/patches/) - model: {where}"]
+        if not found and not away:
             lines.append("  none trained yet: training/train.sh gesture|habit (docs/patches.md)")
         for p in found:
             on = next((r for r in live or [] if r["path"].endswith(p["name"] + ".gguf")), None)
             state = (f"loaded, id {on['id']}, strength {on['scale']:g}" if on else
                      "fits, not loaded (restart server/llama/start.sh)" if p["fits"] else f"left out: made for {p['for'] or 'unknown'}")
             lines.append(f"  {p['name']}  [{p['kind']}, {p['examples'] or '?'} examples]  {state}")
+        for r in away:
+            lines.append(f"  {os.path.basename(r['path'])[:-5]}  loaded on her model server, id {r['id']}, "
+                         f"strength {r['scale']:g}")
         if live is None:
             lines.append("  (llama-server isn't answering, so what's loaded is unknown)")
         ui.add_message("system", "\n".join(lines))

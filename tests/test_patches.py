@@ -109,6 +109,21 @@ class OnDisk(unittest.TestCase):
         self.assertIn("habit-b", text)
         self.assertIn("made for Other", text)
 
+    def test_command_with_her_model_on_another_machine(self):
+        # the desktop has no patch files; the server reports what it loaded
+        from commands import patches as cmd
+
+        empty = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, empty, True)
+        live = [{"id": 0, "path": "/home/you/luna/llama/patches/habit-qwen-9b-n14.gguf", "scale": 1}]
+        with mock.patch.object(patches, "FOLDER", empty), mock.patch.object(patches, "_call", return_value=live), \
+                mock.patch("ui.add_message") as say:
+            cmd.handle("/patches")
+        text = say.call_args[0][1]
+        self.assertIn("model: her model server", text)
+        self.assertIn("habit-qwen-9b-n14  loaded on her model server, id 0, strength 1", text)
+        self.assertNotIn("none trained yet", text)
+
 
 try:
     import jinja2  # noqa: F401

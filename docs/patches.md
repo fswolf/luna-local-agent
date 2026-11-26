@@ -117,6 +117,22 @@ What it does:
 A patch is named for what it is: `gesture-<model>-<date>-n<examples>.gguf`. A second
 run on the same day adds the time, so the first one is kept.
 
+### Leaving it running
+
+- **No timer to set.** It's a fixed amount of work, `EPOCHS` passes over your
+  examples, then it stops and writes the patch. How long depends on how many examples
+  there are and how long they are.
+- **Watch the first few minutes.** It prints how many examples it's using (and how many
+  were too long), a progress bar with the time left, and the loss every few steps. The
+  loss should drift down.
+- **The first run takes longest.** It builds the trainer image (PyTorch for ROCm,
+  several GB) and downloads the full-size model (`BASE`, about 18 GB for a 9B) into
+  `~/.cache/huggingface`. Both happen once.
+- **Start it in `tmux`** (or `screen`). If your SSH connection drops, the run goes with
+  it; in `tmux`, Ctrl+B then D leaves it running and `tmux attach` comes back to it.
+- **Let it finish.** Nothing is saved partway, so a stopped run starts over. Keep the
+  machine from sleeping or rebooting.
+
 ### Settings
 
 In `training/train.env`. Any of them can also be given on the command line, like
@@ -141,6 +157,52 @@ lines and her earlier replies in that conversation are there as context, never l
 from, since you never reviewed them. Whatever her model's chat template writes before a
 reply (Qwen's empty thinking block) is context too, so a patch doesn't teach her to skip
 thinking.
+
+## Training on her model server
+
+Training needs the graphics card her model runs on. When that's another machine (a
+server, or a VM with the card passed through), train there. That machine needs a little
+of Luna's folder, not all of it, and nothing installed in Python: the export runs on
+plain `python3`.
+
+1. **A Luna folder on the server**, say `~/luna`, with:
+   - `training/` and `config/`, copied from your Luna folder;
+   - `agent/dataset/examples.jsonl`, your examples. They're collected where she runs
+     and never go in git, so copy them over again before every run;
+   - her llama folder at `server/llama`. If the server already runs her model from a
+     copy of `server/llama` somewhere else (say `~/luna/llama`), link it rather than
+     copying: `mkdir -p ~/luna/server && ln -s ~/luna/llama ~/luna/server/llama`. The
+     script reads which model is running (`patches/.current_model`, written by
+     `start.sh`) and writes the patch where `start.sh` loads it from, so both have to be
+     the folder the server really uses.
+
+   Any way of copying works: `scp`, `rsync`, or FileZilla over SFTP.
+2. **`BASE` in `training/train.env`**: the Hugging Face id of the full-size (safetensors,
+   16-bit) version of the exact model in her `server.env`, not the GGUF. For DavidAU's
+   Qwen3.5-9B The Defiant Fable Heretic that's
+   `DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP`. A
+   different finetune, or the stock model, gives a patch that doesn't fit.
+3. **Docker or podman.** With Docker, your user has to be in the `docker` group:
+   `sudo usermod -aG docker <you>`, then log in again (`docker ps` should list nothing,
+   not "permission denied").
+4. **`tmux`** for leaving it running: `sudo apt install tmux` on Debian.
+5. **Stop her model server**, then check and run:
+
+   ```
+   cd ~/luna && training/train.sh habit --check
+   tmux new -s train
+   cd ~/luna && training/train.sh habit
+   ```
+6. **Start her model server again.** It loads the new patch by itself.
+
+**Memory and disk.** A 9B loaded in 4 bits (`LOAD_4BIT=1`) takes 5 to 6 GB of the card,
+and training a patch adds the room for the examples on top, so a 16 to 20 GB card has
+space once her server is stopped. Her server and the training together don't fit. The
+disk needs about 18 GB for the full-size 9B and a few GB for the trainer image.
+
+From Luna on your desktop, `/patches` shows the patches the server has loaded ("loaded
+on her model server") and `/patches <name> 0.5` changes their strength, the same as on
+one machine.
 
 ## Using a patch
 
