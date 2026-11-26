@@ -43,7 +43,7 @@ Everything the README only touches on, one subject per page.
 - [Gestures](gestures.md): how her body moves, and writing your own
 - [Home automation](home.md): Home Assistant on your own network, setup, what always asks, local devices
 - [Offline library](library.md): Wikipedia and other reference books on your own disks through Kiwix, no internet needed
-- [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, from your phone
+- [Sysadmin](sysadmin.md): looking after your machines, scheduled checks, other boxes over SSH, helper scripts (health, backups, CVEs, updates, website security), from your phone
 - [Plugins](plugins.md): how they work, writing your own, scheduled jobs and Discord
 - [Stream chat](chat.md): pomf.tv, Twitch, YouTube and IRC, and what viewers can and can't reach
 - [Games](games.md): chess, Minecraft, her text adventure library (Zork I to III, Starcross, Planetfall, The Hitchhiker's Guide), Vibe City, REALITI, Game Boy, playing on her own

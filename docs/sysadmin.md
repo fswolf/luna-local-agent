@@ -211,6 +211,101 @@ Luna's own folder can), and that's deliberate here too: a scheduled job
 that reads the web shouldn't be able to rewrite a script you approved.
 Reports from scheduled jobs go in a folder of their own outside it.
 
+## Helper scripts
+
+Anything with more than a step or two goes in a script in
+`agent/jobs/`: she runs it and reads what it printed, instead of
+writing twenty commands on the spot. The same check gives the same
+answer every time, and a small model only has to explain a report.
+These six are from the setup Luna is built on (a desktop, a VM with the
+graphics card, a web server called the NUC, and an Unraid NAS). The
+folder is gitignored, so they aren't in the repo: write your own the
+same way, with your own hosts.
+
+| Script | What it does | Changes anything? | Used as |
+|--------|--------------|-------------------|---------|
+| `vm-health.sh` | the VM her model runs on: up, load, memory, disks, the GPU (busy, VRAM, temperatures, power), llama-server (`/health`, `/props`, `/slots`: model, context, busy slots), failed services, driver warnings, errors since boot | no | recipe: "check vm health" |
+| `nuc-health.sh` | the web server: the basics, Apache and MariaDB, certbot's timer, every site Apache serves with its answer and certificate days left | no | recipe |
+| `backups-to-nas.sh` | copies the nightly `*.sql.gz` dumps to the NAS (`.part`, `gzip -t`, rename), then thins the share: 30 days, the first of each month for a year, never under 7 per database. `--dry-run` | writes to the NAS only | job, Sundays 4am ([walkthrough](jobs.md)) |
+| `cve-check.sh` | security fixes each machine is missing, from its own package manager: debsecan on Debian (urgency, remotely exploitable), apt on Ubuntu, dnf on Fedora, arch-audit on Arch, the version on Unraid. A kernel waiting on a reboot. `local` checks this computer | no | recipe |
+| `nuc-update.sh` | lists what's waiting (security fixes marked), then `apt-get upgrade`: no removals, configs kept, never reboots. Apache and MariaDB checked after, and whether a reboot is waiting. `--check` lists only | yes | you, in a terminal (sudo asks); Luna runs `--check` |
+| `site-check.sh` | a website's security from outside, with the fix for every finding (below) | no | recipe |
+
+Each one uses SSH key login with `BatchMode=yes`, so it fails instead
+of waiting for a password, and marks problems in words she can find:
+`FAILED`, `[HIGH]`, `reboot waiting`. Turn one into a one-sentence
+check with a [recipe](skills.md#walkthrough-check-vm-health), or run it
+on a timer as a [script job](plugins.md#a-job-that-runs-a-script).
+Upgrading stays a terminal job on purpose: it needs root, and Luna has
+no password to give sudo.
+
+### Website security: site-check.sh
+
+```bash
+bash ~/ai-voice/agent/jobs/site-check.sh example.com            # the public face
+bash ~/ai-voice/agent/jobs/site-check.sh example.com --active   # plus ports and leaked files
+bash ~/ai-voice/agent/jobs/site-check.sh example.com --active --report   # as a report to read
+```
+
+| Part | Checks |
+|------|--------|
+| DNS and email | SPF, DMARC, DKIM (common selectors), CAA, DNSSEC |
+| Web | the https redirect, HSTS, CSP, X-Frame-Options or `frame-ancestors`, nosniff, Referrer-Policy, version numbers in `Server`, `X-Powered-By` and the generator tag, cookie flags, `security.txt` |
+| Certificate and TLS | days left, TLS 1.0 and 1.1 still on, TLS 1.3 |
+| Ports (`--active`) | nmap's top 100 with versions: databases, Webmin, cPanel, Proxmox, Cockpit, FTP, an open DNS resolver |
+| Leaked files (`--active`) | `.git`, `.env`, backups, phpinfo, `server-status`, phpMyAdmin; nuclei's non-intrusive templates if nuclei is installed |
+
+The public face is only what any browser or mail server already sees.
+`--active` scans ports and asks for paths that shouldn't exist: your
+own sites, or a client's who said yes in writing. Nothing is logged
+into, submitted or changed either way. Needs `curl`, `openssl`, `dig`,
+and `nmap` for `--active`.
+
+Each finding is one line, `[HIGH]` `[MED]` `[LOW]` `[INFO]` or `[OK]`,
+and most have a `fix:` line under it, written for what serves the site
+(Apache, nginx, or Plesk, where the fix goes through its panel):
+
+```
+[LOW] Server header shows a version: Apache/2.4.62 (Debian)
+       fix: in /etc/apache2/conf-available/security.conf: ServerTokens Prod and ServerSignature Off, one per line, then sudo systemctl reload apache2
+[HIGH] port 10000 open: almost certainly Webmin, a full server admin panel, open to the whole internet
+       fix: allow=<your IP> in /etc/webmin/miniserv.conf, then sudo systemctl restart webmin
+```
+
+The fix lines are there because she made them up without them: a
+config file that doesn't exist, nginx on an Apache box, a CAA record as
+TXT. `--report` prints the same findings grouped worst first, each a
+bullet with a bold title and its fix, in plain text with `**bold**`
+(what her chat and Discord both show). She passes it on as printed:
+asked to tidy a report herself, a small model copies the look of the
+last one in the chat, good or bad.
+
+**From inside your own network.** For a site hosted at home, scanned
+from home, the domain resolves to your own router, and the router
+answers for itself as it does for anything on the LAN (DNS on 53, UPnP
+on 1900, its admin page). The script compares the site's address with
+your public one (`myip.opendns.com`), says at the top that this is the
+inside view, and marks 53, 1900, 5000 and 5351 as INFO instead of
+counting them. Forwarded ports are still real. For the outside view,
+run it from a phone hotspot.
+
+**As a recipe.** Scans take a minute or two, longer than
+`run_command`'s 60 second default, so the recipe says so. Run one scan
+by asking, then send this as a message of its own:
+
+> Remember this recipe for website security scans: run bash
+> ~/ai-voice/agent/jobs/site-check.sh <domain> --active --report with a
+> 180 second timeout. Reply with the report exactly as the script
+> printed it, first line to last: don't reformat it, drop lines or add
+> fixes of your own. After it, one or two sentences of your own on what
+> to fix first. Never say the scan was from my network unless the report
+> says so.
+
+"Scan example.com" is the whole request after that. Each scan is
+still a popup you allow:
+
+![The approval popup for a scan: the site-check.sh command, the folder, a 60 second timeout and her reason, with Allow and Deny](https://raw.githubusercontent.com/fswolf/luna-local-agent/main/assets/approval-site-check.png)
+
 ## From your phone
 
 With [Discord](plugins.md#discord-remote-access) on, the same questions
