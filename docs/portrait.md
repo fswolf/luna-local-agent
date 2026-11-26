@@ -735,7 +735,7 @@ gestures <mode>`.
 | Mode | How | Cost |
 |------|-----|------|
 | `keywords` (default) | Only `*hugs*`, `*waves*`, 🤗, a move she describes like "(waves hello)", and your hi or hug request. Nothing is added to her prompt, so it never changes how she talks | Nothing |
-| `tags` | She picks. A line in her prompt lets her put one hidden tag like `[hug]` where it fits; it's cut out before anything is shown, spoken or saved, and sent to the portrait. Keywords catch what she forgets | About 50 prompt tokens for a few gestures that fit her mood (`portrait.gestures_offered`) and a few output tokens when she uses one. No extra time |
+| `tags` | She picks. A line in her prompt lets her put one hidden tag like `[hug]` where it fits; it's cut out before anything is shown, spoken or saved, and sent to the portrait. Keywords catch what she forgets. A bracketed action that isn't a tag, like `[blushing]`, is shown as `*blushing*` and read like her other actions | About 50 prompt tokens for a few gestures that fit her mood (`portrait.gestures_offered`) and a few output tokens when she uses one. No extra time |
 | `meaning` | After she answers, the embedding model compares what was said with a short description of each gesture, and plays the one that clearly beats "an ordinary reply". Keywords as a fallback | One embedding call per reply, 10 to 30 ms, off the turn's path. Needs the embedding server; without it this is keywords only |
 | `off` | Nothing from the conversation. Idle moves and chat still work | Nothing |
 

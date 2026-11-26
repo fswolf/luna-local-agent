@@ -216,6 +216,11 @@ def _ask(text, model, on_text=None, on_sentence=None,
     started = time.monotonic()
     _last_raw["thinking"] = []
     _last_raw["tokens"] = []
+    # This turn's tool calls. Only the tool rounds reset these, so a turn
+    # without tools kept the last turn's: saved into this turn's history,
+    # and read as "a tool was called" by the second look and held speech.
+    _last_raw["exchanges"] = []
+    _last_raw["called"] = set()
     _last_raw["steps"] = []           # follow-throughs, in order (second_look._note_step)
     _last_raw["steps_said"] = ""
 
@@ -327,6 +332,14 @@ def _ask(text, model, on_text=None, on_sentence=None,
     adaptive = _adaptive_on(remember)
     base_messages = list(messages)
 
+    # Held speech: her sentences wait until the reply has had its second
+    # look, so a reply that gets corrected is never half-said and only the
+    # one she settles on is spoken. Once a tool is called there's no second
+    # look, and from then on she speaks as she goes.
+    speech = (_HeldSpeech(on_sentence)
+              if adaptive and on_sentence and getattr(config, "ADAPTIVE_HOLD_SPEECH", True) else None)
+    first_sentence = speech or on_sentence
+
     if adaptive and config.ADAPTIVE_FIRST_BUDGET >= 0:
         payload["reasoning_budget_tokens"] = int(config.ADAPTIVE_FIRST_BUDGET)
     elif (turnctx.current().job and getattr(config, "LLM_BACKEND", "") == "llama"
@@ -359,7 +372,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
                                        previous=_previous_user_text(replayed))
 
         try:
-            answer = _heard(_tool_rounds, payload, model, on_text, on_sentence)
+            answer = _heard(_tool_rounds, payload, model, on_text, first_sentence)
         except RuntimeError as e:
             if "image" in str(e).lower() or "vision" in str(e).lower():
                 if getattr(config, "LLM_BACKEND", "") == "llama":
@@ -395,9 +408,12 @@ def _ask(text, model, on_text=None, on_sentence=None,
                 logbook.warn("llm", "tool round failed, answering this turn without tools: %s", e)
                 _log_tool_call("tools", "that went wrong, answering without tools this once")
 
-            answer = _heard(_generate, payload, on_text, on_sentence)
+            if speech:
+                speech.forget()     # the failed attempt's sentences: only the retry's are hers
+
+            answer = _heard(_generate, payload, on_text, first_sentence)
     else:
-        answer = _heard(_generate, payload, on_text, on_sentence)
+        answer = _heard(_generate, payload, on_text, first_sentence)
 
     answer = _strip_leading_timestamps(answer)
 
@@ -427,6 +443,8 @@ def _ask(text, model, on_text=None, on_sentence=None,
         # already said what's coming. Unless nothing she has does it: then
         # one honest line, not some other tool for the sake of calling one.
         promise = _promised_action(answer)
+        if speech:
+            speech.release()
         _log_tool_call("follow-through", f"said \u201c{promise}\u201d but called nothing - doing it now")
         livefeed.emit("rethink", step="done", outcome="follow-through: promised a step, taking it")
         answer = _follow_through(
@@ -447,6 +465,8 @@ def _ask(text, model, on_text=None, on_sentence=None,
         # She said she did it, or that it works, and the record says
         # otherwise. Back to it, out loud: do it now or own up. The calls
         # made before stay in this turn's record.
+        if speech:
+            speech.release()
         before, called = list(_last_raw.get("exchanges") or []), set(_last_raw.get("called") or ())
         _log_tool_call("follow-through", unbacked[0].upper() + unbacked[1:].split(". ")[0])
         livefeed.emit("rethink", step="done", outcome="follow-through: a claim the tools don't back")
@@ -461,7 +481,17 @@ def _ask(text, model, on_text=None, on_sentence=None,
             and _last_raw.get("tokens")
             and answer != "...sorry, I got tangled up there. Say that again?"):
         how = _vote if str(getattr(config, "ADAPTIVE_MODE", "vote")).lower() == "vote" else _rethink
-        second = how(payload, base_messages, answer, on_text, on_sentence)
+        try:
+            second = how(payload, base_messages, answer, on_text, on_sentence, held=bool(speech))
+        except Exception:
+            if speech:
+                speech.release()    # the second look failed: the reply she wrote still gets said
+            raise
+
+    if speech:
+        # Corrected: the first reply was never said, and now never will be.
+        # Anything else: say it now.
+        speech.drop() if (second and second.get("corrected")) else speech.release()
 
     if second and second.get("wants_tools"):
         # She answered without looking, and the second look says she
@@ -477,9 +507,11 @@ def _ask(text, model, on_text=None, on_sentence=None,
     first_answer = answer
 
     if second and second["corrected"]:
-        # What she actually said, both parts - history and the
-        # transcript keep the correction, not a tidier version of events.
-        answer = f"{first_answer}\n\n{second['said']}"
+        # The answer she settled on takes the first one's place, on screen
+        # and in history: glued on after it, she said nearly the same thing
+        # twice, and then copied that from her own history. The thought log
+        # still keeps both, side by side (below).
+        answer = second["answer"]
 
     pre_calibration = answer
     spoken = _calibrate(answer, second, remember and source is None, on_text, on_sentence)
@@ -646,3 +678,34 @@ def _ask(text, model, on_text=None, on_sentence=None,
             longterm.extract_in_background(model, text, answer, asked=True)
 
     return answer
+
+
+class _HeldSpeech:
+    """Her sentences for the voice, held back until the turn knows whether
+    the reply stands. Called like on_sentence. release() speaks what's held
+    and lets the rest through; drop() throws it away for good (the reply was
+    replaced); forget() throws it away and keeps holding (a retry)."""
+
+    def __init__(self, on_sentence):
+        self._on_sentence = on_sentence
+        self._held = []
+        self._open = False
+
+    def __call__(self, sentence):
+        if not self._open and _last_raw.get("exchanges"):
+            self.release()      # a tool was called: no second look, so no reason to wait
+        if self._open:
+            self._on_sentence(sentence)
+        else:
+            self._held.append(sentence)
+
+    def release(self):
+        held, self._held, self._open = self._held, [], True
+        for sentence in held:
+            self._on_sentence(sentence)
+
+    def drop(self):
+        self._held, self._open = [], True
+
+    def forget(self):
+        self._held = []

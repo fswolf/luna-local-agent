@@ -86,14 +86,25 @@ def handle(text):
                     "partly": "dressed, without her " + ", ".join(now["off"])}.get(now["wearing"], "not reported yet (is the portrait open?)")
             ui.add_message("system", f"She's {said}.\n  /outfit dressed | underwear | off <piece> | on <piece>   (pieces: top, tie, bottoms...)")
             return True
-        if words[0] in ("dressed", "underwear"):
-            livefeed.emit("outfit", wear=words[0])
-        elif words[0] in ("off", "on") and len(words) > 1:
-            livefeed.emit("outfit", **{words[0]: [" ".join(words[1:]).lower()]})
+        piece = " ".join(words[1:]).lower()
+        if words[0] == "dressed":
+            said = "Getting her dressed."
+        elif words[0] == "underwear":
+            said = "Down to her underwear."
+        elif words[0] in ("off", "on") and piece:
+            said = f"Taking off her {piece}." if words[0] == "off" else f"Putting her {piece} back on."
         else:
             ui.add_message("system", "/outfit dressed | underwear | off <piece> | on <piece>")
             return True
-        ui.add_message("system", "Sent to the portrait (taking things off waits while she's in tame mode).")
+
+        # taking things off waits while a stream has lewd off; putting them on never does
+        from mind import mood
+        held = mood.tame()
+        if words[0] in ("underwear", "off") and held:
+            ui.add_message("system", f"Not now: she's in tame mode while {', '.join(held)} is live, so nothing comes off.")
+            return True
+        livefeed.emit("outfit", **({"wear": words[0]} if words[0] in ("dressed", "underwear") else {words[0]: [piece]}))
+        ui.add_message("system", said)
         return True
 
     if text in ("/lights", "/lights on", "/lights off"):

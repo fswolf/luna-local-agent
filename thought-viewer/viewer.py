@@ -549,7 +549,7 @@ function el(tag, cls, text) {
 // herself, so it says which, or it reads like a reply that went missing.
 const SOURCES = {
   rethink: ["second look · not said", "the same question asked again behind the scenes because the first answer was shaky; she kept her first answer, so this was never said"],
-  correction: ["correction · said", "a second look that disagreed on a fact: she said it out loud after her first answer"],
+  correction: ["correction · said", "a second look that disagreed on a fact: this answer replaced her first one, on screen and in history"],
 };
 function srcPill(source) {
   const [text, title] = SOURCES[source] || [source, ""];

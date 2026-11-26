@@ -274,15 +274,33 @@ def turn_steps(answer):
 _TOOL_MARKUP = re.compile(r"<tool_call>|<function=", re.IGNORECASE)
 
 
-def _rethink(payload, base_messages, answer, on_text, on_sentence):
+def _say_correction(text, on_sentence, held):
+    """Speak the answer she settled on. The reply on screen and in history
+    becomes this answer (ask() swaps it in): it's never added after the first.
+    Held speech means nothing of the first was said, so she just says this
+    one; otherwise the first is already out loud and the prefix owns up."""
+    said = str(text or "").strip() if held else f"{config.ADAPTIVE_PREFIX} {text}".strip()
+
+    if on_sentence:
+        speaker = _Narrator(None, on_sentence)
+        speaker.feed(said + " ")
+        speaker.finish()
+
+    return said
+
+
+def _rethink(payload, base_messages, answer, on_text, on_sentence, held=False):
     """A deeper second look at a shaky reply. Returns None when the
     first reply was sure enough, otherwise a dict with both passes'
     thinking and tokens, the outcome, and what (if anything) was said.
 
-    Shaky means unsure on average (under rethink_below), or a run of
-    coin-flip tokens on a specific - a number or a name. An unsure run in
-    banter is word choice; another look can't make "leans in closer" more
-    right, so it costs a generation for nothing (_vote the same)."""
+    Shaky means a run of coin-flip tokens on a specific - a number, a name,
+    a time. Low confidence on average isn't enough: a small model sits under
+    75% on nearly every chat reply, and its unsure runs there are word
+    choice. Another look can't make "leans in closer" more right, so it
+    costs a generation for nothing, and banter that names PHP or Tarkov in
+    passing isn't unsure of them (_vote the same). rethink_below is the bar
+    the second answer has to clear to replace the first."""
     from mind import thoughtlog
 
     first = {"thinking": _last_raw.get("thinking") or [],
@@ -293,7 +311,7 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
 
     shaky = _unsure_of_a_specific(answer, shape.get("span", ""))
 
-    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shaky):
+    if conf is None or not shaky:
         return None
 
     reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shaky
@@ -370,10 +388,7 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence):
     said = ""
 
     if corrected:
-        said = f"{config.ADAPTIVE_PREFIX} {second_text}".strip()
-        speaker = _Narrator(on_text, on_sentence)
-        speaker.feed("\n\n" + said + " ")
-        speaker.finish()
+        said = _say_correction(second_text, on_sentence, held)
         outcome = f"corrected herself - {conf:.0%} → {conf2:.0%} sure"
     elif not second_text:
         outcome = "second look came back empty - kept the first answer"
@@ -527,7 +542,7 @@ def _agrees(a, b):
 
     return _same_answer(a, b)
 
-def _vote(payload, base_messages, answer, on_text, on_sentence):
+def _vote(payload, base_messages, answer, on_text, on_sentence, held=False):
     """Like _rethink, but instead of one deeper look it asks the same
     question `adaptive.votes` more times at the normal thinking budget and
     compares the answers. Whatever most of them agree on wins:
@@ -540,8 +555,8 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
       * most of the new answers reach for a tool -> she goes and checks
 
     A correction needs a fact to correct: only when her answer and the
-    majority's both carry specifics (numbers, names) that differ does she
-    speak again. Playful replies that merely differ in wording are left
+    majority's both carry specifics (numbers, names) that differ does the
+    majority's answer replace hers. Playful replies that merely differ in wording are left
     alone, so the vote changes what she knows, never how she sounds.
 
     Returns the same shape _rethink does, so ask() treats them alike."""
@@ -555,7 +570,7 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
 
     shaky = _unsure_of_a_specific(answer, shape.get("span", ""))
 
-    if conf is None or (conf >= config.ADAPTIVE_RETHINK_BELOW and not shaky):
+    if conf is None or not shaky:
         return None
 
     reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shaky
@@ -655,10 +670,7 @@ def _vote(payload, base_messages, answer, on_text, on_sentence):
 
         if config.ADAPTIVE_SPEAK_CORRECTIONS:
             corrected = True
-            said = f"{config.ADAPTIVE_PREFIX} {best['text']}".strip()
-            speaker = _Narrator(on_text, on_sentence)
-            speaker.feed("\n\n" + said + " ")
-            speaker.finish()
+            said = _say_correction(best["text"], on_sentence, held)
             outcome = f"corrected herself - {best['agree'] + 1} of {total} answers agree on another reply"
         else:
             outcome = (f"would have corrected ({best['agree'] + 1} of {total} agree) - "

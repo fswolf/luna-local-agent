@@ -205,12 +205,35 @@ def prompt_line(private=True):
             "Most replies need none.\n")
 
 
+# Her own [blushing] or [gets into position]: an action in tag brackets that
+# isn't a tag. Tags taught her that brackets mean "something I do", so she
+# writes actions in them too. Shown as the action it is, *blushing*: never a
+# timestamp [01:23], a number [1], a link [text](url), an index (arr[i]), or
+# anything inside code she wrote (``` blocks and `inline`).
+_BRACKET_ACTION = re.compile(r"(?<![\w\])\[])\[([A-Za-z][A-Za-z' ,-]{1,118}[A-Za-z])\](?![(\[\]])")
+_CODE = re.compile(r"```.*?(?:```|$)|`[^`\n]*`", re.DOTALL)
+
+
+def _as_actions(text):
+    if "[" not in text:
+        return text
+    out, at = [], 0
+    for code in _CODE.finditer(text):           # an unclosed ``` runs to the end (still streaming)
+        out.append(_BRACKET_ACTION.sub(lambda m: f"*{m.group(1)}*", text[at:code.start()]))
+        out.append(code.group(0))
+        at = code.end()
+    out.append(_BRACKET_ACTION.sub(lambda m: f"*{m.group(1)}*", text[at:]))
+    return "".join(out)
+
+
 def strip(text):
-    """Text with gesture tags cut, and a half-written one held back."""
+    """Text with gesture tags cut, her other bracketed actions shown as
+    *actions*, and a half-written tag held back."""
     if "[" in text:
         # a space where it sat between words, nothing before punctuation
         text = _tag().sub("\0", text)
         text = re.sub(r"(?<=\S)\0(?=\w)", " ", text).replace("\0", "")
+        text = _as_actions(text)
     partial = _PARTIAL.search(text)
 
     if partial and any(n.startswith(partial.group(1).lower()) for n in names()):
@@ -233,8 +256,8 @@ def from_tags(answer_text):
     from life import clothes
 
     moves = mode() != "off"
-    if moves and ("(" in answer_text or "*" in answer_text):
-        from_asides(answer_text)
+    if moves and ("(" in answer_text or "*" in answer_text or "[" in answer_text):
+        from_asides(_as_actions(answer_text))
     if "[" not in answer_text:
         return
 

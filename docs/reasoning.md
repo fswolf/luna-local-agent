@@ -216,16 +216,20 @@ the thought log already measures:
 
 1. **Every turn thinks on a modest budget** (`first_budget`, 1024
    tokens), which also makes easy questions answer sooner.
-2. **If the reply came out shaky**, meaning under `rethink_below` (75%)
-   sure on average or with a run of coin-flip tokens on a specific (a
-   number, a name), the same question is asked again, silently, with the
-   thinking budget lifted (`deep_budget`, -1 = unlimited). An unsure run
-   in banter ("leans in closer") is just word choice, so it doesn't count.
+2. **If the reply came out shaky on a specific**, meaning a run of
+   coin-flip tokens on a number, a name, a time or a date, the same
+   question is asked again, silently, with the thinking budget lifted
+   (`deep_budget`, -1 = unlimited). Low confidence on average isn't
+   enough: a small model sits under 75% on nearly every chat reply, and
+   its unsure stretches in banter ("leans in closer") are word choice, not
+   doubt about a fact. Another answer would only change the wording.
 3. **The second answer replaces the first only if it's different and
-   genuinely sure**: above the same 75%, at least `min_gain` surer than
-   the first, and with no shaky stretch of its own. Then she says *"Hang
-   on, let me correct that."* and gives it. Otherwise she keeps what she
-   said, and the conversation shows a note: *held: same answer on a
+   genuinely sure**: above `rethink_below` (75%), at least `min_gain` surer than
+   the first, and with no shaky stretch of its own. Then it takes the
+   first one's place: on screen and in history there's only the corrected
+   answer, never the first with the second added after it (she read that
+   back as saying everything twice, and started doing it). Otherwise she
+   keeps what she said, and the conversation shows a note: *held: same answer on a
    second look*, or *kept the first answer: the second wasn't sure
    enough either*.
 
@@ -252,6 +256,16 @@ word and still disagree.
 
 It costs two quick extra answers, only on shaky turns. `/set
 adaptive.mode rethink` goes back to the single deeper second look.
+
+**Held speech (`hold_speech`, on by default).** Her voice waits until the
+reply has been checked, so a reply that gets corrected is never half-said:
+only the answer she settles on is spoken, once, with no *"Hang on, let me
+correct that."* since you never heard the first. The cost is the time to
+write the whole reply before the first word, a few seconds on a chat reply;
+the text still appears as it's written. A turn that calls a tool can't get
+a second look, so once she calls one she speaks as she goes. `/set
+adaptive.hold_speech false` starts speaking with the first sentence again;
+then a correction is said after the first reply, with the prefix.
 
 **Follow-through.** Separate from the second look, and on any server:
 when a reply ends with a step she announced ("let me read the file and
@@ -288,7 +302,7 @@ probabilities, so LM Studio gets neither the budget nor the rethink.
 Both passes are kept: the second look is its own row in the thought log,
 right after the turn it reconsidered, marked **second look · not said**
 (checked behind the scenes, her first answer stood) or **correction ·
-said** (she said it after her first answer). The **second looks** filter
+said** (the answer she gave in place of the first). The **second looks** filter
 lists them, and the live monitor shows the second
 look as it happens. Over time that answers the research question
 directly: when she was unsure, did more thinking actually help?
@@ -301,6 +315,7 @@ directly: when she was unsure, did more thinking actually help?
     "rethink_below": 0.75,
     "min_gain": 0.05,
     "speak_corrections": true,
+    "hold_speech": true,
     "follow_through": true,
     "mode": "vote",
     "votes": 2

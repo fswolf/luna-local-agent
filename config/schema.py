@@ -203,10 +203,17 @@ SCHEMA = {
     "portrait.hologram.intensity": ("float", "How strong the whole hologram effect is"),
     "portrait.hologram.glitch": ("float", "How often the hologram glitches sideways (0 = never)"),
     "portrait.hologram.base": ("bool", "Show the projector glow under the hologram"),
-    "portrait.gestures": ("choice", "How replies trigger gestures: tags (the model picks), meaning, keywords, or off",
+    "portrait.gestures": ("choice", "How her replies set off gestures. tags: she picks one herself as she answers, a hidden tag cut out "
+                          "before it's shown or spoken (about 50 prompt tokens; best with a capable model). meaning: after she answers, "
+                          "the embedding model she already runs for memory matches what was said to a gesture (nothing added to her "
+                          "prompt; needs the embedding server). keywords: only written actions like *hugs*, emoji, and your hi or hug. "
+                          "off: none from the conversation",
                           ("tags", "meaning", "keywords", "off")),
     "portrait.gestures_offered": ("int", "In tags mode, how many gestures the model gets to pick from at once (fewer helps small models)"),
-    "portrait.clothes": ("choice", "How the conversation changes the avatar's clothes: like gestures, tags (the model picks), keywords, or off (/outfit only)",
+    "portrait.clothes": ("choice", "How the conversation changes her clothes on a human model. gestures: follow the gestures setting "
+                         "(meaning counts as keywords). tags: she picks [top_off], [dress] and so on herself as she answers. keywords: "
+                         "only your plain words (take off your top) and her written actions (*slips her top off*). off: /outfit and "
+                         "the pose studio only",
                          ("gestures", "tags", "keywords", "off")),
     "portrait.chat_gestures": ("bool", "Let stream viewers trigger gestures (!hug, hi, lol)"),
     "portrait.meaning_margin": ("float", "In meaning mode, how clearly a reply has to match a gesture for it to play"),
@@ -398,9 +405,12 @@ SCHEMA = {
     "adaptive.first_budget": ("int", "How much the model can think on every turn (tokens)"),
     "adaptive.deep_budget": ("int", "How much it can think on a second look (tokens, -1 = no limit)"),
     "adaptive.job_budget": ("int", "How much it can think on jobs and game turns (tokens, -1 = no limit)"),
-    "adaptive.rethink_below": ("float", "Take a second look when the model is less sure than this (0 to 1)"),
+    "adaptive.rethink_below": ("float", "How sure a second answer must be to replace the first (0 to 1). A second look "
+                               "only happens when the model was unsure on a specific: a number, name or time"),
     "adaptive.min_gain": ("float", "How much surer a second answer must be to replace the first (0 to 1)"),
     "adaptive.speak_corrections": ("bool", "Say a corrected answer out loud. Off only shows it"),
+    "adaptive.hold_speech": ("bool", "Start speaking once the reply has been checked, so a corrected reply is never half-said "
+                             "and only the answer she settles on is spoken. Off starts speaking with the first sentence"),
     "adaptive.correction_prefix": ("text", "What Luna says before a corrected answer"),
     "adaptive.follow_through": ("bool", "If Luna says it'll do something and doesn't, make it actually do it"),
 

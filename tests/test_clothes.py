@@ -76,6 +76,33 @@ class Command(unittest.TestCase):
             self.assertTrue(portrait.handle("/outfit sideways"))
             emit.assert_not_called()
 
+    def test_outfit_says_what_it_did(self):
+        from commands import portrait
+
+        with mock.patch("web.livefeed.emit"), mock.patch("ui.add_message") as say, \
+                mock.patch("mind.mood.tame", return_value=[]):
+            portrait.handle("/outfit dressed")
+            self.assertEqual(say.call_args[0][1], "Getting her dressed.")
+            portrait.handle("/outfit on top")
+            self.assertEqual(say.call_args[0][1], "Putting her top back on.")
+            portrait.handle("/outfit off tie")
+            self.assertEqual(say.call_args[0][1], "Taking off her tie.")
+            self.assertNotIn("tame", " ".join(c[0][1] for c in say.call_args_list))
+
+    def test_tame_mode_holds_undressing_only(self):
+        from commands import portrait
+
+        with mock.patch("web.livefeed.emit") as emit, mock.patch("ui.add_message") as say, \
+                mock.patch("mind.mood.tame", return_value=["twitch"]):
+            portrait.handle("/outfit off top")
+            emit.assert_not_called()
+            self.assertIn("tame mode while twitch is live", say.call_args[0][1])
+            portrait.handle("/outfit underwear")
+            emit.assert_not_called()
+            portrait.handle("/outfit dressed")
+            emit.assert_called_with("outfit", wear="dressed")
+            self.assertEqual(say.call_args[0][1], "Getting her dressed.")
+
     def test_rave_set(self):
         from commands import portrait
 

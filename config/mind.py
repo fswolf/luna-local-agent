@@ -53,8 +53,10 @@ THOUGHTS_MAX_RECORDS = int(_thoughts_cfg.get("max_records", 2000))
 THOUGHTS_TOKEN_PROBS = flag(_thoughts_cfg.get("token_probs", True))
 
 # Adaptive thinking (llama-server only): a modest thinking budget for
-# every turn, and a second, deeper look only when the reply came out
-# shaky by its own token probabilities. See llm._rethink.
+# every turn, and a second look only when the reply came out shaky on a
+# specific (a number, a name) by its own token probabilities. rethink_below
+# is how sure the second answer has to be to replace the first. See
+# llm/second_look.py.
 #   "adaptive": { "enabled": true, "first_budget": 1024, "deep_budget": -1,
 #                 "rethink_below": 0.75, "min_gain": 0.05,
 #                 "speak_corrections": true, "job_budget": 1024 }
@@ -69,6 +71,10 @@ ADAPTIVE_DEEP_BUDGET = int(_adaptive_cfg.get("deep_budget", -1))
 ADAPTIVE_RETHINK_BELOW = float(_adaptive_cfg.get("rethink_below", 0.75))
 ADAPTIVE_MIN_GAIN = float(_adaptive_cfg.get("min_gain", 0.05))
 ADAPTIVE_SPEAK_CORRECTIONS = flag(_adaptive_cfg.get("speak_corrections", True))
+# Wait to speak until the reply has been checked: a reply that gets a second
+# look is never half-spoken, and only the answer she settles on is said.
+# Costs the time to write the whole reply before the first word is heard.
+ADAPTIVE_HOLD_SPEECH = flag(_adaptive_cfg.get("hold_speech", True))
 # "vote": on a shaky reply, ask again `votes` more times and go with what
 # most of the answers agree on. "rethink": one deeper second look.
 ADAPTIVE_MODE = str(_adaptive_cfg.get("mode", "vote")).lower()

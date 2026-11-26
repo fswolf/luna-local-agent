@@ -325,7 +325,8 @@
         "deep_budget": -1,
         "rethink_below": 0.75,
         "min_gain": 0.05,
-        "speak_corrections": true
+        "speak_corrections": true,
+        "hold_speech": true
     },
     "self": {
         "lessons": true,

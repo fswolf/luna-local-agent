@@ -153,6 +153,13 @@ def _tool_rounds(payload, model, on_text=None, on_sentence=None):
         })
         _last_raw["rounds"].append({"role": "assistant", "content": text or "", "tool_calls": calls})
 
+        # Held speech (llm/turns.py): a turn that calls a tool gets no second
+        # look, so what she said before the call ("let me check") is spoken
+        # now, not after the tool - or after its approval popup - comes back.
+        release = getattr(on_sentence, "release", None)
+        if release:
+            release()
+
         for call in calls:
             function = call.get("function", {})
             name = function.get("name", "")

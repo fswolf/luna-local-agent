@@ -48,14 +48,20 @@ class Refusals(unittest.TestCase):
             self.assertIn("already know", memory._remember_fact("Ryan has a cat"))
 
 
+def _called(names):
+    """A tool round that called these tools, recorded where real rounds record them."""
+    from llm import turns
+    turns._last_raw["called"] = set(names)
+    return "Got it!"
+
+
 class TheSafetyNet(unittest.TestCase):
     def run_turn(self, text, called):
         seen = []
         with mock.patch("llm.turns._generate", lambda *x: "ok"), \
                 mock.patch("tools.specs", lambda *x, **k: []), mock.patch("tools.begin_turn"), \
                 mock.patch("llm.turns.turn_prompt", lambda *x, **k: ("SYSTEM", "")), \
-                mock.patch("llm.turns._tool_rounds", lambda *x: "Got it!"), \
-                mock.patch.dict("llm.turns._last_raw", {"called": set(called)}), \
+                mock.patch("llm.turns._tool_rounds", lambda *x: _called(called)), \
                 mock.patch("llm.turns._calibrate", lambda answer, *x: answer), \
                 mock.patch("llm.turns._record_thoughts"), \
                 mock.patch("core.history.add_message"), mock.patch("core.history.save"), \

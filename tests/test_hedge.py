@@ -95,8 +95,24 @@ class WhenToLookAgain(unittest.TestCase):
     def test_a_shaky_specific_gets_one(self):
         self.assertEqual(self.run_vote("The card has 20 GB of VRAM.", "20 GB of"), 2)
 
-    def test_unsure_on_average_still_does(self):
-        self.assertEqual(self.run_vote("*smiles* Sure, it's running.", "smiles", conf=0.5), 2)
+    def test_unsure_on_average_with_the_doubt_on_a_specific_does(self):
+        self.assertEqual(self.run_vote("*smiles* Jellyfin is up on port 8096.", "port 8096", conf=0.5), 2)
+
+    def test_unsure_on_average_alone_does_not(self):
+        # the Q8 model: every chat reply under 0.75, and banter names things in
+        # passing (PHP, Tarkov, the time) without being unsure of them
+        self.assertEqual(self.run_vote("Oh, you silly senpai~ You came crawling back already?", "silly", conf=0.44), 0)
+        self.assertEqual(self.run_vote("Still debugging that PHP framework at 1:28? *leans in*", "leans in", conf=0.39), 0)
+        self.assertEqual(self.run_vote("*smiles* Sure, it's running.", "smiles", conf=0.5), 0)
+
+    def test_the_deeper_look_follows_the_same_rule(self):
+        shape = {"conf": 0.4, "shaky": "", "span": "leans in"}
+        raw = {"tokens": [[("x", "a", -1.0)]], "thinking": [], "exchanges": []}
+        with mock.patch.object(second_look, "_last_raw", raw), \
+                mock.patch.object(thoughtlog, "confidence", return_value=shape), \
+                mock.patch.object(second_look, "_chat_completion") as asked:
+            self.assertIsNone(second_look._rethink({"messages": []}, [], "Still on PHP at 1:28? *leans in*", None, None))
+        asked.assert_not_called()
 
 
 if __name__ == "__main__":

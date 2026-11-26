@@ -284,6 +284,7 @@ SETTINGS = {
     "adaptive.speak_corrections": ("ADAPTIVE_SPEAK_CORRECTIONS",   True),
     "adaptive.mode":              ("ADAPTIVE_MODE",                True),
     "adaptive.votes":             ("ADAPTIVE_VOTES",               True),
+    "adaptive.hold_speech":       ("ADAPTIVE_HOLD_SPEECH",         True),
     "grounding.enabled":          ("GROUNDING_ENABLED",            True),
     "grounding.mode":             ("GROUNDING_MODE",               True),
     "grounding.hedge_line":       ("GROUNDING_HEDGE_LINE",         True),
