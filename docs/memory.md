@@ -164,8 +164,10 @@ search, add, edit, confirm, retire, restore and delete (forget) facts. It's safe
 while she's running: an edit is in her next prompt. Your preferences
 (what she calls you, nicknames, what to avoid) aren't here: they're
 `user_preferences` in agent.json, under **Who she is** on the settings
-page ([Companion](companion.md#who-she-is-agentjson)). The page has four
-tabs: **About you** (the facts), **Her notebook** (how she feels about
+page ([Companion](companion.md#who-she-is-agentjson)). The page has six
+tabs: **About you** (the facts), **What she's concluded** (her conclusions
+about each person, with the ones set aside below), **Retired** (facts that
+stopped being true, with a restore button), **Her notebook** (how she feels about
 each game she's played, her notes on past conversations and game
 sessions, game ones marked), **Her lessons** (what she's learned, with
 retired ones below), each row with a forget, retire or edit button, and

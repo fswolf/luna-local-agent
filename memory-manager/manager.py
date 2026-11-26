@@ -389,11 +389,12 @@ PAGE = r"""<!DOCTYPE html>
             color: var(--ok); opacity: 0; transition: opacity .3s; }
   .empty { color: var(--dim); font-size: 13px; padding: 8px 2px; }
   .meta-note { color: var(--dim); font-size: 13px; }
-  #epsearch, #hsearch {
+  #epsearch, #hsearch, #csearch, #rsearch {
     width: 100%; padding: 9px 12px; border-radius: 8px;
     border: 1px solid var(--line); background: var(--panel);
     color: var(--text); font-size: 14px; outline: none;
   }
+  #csearch, #rsearch { margin: 12px 0 4px; }
   #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 6px 0 16px; flex-wrap: wrap; }
   #tabs a { color: var(--dim); text-decoration: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
             border: 1px solid transparent; border-bottom: none; margin-bottom: -1px; font-size: 14px; }
@@ -409,6 +410,8 @@ PAGE = r"""<!DOCTYPE html>
 <h1>Luna's memory</h1>
 <nav id="tabs">
   <a href="#facts" data-tab="facts">About you <span id="n-facts"></span></a>
+  <a href="#concluded" data-tab="concluded">What she's concluded <span id="n-concluded"></span></a>
+  <a href="#retired" data-tab="retired">Retired <span id="n-retired"></span></a>
   <a href="#notebook" data-tab="notebook">Her notebook <span id="n-notebook"></span></a>
   <a href="#lessons" data-tab="lessons">Her lessons <span id="n-lessons"></span></a>
   <a href="#history" data-tab="history">History</a>
@@ -431,22 +434,27 @@ PAGE = r"""<!DOCTYPE html>
 <input id="search" placeholder="filter..." oninput="render()">
 <div id="active"></div>
 
-<h2 id="retired-h">Retired</h2>
-<div id="retired"></div>
+<h2>Preferences</h2>
+<div class="meta-note">What she calls you, nicknames and what to avoid are in agent.json now, as <code>user_preferences</code>: the settings page, <a href="/settings/">Who she is</a>.</div>
+<!-- <textarea id="prefs" spellcheck="false"></textarea>
+<div style="margin-top:8px"><button onclick="savePrefs()">save preferences</button></div> -->
+</section>
 
+<section data-tab="retired" hidden>
+<div class="meta-note">Facts that stopped being true (she was told something newer) or that you or she retired. Kept as history: what used to be true, and when it stopped. Restore one to make it current again.</div>
+<input id="rsearch" placeholder="filter..." oninput="render()">
+<div id="retired"></div>
+</section>
+
+<section data-tab="concluded" hidden>
+<div class="empty nb-missing" style="display:none">What she's concluded (agent/notebook.db) can't be read right now.</div>
 <div id="nb-conclusions">
-<h2>What she's concluded</h2>
 <div class="meta-note">Read back from your conversations while she's idle: <b>said</b> is something you told her, <b>inferred</b> her own read of you (from two or more exchanges). Overnight she merges duplicates, sets aside the older of two that contradict, and lets guesses nothing has backed up fade. Mark one wrong and she won't conclude it again. <code>/conclusions why &lt;n&gt;</code> in the app shows the conversation behind one.</div>
 <input id="csearch" placeholder="filter..." oninput="renderNotebook()">
 <div id="conclusions"></div>
 <h2>Set aside</h2>
 <div id="rconclusions"></div>
 </div>
-
-<h2>Preferences</h2>
-<div class="meta-note">What she calls you, nicknames and what to avoid are in agent.json now, as <code>user_preferences</code>: the settings page, <a href="/settings/">Who she is</a>.</div>
-<!-- <textarea id="prefs" spellcheck="false"></textarea>
-<div style="margin-top:8px"><button onclick="savePrefs()">save preferences</button></div> -->
 </section>
 
 <section data-tab="notebook" hidden>
@@ -582,11 +590,12 @@ function editFeeling(row, f) {
   input.onkeydown = e => { if (e.key === "Enter") save.onclick(); };
 }
 
-// Tabs: one page each for facts, her notebook and her lessons, remembered in
+// Tabs: one page each for facts, what she's concluded, retired facts, her notebook,
+// her lessons and the history, remembered in
 // the address (#notebook), so a reload or a link lands on the same one.
 function showTab() {
   const want = (location.hash || "#facts").slice(1);
-  const tab = ["facts", "notebook", "lessons", "history"].includes(want) ? want : "facts";
+  const tab = ["facts", "concluded", "retired", "notebook", "lessons", "history"].includes(want) ? want : "facts";
   document.querySelectorAll("section[data-tab]").forEach(s => s.hidden = s.dataset.tab !== tab);
   document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
 }
@@ -600,6 +609,8 @@ function renderNotebook() {
   for (const id of ["nb", "nb-lessons", "nb-conclusions"]) document.getElementById(id).style.display = N ? "" : "none";
   document.querySelectorAll(".nb-missing").forEach(el => el.style.display = N ? "none" : "");
   count("n-facts", S.active.length);
+  count("n-retired", S.retired.length);
+  count("n-concluded", N ? N.conclusions.length : 0);
   count("n-notebook", N ? N.episodes.length + N.feelings.length : 0);
   count("n-lessons", N ? N.lessons.length : 0);
   if (!N) return;
@@ -748,7 +759,8 @@ function render() {
 
   const retiredWrap = document.getElementById("retired");
   retiredWrap.replaceChildren();
-  const rows = S.retired.filter(match);
+  const rq = document.getElementById("rsearch").value.toLowerCase();
+  const rows = S.retired.filter(f => !rq || f.fact.toLowerCase().includes(rq) || (f.subject || "").toLowerCase().includes(rq));
   if (!rows.length)
     retiredWrap.innerHTML = '<div class="empty">nothing retired</div>';
   rows.forEach(f => retiredWrap.appendChild(factRow(f, true)));
