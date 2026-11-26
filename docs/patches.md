@@ -150,6 +150,41 @@ In `training/train.env`. Any of them can also be given on the command line, like
 | `ENGINE` | podman, else docker | What runs the trainer |
 | `ROCM` | rocm6.4 | The PyTorch build in the container: rocm6.4 for ROCm 6 drivers, rocm7.2 for 7 |
 
+### Setting BASE
+
+`BASE` is the one setting every run needs. Open `training/train.env` and put the
+full-size version of her model between the quotes:
+
+```
+BASE="${BASE:-DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP}"
+```
+
+It has to be the **same model she runs, at full size**: the 16-bit safetensors, not the
+GGUF. Her GGUF is a packed copy for running; the trainer learns on the original, and the
+patch it makes is turned into a GGUF that sits on top of her packed one. A different
+finetune, or the stock model it was made from, gives a patch that doesn't fit.
+
+To find it:
+
+1. Her model's file name is in `server/llama/server.env` (`MODEL`), and
+   `training/train.sh habit --check` prints it on its first line.
+2. On Hugging Face, open the GGUF's page. The full-size version is usually the same
+   name without `-GGUF`, by the same author, and its page has a *Browse quantizations*
+   link back to the GGUF repo. Check it says *Safetensors*.
+3. Put that id in `BASE`. The first run downloads it (about 18 GB for a 9B) into
+   `~/.cache/huggingface`; or download it yourself and give the folder instead.
+
+What I run, and set:
+
+| | |
+|---|---|
+| Her model (`MODEL`) | `Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-NEO-MAX-MTP-Q8_0.gguf`, from `DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP-GGUF` |
+| `BASE` | `DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP` |
+| `FOR_MODEL` | left empty: `start.sh` notes the model it starts, and the patch is named for it |
+
+`--check` shows both before anything runs: `patch: habit, for <her GGUF>` and
+`trained on: <BASE>`. If those two aren't the same model, stop there.
+
 ### What she learns from
 
 Only the last reply in each example: the one you approved or wrote. Her prompt, your
@@ -177,11 +212,8 @@ plain `python3`.
      the folder the server really uses.
 
    Any way of copying works: `scp`, `rsync`, or FileZilla over SFTP.
-2. **`BASE` in `training/train.env`**: the Hugging Face id of the full-size (safetensors,
-   16-bit) version of the exact model in her `server.env`, not the GGUF. For DavidAU's
-   Qwen3.5-9B The Defiant Fable Heretic that's
-   `DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP`. A
-   different finetune, or the stock model, gives a patch that doesn't fit.
+2. **`BASE` in `training/train.env`**: the full-size version of the exact model the
+   server runs ([Setting BASE](#setting-base) above).
 3. **Docker or podman.** With Docker, your user has to be in the `docker` group:
    `sudo usermod -aG docker <you>`, then log in again (`docker ps` should list nothing,
    not "permission denied").
