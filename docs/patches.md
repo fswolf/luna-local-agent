@@ -50,6 +50,13 @@ on a phone), so you can keep any of her recent replies, not only the last one:
   empty ("Just mark it bad") and the reply is kept as a bad example. A bad example is never
   trained on as it is (it's dropped), but it's kept: a later kind of training learns from
   good and bad replies side by side.
+- Or type a note instead of the reply and press **She rewrites it**: "a playful no, she's
+  not in the mood", "shorter, and tease me back". Her own model writes the reply from the
+  same moment (the same prompt, her reply and your note), on your machine only, never a
+  bigger model, and it's kept like your own version with the note beside it. A line in the
+  conversation shows what she wrote; fix it on the examples page if it's off. This is how
+  to teach her things she never does on her own, like saying no, where there's no reply of
+  hers to keep.
 - A reply with gesture tags in it goes to the **gesture** examples, the rest to **habit**.
   You can still switch it on the examples page.
 - Changed your mind? Click the other thumb: it's still one example.

@@ -35,6 +35,7 @@ def _row(r):
     return {"id": r.get("id"), "when": r.get("when"), "kind": r.get("kind"), "source": r.get("source"),
             "model": r.get("model"), "approved": r.get("approved"), "said": said, "reply": r.get("reply"),
             "original": r.get("original"),
+            "note": r.get("note"),
             "context": [m for m in msgs if m.get("role") != "system"][:-1],
             "steps": _steps(r.get("rounds")),
             "system": f"{system}\n\n{note}" if note else system}

@@ -154,6 +154,7 @@ def _rate(body):
         data = json.loads(body or b"{}")
         epoch, index, up = int(data.get("e")), int(data.get("i")), data.get("up") is True
         better = str(data.get("better") or "")[:MAX_TYPED]
+        note = data.get("note") is True and not up
     except (ValueError, TypeError, AttributeError):
         return _json(400, {"error": "that couldn't be read"})
     with _lock:
@@ -161,7 +162,11 @@ def _rate(body):
     try:
         if shown is None:
             raise ValueError("that reply has gone from the conversation")
-        ex = dataset.rate(epoch, shown, up, better)
+        if note:            # her own model writes it from your note, in the background
+            # what she wrote answers your click, so it shows open (ui.Asked), not folded like a tool log
+            ex = dataset.rate_note(epoch, shown, better, done=lambda said: ui.add_message("system", ui.Asked(said)))
+        else:
+            ex = dataset.rate(epoch, shown, up, better)
     except ValueError as e:
         return _json(409, {"error": str(e)})
     n = dataset.counts()

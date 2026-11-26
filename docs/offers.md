@@ -24,6 +24,26 @@ Dates come from her memory: anything with a month and a day ("March 3",
 with a year long gone ("born May 3, 1990"), is the next time it comes
 round, like a birthday.
 
+### Right when she saves it
+
+A date doesn't have to wait until it's two weeks away. When she saves
+or updates a fact with a date coming up, and nothing reminds you of it
+yet, she asks then and there:
+
+```
+You:  Shannon's birthday is March 3
+Luna: Got it, March 3. Want a reminder the day before?
+```
+
+Yes sets the reminder; no means not now. That question counts as one of
+the date's two asks, so after a no she brings it up at most once more,
+when it's close, and only if there's still no reminder. "Don't ask me
+about that again" mutes it for good, every year. Same rules as the
+rest, with one difference: your own turns only, never a guest's fact,
+never in a heavy moment or while she's walked away, but the lewd row
+doesn't hold it back (it's a follow-up to what you just said, not an
+interruption). `offers.dates` switches it off with the watcher.
+
 ## When she brings it up
 
 - One thing per turn, on your own turns only: typed, spoken, from a

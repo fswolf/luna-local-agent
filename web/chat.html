@@ -98,6 +98,7 @@ color:var(--dim);cursor:pointer}
 padding:7px 9px;resize:vertical;min-height:60px}
 .better .row{display:flex;gap:6px;flex-wrap:wrap}
 .better .btn{padding:5px 11px;font-size:13px}
+.better .hint2{color:var(--dim);font-size:12px;line-height:1.4}
 body.drag #log{outline:2px dashed var(--accent);outline-offset:-8px}
 </style></head><body>
 <div id=log><div id=list><div class=hint>Say something. This is the same conversation as the terminal.</div>
@@ -309,11 +310,14 @@ function better(el, bar, idx) {
   if (el.querySelector('.better')) return;
   bar.classList.add('open');
   const f = document.createElement('div'); f.className = 'better';
-  f.innerHTML = `<textarea placeholder="How should it have been said? (optional)"></textarea>
-    <div class=row><button class=btn>Keep my version</button><button class="btn no" data-bad>Just mark it bad</button>
-    <button class="btn no" data-x>Cancel</button></div>`;
+  f.innerHTML = `<textarea placeholder="Her reply as it should have been, or a note on how (optional)"></textarea>
+    <div class=hint2><b>Keep my version:</b> what you typed is her reply, word for word.
+    <b>She rewrites it:</b> what you typed is a note ("a playful no, she's not in the mood"); her own model writes the reply on this machine and it's kept. Fix it on the examples page if it's off.</div>
+    <div class=row><button class=btn>Keep my version</button><button class=btn data-note>She rewrites it</button>
+    <button class="btn no" data-bad>Just mark it bad</button><button class="btn no" data-x>Cancel</button></div>`;
   const ta = f.querySelector('textarea'), close = () => { f.remove(); bar.classList.remove('open'); };
   f.querySelector('.btn').onclick = () => { if (ta.value.trim()) rate(idx, false, ta.value).then(ok => ok && close()); else ta.focus(); };
+  f.querySelector('[data-note]').onclick = () => { if (ta.value.trim()) rate(idx, false, ta.value, true).then(ok => ok && (close(), toast('She\'s rewriting it from your note...'))); else ta.focus(); };
   f.querySelector('[data-bad]').onclick = () => rate(idx, false, '').then(ok => ok && close());
   f.querySelector('[data-x]').onclick = close;
   f.onclick = ev => ev.stopPropagation();
@@ -328,10 +332,10 @@ function toast(words) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
 }
-async function rate(idx, up, better) {
+async function rate(idx, up, better, note) {
   try {
     const r = await fetch('rate', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({e, i: idx, up, better})});
+      body: JSON.stringify({e, i: idx, up, better, note: !!note})});
     const out = await r.json().catch(() => ({}));
     if (!r.ok) { toast(out.error || ('error ' + r.status)); return false; }
     rates[idx] = out.rated; thumbs();

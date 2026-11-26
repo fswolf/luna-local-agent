@@ -53,7 +53,7 @@ def _hers(fn):
 @_hers
 def _remember_fact(fact, since="", again=False):
     if longterm.add_fact(fact, since=since, again=_yes(again)):
-        return f"Saved: {fact}" + _date_note(since)
+        return f"Saved: {fact}" + _date_note(since) + _reminder_offer(fact)
 
     why = longterm.why_not(fact)
 
@@ -62,6 +62,16 @@ def _remember_fact(fact, since="", again=False):
 def _yes(value):
     """A boolean argument, however the model sent it ("false" is a word, and truthy)."""
     return value is True or str(value).strip().lower() in ("true", "yes", "1")
+
+
+def _reminder_offer(fact):
+    """A fact with a date coming up ("Shannon's birthday is March 3"): ask once
+    about a reminder (life/offers.py). Your own turns only."""
+    try:
+        from life import offers
+        return offers.on_save(fact)
+    except Exception:
+        return ""
 
 
 def _date_note(since):
@@ -229,8 +239,9 @@ def _update_fact(about, corrected, since="", mistake=False):
         if changed[0] == changed[1]:
             return f"Unchanged: {changed[0]!r}" + (_date_note(since) or " (it already says that)")
         if mistake or longterm.guest():          # a guest's facts keep no history
-            return f"Fixed: {changed[0]!r} is now {changed[1]!r}" + _date_note(since)
-        return f"Updated: {changed[1]!r} (kept {changed[0]!r} as what used to be true)" + _date_note(since)
+            return f"Fixed: {changed[0]!r} is now {changed[1]!r}" + _date_note(since) + _reminder_offer(changed[1])
+        return (f"Updated: {changed[1]!r} (kept {changed[0]!r} as what used to be true)" + _date_note(since)
+                + _reminder_offer(changed[1]))
 
     if candidates:
         listing = "\n".join(f"- {c}" for c in candidates)

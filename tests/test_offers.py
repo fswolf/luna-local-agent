@@ -153,5 +153,82 @@ class Dates(unittest.TestCase):
         self.assertIn("Monday November 2", found[0]["text"])
 
 
+class OnSave(unittest.TestCase):
+    """Saving a fact with a date coming: she asks once about a reminder."""
+    TODAY = date(2026, 10, 27)
+
+    def setUp(self):
+        self.book = {}
+        self.pending = []
+        for p in (mock.patch("mind.notebook.get", lambda k, d=None: self.book.get(k, d)),
+                  mock.patch("mind.notebook.put", lambda k, v: self.book.__setitem__(k, v)),
+                  mock.patch.object(offers, "settings", lambda: dict(offers.DEFAULTS)),
+                  mock.patch("mind.mood.walkaway.away", lambda: False),
+                  mock.patch("mind.mood.heavy.level", lambda now=None: 0),
+                  mock.patch("life.reminders.pending", lambda: self.pending)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def save(self, fact, **kw):
+        kw.setdefault("source", "typed")
+        with turnctx.begin(**kw):
+            return offers.on_save(fact, self.TODAY)
+
+    def test_a_dated_fact_gets_one_question(self):
+        said = self.save("Shannon's birthday is March 3")
+        self.assertIn("Wednesday March 3 2027, in 127 days", said)
+        self.assertIn("Ask once", said)
+        self.assertIn("stop_offering", said)
+        self.assertTrue(offers.recently_offered())          # so stop_offering is offered
+
+    def test_the_key_is_the_stored_fact(self):
+        self.save("  Shannon's birthday is March 3  ")
+        key = offers._date_key("Shannon's birthday is March 3", date(2027, 3, 3))
+        self.assertEqual(self.book["offers"]["asked"][key][1], 1)
+
+    def test_nothing_without_a_coming_date(self):
+        for fact in ("likes coffee black", "started the job on 2019-05-01", "the meeting was on Oct 1, 2026"):
+            self.assertEqual(self.save(fact), "", fact)
+
+    def test_not_when_a_reminder_is_already_there(self):
+        self.pending = [{"due_at": "2027-03-02T09:00:00"}]
+        self.assertEqual(self.save("Shannon's birthday is March 3"), "")
+
+    def test_only_on_your_own_turn(self):
+        for kw in ({"speaker": "mike"}, {"private": False}, {"source": "job:x", "job": "x"}):
+            self.assertEqual(self.save("Shannon's birthday is March 3", **kw), "", kw)
+
+    def test_saving_it_again_asks_at_most_twice_and_counts_toward_the_watcher(self):
+        fact = "the car is in for service on November 4th"
+        self.assertTrue(self.save(fact))
+        self.assertTrue(self.save(fact))
+        self.assertEqual(self.save(fact), "")
+        key = offers._date_key(fact, date(2026, 11, 4))
+        self.assertEqual(self.book["offers"]["asked"][key][1], 2)
+
+    def test_muted_stays_muted(self):
+        self.assertTrue(self.save("Shannon's birthday is March 3"))
+        offers.stop()
+        self.assertEqual(self.save("Shannon's birthday is March 3"), "")
+
+    def test_asked_in_the_lewd_row_but_not_a_heavy_moment(self):
+        from mind.mood import core
+        with mock.patch.object(core.S, "label", core._extra("lewd")["row"][0]):
+            self.assertTrue(self.save("Shannon's birthday is March 3"))
+        with mock.patch("mind.mood.heavy.level", lambda now=None: 2):
+            self.assertEqual(self.save("the car is in for service on November 4th"), "")
+
+    def test_a_broken_notebook_never_breaks_a_save(self):
+        with mock.patch("mind.notebook.get", side_effect=RuntimeError("db gone")):
+            self.assertEqual(self.save("Shannon's birthday is March 3"), "")
+
+    def test_the_tool_answer_carries_it(self):
+        from tools import memory
+        with mock.patch("mind.longterm.add_fact", return_value=True), \
+                mock.patch.object(offers, "on_save", return_value=" It has a date."):
+            self.assertEqual(memory._remember_fact("Shannon's birthday is March 3"),
+                             "Saved: Shannon's birthday is March 3 It has a date.")
+
+
 if __name__ == "__main__":
     unittest.main()

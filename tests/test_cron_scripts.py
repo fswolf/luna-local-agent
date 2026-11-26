@@ -130,6 +130,26 @@ class ScriptJobs(unittest.TestCase):
         self.assertEqual(text, "partial")
         kill.assert_called_once()
 
+    def test_a_stuck_child_never_hangs_the_scheduler(self):
+        with mock.patch("config.plugin_settings", return_value={"script_timeout": 10}), \
+                mock.patch.object(cron.subprocess.Popen, "communicate",
+                                  side_effect=[cron.subprocess.TimeoutExpired("bash", 10),
+                                               cron.subprocess.TimeoutExpired("bash", 10)]), \
+                mock.patch.object(cron.subprocess.Popen, "kill") as kill, mock.patch.object(cron.os, "killpg"):
+            status, text = cron._run_script("copy.sh", b"sleep 100\n")
+        self.assertIn("stopped after 10s", status)
+        self.assertEqual(text, "")
+        kill.assert_called_once()
+
+    def test_the_script_result_is_kept_even_when_her_turn_fails(self):
+        self.schedule()
+        job = cron._jobs[0]
+        job["_busy"] = True
+        with mock.patch("core.assistant.respond_to_job", side_effect=RuntimeError("model gone")):
+            cron._fire(job)
+        self.assertIn("[script exit code 0", cron._last["nas"][1])
+        self.assertIn("script exit code 0", cron._away.call_args[0][0])
+
     def test_long_output_keeps_the_end(self):
         status, text = cron._run_script("copy.sh", b"seq 1 5000\n")
         self.assertIn("exit code 0", status)

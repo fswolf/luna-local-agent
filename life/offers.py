@@ -22,6 +22,14 @@ at most offers.per_day a day, offers.gap_minutes apart, and each thing
 waits a while before she mentions it again (a day for dates, twelve
 hours for the machine; a date at most twice).
 
+A date is also offered the moment she saves it: remember_fact or
+update_fact with "Shannon's birthday is March 3" comes back with "it has
+a date: ask once whether they want a reminder" (on_save below). That
+counts as one of the date's two asks (and it's asked in the lewd row too,
+since it answers what you just said), so if you say no she brings it up
+at most once more, when it's close, and only if there's still no
+reminder; "don't ask me about that again" mutes it for good.
+
 The watchers run in the background every ten minutes, so a turn never
 waits on them. What she's asked and what you've muted is kept in her
 notebook (agent/notebook.db).
@@ -128,6 +136,50 @@ def _reminded_near(day):
     return False
 
 
+def _date_key(fact, day):
+    return f"date:{hashlib.sha1(fact.encode()).hexdigest()[:8]}:{day.isoformat()}"
+
+
+def on_save(fact, today=None):
+    """A note for the tool's answer when the fact she just saved has a date coming
+    and nothing reminds you of it yet: ask once. '' otherwise, and never the reason
+    a save fails."""
+    try:
+        return _on_save(str(fact or "").strip(), today)     # as it's stored, so the watcher's key is the same
+    except Exception:
+        logbook.exception("offers", "date offer on save failed")
+        return ""
+
+
+def _on_save(fact, today):
+    s = settings()
+    if not (s["enabled"] and s["dates"]) or _quiet_now(lewd_ok=True):
+        return ""
+    today = today or date.today()
+    day = date_in(fact, today)
+    if not day or day == today or _reminded_near(day):
+        return ""
+    key = _date_key(fact, day)
+    with _state_lock:
+        st = _state()
+        if _muted(st, key):
+            return ""
+        last, times = st["asked"].get(key, [0.0, 0])
+        if times >= DATE_ASKS:
+            return ""
+        st["asked"][key] = [time.time(), times + 1]
+        st["latest"] = key                  # so "don't ask about that again" mutes this one
+        _save(st)
+    logbook.info("offers", "offering on save %s", key)
+    days = (day - today).days
+    when = "tomorrow" if days == 1 else f"in {days} days"
+    year = f" {day.year}" if day.year != today.year else ""
+    return (f" It has a date: {day:%A %B} {day.day}{year}, {when}, and nothing reminds them of it yet. "
+            "Ask once, in a few words, whether they'd like a reminder (the day before, or on the day). "
+            "Set one only if they say yes (set_reminder). If they say not to ask about it again, call "
+            "stop_offering.")
+
+
 def watch_dates(today=None):
     from mind import factstore
 
@@ -144,8 +196,7 @@ def watch_dates(today=None):
         if not 1 <= days <= ahead or _reminded_near(day):
             continue
         when = "tomorrow" if days == 1 else f"in {days} days"
-        tag = hashlib.sha1(fact.encode()).hexdigest()[:8]
-        found.append({"key": f"date:{tag}:{day.isoformat()}", "kind": "date", "cooldown": 24 * 3600,
+        found.append({"key": _date_key(fact, day), "kind": "date", "cooldown": 24 * 3600,
                       "label": f"{fact} ({when}, no reminder yet)",
                       "text": f'you remember "{fact}". That\'s {when} ({day:%A %B} {day.day}). '
                               "Offer to set a reminder for it, maybe the day before (set_reminder)."})
@@ -250,8 +301,11 @@ def _muted(st, key):
     return key in st["muted"] or _mute_key(key) in st["muted"]
 
 
-def _quiet_now():
-    """'' when an offer may ride along on this turn, else why not."""
+def _quiet_now(lewd_ok=False):
+    """'' when an offer may ride along on this turn, else why not. lewd_ok: the
+    question after a date you just told her (on_save) is part of the conversation,
+    not an interruption, and the lewd row is easy to drift into: only a heavy
+    moment or her having walked away hold it back."""
     from core import turnctx
 
     turn = turnctx.current()
@@ -259,7 +313,7 @@ def _quiet_now():
         return "not your own turn"
     try:
         from mind.mood import core, heavy, walkaway
-        if core.S.label in core._extra("lewd")["row"]:
+        if not lewd_ok and core.S.label in core._extra("lewd")["row"]:
             return "lewd row"
         if heavy.level():
             return "heavy moment"

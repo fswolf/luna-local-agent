@@ -104,9 +104,10 @@ function card(r) {
       <span>${esc(r.source)} · ${esc(r.when)} · ${esc(r.model)}</span></div>
     <div class="who">You said</div><div class="said">${esc(r.said)}</div>
     ${r.original ? `<div class="who">Luna said</div><div class="was">${esc(r.original)}</div>` : ""}
+    ${r.note ? `<div class="who">Your note (she rewrote it from this)</div><div class="was">${esc(r.note)}</div>` : ""}
     ${(r.steps || []).length ? `<details open><summary>the tools it used (what came back is never learned)</summary>
       <pre>${esc(r.steps.join("\n\n"))}</pre></details>` : ""}
-    <div class="who">${r.original ? "Your version (what is learned)" : (r.steps || []).length ? "The answer after the tools (what is learned)" : "The reply (what is learned)"}</div>
+    <div class="who">${r.note ? "Her rewrite (what is learned)" : r.original ? "Your version (what is learned)" : (r.steps || []).length ? "The answer after the tools (what is learned)" : "The reply (what is learned)"}</div>
     <textarea data-reply>${esc(r.reply)}</textarea>
     <details><summary>the conversation before (${(r.context || []).length} turns) and the prompt</summary>
       ${ctx ? `<pre>${esc(ctx)}</pre>` : ""}<pre>${esc(r.system)}</pre></details>
