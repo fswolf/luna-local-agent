@@ -784,7 +784,10 @@ const gmode = { mode: cfg.gestures || 'keywords', chat: cfg.chat_gestures !== fa
 // Built from each gesture file's "keywords" (and clips.json's): a word
 // inside an action she writes (*beckons you closer*) or an emoji anywhere.
 // A keyword matches as the start of a word, so "hug" also catches hugs,
-// hugging. Built once the gestures and clips have loaded.
+// hugging. Built once the gestures and clips have loaded. Her actions run
+// long ("*bounces a little higher in my chair, the playful edge of my smile
+// widening*"): up to 160 characters either side, the same as the clothes
+// reader below; at 60, only short ones like *giggle* ever played.
 let ACTS = [];
 function buildActs() {
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
@@ -793,7 +796,7 @@ function buildActs() {
   for (const [name, kws] of lists) {
     const words = kws.filter(k => /\w/.test(k)), marks = kws.filter(k => !/\w/.test(k));
     const parts = [];
-    if (words.length) parts.push(`\\*[^*\\n]{0,60}\\b(?:${words.map(esc).join('|')})\\w*[^*\\n]{0,60}\\*`);
+    if (words.length) parts.push(`\\*[^*\\n]{0,160}\\b(?:${words.map(esc).join('|')})\\w*[^*\\n]{0,160}\\*`);
     if (marks.length) parts.push(marks.map(esc).join('|'));
     if (parts.length) ACTS.push([name, new RegExp(parts.join('|'), 'iu')]);
   }

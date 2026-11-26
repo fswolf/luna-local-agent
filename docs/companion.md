@@ -581,6 +581,7 @@ stream) · 🔒 private (never from stream chat) · 🧍 full body only ·
 | `arch_stretch` | relaxed, unwinding, at ease: hands behind her head, arches her back with a long sigh | 5.0 s | 💤 | - | any |
 | `bashful` | bashful, embarrassed, small and quiet: head tipped down, a hand at her collarbone, blushing | 5.5 s | - | - | any |
 | `beckon_kiss` | flirty, teasing, wants you closer: beckons you over with a finger, winks, then blows you a kiss | chain: sultry_beckon → blow_kiss | 🔒 | mouth, chest | loving |
+| `bend_forward` | bending forward at the waist toward you, looking up at you: a stretch, a closer look | 4.0 s | 🧍 | - | neutral, warm, loving |
 | `bend_over` | lewd, teasing: bends right over with her back to you, hands on her backside | 9.0 s | 🔥🔒🧍 | butt, back | lewd |
 | `blow_kiss` | fond, affectionate, sending love, goodnight: fingers to her lips, then blows you a kiss | 3.0 s | - | - | any |
 | `boop` | booped on the nose: squeezes her eyes shut, 'hey!', then a happy flustered smile | 1.8 s | - | nose | neutral, warm, loving |

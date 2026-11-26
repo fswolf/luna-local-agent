@@ -17,6 +17,9 @@ than "works". Tried her on something else? Please say how it went in
 [issue #2](https://github.com/fswolf/luna-local-agent/issues/2) and it'll
 go in the table below.
 
+Once a model is running, [Fitting her to your model](tuning.md) says what
+to set for its quant and context, and what small models get wrong.
+
 ## What's been tested
 
 | Model | Quants | Tool calling | Notes |

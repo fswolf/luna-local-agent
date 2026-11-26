@@ -166,32 +166,68 @@ def _appraise(said, answer, model):
     return read
 
 
+_SIGNS = {"-": -1, "=": 0, "+": 1}
+_HEAVINESS = ("normal", "rough", "heavy")
+
+
+def _answer_line(reply):
+    """The rating line's words, from its first field on, or None.
+
+    Small models don't always keep to six fields: tonight's Q8 wrote
+    "2 + = + 3 1 normal" (a sign too many, the feeling as a number) and
+    "0 = = none 1 playful 0 normal". Matching the exact shape threw those
+    away, and with them the flirt score, so her mood never moved. So each
+    field is taken from where it reliably sits instead: the rating first,
+    the first two signs after it, the feeling wherever a known feeling is,
+    the heaviness word last and the flirt digit just before it. A reasoning
+    model thinks first, so it's the last line that has the shape."""
+    reply = re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL)
+    for line in reversed(reply.splitlines()):
+        words = [w.strip(".,;:()[]{}\"'`*").lower() for w in line.split()]
+        words = [w for w in words if w]
+        for i in range(len(words) - 1):
+            if re.fullmatch(r"[0-3]", words[i]) and words[i + 1] in _SIGNS:
+                return words[i:]
+    return None
+
+
 def _parse_heaviness(reply):
     """"normal", "rough", "heavy", or None when the line didn't say."""
-    reply = re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL)
-    found = re.findall(r"\b[0-3]\s+[-=+]\s+[-=+]\s+[A-Za-z_]+(?:\s+[0-2])?\s+(normal|rough|heavy)\b", reply, re.I)
-    return found[-1].lower() if found else None
+    words = _answer_line(reply)
+    if not words:
+        return None
+    said = [w for w in words if w in _HEAVINESS]
+    return said[-1] if said else None
 
 
 def _parse_appraisal(reply, feelings):
-    # A reasoning model thinks out loud first; the answer is the last
-    # line that has the right shape, not the first thing it mentions.
-    reply = re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL)
-    signs = {"-": -1, "=": 0, "+": 1}
-    shape = re.compile(r"\b([0-3])\s+([-=+])\s+([-=+])\s+([A-Za-z_]+)(?:\s+([0-2])\b)?")
-    found = shape.findall(reply)
+    """(rating 0-3, energy -1/0/1, warmth -1/0/1, feeling or None, flirt 0-2)."""
+    words = _answer_line(reply)
 
-    if found:
-        rating, energy, warmth, feeling, flirt = found[-1]
-        feeling = feeling.lower()
+    if not words:
+        # A model that only managed the digit still gets its warmth counted.
+        digits = re.findall(r"\b([0-3])\b", re.sub(r"<think>.*?</think>", "", str(reply or ""), flags=re.DOTALL))
+        return (int(digits[-1]) if digits else 0), 0, 0, None, 0
 
-        return (int(rating), signs[energy], signs[warmth],
-                feeling if feeling in feelings else None, int(flirt or 0))
+    signs = [_SIGNS[w] for w in words[1:] if w in _SIGNS]
+    known = {f.lower() for f in feelings}
+    feeling = next((w for w in words[1:] if w in known), None)
 
-    # A model that only managed the digit still gets its warmth counted.
-    digits = re.findall(r"\b([0-3])\b", reply)
+    # flirt: the digit just before the heaviness word, or the last field of
+    # an answer without one ("2 + + playful 1"); never the rating itself
+    end = max((i for i, w in enumerate(words) if w in _HEAVINESS), default=len(words))
+    flirt = words[end - 1] if end - 1 > 0 else ""
+    flirt = int(flirt) if re.fullmatch(r"[0-2]", flirt) else 0
 
-    return (int(digits[-1]) if digits else 0), 0, 0, None, 0
+    # Two signs: energy then warmth. A third one makes warmth a guess; it
+    # only counts when the extra signs agree, since warmth is what decides
+    # she was insulted (or treated kindly), and a wrong reading there costs
+    # more than none.
+    energy = signs[0] if signs else 0
+    rest = signs[1:]
+    warmth = rest[0] if rest and len(set(rest)) == 1 else 0
+
+    return int(words[0]), energy, warmth, feeling, flirt
 
 
 # ---------------------------------------------------------------------------

@@ -39,6 +39,28 @@ class Heavy(unittest.TestCase):
         self.assertEqual(appraise._parse_appraisal("2 + + laughing 1 rough", feelings),
                          appraise._parse_appraisal("2 + + laughing 1", feelings))
 
+    def test_a_small_model_s_untidy_lines_still_read(self):
+        # real lines from the Q8 model (2026-11-26): an extra field used to
+        # lose the flirt score and the heaviness, so her mood never moved
+        f = ["happy", "laughing", "surprised", "embarrassed", "touched", "playful", "curious",
+             "confused", "sad", "annoyed"]
+        read = appraise._parse_appraisal
+        self.assertEqual(read("2 + = + 3 1 normal", f), (2, 1, 0, None, 1))
+        self.assertEqual(read("0 = = none 1 playful 0 normal", f), (0, 0, 0, "playful", 0))
+        self.assertEqual(read("0 = = 1 playful 1 normal", f), (0, 0, 0, "playful", 1))
+        self.assertEqual(read("Answer: 2 + + playful 2 normal", f), (2, 1, 1, "playful", 2))
+        self.assertEqual(read("<think>2 + + happy 2</think>\n0 = - annoyed 0 normal", f), (0, 0, -1, "annoyed", 0))
+        for line in ("0 = = = none 0 normal", "2 + = + 3 1 normal", "0 = = none 1 playful 0 normal"):
+            self.assertEqual(appraise._parse_heaviness(line), "normal", line)
+        self.assertEqual(appraise._parse_heaviness("0 = - = sad 0 heavy"), "heavy")
+
+    def test_an_extra_sign_never_invents_warmth(self):
+        f = ["playful"]
+        # "god damn it luna ... bend over now": three signs, which is warmth? none of them
+        self.assertEqual(appraise._parse_appraisal("0 = + = playful 1 normal", f)[2], 0)
+        self.assertEqual(appraise._parse_appraisal("0 = - - none 0 normal", f)[2], -1)   # the extras agree
+        self.assertEqual(appraise._parse_appraisal("0 = - none 0 normal", f)[2], -1)
+
     def test_heavy_counts_at_once_rough_needs_two(self):
         heavy.note("rough")
         self.assertEqual(heavy.level(), 0)

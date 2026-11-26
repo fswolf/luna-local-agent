@@ -140,8 +140,8 @@ def _three_d():
 BAND_PICKS = {
     "grudge": ["huff", "sulk", "step_back", "shrug"],
     "cool": ["shrug", "huff", "explain", "wave", "step_back"],
-    "neutral": ["wave", "shrug", "explain", "bounce", "surprise", "giggle", "shy"],
-    "warm": ["wave", "hug", "giggle", "bounce", "shy", "wink", "surprise", "shrug"],
+    "neutral": ["wave", "shrug", "explain", "bounce", "surprise", "giggle", "shy", "bend_forward"],
+    "warm": ["wave", "hug", "giggle", "bounce", "shy", "wink", "bend_forward", "surprise", "shrug"],
     "loving": ["hug", "blow_kiss", "giggle", "shy", "wink", "beckon_kiss", "bounce", "wave"],
     "lewd": ["sultry_beckon", "beckon_kiss", "blow_kiss", "look_back", "bend_over", "touch_self",
              "wink", "shy"],
