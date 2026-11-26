@@ -12,7 +12,9 @@ the computer already knows and a few quiet lookups:
    makes the kernel ask "who has this IP?", and every machine that's on
    answers that, even the ones that ignore ping. Nothing is port scanned.
 3. Names: name.local (mDNS: Unraid, Macs, avahi desktops, printers), the
-   router's DNS, and reverse lookups of what answered.
+   router's DNS, and reverse lookups of what answered: the router's DNS, and
+   each machine asked directly over mDNS what it calls itself (the router
+   rarely knows "UnraidTower.local"; the tower does).
 
 Remembering is long-term memory, not a list in config: when she finds
 something she offers to save a fact like "Ryan's Unraid server has MAC
@@ -26,8 +28,11 @@ cleaned down to plain characters before the model sees them.
 import concurrent.futures as futures
 import ipaddress
 import os
+import random
 import re
+import select
 import socket
+import struct
 import subprocess
 import sys
 import time
@@ -160,9 +165,97 @@ def _reverse(ips):
     return names
 
 
+# ---------------------------------------------------------------------------
+# mDNS: asking each machine its own name
+# ---------------------------------------------------------------------------
+def _read_name(packet, at, depth=0):
+    """A DNS name from a packet, following compression pointers. (name, next offset)."""
+    labels, end = [], None
+    while at < len(packet) and depth < 20:
+        n = packet[at]
+        if n == 0:
+            at += 1
+            break
+        if n & 0xC0 == 0xC0:                    # a pointer to a name earlier in the packet
+            if at + 1 >= len(packet):
+                return "", len(packet)
+            if end is None:
+                end = at + 2
+            at = ((n & 0x3F) << 8) | packet[at + 1]
+            depth += 1
+            continue
+        labels.append(packet[at + 1:at + 1 + n].decode("utf-8", "replace"))
+        at += 1 + n
+    return ".".join(labels), (end if end is not None else at)
+
+
+def _ptr_query(ip, qid):
+    """A PTR question for ip's reverse name, asking for a unicast answer (QU bit)."""
+    name = b"".join(bytes([len(p)]) + p.encode() for p in (list(reversed(ip.split("."))) + ["in-addr", "arpa"]))
+    return struct.pack(">HHHHHH", qid, 0, 1, 0, 0, 0) + name + b"\x00" + struct.pack(">HH", 12, 0x8001)
+
+
+def _ptr_answer(packet, qid):
+    """The name in a reply to our PTR question, or ''."""
+    try:
+        rid, _flags, qd, an = struct.unpack(">HHHH", packet[:8])
+        if rid != qid or not an:
+            return ""
+        at = 12
+        for _ in range(qd):
+            _n, at = _read_name(packet, at)
+            at += 4
+        for _ in range(an):
+            _n, at = _read_name(packet, at)
+            rtype, _cls, _ttl, size = struct.unpack(">HHIH", packet[at:at + 10])
+            at += 10
+            if rtype == 12:
+                return _read_name(packet, at)[0]
+            at += size
+    except (struct.error, IndexError):
+        pass
+    return ""
+
+
+def _mdns_names(ips, wait=1.5):
+    """{ip: name} from asking each machine directly, over mDNS, what it's called:
+    one small question each to port 5353, answers collected for `wait` seconds.
+    Unraid, Macs, Linux desktops running avahi and most printers answer."""
+    names = {}
+    if not ips:
+        return names
+    qid = random.randint(1, 0xFFFF)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    except OSError:
+        return names
+    try:
+        s.setblocking(False)
+        for ip in ips:
+            try:
+                s.sendto(_ptr_query(ip, qid), (ip, 5353))
+            except OSError:
+                pass
+        end = time.monotonic() + wait
+        while time.monotonic() < end and len(names) < len(ips):
+            ready, _w, _x = select.select([s], [], [], max(0.0, end - time.monotonic()))
+            if not ready:
+                break
+            try:
+                packet, (ip, _port) = s.recvfrom(4096)
+            except OSError:
+                continue
+            name = _clean(_ptr_answer(packet, qid))
+            if ip in ips and name and not _IP.fullmatch(name):
+                names[ip] = name
+    finally:
+        s.close()
+    return names
+
+
 def _resolve(name):
     """name -> IPs, via the router's DNS and mDNS (.local)."""
-    base = re.sub(r"[^a-z0-9-]", "", name.lower().replace(" ", "-"))
+    base = re.sub(r"[^a-z0-9.-]", "", name.lower().replace(" ", "-")).strip(".")
     tries = [base] if base.endswith(".local") else [base, base + ".local"]
     found = {}
 
@@ -201,7 +294,15 @@ def _scan(fresh=False):
         _wake(mine)
 
     table = _neighbors()
-    names = _reverse(list(table) + ([mine] if mine else []))
+    ips = list(table) + ([mine] if mine else [])
+    with futures.ThreadPoolExecutor(max_workers=2) as pool:
+        dns, mdns = pool.submit(_reverse, ips), pool.submit(_mdns_names, [ip for ip in table if _private(ip)])
+        names = dns.result()
+        for ip, name in mdns.result().items():
+            if not names.get(ip) or names[ip] == "_gateway":
+                names[ip] = name            # what it calls itself beats what the router guessed
+            elif name.lower().split(".")[0] not in names[ip].lower():
+                names[ip] = f"{names[ip]} / {name}"
     found = {ip: {"mac": mac, "name": names.get(ip, "")} for ip, mac in table.items()}
 
     if mine:
@@ -272,8 +373,10 @@ def _row(ip, info):
 def _find_device(name):
     name = str(name or "").strip()
     asked_mac = _MAC.search(name)
+    # "local", "lan" and "home" are the end of a hostname, not part of what it's called:
+    # unraid.local is found as UnraidTower.local, by "unraid"
     words = [w for w in re.findall(r"[a-z0-9]+", name.lower())
-             if w not in {"my", "the", "a", "server", "pc", "computer", "box", "machine"}] or \
+             if w not in {"my", "the", "a", "server", "pc", "computer", "box", "machine", "local", "lan", "home"}] or \
         re.findall(r"[a-z0-9]+", name.lower())
 
     lines = []
@@ -286,9 +389,11 @@ def _find_device(name):
         else:
             lines.append(f"- {value}  remembered: {fact!r} (not checked)")
 
-    # 2. Its own name on the network: the whole thing, then each word ("mewnix desktop" -> mewnix).
+    # 2. Its own name on the network: as given when it's a hostname (unraidtower.local),
+    #    then the words together, then each word ("mewnix desktop" -> mewnix).
     if not asked_mac:
-        for guess in dict.fromkeys([" ".join(words) or name] + [w for w in words if len(w) > 2]):
+        host = [name] if re.fullmatch(r"[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+", name) else []
+        for guess in dict.fromkeys(host + [" ".join(words) or name] + [w for w in words if len(w) > 2]):
             for ip, host in _resolve(guess).items():
                 if not any(l.startswith(f"- {ip} ") for l in lines):
                     lines.append(f"- {ip}  {host}  (answers to that name)")
@@ -311,8 +416,10 @@ def _find_device(name):
             return (f"Remembered MAC {', '.join(sorted(want_macs))} for {name!r}, but nothing with that MAC "
                     "answered just now. It may be off or asleep.")
 
-        return (f"Nothing on the network calls itself {name!r}. Run scan_network to see everything "
-                "that's on, and ask the user which one it is.")
+        return (f"Nothing on the network calls itself {name!r}. If that's a program (Jellyfin, Plex, "
+                "Home Assistant) rather than a machine, it runs on one, often the home server: look for "
+                "that instead. Otherwise run scan_network to see everything that's on, and ask the user "
+                "which one it is.")
 
     remember = "" if want_macs else (
         " If the user confirms which one it is, offer to remember it with remember_fact, including its "

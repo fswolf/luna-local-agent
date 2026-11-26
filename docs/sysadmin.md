@@ -139,8 +139,15 @@ without you opening the router page. `find_device` looks, in order:
    running avahi), then your router's DNS.
 3. **A look around.** One empty packet to each address on your /24, so
    everything that's on shows up in the neighbor table, even machines
-   that ignore ping. Then reverse lookups for names. About three
-   seconds.
+   that ignore ping. Then names: your router's DNS, and each machine
+   asked directly over mDNS what it calls itself, since the router rarely
+   knows that Unraid is `UnraidTower.local` and the tower does. A partial
+   name is enough: "unraid" or `unraid.local` finds `UnraidTower.local`.
+   About four seconds.
+
+A program isn't a machine: Jellyfin, Plex or Home Assistant runs on one
+(often the Unraid server), so ask for the server, or tell her once
+"Jellyfin runs on the Unraid server" and she'll remember.
 
 When she finds one she offers to remember it, MAC and all, in her
 [long-term memory](memory.md). Say yes and next time it's instant.
