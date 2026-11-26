@@ -222,6 +222,13 @@ graphics card, a web server called the NUC, and an Unraid NAS). The
 folder is gitignored, so they aren't in the repo: write your own the
 same way, with your own hosts.
 
+**Linux only.** They're bash scripts built on Linux's own tools
+(systemd, apt or dnf, `/proc`, `dig`, `nmap`), so the computer Luna
+runs on and the machines they check need to be Linux (Unraid counts).
+Of the built-in tools, `last_boot` is Linux only too, and
+`system_health` gives its full report there (on Windows and macOS it
+reports what it can); `find_device` and `run_command` work everywhere.
+
 | Script | What it does | Changes anything? | Used as |
 |--------|--------------|-------------------|---------|
 | `vm-health.sh` | the VM her model runs on: up, load, memory, disks, the GPU (busy, VRAM, temperatures, power), llama-server (`/health`, `/props`, `/slots`: model, context, busy slots), failed services, driver warnings, errors since boot | no | recipe: "check vm health" |
