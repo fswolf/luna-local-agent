@@ -218,9 +218,10 @@ Anything with more than a step or two goes in a script in
 writing twenty commands on the spot. The same check gives the same
 answer every time, and a small model only has to explain a report.
 These six are from the setup Luna is built on (a desktop, a VM with the
-graphics card, a web server called the NUC, and an Unraid NAS). The
-folder is gitignored, so they aren't in the repo: write your own the
-same way, with your own hosts.
+graphics card, a web server and an Unraid NAS), and they ship in
+[`examples/jobs/`](https://github.com/fswolf/luna-local-agent/tree/main/examples/jobs) as starting points: copy one into
+`agent/jobs/` (gitignored, so your host names stay yours), change the
+address line at the top, and it works.
 
 **Linux only.** They're bash scripts built on Linux's own tools
 (systemd, apt or dnf, `/proc`, `dig`, `nmap`), so the computer Luna
@@ -232,10 +233,10 @@ reports what it can); `find_device` and `run_command` work everywhere.
 | Script | What it does | Changes anything? | Used as |
 |--------|--------------|-------------------|---------|
 | `vm-health.sh` | the VM her model runs on: up, load, memory, disks, the GPU (busy, VRAM, temperatures, power), llama-server (`/health`, `/props`, `/slots`: model, context, busy slots), failed services, driver warnings, errors since boot | no | recipe: "check vm health" |
-| `nuc-health.sh` | the web server: the basics, Apache and MariaDB, certbot's timer, every site Apache serves with its answer and certificate days left | no | recipe |
+| `web-health.sh` | the web server: the basics, Apache and MariaDB, certbot's timer, every site Apache serves with its answer and certificate days left | no | recipe |
 | `backups-to-nas.sh` | copies the nightly `*.sql.gz` dumps to the NAS (`.part`, `gzip -t`, rename), then thins the share: 30 days, the first of each month for a year, never under 7 per database. `--dry-run` | writes to the NAS only | job, Sundays 4am ([walkthrough](jobs.md)) |
 | `cve-check.sh` | security fixes each machine is missing, from its own package manager: debsecan on Debian (urgency, remotely exploitable), apt on Ubuntu, dnf on Fedora, arch-audit on Arch, the version on Unraid. A kernel waiting on a reboot. `local` checks this computer | no | recipe |
-| `nuc-update.sh` | lists what's waiting (security fixes marked), then `apt-get upgrade`: no removals, configs kept, never reboots. Apache and MariaDB checked after, and whether a reboot is waiting. `--check` lists only | yes | you, in a terminal (sudo asks); Luna runs `--check` |
+| `web-update.sh` | lists what's waiting (security fixes marked), then `apt-get upgrade`: no removals, configs kept, never reboots. Apache and MariaDB checked after, and whether a reboot is waiting. `--check` lists only | yes | you, in a terminal (sudo asks); Luna runs `--check` |
 | `site-check.sh` | a website's security from outside, with the fix for every finding (below) | no | recipe |
 
 Each one uses SSH key login with `BatchMode=yes`, so it fails instead
