@@ -67,7 +67,7 @@ CHUNK_CHARS = 900
 
 _lock = threading.Lock()
 _state = {"files": 0, "chunks": 0, "embedded": 0, "indexed_at": 0.0, "busy": False,
-          "skipped": [], "error": "", "cache": None, "cache_at": -1.0, "changed": 0.0}
+          "skipped": [], "error": "", "cache": None, "cache_at": -1.0, "changed": 0.0, "svecs": None}
 _wake = threading.Event()
 
 
@@ -607,6 +607,9 @@ def _embed_summaries():
     finally:
         conn.close()
 
+    if done:
+        _state["changed"] = time.time()
+
     return done
 
 
@@ -614,6 +617,8 @@ def _embed_summaries():
 # What each file covers (written while she's idle; mind/reflect.py)
 # ---------------------------------------------------------------------------
 SUMMARIES_PER_PASS = 8
+SUMMARY_TRIES = 3          # empty replies for one file before it's settled, per run of the app
+_tries = {}
 SUMMARY_CHARS = 320
 SUMMARY_SOURCE_CHARS = 3000
 INDEX_NAMES = ("00-index", "index", "readme")
@@ -701,6 +706,13 @@ def write_summaries(ask, yield_=lambda: None, report=None, limit=SUMMARIES_PER_P
     -> text. yield_() raises to stop when a turn starts. Returns the files
     written, or None when a model call failed (the server's down)."""
     written = []
+    conn = _db()
+    try:
+        # a file removed while a summary of it was being written left one behind
+        conn.execute("DELETE FROM summaries WHERE path NOT IN (SELECT path FROM files)")
+        conn.commit()
+    finally:
+        conn.close()
     for path in summaries_due()[:limit]:
         conn = _db()
         try:
@@ -723,7 +735,13 @@ def write_summaries(ask, yield_=lambda: None, report=None, limit=SUMMARIES_PER_P
                 return None             # the ones written stay; the rest after a rest
         text = _short_text(re.sub(r"^(summary|this file)\s*:\s*", "", str(text or "").strip(), flags=re.I))
         if len(text) < 10:
+            # an empty reply (a thinking model that spent its budget) gets
+            # another go next pass; after a few, it's settled until the file changes
+            _tries[path] = _tries.get(path, 0) + 1
+            if _tries[path] < SUMMARY_TRIES:
+                continue
             text = "(couldn't say what this covers)"
+        _tries.pop(path, None)
         conn = _db()
         try:
             conn.execute("INSERT OR REPLACE INTO summaries (path, mtime, size, text, how, model, vec) "
@@ -738,6 +756,15 @@ def write_summaries(ask, yield_=lambda: None, report=None, limit=SUMMARIES_PER_P
         if report:
             report(f"Knowledge: wrote what {len(written)} file(s) cover")
     return written
+
+
+def _readable():
+    """Files with something in them, the ones a summary is written for."""
+    conn = _db()
+    try:
+        return conn.execute("SELECT COUNT(*) FROM files WHERE chunks > 0").fetchone()[0]
+    finally:
+        conn.close()
 
 
 def summaries():
@@ -775,7 +802,7 @@ def browse(folder=""):
     inside = [(rel(p)[len(prefix):], p) for p in paths if rel(p).lower().startswith(prefix)]
     if not inside:
         names = sorted({rel(p).rsplit("/", 1)[0] for p in paths if "/" in rel(p)})
-        return f"No folder {folder!r} in the knowledge folder. Folders: {', '.join(names) or 'none'}."
+        return _cap(f"No folder {folder!r} in the knowledge folder. Folders: {', '.join(names) or 'none'}.")
 
     groups, loose = {}, []
     for r, p in inside:
@@ -803,19 +830,41 @@ def browse(folder=""):
     return _cap("\n".join(lines))
 
 
+def _folder_dirs(folder):
+    """A folder inside the knowledge folders ("games/zork") -> its real paths.
+    Nothing outside them: no "..", no absolute paths."""
+    parts = [x for x in str(folder or "").strip().replace("\\", "/").split("/") if x and x not in (".", "..")]
+    if not parts:
+        return []
+    out = []
+    for root in folders():
+        d = os.path.realpath(os.path.join(root, *parts))
+        if d.startswith(root + os.sep) and os.path.isdir(d):
+            out.append(d)
+    return out
+
+
 def _cap(text, n=4000):
     return text if len(text) <= n else text[:n].rsplit("\n", 1)[0] + "\n(more: browse one folder)"
 
 
 def _summary_vecs():
-    """{path: vector} for the summaries embedded with the current model."""
+    """{path: vector} for the summaries embedded with the current model,
+    cached until the index or the summaries change (like _load)."""
     model = _model()
+    with _lock:
+        cached = _state.get("svecs")
+        if cached is not None and cached[0] >= _state["changed"] and cached[1] == model:
+            return cached[2]
     conn = _db()
     try:
         rows = conn.execute("SELECT path, model, vec FROM summaries WHERE vec IS NOT NULL").fetchall()
     finally:
         conn.close()
-    return {p: array("f", v) for p, m, v in rows if m == model}
+    vecs = {p: array("f", v) for p, m, v in rows if m == model}
+    with _lock:
+        _state["svecs"] = (time.time(), model, vecs)
+    return vecs
 
 
 def _count():
@@ -932,17 +981,18 @@ def _cosines(qv, vecs):
         return [sum(a * b for a, b in zip(qv, v)) for v in vecs]
 
 
-def search(query, limit=5, within=None):
+def search(query, limit=5, within=None, spoilers=False):
     """([(score, item)], how) best first. how is 'by meaning', 'by meaning,
     reranked' or 'by words'. within: only these folders (a game's guide),
-    and none of their spoiler files."""
+    and, unless spoilers, none of their spoiler files."""
     query = " ".join(str(query or "").split())[:500]
     items = _load()
 
     if within:
         roots = tuple(os.path.realpath(d) + os.sep for d in within)
         items = [i for i in items if os.path.realpath(i["path"]).startswith(roots)]
-        items = [i for i in items if not _spoilers(i["path"])]
+        if not spoilers:
+            items = [i for i in items if not _spoilers(i["path"])]
 
     if not query or not items:
         return [], ""
@@ -953,13 +1003,16 @@ def search(query, limit=5, within=None):
     if embedder is not None:
         try:
             qv = _embed([_query_prefix() + query], timeout=5)[0]
-            scores = _cosines(qv, [i["vec"] for i in with_vec])
+            raw = _cosines(qv, [i["vec"] for i in with_vec])
             # a small lift for passages from files whose summary fits the
-            # question: the right file's weaker passages reach the reranker
+            # question, for the order only: the right file's weaker passages
+            # reach the reranker. The score handed back stays the plain
+            # match, so knowledge.min_score (what comes along unasked) means
+            # what it always did.
             lift = _summary_lift(qv)
-            if lift:
-                scores = [s + lift.get(i["path"], 0.0) for s, i in zip(scores, with_vec)]
-            scored = sorted(zip(scores, with_vec), key=lambda p: p[0], reverse=True)
+            order = [s + lift.get(i["path"], 0.0) for s, i in zip(raw, with_vec)] if lift else raw
+            ranked = sorted(zip(order, raw, with_vec), key=lambda p: p[0], reverse=True)
+            scored = [(s, i) for _o, s, i in ranked]
             how = "by meaning"
             top = scored[:max(limit, safe.whole(getattr(config, "RERANK_CANDIDATES", 24), 24, lo=1, hi=1000))]
             better = embedder.rerank(query, [_doc_text(i["path"], i["heading"], i["text"]) for _s, i in top])
@@ -1036,9 +1089,9 @@ def status():
 
     if summaries_enabled():
         try:
-            n = len(summaries())
-            lines.append(f"  what each file covers: {n} of {_state['files']} written"
-                         + ("" if n >= _state["files"] else " (more while she's idle)"))
+            n, of = len(summaries()), _readable()
+            lines.append(f"  what each file covers: {n} of {of} written"
+                         + ("" if n >= of else " (more while she's idle)"))
         except Exception:
             pass
 
@@ -1076,18 +1129,25 @@ def _register():
         if not enabled():
             return "The knowledge base is off."
 
-        if browse or folder or not str(query or "").strip():
+        listing = str(browse).strip().lower() in ("true", "1", "yes")
+        if listing or not str(query or "").strip():
             return globals()["browse"](folder)
+
+        within = None
+        if str(folder or "").strip():
+            within = _folder_dirs(folder)
+            if not within:
+                return globals()["browse"](folder)      # no such folder: say which there are
 
         try:
             limit = safe.whole(limit or 5, 5, lo=1, hi=10)
         except (TypeError, ValueError):
             limit = 5
 
-        found, how = search(query, limit)
+        found, how = search(query, limit, within=within, spoilers=True)
 
         if not found:
-            return (f"Nothing in the user's documents matches {query!r}. Say so - don't "
+            return (f"Nothing in the user's documents{' in ' + str(folder) if within else ''} matches {query!r}. Say so - don't "
                     "guess - and offer web_search if it's something public.")
 
         return "\n\n".join(
@@ -1104,7 +1164,8 @@ def _register():
          "limit": {"type": "integer", "description": "How many passages, default 5."},
          "browse": {"type": "boolean", "description": "true lists what's in the folder and what "
                     "each part covers, instead of searching."},
-         "folder": {"type": "string", "description": "With browse: one folder's files."}},
+         "folder": {"type": "string", "description": "A folder inside it, like games/zork: with browse, "
+                    "its files; with a query, search only there."}},
         required=(), run=run, group="Knowledge",
         available=lambda: enabled() and _state["chunks"] > 0,
         why=lambda: "the knowledge base is off" if not enabled() else

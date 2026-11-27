@@ -135,7 +135,9 @@ The knowledge folder (66 files; browse a folder by name for more):
 ```
 
 `games` then lists each game with its index file's own words, and
-`games/zork` the files in it. The summaries never ride in her prompt.
+`games/zork` the files in it. A search can also stay in one folder
+("look in my zork notes for the troll"), and then spoiler files count,
+since you asked. The summaries never ride in her prompt.
 They do help the search a little: passages from a file whose summary
 fits your question rank a bit higher, so the right file's quieter
 passages still reach her.

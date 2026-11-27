@@ -126,5 +126,58 @@ class Summaries(unittest.TestCase):
         self.assertEqual(lift[other], 0.0)
 
 
+    def test_lift_orders_but_the_score_stays_the_plain_match(self):
+        # knowledge.min_score decides what comes along unasked: the lift must not move it
+        net = os.path.join(self.docs, "network.md")
+        items = [{"path": net, "heading": "", "text": "jellyfin", "vec": [0.5, 0.0]},
+                 {"path": "/x/other.md", "heading": "", "text": "other", "vec": [0.6, 0.0]}]
+
+        class Emb:
+            def rerank(self, q, docs):
+                return None
+        with mock.patch.object(knowledge, "_load", return_value=items), \
+             mock.patch.object(knowledge, "_embedder", return_value=Emb()), \
+             mock.patch.object(knowledge, "_embed", return_value=[[1.0, 0.0]]), \
+             mock.patch.object(knowledge, "_summary_lift", return_value={net: 0.15}):
+            found, _how = knowledge.search("where is jellyfin", 2)
+        self.assertEqual(found[0][1]["path"], net)            # lifted to the top...
+        self.assertAlmostEqual(found[0][0], 0.5)              # ...with its own score
+
+    def test_tool_searches_one_folder_or_browses(self):
+        knowledge.write_summaries(self.ask)
+        found = {}
+
+        def fake(query, limit, within=None, spoilers=False):
+            found.update(within=within, spoilers=spoilers)
+            return [], ""
+        import tools
+        with mock.patch.object(knowledge, "search", side_effect=fake):
+            tools.call("search_docs", '{"query": "troll", "folder": "game"}')
+        self.assertEqual(found["within"], [os.path.join(os.path.realpath(self.docs), "game")])
+        self.assertTrue(found["spoilers"])                   # asked for: spoiler files count
+        out = tools.call("search_docs", '{"browse": "true"}')
+        self.assertIn("game/", out)
+        self.assertIn("No folder", tools.call("search_docs", '{"query": "x", "folder": "../etc"}'))
+
+    def test_a_removed_file_leaves_no_summary_behind(self):
+        knowledge.write_summaries(self.ask)
+        conn = knowledge._db()
+        conn.execute("INSERT INTO summaries (path, mtime, size, text, how) VALUES ('/gone.md', 0, 0, 'x', 'model')")
+        conn.commit()
+        conn.close()
+        knowledge.write_summaries(self.ask)
+        self.assertNotIn("/gone.md", knowledge.summaries())
+
+
+    def test_an_empty_reply_gets_more_tries(self):
+        knowledge._tries.clear()
+        net = os.path.join(self.docs, "network.md")
+        for _ in range(knowledge.SUMMARY_TRIES - 1):
+            knowledge.write_summaries(lambda p: "")
+            self.assertNotIn(net, knowledge.summaries())
+        knowledge.write_summaries(lambda p: "")
+        self.assertEqual(knowledge.summaries()[net], "(couldn't say what this covers)")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -901,6 +901,7 @@ def run_all(model, report=None):
             dream_conclusions(model, report)
             write_pages(model, report)
             write_profiles(model, report)
+            write_doc_summaries(model, report)
         except Interrupted:
             if report:
                 report("Paused - you started talking. The rest happens next time she's idle.")
