@@ -134,7 +134,10 @@ lunaHead.fed = true;
 // --- drawing --------------------------------------------------------------
 const atBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 80;
 function show(fn) {
-  const stick = atBottom();
+  // pinned, not atBottom(): something that grew the conversation outside a
+  // redraw (a picture loading, the box growing) mustn't count as you having
+  // scrolled away from the newest message
+  const stick = pinned;
   fn();
   if (stick) log.scrollTop = log.scrollHeight;
   pinned = atBottom();
@@ -154,6 +157,9 @@ new ResizeObserver(() => {
   document.body.style.setProperty('--foot', $('footer').offsetHeight + 'px');
   if (pinned) log.scrollTop = log.scrollHeight;
 }).observe($('footer'));
+// and the same when the conversation itself grows outside a redraw: a picture
+// or a code box finishing its layout, the thumbs under a reply
+new ResizeObserver(() => { if (pinned) log.scrollTop = log.scrollHeight; }).observe(list);
 
 function esc(s) { return s.replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
 // her *actions* in italics; everything else exactly as written
@@ -467,7 +473,18 @@ function dictated(d) {
 text.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); go(); }
 });
-function grow() { text.style.height = 'auto'; text.style.height = Math.min(text.scrollHeight, innerHeight * .4) + 'px'; }
+// The box is measured by shrinking it to one line for a moment. That moment
+// makes the conversation taller, and the browser moves its scroll position to
+// fit; Chromium moves it back after, Firefox doesn't, so on every key the
+// newest message sank under the box, until the box grew a line and the
+// footer's ResizeObserver put it back (the "random" jump up). Where it was is
+// put back here, the same in every browser.
+function grow() {
+  const stick = pinned, top = log.scrollTop;
+  text.style.height = 'auto';
+  text.style.height = Math.min(text.scrollHeight, innerHeight * .4) + 'px';
+  log.scrollTop = stick ? log.scrollHeight : top;
+}
 text.addEventListener('input', () => { grow(); buttons(); });
 
 // --- one file a message ---------------------------------------------------
