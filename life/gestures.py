@@ -207,10 +207,11 @@ def prompt_line(private=True):
 
 # Her own [blushing] or [gets into position]: an action in tag brackets that
 # isn't a tag. Tags taught her that brackets mean "something I do", so she
-# writes actions in them too. Shown as the action it is, *blushing*: never a
+# writes actions in them too, made-up tags included ([slowly_unfastens]).
+# Shown as the action it is, *blushing*, *slowly unfastens*: never a
 # timestamp [01:23], a number [1], a link [text](url), an index (arr[i]), or
 # anything inside code she wrote (``` blocks and `inline`).
-_BRACKET_ACTION = re.compile(r"(?<![\w\])\[])\[([A-Za-z][A-Za-z' ,-]{1,118}[A-Za-z])\](?![(\[\]])")
+_BRACKET_ACTION = re.compile(r"(?<![\w\])\[])\[([A-Za-z][A-Za-z' ,_-]{1,118}[A-Za-z])\](?![(\[\]])")
 _CODE = re.compile(r"```.*?(?:```|$)|`[^`\n]*`", re.DOTALL)
 
 
@@ -218,11 +219,12 @@ def _as_actions(text):
     if "[" not in text:
         return text
     out, at = [], 0
+    act = lambda m: f"*{m.group(1).replace('_', ' ')}*"
     for code in _CODE.finditer(text):           # an unclosed ``` runs to the end (still streaming)
-        out.append(_BRACKET_ACTION.sub(lambda m: f"*{m.group(1)}*", text[at:code.start()]))
+        out.append(_BRACKET_ACTION.sub(act, text[at:code.start()]))
         out.append(code.group(0))
         at = code.end()
-    out.append(_BRACKET_ACTION.sub(lambda m: f"*{m.group(1)}*", text[at:]))
+    out.append(_BRACKET_ACTION.sub(act, text[at:]))
     return "".join(out)
 
 
@@ -232,6 +234,9 @@ def strip(text):
     if "[" in text:
         # a space where it sat between words, nothing before punctuation
         text = _tag().sub("\0", text)
+        # a tag on a line of its own goes with its line, not leaving a gap
+        text = re.sub(r"\n+[ \t]*\0[ \t]*\n+", "\n\n", text)
+        text = re.sub(r"^[ \t]*\0[ \t]*\n+", "", text)
         text = re.sub(r"(?<=\S)\0(?=\w)", " ", text).replace("\0", "")
         text = _as_actions(text)
     partial = _PARTIAL.search(text)

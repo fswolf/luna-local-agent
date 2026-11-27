@@ -103,6 +103,12 @@ class BracketActions(unittest.TestCase):
                          "a [[wiki link]] here"):
                 self.assertEqual(gestures.strip(left), left)
             self.assertEqual(gestures.strip("[sighs] Fine: `d[key]`"), "*sighs* Fine: `d[key]`")
+            # a made-up tag is an action too, not left raw in the reply
+            self.assertEqual(gestures.strip("why wait. [slowly_unfastens] There."), "why wait. *slowly unfastens* There.")
+            self.assertEqual(gestures.strip("use my_list[some_index] `[a_b]`"), "use my_list[some_index] `[a_b]`")
+            # a tag on a line of its own takes its line with it
+            self.assertEqual(gestures.strip("Hi.\n\n[top_off]\n\nThere."), "Hi.\n\nThere.")
+            self.assertEqual(gestures.strip("[wave]\nHello"), "Hello")
         gestures._tag_cache.clear()
 
 

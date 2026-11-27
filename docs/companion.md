@@ -695,7 +695,7 @@ everything, with the same rules as any piece below.
 | How | Example |
 |---|---|
 | You ask, in plain words | take off your top, lose the tie, take off your shoes and socks, strip, get dressed, put your shirt back on; on a model with underwear pieces also take off your bra, your panties, your underwear (both), get naked |
-| She does it herself | `*slips her top off*`, `*kicks off her shoes*`, `*pulls her shirt back on*`, `*gets dressed*`, `*slips out of her panties*`, `*gets naked*` in her reply |
+| She does it herself | `*slips her top off*`, `*kicks off her shoes*`, `*pulls her shirt back on*`, `*gets dressed*`, `*slips out of her panties*`, `*gets naked*` in her reply, or in the first person the way she writes in a roleplay: `*unhooks my bra*`, `*slips out of my shorts*`, `*pulls my panties back into place*` |
 | She picks a tag (tags mode) | `[top_off]`, `[undress]`, `[top_on]`, `[dress]`, `[bra_off]` |
 | `/outfit` | `/outfit underwear`, `/outfit bare`, `/outfit dressed`, `/outfit off tie`, `/outfit on top`; on its own it says what she's wearing |
 | `/blanket` | `/blanket on`, `/blanket off`, or `/blanket` to swap: a plaid blanket round her shoulders that moves with her |

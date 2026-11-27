@@ -1,6 +1,7 @@
 """Approved examples -> the trainer's files (docs/patches.md).
 
     python3 -m training.export gesture      (or habit)
+    python3 -m training.export style [name] (text from agent/dataset/style/[name]/)
 
 Writes agent/dataset/export/<kind>-train.jsonl and <kind>-test.jsonl, one
 conversation per line: {"messages": [system, ..., user, assistant]}, the
@@ -108,9 +109,108 @@ def export(kind, folder=OUT):
     return len(train), len(test), paths
 
 
+# --- style: a writing style, from text ------------------------------------
+# A style patch learns how a pile of writing reads (novels, a genre, an
+# author she should sound like), not facts from it: a small model trained
+# on physics books learns to sound like physics, and makes up the rest.
+# The text is cut into pieces of about CHUNK characters at paragraph breaks,
+# and every word is learned. Your approved chat examples go in with it, so
+# she keeps answering you instead of narrating; without any, a style patch
+# can turn every reply into a page of a book.
+STYLE = os.path.join(dataset.FOLDER, "style")
+CHUNK = 6000             # characters, about 1500 tokens
+SHORTEST = 400           # a piece shorter than this (a heading, a copyright line) is left out
+TEXT_FILES = (".txt", ".md")
+
+
+def style_folder(name=""):
+    name = str(name or "").strip()
+    if name and (os.sep in name or name.startswith(".")):
+        raise ValueError(f"{name!r}: a folder name in {STYLE}, not a path")
+    return os.path.join(STYLE, name) if name else STYLE
+
+
+def chunks(text, size=CHUNK):
+    """The text in pieces of about size characters, cut between paragraphs
+    (or, inside a paragraph longer than that, between sentences)."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    paras = [" ".join(p.split()) for p in text.split("\n\n")]
+    out, cur = [], ""
+    for para in (p for p in paras if p):
+        pieces = [para]
+        if len(para) > size:            # one huge paragraph: by sentences
+            pieces, part = [], ""
+            sents = para.replace(". ", ".\x00").split("\x00")
+            # no sentence ends at all (a wall of text): cut it at the size
+            sents = [x[i:i + size] for x in sents for i in range(0, len(x), size)]
+            for sent in sents:
+                if part and len(part) + len(sent) + 1 > size:
+                    pieces.append(part)
+                    part = ""
+                part = f"{part} {sent}".strip()
+            if part:
+                pieces.append(part)
+        for piece in pieces:
+            if cur and len(cur) + len(piece) + 2 > size:
+                out.append(cur)
+                cur = ""
+            cur = f"{cur}\n\n{piece}" if cur else piece
+    if cur:
+        out.append(cur)
+    return [c for c in out if len(c) >= SHORTEST]
+
+
+def export_style(name="", folder=OUT):
+    """(text pieces, chat examples mixed in, test count, paths) for a style
+    patch. ValueError when there's no text."""
+    src = style_folder(name)
+    files = sorted(os.path.join(dp, f) for dp, _dirs, fs in os.walk(src) for f in fs
+                   if f.lower().endswith(TEXT_FILES)) if os.path.isdir(src) else []
+    if not files:
+        raise ValueError(f"no text to learn a style from: put .txt files in {src}")
+    train, test = [], []
+    for path in files:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for piece in chunks(f.read()):
+                key = hashlib.sha1(piece.encode()).hexdigest()
+                (test if held_back(key) else train).append({"text": piece})
+    if not train:
+        raise ValueError(f"the text in {src} is too short to learn from")
+    pieces = len(train)
+    chat = 0
+    for kind in dataset.KINDS:
+        for ex in dataset.examples(kind):
+            conv = conversation(ex) if ex.get("approved") is True and not held_back(ex.get("id")) else None
+            if conv:
+                train.append(conv)
+                chat += 1
+    os.makedirs(folder, exist_ok=True)
+    tag = "style" + (f"-{name}" if name else "")
+    paths = {}
+    for which, rows in (("train", train), ("test", test)):
+        paths[which] = os.path.join(folder, f"{tag}-{which}.jsonl")
+        with open(paths[which], "w", encoding="utf-8") as f:
+            for r in rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    return pieces, chat, len(test), paths
+
+
 def main(argv):
+    if argv and argv[0] == "style" and len(argv) <= 2:
+        try:
+            pieces, chat, n_test, paths = export_style(argv[1] if len(argv) == 2 else "")
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            return 1
+        print(f"style: {pieces} pieces of text and {chat} of your chat examples to train on, "
+              f"{n_test} pieces held back")
+        print(f"  {paths['train']}\n  {paths['test']}")
+        if not chat:
+            print("  (no approved chat examples to mix in: the patch may make her narrate - "
+                  "keep its strength low, /patches style 0.3)", file=sys.stderr)
+        return 0
     if len(argv) != 1:
-        print("usage: python3 -m training.export gesture|habit", file=sys.stderr)
+        print("usage: python3 -m training.export gesture|habit|style [name]", file=sys.stderr)
         return 2
     try:
         n_train, n_test, paths = export(argv[0])

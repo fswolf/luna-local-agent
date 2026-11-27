@@ -24,6 +24,11 @@ the template shows it the way she'd write it, after the same opening as a
 reply; Qwen drops the thinking from calls before her answer, so there the
 calls stay context and only the answer is learned.
 
+A style patch (--kind style) also has lines of plain text, {"text": ...}:
+a piece of a book. Every word of it is learned, no chat template around it,
+so she picks up how it's written. Its chat examples, mixed in by the export,
+are learned as above.
+
 Saves the adapter (safetensors) in --out; train.sh turns it into a GGUF.
 """
 import argparse
@@ -85,6 +90,15 @@ def encode(tok, messages, prefix, max_len, tools=None):
     return {"input_ids": ids, "labels": labels}
 
 
+def encode_text(tok, text, max_len):
+    """A piece of a book: every token learned, cut to max_len, ending in the
+    end-of-text token so a piece doesn't run on into the next."""
+    ids = tok(text, add_special_tokens=True).input_ids[:max_len - 1]
+    if tok.eos_token_id is not None:
+        ids = ids + [tok.eos_token_id]
+    return {"input_ids": ids, "labels": list(ids)}
+
+
 def _settings(a, n):
     """The trainer's settings, kept to the ones this transformers has: version 5
     dropped warmup_ratio ("unexpected keyword argument"), and the image takes
@@ -139,12 +153,16 @@ def main():
         tok.pad_token = tok.eos_token
 
     prefix = reply_prefix(tok)
-    rows, too_long, odd = [], 0, 0
+    rows, too_long, odd, texts = [], 0, 0, 0
     with open(a.train, encoding="utf-8") as f:
         for line in f:
             if not line.strip():
                 continue
             row = json.loads(line)
+            if "text" in row:                       # a style patch's piece of text
+                rows.append(encode_text(tok, row["text"], a.max_len))
+                texts += 1
+                continue
             r = encode(tok, row["messages"], prefix, a.max_len, row.get("tools"))
             if r is None:
                 n = len(tok(tok.apply_chat_template(row["messages"], tools=row.get("tools") or None,
@@ -153,8 +171,8 @@ def main():
                 too_long, odd = too_long + (n > a.max_len), odd + (n <= a.max_len)
             else:
                 rows.append(r)
-    print(f"{len(rows)} examples to train on; left out: {too_long} longer than {a.max_len} tokens, "
-          f"{odd} the template wouldn't split cleanly")
+    print(f"{len(rows)} examples to train on{f' ({texts} of them text)' if texts else ''}; left out: "
+          f"{too_long} longer than {a.max_len} tokens, {odd} the template wouldn't split cleanly")
     if not rows:
         raise SystemExit("nothing to train on")
 
@@ -167,7 +185,8 @@ def main():
     model.save_pretrained(a.out)
     tok.save_pretrained(a.out)
     with open(os.path.join(a.out, "luna-patch.json"), "w", encoding="utf-8") as f:
-        json.dump({"kind": a.kind, "base": a.base, "examples": len(rows), "left_out": too_long + odd,
+        json.dump({"kind": a.kind, "base": a.base, "examples": len(rows), "text_pieces": texts,
+                   "left_out": too_long + odd,
                    "rank": a.rank, "epochs": a.epochs, "lr": a.lr, "max_len": a.max_len,
                    "loss": round(float(stats.training_loss), 4),
                    "trained": time.strftime("%Y-%m-%dT%H:%M:%S")}, f, indent=1)

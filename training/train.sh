@@ -2,7 +2,8 @@
 # Train one of her patches overnight, by hand (docs/patches.md).
 #
 #   training/train.sh gesture        or  habit
-#   training/train.sh gesture --check   only check everything's in place
+#   training/train.sh style [name]  a writing style, from the text in agent/dataset/style/[name]/
+#   training/train.sh gesture --check   only check everything's in place (style [name] --check too)
 #
 # 1. exports the approved examples (python3 -m training.export)
 # 2. builds the trainer container once (training/Containerfile: Unsloth, ROCm)
@@ -16,12 +17,19 @@ cd "$(dirname "$(realpath "$0" 2>/dev/null || echo "$0")")/.." || exit 1
 ROOT="$PWD"
 
 KIND="${1:-}"
+STYLE=""
 CHECK=""
-[ "${2:-}" = "--check" ] && CHECK=1
+shift || true
+if [ "$KIND" = style ] && [ -n "${1:-}" ] && [ "$1" != --check ]; then STYLE="$1"; shift; fi
+[ "${1:-}" = "--check" ] && CHECK=1
 case "$KIND" in
-    gesture|habit) ;;
-    *) echo "usage: training/train.sh gesture|habit [--check]" >&2; exit 2 ;;
+    gesture|habit|style) ;;
+    *) echo "usage: training/train.sh gesture|habit [--check]   or   training/train.sh style [name] [--check]" >&2; exit 2 ;;
 esac
+case "$STYLE" in
+    */*|.*) echo "style name: a folder in agent/dataset/style/, not a path" >&2; exit 2 ;;
+esac
+TAG="$KIND${STYLE:+-$STYLE}"        # style-novels: the export's files and the patch's name
 
 # shellcheck disable=SC1091
 source training/train.env
@@ -44,7 +52,7 @@ if [ -z "$FOR_MODEL" ]; then
     FOR_MODEL="$(cat server/llama/patches/.current_model 2>/dev/null || true)"
     [ -n "$FOR_MODEL" ] || lack "Don't know which GGUF this is for: start server/llama/start.sh once (it notes the model), or set FOR_MODEL."
 fi
-echo "patch: $KIND, for $FOR_MODEL"
+echo "patch: $TAG, for $FOR_MODEL"
 echo "  trained on: $BASE"
 
 # --- the GPU has to be free -------------------------------------------------
@@ -103,8 +111,12 @@ mkdir -p "$HOME/.cache/huggingface" server/llama/patches
 LLAMA="$(realpath server/llama)"
 
 # --- the examples -----------------------------------------------------------
-"$PY" -m training.export "$KIND" || lack "No approved $KIND examples to train on yet."
-TRAIN="agent/dataset/export/$KIND-train.jsonl"
+if [ "$KIND" = style ]; then
+    "$PY" -m training.export style ${STYLE:+"$STYLE"} || lack "No text to learn a style from: put .txt files in agent/dataset/style/${STYLE:+$STYLE/}"
+else
+    "$PY" -m training.export "$KIND" || lack "No approved $KIND examples to train on yet."
+fi
+TRAIN="agent/dataset/export/$TAG-train.jsonl"
 N="$(grep -c . "$TRAIN" 2>/dev/null || true)"
 
 if [ -n "$CHECK" ]; then
@@ -126,7 +138,7 @@ if ! $ENGINE image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 slug() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9\n' '-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40; }
-NAME="$KIND-$(slug "$FOR_MODEL")-$(date +%Y-%m-%d)-n$N"
+NAME="$TAG-$(slug "$FOR_MODEL")-$(date +%Y-%m-%d)-n$N"
 [ -e "server/llama/patches/$NAME.gguf" ] && NAME="$NAME-$(date +%H%M)"      # a second run the same day keeps the first
 RUN="agent/dataset/runs/$NAME"
 mkdir -p "$RUN"
@@ -185,4 +197,4 @@ echo
 echo "Done: server/llama/patches/$NAME.gguf"
 echo "Restart server/llama/start.sh to load it (PATCHES in server/llama/server.env), then try it:"
 echo "  /patches             what's loaded"
-echo "  /patches $KIND 0.5   half strength while you compare; 0 turns it off"
+echo "  /patches $TAG 0.5   half strength while you compare; 0 turns it off"

@@ -132,6 +132,68 @@ except ImportError:
 
 
 @unittest.skipIf(jinja2 is None, "jinja2 isn't installed")
+class Style(unittest.TestCase):
+    """A style patch: text from agent/dataset/style/[name]/ in pieces, your chat examples mixed in."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        with open(os.path.join(self.tmp, "examples.jsonl"), "w") as f:
+            f.writelines(json.dumps(r) + "\n" for r in [row(i, kind="habit", reply="Mrrp~") for i in range(20)]
+                         + [row(50, approved=False)])
+        for p in (mock.patch.object(dataset, "FOLDER", self.tmp),
+                  mock.patch.object(dataset, "FILE", os.path.join(self.tmp, "examples.jsonl")),
+                  mock.patch.object(export, "STYLE", os.path.join(self.tmp, "style"))):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def book(self, name="", text=None):
+        folder = os.path.join(self.tmp, "style", name)
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "book.txt"), "w") as f:
+            f.write(text if text is not None else "\n\n".join(f"Paragraph {i}. " + "She smiled. " * 40
+                                                                for i in range(200)))
+
+    def test_pieces_cut_between_paragraphs(self):
+        text = "\n\n".join(f"P{i} " + "word " * 100 for i in range(40))
+        pieces = export.chunks(text, size=2000)
+        self.assertTrue(all(len(p) <= 2000 for p in pieces))
+        self.assertTrue(all(p.startswith("P") for p in pieces))          # never split mid-paragraph
+        self.assertEqual(export.chunks("x" * 5000, size=2000)[0], "x" * 2000)   # a wall of text is cut
+        self.assertEqual(export.chunks("Chapter One"), [])                # too short to learn from
+
+    def test_export_mixes_in_your_chat(self):
+        self.book("novels")
+        pieces, chat, n_test, paths = export.export_style("novels", os.path.join(self.tmp, "export"))
+        self.assertTrue(paths["train"].endswith("style-novels-train.jsonl"))
+        rows = [json.loads(line) for line in read(paths["train"]).splitlines()]
+        self.assertEqual(sum("text" in r for r in rows), pieces)
+        self.assertEqual(sum("messages" in r for r in rows), chat)
+        self.assertTrue(0 < chat < 20)                                     # approved ones, not the held-back ones
+        self.assertGreater(pieces, n_test)
+
+    def test_no_text_or_a_path(self):
+        with self.assertRaises(ValueError):
+            export.export_style("", os.path.join(self.tmp, "export"))
+        with self.assertRaises(ValueError):
+            export.style_folder("../secrets")
+
+    def test_text_is_learned_whole(self):
+        sys.path.insert(0, os.path.join(HERE, "training"))
+        import train
+
+        class Tok:
+            eos_token_id = 0
+
+            def __call__(self, text, add_special_tokens=False):
+                return mock.Mock(input_ids=[ord(c) for c in text])
+
+        r = train.encode_text(Tok(), "Once upon a time", 8192)
+        self.assertEqual(r["labels"], r["input_ids"])
+        self.assertEqual(r["input_ids"][-1], 0)                            # ends with end-of-text
+        self.assertEqual(len(train.encode_text(Tok(), "x" * 100, 10)["input_ids"]), 10)
+
+
 class Masking(unittest.TestCase):
     """training/train.py learns only her last reply (no model or GPU: a stand-in template)."""
 

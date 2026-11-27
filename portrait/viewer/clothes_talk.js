@@ -3,7 +3,8 @@
 // clothesAsked(text)   what you said: "take off your top", "strip", "lose the
 //                      tie", "put your shirt back on", "get dressed"
 // clothesActed(text)   what she wrote in an action: *slips her top off*,
-//                      *pulls her shirt back on*, (gets dressed)
+//                      *pulls her shirt back on*, (gets dressed), and in the
+//                      first person: *unhooks my bra*, *slips out of my shorts*
 //
 // Both answer the same way, or null:
 //   { wear: 'dressed' | 'underwear' | 'bare' }   everything on, down to her
@@ -60,13 +61,21 @@ export function clothesAsked(text) {
   return null;
 }
 
-// what she writes, about herself
-const HER_STRIP = /\b(?:strips|undresses|gets\s+undressed|strips\s+(?:down|off)|down\s+to\s+her\s+(?:underwear|undies|bra))\b/;
-const HER_NAKED = /\b(?:gets|strips)\s+(?:completely\s+|all\s+the\s+way\s+)?(?:naked|nude|bare)\b/;
-const HER_DRESS = /\b(?:gets\s+dressed|dresses|puts\s+her\s+clothes\s+(?:back\s+)?on)\b/;
+// what she writes, about herself: in the third person (*slips her top off*,
+// *takes off her tie*) or the first, the way she writes in a roleplay
+// (*slips out of my shorts*, *unhooks my bra*, *slides the top off over my head*)
+const S = "s?";                               // takes / take
+const HER = "(?:her|my)";                     // whose: hers either way
+const ANY = "(?:her|my|the)";                 // "the top" too, where the verb says enough
+const V_OFF = `(?:take|pull|slip|slide|peel|shrug|wriggle|tug|kick)${S}`;
+const her = src => re(src.replace(/HER/g, HER).replace(/ANY/g, ANY).replace(/VOFF/g, V_OFF));
+const HER_STRIP = her(String.raw`\b(?:strips|undress(?:es)?|gets?\s+undressed|strip${S}\s+(?:down|off)|down\s+to\s+HER\s+(?:underwear|undies|bra))\b`);
+const HER_NAKED = her(String.raw`\b(?:get|strip)${S}\s+(?:completely\s+|all\s+the\s+way\s+)?(?:naked|nude|bare)\b`);
+const HER_DRESS = her(String.raw`\b(?:gets?\s+dressed|dresses|puts?\s+HER\s+clothes\s+(?:back\s+)?on)\b`);
 // "off" has to be there: *tugs her skirt down* is fixing it, not taking it off
-const HER_OFF = re(String.raw`\b(?:takes|pulls|slips|peels|shrugs|wriggles|tugs|kicks)\s+off\s+her\s+(W)|\b(?:takes|pulls|slips|peels|shrugs|wriggles|tugs|kicks)\s+her\s+(W)\s+off\b|\b(?:removes|sheds)\s+her\s+(W)|\b(?:slips|wriggles|steps|shimmies)\s+out\s+of\s+her\s+(W)|\bpulls\s+her\s+(W)\s+(?:up\s+)?over\s+her\s+head|\blets\s+her\s+(W)\s+(?:fall|drop)\b`);
-const HER_ON = re(String.raw`\b(?:puts|pulls|slips|tugs)\s+her\s+(W)\s+(?:back\s+)?on\b|\b(?:puts|pulls|slips)\s+(?:back\s+)?on\s+her\s+(W)`);
+const HER_OFF = her(String.raw`\bVOFF\s+off\s+ANY\s+(W)|\bVOFF\s+ANY\s+(W)\s+off\b|\b(?:remove|shed|unhook|unclasp|unfasten)${S}\s+ANY\s+(W)|\b(?:slip|wriggle|step|shimmy|shimmie)${S}\s+out\s+of\s+ANY\s+(W)|\bpull${S}\s+HER\s+(W)\s+(?:up\s+)?over\s+HER\s+head|\blet${S}\s+ANY\s+(W)\s+(?:fall|drop)\b`);
+// "back": *pulls my panties back into place*, *pulls her shorts back up* - after they were off
+const HER_ON = her(String.raw`\b(?:put|pull|slip|tug)${S}\s+ANY\s+(W)\s+(?:back\s+)?on\b|\b(?:put|pull|slip)${S}\s+(?:back\s+)?on\s+ANY\s+(W)|\b(?:pull|tug|slip)${S}\s+ANY\s+(W)\s+back\s+(?:up|into\s+place)\b`);
 
 export function clothesActed(text) {
   const t = String(text || '').toLowerCase().replace(/[’`]/g, "'");

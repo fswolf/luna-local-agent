@@ -369,6 +369,24 @@ CASES_HER = {
     "slips out of her panties": {"off": ["panties"]},
     "gets completely naked": {"wear": "bare"},
     "stands there naked": None,
+    # the first person, the way she writes in a roleplay
+    "slides the top off over my head and lets it fall to the desk": {"off": ["top"]},
+    "unhooks my bra and lets it fall": {"off": ["bra"]},
+    "unclasps my bra": {"off": ["bra"]},
+    "slips out of my shorts": {"off": ["bottoms"]},
+    "shimmies out of my panties": {"off": ["panties"]},
+    "pull my panties back into place": {"on": ["panties"]},
+    "pulls my shorts back up": {"on": ["bottoms"]},
+    "pulls my bra back on": {"on": ["bra"]},
+    "take my top off": {"off": ["top"]},
+    "strip down to my underwear": {"wear": "underwear"},
+    "get completely naked": {"wear": "bare"},
+    "put my clothes back on": {"wear": "dressed"},
+    "tug my skirt down": None,
+    "reaches for the waistband": None,
+    "lets her hair fall": None,
+    "slides my hand off your shirt": None,
+    "start to take my top off": None,
 }
 
 

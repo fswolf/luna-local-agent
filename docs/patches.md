@@ -27,6 +27,7 @@ Each is its own patch, so one can be tested and rolled back without touching the
 2. Look through them on the examples page now and then: approve, drop, edit.
 3. With a few hundred approved, stop Luna and the model server, check with
    `training/train.sh gesture --check`, then run `training/train.sh gesture` (or `habit`).
+   A writing style learns from text instead: *A writing style* below.
    Leave it running; overnight is a good time.
 4. Restart `server/llama/start.sh`. The new patch loads by itself, for the model it was made for.
 5. Try it with `/patches`, at half strength first if you like.
@@ -203,6 +204,36 @@ from, since you never reviewed them. Whatever her model's chat template writes b
 reply (Qwen's empty thinking block) is context too, so a patch doesn't teach her to skip
 thinking.
 
+## A writing style
+
+A style patch learns how a pile of writing reads: novels in a genre, an author's voice,
+the way a kind of book talks. It learns from text instead of examples:
+
+```
+mkdir -p agent/dataset/style/novels         # any name; one folder per style
+cp ~/books/*.txt agent/dataset/style/novels/
+training/train.sh style novels --check
+training/train.sh style novels               # overnight, like the others
+```
+
+Plain text (`.txt` or `.md`, in subfolders too) is cut into pieces of about 1,000
+words at paragraph breaks, and every word of each piece is learned. A few MB
+of text is plenty for a first try. Strip anything that isn't the writing first: a
+licence block, a table of contents, page numbers.
+
+Your approved chat examples go in with it, so she keeps answering you instead of
+narrating. Without any, a style patch can turn every reply into a page of a book;
+`train.sh` says so, and a low strength (`/patches style-novels 0.3`) keeps it in check.
+
+It loads next to any other patch for her model, each at its own strength:
+`/patches style-novels 0.5`.
+
+It changes how she writes, not what she knows. Trained on physics books she'd sound
+like one and make up the physics: for knowledge, the knowledge folder is the tool (she
+looks it up from the real text). `agent/dataset/` never goes into git, so the books
+stay on your machine. Train on what you own or what's free to use, and only share a
+style patch made from text that's free to share.
+
 ## Training on her model server
 
 Training needs the graphics card her model runs on. When that's another machine (a
@@ -313,6 +344,7 @@ they carry over to every model you use.
 | What | Where | In git? |
 |---|---|---|
 | Examples | `agent/dataset/examples.jsonl` | Never: they hold her whole prompt, your facts included |
+| Text for a style patch | `agent/dataset/style/<name>/` | Never |
 | Exports for training | `agent/dataset/export/` | Never |
 | Training runs | `agent/dataset/runs/<name>/` | Never |
 | Patches | `server/llama/patches/` | Never: built from your examples, for your model |
