@@ -130,9 +130,15 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
                      for speaker, text in convo[start:]], "total": total,
             "streaming": streaming, "busy": interrupts.busy(), "stoppable": _stoppable(),
             "status": status, "name": name,
-            "mood": mood, "rows": rows, "ask": ui.pending_approval(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
+            "mood": mood, "rows": rows, "ask": ui.pending_approval(), "notify_asks": _notify_asks(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
             "can_talk": bool(ui.view.on_hotkey), "rate": _rateable(now_epoch, convo),
             "dictated": dict(DICTATED), "replay": replaying()}
+
+
+def _notify_asks():
+    import config
+
+    return bool(getattr(config, "TOOLS_NOTIFY_ASKS", True))
 
 
 def _rateable(epoch, convo):

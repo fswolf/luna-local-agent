@@ -51,7 +51,10 @@ starts with the conversation as it stands.
   on the page works too. A picture needs a model that can see.
 - When a tool asks first (writing a file, running a command), the question
   shows in the page with Allow and Deny. Answering it in either place answers
-  it in both.
+  it in both. If you're in another window when she asks, a desktop notification
+  says so; clicking it brings her chat back. Your browser asks once whether to
+  allow notifications, the first time you click in her chat. `tools.notify_asks`
+  in settings turns it off.
 - Your messages are on the left, hers in the middle, and her own notes (a
   tool she ran, a vote, a summary of last time) in small yellow boxes on the
   right; click a long one to open it.

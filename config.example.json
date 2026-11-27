@@ -255,7 +255,8 @@
     },
     "tools": {
         "enabled": true,
-        "max_rounds": 4
+        "max_rounds": 4,
+        "notify_asks": true
     },
     "shell": {
         "enabled": true,

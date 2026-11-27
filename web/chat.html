@@ -232,6 +232,7 @@ function apply(s) {
     els.forEach((el, at) => { if (el.classList.contains('waiting')) el.hidden = base + at !== streaming; });
     const waiting = !!list.querySelector('.msg.waiting:not([hidden])');   // her reply's own bubble has the dots
     typing.classList.toggle('on', busy && !s.ask && !!last && last[0] === 'user' && !waiting);
+    notifyAsks = !!s.notify_asks;
     asking(s.ask);
   });
   document.title = (s.name || 'Luna') + ' · chat';
@@ -344,11 +345,35 @@ async function rate(idx, up, better, note) {
 }
 
 // --- a tool asking first --------------------------------------------------
+// tools.notify_asks: a desktop notification when she asks and you're in
+// another window or tab (her own app window counts as away once it loses focus)
+let notifyAsks = false, askNote = null;
+const away = () => document.hidden || !document.hasFocus();
+function notifyAsk(q) {
+  if (!notifyAsks || !away() || !('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const body = [q.note || '', ...q.body].filter(Boolean).join('\n').slice(0, 300);
+    askNote = new Notification(q.title, {body, tag: 'luna-ask', requireInteraction: true, icon: 'logo.png'});
+    askNote.onclick = () => { window.focus(); askNote && askNote.close(); };
+  } catch (err) {}
+}
+function clearAskNote() { if (askNote) { askNote.close(); askNote = null; } }
+// a browser only asks for permission after a click or key, so the first one does
+function askPermission() {
+  if (notifyAsks && 'Notification' in window && Notification.permission === 'default')
+    Notification.requestPermission().catch(() => {});
+}
+addEventListener('pointerdown', askPermission);
+addEventListener('keydown', askPermission);
+addEventListener('focus', clearAskNote);
+
 function asking(q) {
-  if (!q) { if (askEl) askEl.remove(); askEl = null; askId = null; return; }
+  if (!q) { if (askEl) askEl.remove(); askEl = null; askId = null; clearAskNote(); return; }
   if (askId !== q.id) {
     if (askEl) askEl.remove();
+    clearAskNote();
     askId = q.id;
+    notifyAsk(q);
     // floats over the chat, centred, until it's answered (or closes on its own)
     askEl = document.createElement('div'); askEl.className = 'askwrap';
     askEl.innerHTML = `<div class=ask><b></b><div class=note></div><pre></pre><div class=row>

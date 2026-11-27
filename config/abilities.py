@@ -61,6 +61,9 @@ _tools_cfg = setting("tools", {})
 TOOLS_ROUTING = flag(_tools_cfg.get("routing", True))
 TOOLS_ROUTE_GROUPS = int(_tools_cfg.get("route_groups", 3))
 TOOLS_STICKY_TURNS = int(_tools_cfg.get("sticky_turns", 3))
+# A desktop notification from her chat page when a tool asks first and you're
+# in another window (web/chat.html)
+TOOLS_NOTIFY_ASKS = flag(_tools_cfg.get("notify_asks", True))
 _core = _tools_cfg.get("core", ["Time", "Math", "Reminders", "Memory", "Shell", "Help"])
 TOOLS_CORE = list(_core) if isinstance(_core, (list, tuple)) else ["Time", "Math", "Reminders", "Memory", "Shell", "Help"]
 # The opt-in tools (tools.OPT_IN, the camera) switched on - an on-list,

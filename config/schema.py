@@ -310,6 +310,7 @@ SCHEMA = {
     # --- Tools --------------------------------------------------------------
     "tools.enabled": ("bool", "Turn every tool on or off at once (reminders, search, files...)"),
     "tools.max_rounds": ("int", "Most rounds of tool use before Luna has to answer"),
+    "tools.notify_asks": ("bool", "A desktop notification when Luna asks permission (Allow or Deny) while her chat isn't the window you're in. Your browser asks once whether to allow notifications"),
     "tools.disabled": ("list", "Tools you've switched off, by name"),
     "tools.opt_in": ("list", "Extra tools that are off until you list them here, like look_at_camera"),
     "tools.routing": ("bool", "Only send the tools each message seems to need. Off sends every tool every time"),
@@ -656,7 +657,7 @@ BASIC = (
     "portrait.hologram.enabled", "portrait.lights.enabled", "portrait.chat_gestures", "portrait.touch_talk",
     "camera.presence.enabled", "people.voice", "station.enabled",
     "vision.enabled", "knowledge.enabled", "reminders.enabled", "alarms.volume",
-    "long_term_memory.enabled", "self.greet", "thoughts.enabled", "ui.mouse",
+    "long_term_memory.enabled", "self.greet", "thoughts.enabled", "tools.notify_asks", "ui.mouse",
     # toys: on at startup and the limits, for each way of connecting them
     "plugins.lovense.enabled", "plugins.lovense.max_strength", "plugins.lovense.max_motion",
     "plugins.lovense.max_seconds",

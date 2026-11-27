@@ -229,6 +229,7 @@ SETTINGS = {
     "tools.routing":              ("TOOLS_ROUTING",                True),
     "tools.route_groups":         ("TOOLS_ROUTE_GROUPS",           True),
     "tools.sticky_turns":         ("TOOLS_STICKY_TURNS",           True),
+    "tools.notify_asks":          ("TOOLS_NOTIFY_ASKS",            True),
 
     "shell.enabled":              ("SHELL_ENABLED",                True),
     "shell.timeout":              ("SHELL_TIMEOUT",                True),
