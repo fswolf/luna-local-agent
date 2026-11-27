@@ -732,12 +732,15 @@ Putting clothes on always works. Taking them off doesn't happen:
 plays the gesture that takes it off, and the piece goes at the right moment
 in it: `tie_off` (loosens the knot, lifts it over her head), `top_off`
 (pulls it up over her head; the tie goes with it, since it sits on the
-collar) and `bottoms_off` (pushes her shorts or skirt down and steps out).
+collar) and `bottoms_off` (pushes her shorts or skirt down and steps out),
+and on a model with underwear pieces `bra_off` (unhooks it behind her back,
+holds it to her chest, then draws it away with her other arm still across
+her chest) and `panties_off` (the same moves as `bottoms_off`).
 "Strip" plays them one after another. A piece without a gesture just goes,
 and so does one while her hands are busy (her mug). "Get dressed" or "put
 your top back on" partway through stops the rest, and her arms come down;
 so does tame mode coming on. While one plays, a giggle or a wave from her
-reply doesn't pull her arms away. These three are rough
+reply doesn't pull her arms away. These are rough
 first passes, to refine in the pose studio; any gesture can take a piece
 off with `clothes: [{ at: 2.0, off: ['top'] }]`, and the studio's Details
 tab sets it (**+ clothes**: the piece, off or on, and when).
