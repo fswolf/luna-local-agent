@@ -669,7 +669,7 @@ function wireOutfits(o) {
 //   walked off - then it's up to her (her own action still counts).
 function clothes(a, who) {
   if (!a || !outfits?.has) return false;
-  const off = a.wear === 'underwear' || (Array.isArray(a.off) && a.off.length);
+  const off = a.wear === 'underwear' || a.wear === 'bare' || (Array.isArray(a.off) && a.off.length);
   if (off) {
     if (mind.tame || (who !== 'command' && !said.private)) return false;
     if (who === 'you' && (mind.row === 'grudge' || warmthBand() === 'cool' || mind.hold)) return false;
@@ -678,7 +678,9 @@ function clothes(a, who) {
   if (a.wear === 'dressed') return outfits.wear('dressed');
   for (const p of [].concat(a.on || [])) outfits.set(String(p), true);
   // off: each piece with its gesture where there is one (tie_off, top_off...)
-  const pieces = a.wear === 'underwear' ? outfits.pieces().filter(p => p.on).map(p => p.label) : [].concat(a.off || []).map(String);
+  // down to her underwear: what's on but the underwear; bare: everything that's on
+  const pieces = a.wear === 'underwear' ? outfits.pieces().filter(p => p.on && !p.under).map(p => p.label)
+    : a.wear === 'bare' ? outfits.pieces().filter(p => p.on).map(p => p.label) : [].concat(a.off || []).map(String);
   if (pieces.length) undress(pieces);
   return true;
 }
@@ -687,7 +689,7 @@ function clothes(a, who) {
 // off (a gesture file's clothes: [{ at, off: [...] }]); a piece without one,
 // or when she can't move right now (holding her mug), just goes. A new
 // "get dressed" stops the rest.
-const ORDER = ['tie', 'ribbon', 'top', 'bottoms', 'shoes', 'socks'];
+const ORDER = ['tie', 'ribbon', 'top', 'bottoms', 'shoes', 'socks', 'bra', 'panties'];
 const undressing = { token: 0 };
 const kind = label => String(label).replace(/ \d+$/, '');          // "top 2" -> "top"
 const isOn = piece => outfits.pieces().some(p => p.on && (p.label === piece || kind(p.label) === piece));

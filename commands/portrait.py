@@ -82,28 +82,32 @@ def handle(text):
         words = text.split()[1:]
         if not words:
             now = clothes.current()
-            said = {"dressed": "dressed", "underwear": "in her underwear", "none": "on a model whose clothes don't come off",
+            said = {"dressed": "dressed", "underwear": "in her underwear", "bare": "wearing nothing",
+                    "none": "on a model whose clothes don't come off",
                     "partly": "dressed, without her " + ", ".join(now["off"])}.get(now["wearing"], "not reported yet (is the portrait open?)")
-            ui.add_message("system", f"She's {said}.\n  /outfit dressed | underwear | off <piece> | on <piece>   (pieces: top, tie, bottoms...)")
+            ui.add_message("system", f"She's {said}.\n  /outfit dressed | underwear | bare | off <piece> | on <piece>   "
+                           "(pieces: top, tie, bottoms..., and bra, panties on a model whose underwear comes off)")
             return True
         piece = " ".join(words[1:]).lower()
         if words[0] == "dressed":
             said = "Getting her dressed."
         elif words[0] == "underwear":
             said = "Down to her underwear."
+        elif words[0] == "bare":
+            said = "Taking everything off."
         elif words[0] in ("off", "on") and piece:
             said = f"Taking off her {piece}." if words[0] == "off" else f"Putting her {piece} back on."
         else:
-            ui.add_message("system", "/outfit dressed | underwear | off <piece> | on <piece>")
+            ui.add_message("system", "/outfit dressed | underwear | bare | off <piece> | on <piece>")
             return True
 
         # taking things off waits while a stream has lewd off; putting them on never does
         from mind import mood
         held = mood.tame()
-        if words[0] in ("underwear", "off") and held:
+        if words[0] in ("underwear", "bare", "off") and held:
             ui.add_message("system", f"Not now: she's in tame mode while {', '.join(held)} is live, so nothing comes off.")
             return True
-        livefeed.emit("outfit", **({"wear": words[0]} if words[0] in ("dressed", "underwear") else {words[0]: [piece]}))
+        livefeed.emit("outfit", **({"wear": words[0]} if words[0] in ("dressed", "underwear", "bare") else {words[0]: [piece]}))
         ui.add_message("system", said)
         return True
 

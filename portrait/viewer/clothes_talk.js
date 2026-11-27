@@ -6,12 +6,15 @@
 //                      *pulls her shirt back on*, (gets dressed)
 //
 // Both answer the same way, or null:
-//   { wear: 'dressed' | 'underwear' }      everything on, or everything off
+//   { wear: 'dressed' | 'underwear' | 'bare' }   everything on, down to her
+//                                          underwear, or everything off
 //   { off: [pieces] } / { on: [pieces] }   pieces by the labels outfits.js knows:
-//                                          'top', 'tie', 'bottoms', 'shoes', 'socks'
-//                                          ("your shoes and socks" is both)
-// "Naked" and "nude" mean down to her underwear here: the topless model is a
-// switch you make yourself, never something she does.
+//                                          'top', 'tie', 'bottoms', 'shoes', 'socks',
+//                                          'bra', 'panties' ("your shoes and socks" is
+//                                          both; "your underwear" is bra and panties)
+// "Strip" and "undress" mean down to her underwear; "naked" and "nude" mean
+// everything, which only does more than that on a model whose underwear is
+// its own pieces (outfits.js). The same rules either way (portrait.js clothes()).
 
 const PIECES = [
   ['top', /\b(?:top|shirt|blouse|t-?shirt|tee|jacket|vest|sweater|hoodie)\b/],
@@ -19,6 +22,8 @@ const PIECES = [
   ['bottoms', /\b(?:bottoms|shorts|skirt|pants|trousers|jeans)\b/],
   ['shoes', /\b(?:shoes|boots|sneakers|heels)\b/],
   ['socks', /\b(?:socks|stockings|tights)\b/],
+  ['bra', /\b(?:bra|bralette|underwear|undies|lingerie)\b/],
+  ['panties', /\b(?:panties|knickers|thong|briefs|underwear|undies|lingerie)\b/],
 ];
 const ALL = /\b(?:clothes|outfit|everything|it all|uniform)\b/;
 
@@ -36,7 +41,8 @@ const re = src => new RegExp(src.replace(/W/g, W));
 // what you say
 // "strip" on its own only as something asked: "strip", "strip for me",
 // "can you strip" - not "the comic strip" or "strip tease"
-const STRIP = /(?:^|[.!?,;]\s*|\b(?:you|please|now|and|then|can|could|will|would|gonna|wanna|go|to)\s+)strip(?:\s+(?:down|off))?\b(?!\s*(?:tease|club|mall|steak|light|search))|\b(?:undress|get\s+(?:naked|undressed)|take\s+(?:it\s+)?(?:all|everything)\s+off|down\s+to\s+(?:your|ur)\s+(?:underwear|undies|bra|panties))\b/;
+const STRIP = /(?:^|[.!?,;]\s*|\b(?:you|please|now|and|then|can|could|will|would|gonna|wanna|go|to)\s+)strip(?:\s+(?:down|off))?\b(?!\s*(?:tease|club|mall|steak|light|search))|\b(?:undress|get\s+undressed|take\s+(?:it\s+)?(?:all|everything)\s+off|down\s+to\s+(?:your|ur)\s+(?:underwear|undies|bra|panties))\b/;
+const NAKED = /\b(?:get|go|be|strip)\s+(?:completely\s+|totally\s+|all\s+the\s+way\s+)?(?:naked|nude|bare)\b|\b(?:naked|nude)\s+for\s+me\b/;
 const DRESS = /\b(?:get\s+dressed|dress\s+(?:up|back\s+up)|put\s+(?:your|ur|some)\s+clothes\s+(?:back\s+)?on|clothes\s+back\s+on|cover\s+up)\b/;
 const OFF_ASK = re(String.raw`\b(?:take|pull|slip|peel|get|kick)\s+(?:your|ur|that|the)?\s*(W)\s*off\b|\b(?:take|pull|slip|peel|get|kick)\s+off\s+(?:your|ur|that|the)\s+(W)|\b(?:remove|lose|ditch|drop)\s+(?:your|ur|that|the)\s+(W)`);
 const ON_ASK = re(String.raw`\b(?:put|pull|slip|get)\s+(?:your|ur|that|the)\s+(W)\s+(?:back\s+)?on\b|\b(?:put|pull|slip)\s+(?:back\s+)?on\s+(?:your|ur|that|the)\s+(W)`);
@@ -45,6 +51,7 @@ export function clothesAsked(text) {
   const t = String(text || '').toLowerCase().replace(/[’`]/g, "'");
   if (/\b(?:don'?t|do not|never|keep)\b/.test(t)) return null;      // "don't take your top off", "keep your shirt on"
   if (DRESS.test(t)) return { wear: 'dressed' };
+  if (NAKED.test(t)) return { wear: 'bare' };
   if (STRIP.test(t)) return { wear: 'underwear' };
   let m = t.match(ON_ASK);
   if (m) return answer('on', piecesIn(m.slice(1).filter(Boolean).join(' ')));
@@ -55,6 +62,7 @@ export function clothesAsked(text) {
 
 // what she writes, about herself
 const HER_STRIP = /\b(?:strips|undresses|gets\s+undressed|strips\s+(?:down|off)|down\s+to\s+her\s+(?:underwear|undies|bra))\b/;
+const HER_NAKED = /\b(?:gets|strips)\s+(?:completely\s+|all\s+the\s+way\s+)?(?:naked|nude|bare)\b/;
 const HER_DRESS = /\b(?:gets\s+dressed|dresses|puts\s+her\s+clothes\s+(?:back\s+)?on)\b/;
 // "off" has to be there: *tugs her skirt down* is fixing it, not taking it off
 const HER_OFF = re(String.raw`\b(?:takes|pulls|slips|peels|shrugs|wriggles|tugs|kicks)\s+off\s+her\s+(W)|\b(?:takes|pulls|slips|peels|shrugs|wriggles|tugs|kicks)\s+her\s+(W)\s+off\b|\b(?:removes|sheds)\s+her\s+(W)|\b(?:slips|wriggles|steps|shimmies)\s+out\s+of\s+her\s+(W)|\bpulls\s+her\s+(W)\s+(?:up\s+)?over\s+her\s+head|\blets\s+her\s+(W)\s+(?:fall|drop)\b`);
@@ -64,6 +72,7 @@ export function clothesActed(text) {
   const t = String(text || '').toLowerCase().replace(/[’`]/g, "'");
   if (/\b(?:doesn'?t|does not|won'?t|keeps|refuses|teases|pretends|almost|starts?\s+to)\b/.test(t)) return null;
   if (HER_DRESS.test(t)) return { wear: 'dressed' };
+  if (HER_NAKED.test(t)) return { wear: 'bare' };
   if (HER_STRIP.test(t)) return { wear: 'underwear' };
   let m = t.match(HER_ON);
   if (m) return answer('on', piecesIn(m.slice(1).filter(Boolean).join(' ')));

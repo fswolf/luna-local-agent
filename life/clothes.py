@@ -33,7 +33,13 @@ import config
 _lock = threading.Lock()
 _state = {"wearing": "", "off": [], "pieces": [], "at": 0.0}
 
-WEARING = ("dressed", "underwear", "partly", "none")
+WEARING = ("dressed", "underwear", "bare", "partly", "none")
+# pieces that are underwear (outfits.js UNDER): "underwear" keeps them on, "bare" doesn't
+UNDER = ("bra", "panties")
+
+
+def _under(label):
+    return re.sub(r" \d+$", "", str(label)) in UNDER
 MODES = ("gestures", "tags", "keywords", "off")
 _LABEL = re.compile(r"^[a-z][a-z0-9 _-]{0,23}$")
 # tags she's offered at most, so clothes never crowd out the gestures
@@ -46,8 +52,9 @@ def _labels(items):
 
 
 def note(wearing, off=(), pieces=None):
-    """The page's report. wearing: dressed, underwear, partly, or none (a
-    model without separate clothes). off: the labels of the pieces off.
+    """The page's report. wearing: dressed, underwear, bare (underwear off too,
+    on a model whose underwear is its own pieces), partly, or none (a model
+    without separate clothes). off: the labels of the pieces off.
     pieces: every piece's label (older pages don't send it)."""
     wearing = str(wearing or "").strip().lower()
     if wearing not in WEARING:
@@ -83,6 +90,8 @@ def describe():
         return ""
     if s["wearing"] == "underwear":
         return "Wearing: just your underwear, your clothes are off"
+    if s["wearing"] == "bare":
+        return "Wearing: nothing, your clothes and underwear are off"
     if s["wearing"] == "partly" and s["off"]:
         return "Wearing: your clothes, without your " + _join(s["off"])
     return ""
@@ -120,14 +129,30 @@ def tag_names():
     return names
 
 
+def _in_the_mood():
+    """Her mood is in the lewd row (teasing, frisky, heated): the same rule
+    the lewd gestures follow (life/gestures.py _band). Outside it the
+    taking-off tags aren't on her menu, so a small model doesn't read the
+    list as something to do ("we're testing" and she strips). His own
+    words and a tag she writes anyway still work: this only trims what's
+    offered."""
+    try:
+        from life import gestures
+
+        return gestures._band()[0] == "lewd"
+    except Exception:
+        return False
+
+
 def offered(private=True):
     """The clothes tags that fit right now, at most TAGS_OFFERED: off for
     what she has on, on for what's off. Taking things off only in a private
-    turn and never in tame mode (the page checks again)."""
+    turn, never in tame mode (the page checks again) and only while she's
+    in the mood (_in_the_mood)."""
     if mode() != "tags" or not _open():
         return []
     s = current()
-    if s["wearing"] not in ("dressed", "partly", "underwear") or not s["pieces"]:
+    if s["wearing"] not in ("dressed", "partly", "underwear", "bare") or not s["pieces"]:
         return []
     try:
         from mind import mood
@@ -135,12 +160,13 @@ def offered(private=True):
         tame = bool(mood.tame())
     except Exception:
         tame = False
-    off = set(s["off"]) if s["wearing"] == "partly" else set(s["pieces"]) if s["wearing"] == "underwear" else set()
+    off = (set(s["off"]) if s["wearing"] == "partly" else set(s["pieces"]) if s["wearing"] == "bare"
+           else {p for p in s["pieces"] if not _under(p)} if s["wearing"] == "underwear" else set())
     out = []
     if off:
         out.append("dress")
-    if private and not tame:
-        if s["wearing"] != "underwear":
+    if private and not tame and _in_the_mood():
+        if s["wearing"] not in ("underwear", "bare"):
             out.append("undress")
         out += [_slug(p) + "_off" for p in s["pieces"] if p not in off]
     out += [_slug(p) + "_on" for p in s["pieces"] if p in off]

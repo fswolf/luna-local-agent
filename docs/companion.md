@@ -676,17 +676,28 @@ rotate the live portrait - only she and chat can.
 On a human model whose clothes are separate pieces (a VRoid export keeps
 them that way), her clothes can come off and go back on, piece by piece:
 *top*, *tie*, *bottoms* and so on, down to her underwear. Taking a piece
-off hides it; nothing reloads. The robot has nothing that comes off, and
-the topless model is a switch you make yourself (`/portrait use`), never
-something she does. See *Clothes* in [Portrait](portrait.md) for the pose
-studio's tab.
+off hides it; nothing reloads. The robot has nothing that comes off. See
+*Clothes* in [Portrait](portrait.md) for the pose studio's tab.
+
+**Underwear that comes off** needs a model where the bra and panties are
+pieces of their own. VRoid paints underwear onto the skin, so a plain VRoid
+export never has that: on one, "strip" stops at the underwear, and a
+topless model is a switch you make yourself (`/portrait use`). Luna's
+`models/luna/human.vrm` is built for it: a VRoid export with bare skin
+under her clothes, plus the bra and panties as their own meshes (cut from
+the body where the underwear layers from `portrait/source/layers/` are
+painted, a hair off the skin, on the same bones), named in
+`human.outfits.json`. `human_nsfw.vrm` stays as the fully bare model you
+switch to yourself. On it, "strip" still means down to her
+underwear, and "get naked" (`/outfit bare`, her `*gets naked*`) is
+everything, with the same rules as any piece below.
 
 | How | Example |
 |---|---|
-| You ask, in plain words | take off your top, lose the tie, take off your shoes and socks, strip, get dressed, put your shirt back on |
-| She does it herself | `*slips her top off*`, `*kicks off her shoes*`, `*pulls her shirt back on*`, `*gets dressed*` in her reply |
-| She picks a tag (tags mode) | `[top_off]`, `[undress]`, `[top_on]`, `[dress]` |
-| `/outfit` | `/outfit underwear`, `/outfit dressed`, `/outfit off tie`, `/outfit on top`; on its own it says what she's wearing |
+| You ask, in plain words | take off your top, lose the tie, take off your shoes and socks, strip, get dressed, put your shirt back on; on a model with underwear pieces also take off your bra, your panties, your underwear (both), get naked |
+| She does it herself | `*slips her top off*`, `*kicks off her shoes*`, `*pulls her shirt back on*`, `*gets dressed*`, `*slips out of her panties*`, `*gets naked*` in her reply |
+| She picks a tag (tags mode) | `[top_off]`, `[undress]`, `[top_on]`, `[dress]`, `[bra_off]` |
+| `/outfit` | `/outfit underwear`, `/outfit bare`, `/outfit dressed`, `/outfit off tie`, `/outfit on top`; on its own it says what she's wearing |
 | `/blanket` | `/blanket on`, `/blanket off`, or `/blanket` to swap: a plaid blanket round her shoulders that moves with her |
 
 How the conversation changes them is `portrait.clothes`, set with
@@ -700,7 +711,11 @@ It works the way `portrait.gestures` does, and by default follows it:
   `[dress]` and an `_on` for each piece that's off) go in the same prompt
   line as the gesture tags, and are cut from what she says. Your plain
   words and her written actions still work as the fallback. Taking
-  things off is only offered in your own turns, never on a tame stream.
+  things off is only offered in your own turns, never on a tame stream,
+  and only while her mood is teasing, frisky or heated (the same rule as
+  the lewd gestures). Otherwise a small model can read the list as
+  something to do. Asking her still works in any mood she isn't cool or
+  sulking in, and a tag she writes anyway still plays.
 - **keywords**: your plain words and her written actions only. Nothing
   goes in her prompt.
 - **off**: nothing from the conversation. `/outfit` and the pose studio

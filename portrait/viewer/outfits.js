@@ -11,24 +11,33 @@
 // next to it, {"pieces": {"CLOTH_02": "top"}} (part of the material name ->
 // label), for anything the guess gets wrong or a model that isn't VRoid's.
 //
-//   pieces()          [{ id, label, on }]
+//   pieces()          [{ id, label, on, under }]
 //   set(id, on)       one piece on or off (by id or label)
-//   wear(name)        'dressed' (everything on) or 'underwear' (everything off)
-//   state()           'dressed', 'underwear' or 'partly'
+//   wear(name)        'dressed' (everything on), 'underwear' (everything but
+//                     the underwear off) or 'bare' (everything off)
+//   state()           'dressed', 'underwear', 'bare' or 'partly'
 //   onChange(fn)      called after any change, with state()
+//
+// Underwear is a piece labelled bra or panties (<model>.outfits.json names
+// them: a VRoid export paints underwear on the skin, so a model only has
+// these when they were made as parts of their own). A model without them
+// works as it always did: 'underwear' takes every piece off, and so does 'bare'.
 
 // Material names that are clothing. Skin, face, eyes and hair never are.
 const CLOTHING = /(_CLOTH|Tops?_|Bottoms?_|Onepiece|Shoes_|Socks_|Accessory_)/i;
-// ...and cat ears, a tail, horns or wings are part of her, even when VRoid files them as accessories
-const NOT = /(_SKIN|_FACE|_EYE|_HAIR|Ear|Tail|Horn|Wing)/i;
+// ...and cat ears, a tail, horns or wings are part of her, even when VRoid files them as accessories.
+// Those by their capital (CatEar, Tail): "ear" in any case was in "underwear" too.
+const NOT = /_SKIN|_FACE|_EYE|_HAIR/i, HERS = /Ear|Tail|Horn|Wing/;
 const base = n => String(n || '').replace(/\s*\(Instance\)$/, '');
+// a piece that's underwear, by its label ("bra", "panties", "bra 2")
+export const UNDER = /^(?:bra|panties)(?: \d+)?$/;
 
 export async function createOutfits({ THREE, vrm, url = '' }) {
   const groups = new Map();                       // id -> { id, label, objects: [], tris }
   vrm.scene.traverse(o => {
     if (!o.isMesh) return;
     const name = base([].concat(o.material)[0]?.name);
-    if (!CLOTHING.test(name) || NOT.test(name)) return;
+    if (!CLOTHING.test(name) || NOT.test(name) || HERS.test(name)) return;
     const tris = o.geometry.index ? o.geometry.index.count / 3 : (o.geometry.attributes.position?.count || 0) / 3;
     if (!groups.has(name)) groups.set(name, { id: name, label: '', objects: [], tris: 0 });
     const g = groups.get(name);
@@ -61,10 +70,12 @@ export async function createOutfits({ THREE, vrm, url = '' }) {
 
   const listeners = [];
   const isOn = g => g.objects.some(o => o.visible);
+  const isUnder = g => UNDER.test(g.label);
   function state() {
-    const all = [...groups.values()];
+    const all = [...groups.values()], under = all.filter(isUnder);
     if (!all.length || all.every(isOn)) return 'dressed';
-    if (all.every(g => !isOn(g))) return 'underwear';
+    if (all.every(g => !isOn(g))) return under.length ? 'bare' : 'underwear';
+    if (under.length && under.every(isOn) && all.every(g => isUnder(g) || !isOn(g))) return 'underwear';
     return 'partly';
   }
   const changed = () => { const s = state(); for (const fn of listeners) { try { fn(s); } catch (e) { console.error(e); } } };
@@ -82,14 +93,16 @@ export async function createOutfits({ THREE, vrm, url = '' }) {
     return true;
   }
   function wear(name) {
-    if (name !== 'dressed' && name !== 'underwear') return false;
-    const on = name === 'dressed';
+    if (!['dressed', 'underwear', 'bare'].includes(name)) return false;
     let any = false;
-    for (const g of groups.values()) for (const o of g.objects) if (o.visible !== on) { o.visible = on; any = true; }
+    for (const g of groups.values()) {
+      const on = name === 'dressed' || (name === 'underwear' && isUnder(g));
+      for (const o of g.objects) if (o.visible !== on) { o.visible = on; any = true; }
+    }
     if (any) changed();
     return true;
   }
-  const pieces = () => [...groups.values()].map(g => ({ id: g.id, label: g.label, on: isOn(g) }));
+  const pieces = () => [...groups.values()].map(g => ({ id: g.id, label: g.label, on: isOn(g), under: isUnder(g) }));
 
   return { pieces, set, wear, state, onChange: fn => listeners.push(fn), get has() { return groups.size > 0; } };
 }

@@ -40,6 +40,41 @@ class Report(unittest.TestCase):
         reset()
         self.assertEqual(clothes.describe(), "")              # nothing reported yet
 
+    def test_tags_in_her_underwear(self):
+        clothes.note("underwear", ["top", "bottoms"], ["top", "bottoms", "bra", "panties"])
+        with mock.patch.object(clothes, "mode", return_value="tags"), mock.patch("mind.mood.tame", return_value=[]), \
+             mock.patch.object(clothes, "TAGS_OFFERED", 10), mock.patch.object(clothes, "_in_the_mood", return_value=True):
+            got = clothes.offered()
+        self.assertIn("dress", got)
+        self.assertIn("bra_off", got)
+        self.assertIn("panties_off", got)
+        self.assertNotIn("undress", got)
+        self.assertIn("top_on", got)
+
+    def test_taking_off_only_offered_in_the_mood(self):
+        clothes.note("partly", ["top"], ["top", "tie", "bottoms"])
+        tags = (mock.patch.object(clothes, "mode", return_value="tags"), mock.patch("mind.mood.tame", return_value=[]),
+                mock.patch.object(clothes, "TAGS_OFFERED", 10))
+        for p in tags:
+            p.start()
+        try:
+            for band, keen in (("neutral", False), ("warm", False), ("loving", False), ("lewd", True)):
+                with mock.patch("life.gestures._band", return_value=(band, "")):
+                    got = clothes.offered()
+                self.assertIn("dress", got)                    # putting things on is always there
+                self.assertIn("top_on", got)
+                self.assertEqual("undress" in got, keen, band)
+                self.assertEqual("tie_off" in got, keen, band)
+            with mock.patch("life.gestures._band", side_effect=RuntimeError):
+                self.assertNotIn("undress", clothes.offered())
+        finally:
+            for p in tags:
+                p.stop()
+
+    def test_bare(self):
+        clothes.note("bare", ["top", "tie", "bra", "panties"], ["top", "tie", "bra", "panties"])
+        self.assertEqual(clothes.describe(), "Wearing: nothing, your clothes and underwear are off")
+
     def test_underwear_and_partly(self):
         clothes.note("underwear", ["top", "tie", "bottoms"])
         self.assertIn("underwear", clothes.describe())
@@ -177,7 +212,8 @@ class Tags(unittest.TestCase):
                         mock.patch("mind.mood.tame", return_value=False),
                         mock.patch.object(gestures, "_three_d", return_value=True),
                         mock.patch.object(gestures, "offered", return_value=["wave", "hug"]),
-                        mock.patch.object(gestures, "clips", return_value=[])]
+                        mock.patch.object(gestures, "clips", return_value=[]),
+                        mock.patch.object(gestures, "_band", return_value=("lewd", ""))]   # the full menu
         for p in self.patches:
             p.start()
 
@@ -305,6 +341,15 @@ CASES_YOU = {
     "put some clothes on": {"wear": "dressed"},
     "the comic strip": None,
     "strip for me": {"wear": "underwear"},
+    "take off your bra": {"off": ["bra"]},
+    "take your panties off": {"off": ["panties"]},
+    "take off your underwear": {"off": ["bra", "panties"]},
+    "lose the thong": {"off": ["panties"]},
+    "put your bra back on": {"on": ["bra"]},
+    "get naked for me": {"wear": "bare"},
+    "be nude for me": {"wear": "bare"},
+    "strip down to your underwear": {"wear": "underwear"},
+    "the naked truth": None,
 }
 CASES_HER = {
     "slips her top off": {"off": ["top"]},
@@ -317,6 +362,10 @@ CASES_HER = {
     "kicks off her shoes": {"off": ["shoes"]},
     "slips out of her skirt": {"off": ["bottoms"]},
     "pulls her top over her head": {"off": ["top"]},
+    "unhooks her bra and lets her bra fall": {"off": ["bra"]},
+    "slips out of her panties": {"off": ["panties"]},
+    "gets completely naked": {"wear": "bare"},
+    "stands there naked": None,
 }
 
 
@@ -338,6 +387,53 @@ class Words(unittest.TestCase):
         got = self.run_js("clothesActed", CASES_HER)
         for text, want in CASES_HER.items():
             self.assertEqual(got[text], want, text)
+
+
+
+@unittest.skipUnless(shutil.which("node"), "node isn't installed")
+class Pieces(unittest.TestCase):
+    """portrait/viewer/outfits.js on a stand-in model: underwear (bra, panties)
+    stays on for 'underwear' and comes off for 'bare'; a model without it is
+    as before. Labels from <model>.outfits.json."""
+
+    def run_js(self, materials, names, steps):
+        path = os.path.join(HERE, "portrait", "viewer", "outfits.js")
+        script = r"""
+const [path, mats, names, steps] = [process.argv[1], ...process.argv.slice(2).map(JSON.parse)];
+class V { constructor(){this.x=0;this.y=0;this.z=0;} fromBufferAttribute(a,i){this.x=a.x[i];this.y=a.y[i];return this;} applyMatrix4(){return this;} }
+const THREE = { Vector3: V };
+const meshes = mats.map((m, i) => ({ isMesh: true, visible: true, material: { name: m },
+  geometry: { index: { count: 300 }, attributes: { position: { count: 2, x: [-0.2, 0.2], y: [1.0 - i * 0.01, 1.0 - i * 0.01] } } },
+  updateWorldMatrix(){}, matrixWorld: null }));
+const vrm = { scene: { traverse: f => meshes.forEach(f) }, humanoid: { getNormalizedBoneNode: () => null } };
+global.fetch = async () => ({ ok: true, json: async () => ({ pieces: names }) });
+import(path).then(async m => {
+  const o = await m.createOutfits({ THREE, vrm, url: 'x.vrm' });
+  const out = [];
+  for (const [fn, ...args] of steps) { o[fn](...args); out.push(o.state()); }
+  console.log(JSON.stringify(out));
+});"""
+        res = subprocess.run(["node", "-e", script, "file://" + path, json.dumps(materials), json.dumps(names),
+                              json.dumps(steps)], capture_output=True, text=True, check=True, timeout=30)
+        return json.loads(res.stdout)
+
+    def test_underwear_pieces(self):
+        mats = ["N00_010_01_Onepiece_00_CLOTH_01 (Instance)", "N00_010_01_Onepiece_00_CLOTH_02 (Instance)",
+                "N00_090_00_Underwear_Bra_CLOTH", "N00_090_00_Underwear_Panties_CLOTH"]
+        names = {"CLOTH_01": "top", "CLOTH_02": "bottoms", "Underwear_Bra": "bra", "Underwear_Panties": "panties"}
+        got = self.run_js(mats, names, [["wear", "underwear"], ["set", "bra", False], ["wear", "bare"],
+                                        ["set", "bra", True], ["wear", "dressed"]])
+        self.assertEqual(got, ["underwear", "partly", "bare", "partly", "dressed"])
+
+    def test_cat_ears_are_hers_underwear_is_clothing(self):
+        mats = ["Accessory_CatEar_01_CLOTH (Instance)", "N00_090_00_Underwear_Bra_CLOTH"]
+        got = self.run_js(mats, {"Underwear_Bra": "bra"}, [["wear", "bare"]])
+        self.assertEqual(got, ["bare"])          # one piece, the bra: the ears never came off
+
+    def test_without_underwear_as_before(self):
+        mats = ["N00_010_01_Onepiece_00_CLOTH_01 (Instance)"]
+        got = self.run_js(mats, {"CLOTH_01": "top"}, [["wear", "underwear"], ["wear", "bare"]])
+        self.assertEqual(got, ["underwear", "underwear"])
 
 
 if __name__ == "__main__":
