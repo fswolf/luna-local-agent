@@ -4,6 +4,7 @@ Part of the llm package (it was one llm.py); see llm/__init__.py.
 """
 
 from datetime import datetime
+import re
 
 import config
 from config import GENERATION
@@ -300,6 +301,20 @@ def _profile(private):
         return ""
 
 
+# A message about the time: the exact clock goes in for that turn
+_ABOUT_TIME = re.compile(
+    r"\b(time|clock|o'?clock|hours?|minutes?|mins?|remind\w*|alarms?|timers?|how late|how early"
+    r"|tonight)\b|\d\s*(am|pm|a\.m|p\.m)\b|\b\d{1,2}:\d{2}\b", re.IGNORECASE)
+
+
+def _now(query):
+    """The clock for her prompt (situation.clock)."""
+    exact = str(config.current("situation.clock") or "part of day").strip().lower() == "exact"
+    if exact or _ABOUT_TIME.search(str(query or "")):
+        return timeutil.describe_now()
+    return timeutil.describe_day()
+
+
 def _pieces(query, timing, private):
     # Ryan's history summary, his facts and her notes are his business -
     # a turn from stream chat gets the persona and the clock, not them.
@@ -325,7 +340,7 @@ def _pieces(query, timing, private):
         "user": people.user_line() if private else "",
         "profile": _profile(private),
         # a game's turn goes without: a 9B took the clock for the question
-        "now": ("Right now:\n" + timeutil.describe_now()) if turnctx.current().clock else "",
+        "now": ("Right now:\n" + _now(query)) if turnctx.current().clock else "",
         "situation": situation_block,
         "timing": timing,
         "feelings": f"{mood.line(private)}{heavy.line(private)}{offers.line(private)}{away.line(private)}",

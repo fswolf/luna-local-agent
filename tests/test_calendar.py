@@ -168,7 +168,9 @@ class Words(Base):
         line = calendars.situation_line(NOW)
         if soon.date() == TODAY:
             self.assertTrue(line.startswith("Calendar today: all day: Holiday; "))
-            self.assertIn(f"{soon:%H:%M}-", line)
+            # a call that runs past midnight says so instead of an end time
+            ends = soon + timedelta(hours=1)
+            self.assertIn(f"{soon:%H:%M}-" if ends.date() == TODAY else f"{soon:%H:%M} until tomorrow", line)
 
     def test_nothing_more_today_names_the_next(self):
         nxt = datetime.combine(TODAY + timedelta(days=2), datetime.min.time()) + timedelta(hours=9)

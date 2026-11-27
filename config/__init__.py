@@ -238,6 +238,7 @@ SETTINGS = {
 
     "web_search.enabled":         ("WEB_SEARCH_ENABLED",           True),
     "web_search.max_results":     ("WEB_SEARCH_MAX_RESULTS",       True),
+    "web_search.engines":         ("WEB_SEARCH_ENGINES",           True),
     "web_search.fetch_pages":     ("PAGE_FETCH_ENABLED",           True),
     "web_search.page_max_chars":  ("PAGE_MAX_CHARS",               True),
     "web_search.allow_local":     ("PAGE_ALLOW_LOCAL",             True),
@@ -314,6 +315,7 @@ SETTINGS = {
     "self.profiles":              ("SELF_PROFILES",                True),
     "self.conclusions":           ("SELF_CONCLUSIONS",             True),
     "situation.enabled":          ("SITUATION_ENABLED",            True),
+    "situation.clock":            ("SITUATION_CLOCK",              True),
     "music.url":                  ("MUSIC_URL",                    True),
     "music.after":                ("MUSIC_AFTER",                  True),
     "music.seconds":              ("MUSIC_SECONDS",                True),

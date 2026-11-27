@@ -156,6 +156,7 @@ SCHEMA = {
 
     # --- Situation ----------------------------------------------------------
     "situation.enabled": ("bool", "Give the model a few live details each turn: your window, music, computer load, plugins, reminders"),
+    "situation.clock": ("choice", "The time in her prompt. part of day: the date and morning, evening or night, the exact time only when your message is about time (small models otherwise quote it in every reply). exact: the minute, every turn", ("part of day", "exact")),
     "situation.window": ("bool", "Include the window you're in"),
     "situation.music": ("bool", "Include the music that's playing"),
     "situation.machine": ("bool", "Include CPU, memory and GPU load"),
@@ -341,7 +342,8 @@ SCHEMA = {
 
     # --- Web search ---------------------------------------------------------
     "web_search.enabled": ("bool", "Let Luna search the web"),
-    "web_search.max_results": ("int", "How many search results to get"),
+    "web_search.max_results": ("int", "How many search results to get (from each engine, when engines are named)"),
+    "web_search.engines": ("text", "Which search engines to ask, comma-separated: auto lets the search library pick at random. Or names: brave and mojeek (their own indexes), startpage (Google's results), duckduckgo and yahoo (Bing's), wikipedia, grokipedia. All are asked at once, and she sees which engines returned each result"),
     "web_search.fetch_pages": ("bool", "Open the web pages from a search, not just the snippets"),
     "web_search.page_max_chars": ("int", "How much of a web page Luna reads (characters, about 1000 tokens per 4000)"),
     "web_search.page_timeout": ("float", "How long to wait for a page to load (seconds)"),

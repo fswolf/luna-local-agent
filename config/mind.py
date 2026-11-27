@@ -136,6 +136,9 @@ SELF_CONCLUSIONS = flag(_self_cfg.get("conclusions", True))
 # every private turn.
 _situation_cfg = setting("situation", {})
 SITUATION_ENABLED = flag(_situation_cfg.get("enabled", True))
+# The clock in her prompt: "part of day" (the date and "night", the minute only
+# when the message is about time) or "exact" (llm/prompts.py _now)
+SITUATION_CLOCK = str(_situation_cfg.get("clock", "part of day"))
 SITUATION_PARTS = {k: bool(_situation_cfg.get(k, True))
                    for k in ("window", "music", "machine", "plugins", "reminders", "calendar", "hands", "clothes")}
 

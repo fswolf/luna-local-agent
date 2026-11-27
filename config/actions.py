@@ -59,6 +59,8 @@ SHELL_AUTO_APPROVE_SOURCES = [str(s).strip().lower() for s in
 _web_search_cfg = setting("web_search", {})
 WEB_SEARCH_ENABLED = _web_search_cfg.get("enabled", True)
 WEB_SEARCH_MAX_RESULTS = _web_search_cfg.get("max_results", 5)
+# Which engines ddgs asks: "auto" (it picks), or names like "yandex, mojeek, brave"
+WEB_SEARCH_ENGINES = _web_search_cfg.get("engines", "auto")
 # Opening a page she found, rather than summarizing the search blurb.
 PAGE_FETCH_ENABLED = flag(_web_search_cfg.get("fetch_pages", True))
 # How much of a page reaches the model. Roughly a thousand tokens per

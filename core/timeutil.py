@@ -31,6 +31,7 @@ stamp). The rest is beside it and re-exported, so `timeutil.X` still works:
     core/timewords.py   now(), parts of the day, weekday, month and number words
     core/timeparse.py   parse_when() and next_occurrence(): words into datetimes
 """
+import re
 import time as _time
 from datetime import timedelta
 from core.timewords import WEEKDAY_NAMES, day_part, now
@@ -120,6 +121,21 @@ def describe_now(moment=None):
         f"ISO date {moment.strftime('%Y-%m-%d')}, week "
         f"{moment.isocalendar()[1]} of {moment.year}.",
     ])
+
+
+def describe_day(moment=None):
+    """describe_now() without the minute: the date and the part of the day.
+
+    What goes in her prompt by default (situation.clock "part of day"). A
+    small model treats an exact "02:43" in front of the message as something
+    to say, says it, and then copies her own replies saying it. A person
+    knows it's the middle of the night without counting minutes; the exact
+    time is one get_datetime call away, and goes in when the message asks.
+    """
+    full = describe_now(moment) if moment else describe_now()
+    # "Thursday 26 November 2026, 02:43 (the middle of the night)" ->
+    # "Thursday 26 November 2026, the middle of the night"
+    return re.sub(r", \d{1,2}:\d{2} \(([^)\n]*)\)", r", \1", full, count=1)
 
 
 # ---------------------------------------------------------------------------

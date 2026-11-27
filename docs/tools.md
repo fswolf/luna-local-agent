@@ -47,7 +47,7 @@ blurred here). Click a long one to read all of it.
 | `research` | Search, read the top pages at once, keep the parts that answer the question |
 | `ask_memory` | Ask her own memory a question and get one answer: facts, her [conclusions](memory.md#asking-her-memory), notes on past conversations and the conversations themselves, searched together. On someone else's turn, only what's theirs |
 | `search_history` | Look through past conversations for something |
-| `web_search` | DuckDuckGo, for anything it can't know |
+| `web_search` | several search engines (`web_search.engines`), for anything it can't know |
 | `introspect` | Her measured confidence, near-misses and flags for an earlier reply |
 | `self_status` | How she's doing, measured: model, context, mood, today's confidence and flags, what she's learned |
 | `recall_episodes` | Search her own notes on past conversations |

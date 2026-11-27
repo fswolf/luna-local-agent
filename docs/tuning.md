@@ -60,6 +60,17 @@ up all the time. If you tell her you're "testing", she'll talk about
 testing for the rest of the conversation; `/clear` before a roleplay.
 The rest is her agent file (below).
 
+**Then they copy themselves.** A 9B told it was 02:43 said "at exactly
+02:43 AM" in nearly every reply, and once a few replies did, her history
+taught her that Luna mentions the time: she kept going with a "4:30 AM"
+that was never the time. After a `/clear` she stopped. So by default
+(`situation.clock part of day`) her prompt has the date and the part of
+the day, "Thursday 26 November, the middle of the night", and the exact
+minute only when your message is about time (the time, an alarm, "in 20
+minutes"). She still knows it's late; she can ask `get_datetime` for the
+rest. On a bigger model that doesn't do this, `situation.clock exact`
+puts the minute back.
+
 ## Roleplay is mostly the agent file
 
 The same 9B that drifted out of every scene had roleplayed fine before.

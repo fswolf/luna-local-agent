@@ -5,10 +5,49 @@ Handled by the web_search tool: the model decides a question needs
 looking up and calls it, rather than you having to say the words
 "web search" in your sentence.
 
-Results come from DuckDuckGo via the `ddgs` package - no API key.
+Results come from the `ddgs` package, which searches several engines.
+No API key.
 
 Without tool calling it falls back to the old keyword trigger.
 ```
+
+## Which engines
+
+`web_search.engines` in settings. `auto`, the default, lets `ddgs` pick:
+Wikipedia first, then engines in a random order until it has enough, so
+the same question can come from a different engine each time.
+
+Name them instead, comma-separated, and all of them are asked at once,
+`max_results` from each:
+
+```
+"web_search": { "engines": "mojeek, brave, startpage" }
+```
+
+Each result then says which engines returned it, and she's told which
+were asked and which found nothing:
+
+```
+Searched mojeek, brave, startpage. ...
+1. Swap file - Debian Wiki - ... (https://wiki.debian.org/Swap) [mojeek, brave, startpage]
+2. ... (https://example.org/swap-guide) [brave]
+```
+
+So "search this on mojeek and brave and tell me what only one of them
+has" works. What `ddgs` 9.16 can use:
+
+| Name | Whose results |
+|------|---------------|
+| `brave` | Brave's own index |
+| `mojeek` | Mojeek's own index (UK) |
+| `startpage` | Google's |
+| `duckduckgo`, `yahoo` | Bing's |
+| `wikipedia`, `grokipedia` | encyclopedia articles |
+
+Google, Bing and Yandex are in `ddgs` but switched off by its authors,
+since those sites block it; DuckDuckGo, Yahoo and Startpage reach Bing's
+and Google's results anyway. A name `ddgs` doesn't have is skipped and
+logged.
 
 ## Reading the page, not the blurb
 
