@@ -626,6 +626,14 @@ def _ask(text, model, on_text=None, on_sentence=None,
     history.add_message("user", said)
     history.add_message("assistant", answer, tools=_last_raw.get("exchanges"), steps=turn_steps(answer))
 
+    # What ↻ would redo (llm/retry.py): your own message at the desk, no tools,
+    # no file, no guest (a station's turn has an approver: it answers there)
+    from llm import retry
+
+    retry.note(text, answer, history.tail(2),
+               ok=source is None and not guest and attached is None and turn.approver is None
+               and not (_last_raw.get("called") or _last_raw.get("exchanges")))
+
     # The same turns, to a file summarization never touches. core/history.py
     # deletes these once they're folded into the summary; this is what
     # makes "what did we decide last week" answerable.
@@ -635,6 +643,11 @@ def _ask(text, model, on_text=None, on_sentence=None,
     history.save()
 
     called = _last_raw.get("called") or set()
+
+    if turn.retry:
+        # The same message again: what it says was already read for facts
+        # and reminders the first time.
+        return answer
 
     if source in ("reminder", "task"):
         # Her own reminder or task firing. Its text names a time ("6 PM daily

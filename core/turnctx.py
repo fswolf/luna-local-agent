@@ -48,6 +48,7 @@ class Turn:
     recording: Optional[bytes] = None  # what was said, as WAV, for a model that can hear (voice/hearing.py)
     attachment: Any = None             # one file sent with the message (core/attachments.py)
     clock: bool = True                 # the time in her note; off for a game's turns (respond_to_job)
+    retry: bool = False                # the same message again (llm/retry.py): no second extraction
 
 
 _current = contextvars.ContextVar("luna_turn", default=None)

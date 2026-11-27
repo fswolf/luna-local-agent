@@ -130,9 +130,35 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
                      for speaker, text in convo[start:]], "total": total,
             "streaming": streaming, "busy": interrupts.busy(), "stoppable": _stoppable(),
             "status": status, "name": name,
-            "mood": mood, "rows": rows, "ask": ui.pending_approval(), "notify_asks": _notify_asks(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
+            "mood": mood, "rows": rows, "ask": ui.pending_approval(), "notify_asks": _notify_asks(), "retry": _retry_at(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
             "can_talk": bool(ui.view.on_hotkey), "rate": _rateable(now_epoch, convo),
             "dictated": dict(DICTATED), "replay": replaying()}
+
+
+def _retry_at():
+    """Her reply's index on screen where ↻ shows (llm/retry.py), or None."""
+    try:
+        from llm import retry
+
+        return retry.available()
+    except Exception:
+        return None
+
+
+def _retry(body):
+    """↻: the page says which reply; it has to still be the one a retry would
+    redo, so a click on a reply that something came after does nothing."""
+    import ui
+
+    try:
+        data = json.loads(body or b"{}")
+        epoch, index = int(data.get("e")), int(data.get("i"))
+    except (ValueError, TypeError, AttributeError):
+        return _json(400, {"error": "that couldn't be read"})
+    if epoch != ui.view.epoch or index != _retry_at():
+        return _json(409, {"error": "that reply can't be tried again any more"})
+    ui.submit_soon("/retry")
+    return _json(200, {"ok": True})
 
 
 def _notify_asks():
@@ -586,6 +612,8 @@ def handle(method, sub, body, request=None):
         return _json(200, {"ok": True})
     if method == "POST" and sub == "/answer":
         return _answer(body)
+    if method == "POST" and sub == "/retry":
+        return _retry(body)
     if method == "POST" and sub == "/rate":
         return _rate(body)
     if method == "POST" and sub == "/tray":

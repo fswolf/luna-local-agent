@@ -312,6 +312,31 @@ def add_message(role: str, content: str, tools=None, steps=None):
         _data.setdefault("messages", []).append(entry)
 
 
+def tail(n=2):
+    """The last n stored messages, the dicts themselves (llm/retry.py checks
+    by identity that nothing came after a turn)."""
+    with _lock:
+        return list(_data.get("messages", [])[-n:])
+
+
+def drop(entries):
+    """Take these messages off the end, if they're still the end: a retry
+    (llm/retry.py). False, and nothing changed, if anything came after."""
+    entries = list(entries)
+    with _lock:
+        msgs = _data.get("messages", [])
+        if not entries or len(msgs) < len(entries) or any(a is not b for a, b in zip(msgs[-len(entries):], entries)):
+            return False
+        del msgs[-len(entries):]
+        return True
+
+
+def restore(entries):
+    """Put messages drop() took back on the end (a retry that failed)."""
+    with _lock:
+        _data.setdefault("messages", []).extend(entries)
+
+
 def record_tool_use(name, arguments, result, index=None):
     """Attach a tool exchange to an assistant turn - by default the
     latest one, or `index` for a specific one when repairing the past.

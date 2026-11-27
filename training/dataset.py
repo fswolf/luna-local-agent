@@ -58,6 +58,7 @@ _lock = threading.Lock()
 _last = {}           # her last turn, until you keep it or the next one replaces it
 _recent = {}         # (conversation epoch, her reply as shown) -> turn, the last RECENT
 _rated = {}          # the same key -> "up" | "fix" | "down", for the page
+_replacing = {}      # a retry under way: {"key": the reply it throws away}
 
 
 def _ui_ref():
@@ -105,12 +106,26 @@ def note_turn(system, context, user, reply, model="", used_tools=False, rounds=N
                      used_tools=bool(used_tools), at=time.time())
         if used_tools and rounds:
             _last.update(rounds=json.loads(json.dumps(rounds)), tools=json.loads(json.dumps(tools or [])))
+        old, said = _replacing.pop("key", None), _replacing.pop("said", "")
+        if old is not None and old in _recent and said and said in str(_last["user"].get("content") or ""):
+            _last["replaces"] = old                 # ↻ on the same message: a thumbs up on this one can pair them (rate())
         if ref is not None:
             _recent.pop(ref, None)                  # (the same words again: the newest wins)
             _recent[ref] = _last.copy()
             for k in list(_recent)[:-RECENT]:
                 _recent.pop(k, None)
                 _rated.pop(k, None)
+
+
+def retrying(epoch, shown, said):
+    """A retry (llm/retry.py) is about to replace this reply of hers to your
+    message `said`. The next turn noted is the new reply only if it answers
+    the same words; anything else (the retry failed first) isn't paired."""
+    with _lock:
+        key = _find(int(epoch), str(shown or "").strip())
+        _replacing.clear()
+        if key is not None:
+            _replacing.update(key=key, said=str(said or "").strip())
 
 
 def last():
@@ -185,6 +200,24 @@ def rate(epoch, shown, up, better=None):
     mark = "up" if up else "fix" if better else "down"
     if not better and _rated.get(key) == mark:                               # a second click: nothing new
         return next((r for r in examples() if r.get("id") == turn.get("kept")), None) or {"kind": kind_of(turn["reply"])}
+    with _lock:
+        old_key = tuple(turn["replaces"]) if turn.get("replaces") else None    # (a tuple, until the copy above)
+        old = json.loads(json.dumps(_recent[old_key])) if old_key in _recent else None
+        was = _rated.get(old_key)
+    if up and old and was == "down" and not turn.get("used_tools") and not turn.get("kept"):
+        # ↻ after a thumbs down, and this one's good: the pair is one example,
+        # the bad reply and this one in its place (like /fix with this reply)
+        ex = keep("fix", reply=turn["reply"], turn=old, kind=kind_of(turn["reply"]))
+        if ex.get("id"):
+            update(ex["id"], original=old["reply"])
+        with _lock:
+            _rated[old_key] = "fix"
+            _rated[key] = "up"
+            if key in _recent:
+                _recent[key]["kept"] = ex.get("id")
+        ex["mark"] = "up"
+        ex["paired"] = True
+        return ex
     if up:
         ex = keep("good", turn=turn, kind=kind_of(turn["reply"]))
     elif better:
@@ -444,7 +477,7 @@ def _rewrite(rows):
 
 def update(example_id, **changes):
     """Change one example (approved, reply, kind, source, rated, note). False if there's no such id."""
-    allowed = {k: v for k, v in changes.items() if k in ("approved", "reply", "kind", "source", "rated", "note")}
+    allowed = {k: v for k, v in changes.items() if k in ("approved", "reply", "kind", "source", "rated", "note", "original")}
     if "kind" in allowed and allowed["kind"] not in KINDS:
         raise ValueError(f"no such kind {allowed['kind']!r}")
     with _lock:

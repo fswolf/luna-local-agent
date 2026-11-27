@@ -168,6 +168,7 @@ _HELP_SECTIONS = [
         ("/mouse", "the same as F2, and saves the choice"),
         ("/keys", "check the hotkey and control socket"),
         ("/clear", "clear the conversation and its history (not the memory)"),
+        ("/retry", "throw away her last reply and have her answer your message again (not after a tool, a file or a guest)"),
         ("/quit", "quit"),
     ]),
     ("Settings", [

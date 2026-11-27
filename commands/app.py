@@ -14,8 +14,32 @@ import ui
 from . import ctx
 
 
+def _retry():
+    """/retry and the chat page's ↻: her last reply again (llm/retry.py), on a
+    worker like any typed turn, so the screen stays free while she thinks."""
+    import threading
+
+    from core import assistant, interrupts
+
+    def run(stop):
+        try:
+            with interrupts.using(stop):
+                assistant.respond(None, ctx.model, source="typed", retry=True)
+        except Exception as e:
+            logbook.exception("turn", "trying again failed")
+            ui.add_message("system", f"Error: {e}")
+        finally:
+            ui.set_status("Idle")
+
+    threading.Thread(target=run, args=(interrupts.open("typed"),), daemon=True).start()
+
+
 def handle(text):
     """True when text was one of these commands (and it ran)."""
+    if text == "/retry":
+        _retry()
+        return True
+
     if text == "/clear":
         ui.clear()
         history.clear()

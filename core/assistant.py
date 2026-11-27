@@ -120,7 +120,7 @@ def _say_away(said):
 
 
 def respond(text, model, source="typed", speaker=None, sink=None, approver=None, recording=None,
-            attachment=None):
+            attachment=None, retry=False):
     """Send a turn to the model and speak the reply as it arrives.
 
     Nothing here waits for the whole answer. Text appears on screen as
@@ -151,8 +151,13 @@ def respond(text, model, source="typed", speaker=None, sink=None, approver=None,
     source: "typed", "voice" or "station". Runs as the caller's Stop (interrupts)
     if it opened one - ptt does, at the key press - else its own, opened
     now, before waiting: a HOME pressed while it waits still reaches it.
+
+    retry: try her last reply again (llm/retry.py); text is ignored, it's
+    your last message. Returns None, and says why, when that can't be done.
+    The plugins don't hear it again, and her mood doesn't read it again.
     """
-    _plugins_hear(text)
+    if not retry:
+        _plugins_hear(text)
 
     with interrupts.ensure(source) as stop:
         running = _holder["stop"]
@@ -165,6 +170,21 @@ def respond(text, model, source="typed", speaker=None, sink=None, approver=None,
             _hold(stop)
 
             try:
+                if retry:
+                    from llm import retry as retrying
+
+                    text, undo = retrying.take()
+                    if text is None:
+                        ui.add_message("system", f"Can't try again: {undo}.")
+                        return None
+                    try:
+                        return _respond(text, model, source, stop, speaker, sink, approver, recording,
+                                        attachment, retry=True)
+                    except Exception as e:
+                        retrying.put_back(undo, e)
+                        logbook.exception("turn", "trying again failed")
+                        return None
+
                 said = _gone(text, model)
 
                 if said is not None:
@@ -398,7 +418,7 @@ def respond_remote(text, model, source, who, tools_allowed=None,
 
 
 def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, recording=None,
-             attachment=None):
+             attachment=None, retry=False):
     # a relay station speaks the reply itself: no Player on the PC's speakers
     player = speech.Player() if sink is None else None
     say = sink or player.say
@@ -417,7 +437,7 @@ def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, 
         # those (it's what turns on the second-look checks), so how it
         # reached her is set on the turn itself.
         with turnctx.begin(source=source, speaker=speaker, approver=approver, recording=recording,
-                           attachment=attachment):
+                           attachment=attachment, retry=retry):
             # a stranger or a session guest gets the short list (people.tools_for)
             answer = ask(
                 text, model, on_text=ui.extend_message, on_sentence=on_sentence,
@@ -429,7 +449,8 @@ def _respond(text, model, source, stop, speaker=None, sink=None, approver=None, 
         # Read now, while she's still speaking, so a laugh or a blush
         # lands with the words rather than after them.
         _heavy_from(speaker)
-        _note_mood(text, answer, model)
+        if not retry:
+            _note_mood(text, answer, model)     # a retry: she already heard this message
         if player is not None:
             player.wait()
 

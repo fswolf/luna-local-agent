@@ -226,7 +226,7 @@ def _read_transcript():
 
     for line in complete.splitlines():
         try:
-            _tcache["entries"].append(json.loads(line))
+            transcript.fold(_tcache["entries"], json.loads(line))      # a retry's marker takes its exchange out
         except ValueError:
             continue
 

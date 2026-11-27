@@ -134,6 +134,33 @@ def add(role, content):
         pass
 
 
+def withdraw():
+    """A retry (llm/retry.py): the last exchange, your message and her reply,
+    doesn't count any more. Appended as a marker rather than edited out, the
+    same as everything else here; whoever reads the file folds it (fold())."""
+    if not config.TRANSCRIPT_ENABLED:
+        return
+    entry = {"at": datetime.now().isoformat(timespec="seconds"), "role": "withdrawn", "text": ""}
+    try:
+        with _lock:
+            with open(TRANSCRIPT_FILE, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass
+
+
+def fold(entries, entry):
+    """Add one parsed line to entries: a withdrawn marker takes the exchange
+    before it back out (her reply, and your message before that)."""
+    if entry.get("role") != "withdrawn":
+        entries.append(entry)
+        return
+    if entries and entries[-1].get("role") == "assistant":
+        entries.pop()
+        if entries and entries[-1].get("role") == "user":
+            entries.pop()
+
+
 def _load():
     if not os.path.exists(TRANSCRIPT_FILE):
         return []
@@ -149,7 +176,7 @@ def _load():
                     continue
 
                 try:
-                    entries.append(json.loads(line))
+                    fold(entries, json.loads(line))
                 except json.JSONDecodeError:
                     # A torn line from a crash mid-write. Skip it; the
                     # rest of the archive is still perfectly good.

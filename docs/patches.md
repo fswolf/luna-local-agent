@@ -60,6 +60,10 @@ on a phone), so you can keep any of her recent replies, not only the last one:
 - A reply with gesture tags in it goes to the **gesture** examples, the rest to **habit**.
   You can still switch it on the examples page.
 - Changed your mind? Click the other thumb: it's still one example.
+- **Thumbs down, ↻, thumbs up:** mark a reply bad, have her try again, and
+  give the new one a thumbs up, and the two are kept as one example: the bad
+  reply as the original and the new one as the reply, the same as typing the
+  better version yourself. No thumb on the new one and nothing extra is kept.
 
 She never sees these: commands don't go into her history, her transcript or her notes,
 so collecting examples doesn't change the conversation you're having.

@@ -1,6 +1,6 @@
 """Every /command typed at the desk, one module per area.
 
-    app        /clear /keys /mode /scroll /mouse /log /help
+    app        /clear /retry /keys /mode /scroll /mouse /log /help
     reminders  /reminders /cancel /alarms /alarm /snooze /when /repair
     settings   /settings /preset /set /tools /tooltest /context /allow /mcp /plugins
     voice      /look /mic /voice /barge /hear /wake

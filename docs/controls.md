@@ -46,6 +46,16 @@ starts with the conversation as it stands.
   reply through your speakers in her voice; click it again, or Stop, to
   end it, and a new turn cuts it off), and the thumbs. In her replies,
   code shows in a box with its own copy button.
+- **↻ try again**, on her latest reply (or `/retry`): that reply is thrown
+  away and she answers your message again. Only where that's safe to do
+  twice: not after a reply that used a tool (it would run the command, send
+  the email or set the reminder again), not when your message had a file,
+  and not after a guest's turn or once something else has come since. Her
+  mood doesn't read the message a second time, and nothing is picked out
+  of it for her memory or reminders again; the thought log keeps both
+  replies. It works while she's still speaking the old reply (that's cut
+  off), not while she's still writing it, and not while she's walked away.
+  If the new reply fails, the server down say, her first reply comes back.
 - The paperclip sends one picture (jpg, png, webp, up to 10 MB) or one text,
   Markdown or PDF file with your message. Pasting a picture or dropping a file
   on the page works too. A picture needs a model that can see.
