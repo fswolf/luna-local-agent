@@ -302,15 +302,30 @@ def _profile(private):
 
 
 # A message about the time: the exact clock goes in for that turn
+# A message about the clock: "what time is it", "remind me", "set an alarm
+# for 7am", "is it 3:30 yet". Bare "time" and "reminding" aren't: "every
+# time", "reminding you how much I love you" in a roleplay gave her the
+# minute, and she worked it into the scene. Your *actions* don't count at all.
 _ABOUT_TIME = re.compile(
-    r"\b(time|clock|o'?clock|hours?|minutes?|mins?|remind\w*|alarms?|timers?|how late|how early"
-    r"|tonight)\b|\d\s*(am|pm|a\.m|p\.m)\b|\b\d{1,2}:\d{2}\b", re.IGNORECASE)
+    r"\b(?:what|the)\s+time\b|\btime\s+is\s+it\b|\b(?:clock|o'?clock|hours?|minutes?|mins?|remind|reminders?"
+    r"|alarms?|timers?|how late|how early|tonight)\b|\d\s*(?:am|pm|a\.m|p\.m)\b|\b\d{1,2}:\d{2}\b",
+    re.IGNORECASE)
+_ACTION = re.compile(r"\*[^*\n]*\*|\([^()\n]*\)")
+
+
+def about_time(query):
+    """The message (outside its *actions*) asks about the clock."""
+    return bool(_ABOUT_TIME.search(_ACTION.sub(" ", str(query or ""))))
+
+
+def exact_clock():
+    """situation.clock is "exact": the minute always goes in."""
+    return str(config.current("situation.clock") or "part of day").strip().lower() == "exact"
 
 
 def _now(query):
     """The clock for her prompt (situation.clock)."""
-    exact = str(config.current("situation.clock") or "part of day").strip().lower() == "exact"
-    if exact or _ABOUT_TIME.search(str(query or "")):
+    if exact_clock() or about_time(query):
         return timeutil.describe_now()
     return timeutil.describe_day()
 

@@ -161,7 +161,7 @@ class ATurn(_Live):
         self.assertFalse(any(prompts.LIVE_OPEN in text for _r, text in stored))
 
     def test_a_game_turn_has_no_clock_anywhere(self):
-        # The worked example ("what time is it?") and the clock in the note were all
+        # The worked example ("what day is it?") and the clock in the note were all
         # a game turn's empty history held, and she answered the time every turn.
         import llm
         from llm import session
@@ -187,9 +187,9 @@ class ATurn(_Live):
             return " ".join(str(m.get("content")) for m in sent[0]["messages"])
 
         game = play(False)
-        self.assertNotIn("what time is it", game)
+        self.assertNotIn("what day is it", game)
         self.assertNotIn("Right now:", game)
-        self.assertIn("what time is it", play(True))                 # a scheduled job keeps both
+        self.assertIn("what day is it", play(True))                  # a scheduled job keeps both
 
     def test_off_sends_the_message_bare(self):
         payload, _stored = self.turn(on=False)

@@ -183,10 +183,9 @@ def _demonstration():
 
     So when the window has no example in it, one is supplied. Not a
     fabricated one: the tool is actually called and the real result
-    goes in, which costs nothing (get_datetime is local and instant)
-    and has the side effect of putting the current time in front of her
-    without a round trip. It disappears on its own the moment history
-    has a real exchange to show instead.
+    goes in, which costs nothing (get_datetime is local and instant).
+    It disappears on its own the moment history has a real exchange to
+    show instead.
     """
     try:
         result = tools.call("get_datetime", "{}")
@@ -197,9 +196,21 @@ def _demonstration():
         return []
 
     now = datetime.now()
+    # Put in front of every turn of a conversation without tool calls - a
+    # roleplay is nothing but - "It's 04:17 on Friday" read as her own line,
+    # and she kept telling him the time mid-scene. Unless the clock is set
+    # to exact, the example is the day: the same real call, its minute taken
+    # out the way the prompt's clock line takes it out.
+    from .prompts import exact_clock
+
+    if exact_clock():
+        ask, answer = "what time is it?", f"It's {now.strftime('%H:%M')} on {now.strftime('%A')}."
+    else:
+        ask, answer = "what day is it?", f"It's {now.strftime('%A')} the {_ordinal(now.day)}."
+        result = timeutil.without_minute(result)
 
     return [
-        {"role": "user", "content": "what time is it?"},
+        {"role": "user", "content": ask},
         {
             "role": "assistant",
             "content": "",
@@ -215,11 +226,12 @@ def _demonstration():
             "name": "get_datetime",
             "content": result,
         },
-        {
-            "role": "assistant",
-            "content": f"It's {now.strftime('%H:%M')} on {now.strftime('%A')}.",
-        },
+        {"role": "assistant", "content": answer},
     ]
+
+
+def _ordinal(n):
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
 def _has_tool_example(messages):

@@ -33,6 +33,16 @@ class Clock(unittest.TestCase):
         for q in ("I am tired", "hello luna", "check the server", "*hugs you* I'm home"):
             self.assertNotIn("02:43", self.now(q), q)
 
+    def test_roleplay_words_dont(self):
+        for q in ("*kisses your lips softly and tenderly reminding you how much he loves you*",
+                  "every time I see you I smile", "*checks the time* come here",
+                  "(remind me later) hi", "I had the best time"):
+            self.assertNotIn("02:43", self.now(q), q)
+
+    def test_asking_outside_an_action_still_does(self):
+        for q in ("*yawns* what time is it", "remind me at 5", "*stretches* set a timer"):
+            self.assertIn("02:43", self.now(q), q)
+
     def test_exact_setting(self):
         self.assertIn("02:43", self.now("hello luna", "exact"))
 
@@ -40,6 +50,33 @@ class Clock(unittest.TestCase):
         day = timeutil.describe_day(NIGHT).split("\n")
         full = timeutil.describe_now(NIGHT).split("\n")
         self.assertEqual(day[1:], full[1:])
+
+
+class Example(unittest.TestCase):
+    """The worked tool call in front of a conversation without one
+    (llm/replay.py _demonstration): the day, not the minute."""
+
+    def demo(self, setting):
+        from llm import replay
+
+        with mock.patch.object(config, "SITUATION_CLOCK", setting, create=True), \
+             mock.patch.object(timeutil, "now", return_value=NIGHT), \
+             mock.patch("core.timewords.now", return_value=NIGHT), \
+             mock.patch.object(replay, "datetime", wraps=datetime) as dt:
+            dt.now.return_value = NIGHT
+            return replay._demonstration()
+
+    def test_part_of_day(self):
+        msgs = self.demo("part of day")
+        self.assertEqual(msgs[0]["content"], "what day is it?")
+        self.assertEqual(msgs[-1]["content"], "It's Thursday the 26th.")
+        self.assertTrue(all("02:43" not in str(m.get("content")) for m in msgs))
+        self.assertIn("the middle of the night", msgs[2]["content"])
+
+    def test_exact(self):
+        msgs = self.demo("exact")
+        self.assertEqual(msgs[0]["content"], "what time is it?")
+        self.assertIn("02:43", msgs[-1]["content"])
 
 
 if __name__ == "__main__":

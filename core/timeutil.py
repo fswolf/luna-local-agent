@@ -132,10 +132,14 @@ def describe_day(moment=None):
     knows it's the middle of the night without counting minutes; the exact
     time is one get_datetime call away, and goes in when the message asks.
     """
-    full = describe_now(moment) if moment else describe_now()
-    # "Thursday 26 November 2026, 02:43 (the middle of the night)" ->
-    # "Thursday 26 November 2026, the middle of the night"
-    return re.sub(r", \d{1,2}:\d{2} \(([^)\n]*)\)", r", \1", full, count=1)
+    return without_minute(describe_now(moment) if moment else describe_now())
+
+
+def without_minute(text):
+    """describe_now()'s text (or get_datetime's) with the minute taken out:
+    "Thursday 26 November 2026, 02:43 (the middle of the night)" ->
+    "Thursday 26 November 2026, the middle of the night"."""
+    return re.sub(r", \d{1,2}:\d{2} \(([^)\n]*)\)", r", \1", str(text), count=1)
 
 
 # ---------------------------------------------------------------------------

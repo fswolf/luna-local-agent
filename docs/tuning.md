@@ -67,9 +67,14 @@ that was never the time. After a `/clear` she stopped. So by default
 (`situation.clock part of day`) her prompt has the date and the part of
 the day, "Thursday 26 November, the middle of the night", and the exact
 minute only when your message is about time (the time, an alarm, "in 20
-minutes"). She still knows it's late; she can ask `get_datetime` for the
-rest. On a bigger model that doesn't do this, `situation.clock exact`
-puts the minute back.
+minutes"), outside your `*actions*`: "*reminding you how much I love
+you*" isn't a question about the clock. The worked tool call that goes in
+front of a conversation with none (a roleplay never has one) is "what day
+is it?" for the same reason: as "what time is it?", its "It's 04:17 on
+Friday" read as her own line every turn, and she told you the time in the
+middle of a scene. She still knows it's late; she can ask `get_datetime`
+for the rest. On a bigger model that doesn't do this, `situation.clock
+exact` puts the minute back, in both.
 
 ## Roleplay is mostly the agent file
 
