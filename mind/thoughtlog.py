@@ -100,6 +100,7 @@ def _conn():
                  "(id INTEGER PRIMARY KEY, data BLOB)")
 
     conn.commit()
+    _reflag(conn)
 
     return conn
 
@@ -197,19 +198,12 @@ def record(user_text, rounds, answer, source="typed", tools=(),
                    checks=checks)
     shape = confidence(runs)
 
-    if shape["shaky"] and (checks is None or "low confidence" in checks):
+    low, over = _unsure(shape, str(answer or ""), names, source)
+
+    if low and (checks is None or "low confidence" in checks):
         flags.append(f"low confidence: {shape['shaky']}")
 
-    # Calibration: the number says she didn't know, the words say she
-    # did. Only for answers that rest on nothing but her - a turn that
-    # called a tool is reading its result, and wording that back is
-    # often low-probability without being a guess.
-    hedge_below = float(getattr(config, "SELF_HEDGE_BELOW", 0.6))
-
-    if (shape["conf"] is not None and shape["conf"] < hedge_below and shape["shaky"]
-            and not names and source in ("typed", "voice", "station")
-            and not _HEDGED.search(str(answer or ""))
-            and (checks is None or "overconfident" in checks)):
+    if over and (checks is None or "overconfident" in checks):
         flags.append(f"overconfident: sounded sure at {shape['conf']:.0%} "
                      "measured confidence, and didn't say so")
 
@@ -312,6 +306,90 @@ def tokens_for(row_id):
 # ---------------------------------------------------------------------------
 LOW = 0.30          # a token picked with less than this is a coin flip
 SHAKY_RUN = 3       # this many low tokens in a row is a shaky span
+FLAGS_VERSION = 2   # 2: low confidence and overconfident only on a shaky fact (2026-11-27)
+
+
+def _unsure(shape, answer, tools=(), source="typed"):
+    """(low confidence, overconfident) for a reply, by the same rule the
+    hedge line uses (llm/second_look.py _calibrate). Low confidence: a run
+    of coin-flip tokens on a number or a name, a guess at a fact. A run on
+    wording ("I was hoping the patch through would help") is a small model's
+    normal, and flagged 857 of 1008 turns. Overconfident: that, under
+    self.hedge_below, with no tool to read from and no hedge said."""
+    from core.specifics import _unsure_of_a_specific
+
+    low = bool(shape.get("shaky")) and _unsure_of_a_specific(answer, shape.get("span", ""))
+    hedge_below = float(getattr(config, "SELF_HEDGE_BELOW", 0.6))
+    over = (low and shape.get("conf") is not None and shape["conf"] < hedge_below
+            and not tools and source in ("typed", "voice", "station")
+            and not _HEDGED.search(answer))
+    return low, over
+
+
+def _reflag(conn):
+    """Once: the two flags on turns kept before FLAGS_VERSION, by today's
+    rule. The new rule only ever narrows the old one, so a flag that no
+    longer holds is taken off and nothing is added."""
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+    row = conn.execute("SELECT value FROM meta WHERE key='flags'").fetchone()
+    if row and int(row[0] or 0) >= FLAGS_VERSION:
+        return
+    changed = 0
+    for rid, raw, answer, tools, source in conn.execute(
+            "SELECT id, flags, answer, tools, source FROM thoughts "
+            "WHERE flags LIKE '%low confidence%' OR flags LIKE '%overconfident%'").fetchall():
+        data = conn.execute("SELECT data FROM thought_tokens WHERE id=?", (rid,)).fetchone()
+        if not data:
+            continue        # nothing to judge it by: the flag stays as it was
+        try:
+            flags = json.loads(raw or "[]")
+            shape = confidence(json.loads(zlib.decompress(data[0])))
+            low, over = _unsure(shape, str(answer or ""), json.loads(tools or "[]"), source)
+        except Exception:
+            continue
+        keep = [f for f in flags if not ((f.startswith("low confidence") and not low)
+                                         or (f.startswith("overconfident") and not over))]
+        if keep != flags:
+            conn.execute("UPDATE thoughts SET flags=? WHERE id=?", (json.dumps(keep), rid))
+            changed += 1
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('flags', ?)", (str(FLAGS_VERSION),))
+    conn.commit()
+    if changed:
+        logbook.info("thoughtlog", "flags recounted by the new rule on %d turns", changed)
+
+
+_baselines = {"key": None, "value": {}}
+
+
+def baselines(recent=300, least=30):
+    """{model: {"n", "median", "low", "high"}}: how sure each model usually
+    is, from its last `recent` replies with a measure (low and high are its
+    15th and 85th percentiles). A model with fewer than `least` isn't in it.
+    The viewer reads a reply's % against these instead of fixed lines: a 9B
+    sits around 45% on everyday replies, and 60% painted all of them amber.
+    SQLite picks each model's last `recent`, and the answer is kept until a
+    turn is added or removed: the viewer asks on every refresh."""
+    def read(conn):
+        key = conn.execute("SELECT MAX(id), COUNT(*) FROM thoughts").fetchone() + (recent, least, DB_FILE)
+        if key == _baselines["key"]:
+            return _baselines["value"]
+        seen = {}
+        for model, conf in conn.execute(
+                "SELECT model, conf FROM (SELECT model, conf, ROW_NUMBER() OVER "
+                "(PARTITION BY model ORDER BY id DESC) AS n FROM thoughts WHERE conf IS NOT NULL) "
+                "WHERE n <= ?", (recent,)):
+            seen.setdefault(model or "", []).append(conf)
+        out = {}
+        for model, vals in seen.items():
+            if len(vals) < least:
+                continue
+            vals.sort()
+            at = lambda q: round(vals[min(len(vals) - 1, int(q * len(vals)))], 3)
+            out[model] = {"n": len(vals), "median": at(0.5), "low": at(0.15), "high": at(0.85)}
+        _baselines.update(key=key, value=out)
+        return out
+
+    return _run(read, {})
 
 
 def confidence(runs):

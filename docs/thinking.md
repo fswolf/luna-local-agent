@@ -24,10 +24,13 @@ account.
 - **It matters most on facts.** A run of coin-flip tokens on a number, a
   name or a date is a guess. That's what the review, the hedge line and the
   vote look for.
-- **The red "low confidence" tag** is a run of three or more tokens in a row
-  each under 30% (`LOW` and `SHAKY_RUN` in `mind/thoughtlog.py`). On a small
-  model most replies have one, often a word choice in banter. The
-  percentage beside it is the overall measure.
+- **The viewer reads each % against that model's usual.** It works out
+  each model's normal from its last 300 replies: amber is its bottom 15%
+  ("low for her"), green its top 15%. The header shows the usual range of
+  the model you're looking at and the `rethink_below` that fits it.
+- **The red "low confidence" tag** is a run of three or more coin-flip
+  tokens on a number or a name: a guess at a fact. A run on wording isn't
+  flagged; on a 9B that's most replies.
 
 ## What moves it
 
@@ -74,9 +77,10 @@ longer with `deep_budget: -1` (unlimited), so give it a limit.
 
 ## Setting it for your model
 
-1. Use her for a day and look at the percentages in the thought viewer.
-2. Set `rethink_below` a little under where most replies sit: 0.40 for a
-   9B at around 45%. At the default 0.75 a small model thinks twice on every
+1. Use her for a day. The thought viewer's header then shows her usual
+   range on that model and the `rethink_below` that fits it (her bottom
+   15%).
+2. Set `rethink_below` to that: 0.42 for a 9B whose usual is 43-56%. At the default 0.75 a small model thinks twice on every
    reply, and almost no second try is sure enough to replace the first.
 3. Use `auto`, and a thinking limit for the second try.
 

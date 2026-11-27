@@ -152,6 +152,7 @@ class Handler(BaseHTTPRequestHandler):
                 "page_size": PAGE_SIZE,
                 "enabled": log.enabled(),
                 "budget": _budget(),
+                "baselines": log.baselines(),
                 "rows": log.rows(limit=PAGE_SIZE, offset=offset, **where),
             }))
         elif url.path == "/report":
@@ -404,6 +405,7 @@ PAGE = r"""<!DOCTYPE html>
   .pill.tool { color: var(--cyan); border-color: #3f6b6b; }
   .pill.flag { color: var(--danger); border-color: var(--danger); }
   .pill.warn { color: var(--amber); border-color: #8a6a3a; }
+  .pill.ok { color: var(--ok); border-color: #3f7a5a; }
   .pill.star { color: var(--gold); border-color: #8a7a3a; }
   .empty { color: var(--dim); font-size: 13px; padding: 20px 16px; }
   #pager { display: flex; gap: 8px; align-items: center; padding: 12px 16px; color: var(--dim); font-size: 12px; }
@@ -587,6 +589,7 @@ async function load(quiet) {
   const top = d.rows.length ? d.rows[0].id : 0;
   if (quiet && top === S.newest && d.total === S.total) return;
   S.newest = top; S.total = d.total; S.pageSize = d.page_size; S.budget = d.budget; S.rows = d.rows;
+  S.base = d.baselines || {};
   meta(d); flagChips(d.stats); modelChips(d.stats); list();
   if (S.sel == null && d.rows.length && !quiet) select(d.rows[0].id, true);
   else if (S.sel != null) {
@@ -595,6 +598,15 @@ async function load(quiet) {
   }
   if (!d.rows.length) detail(null);
 }
+// The model being looked at (the filter, or whichever answered last): its
+// usual, and the rethink_below that fits it (its bottom 15%)
+function usual(d) {
+  const m = S.model || (d.rows[0] || {}).model || "", b = (d.baselines || {})[m];
+  if (!b) return "";
+  return ` · <span title="${shortModel(m)}: the middle 70% of its last ${b.n} replies. A reply under ${pct(b.low)} is in its bottom 15%: ` +
+    `adaptive.rethink_below ${b.low.toFixed(2)} gives those a second look">usual ${pct(b.low)} to ${pct(b.high)} sure · ` +
+    `rethink_below fits at ${b.low.toFixed(2)}</span>`;
+}
 function meta(d) {
   const st = d.stats, pct = st.total ? Math.round(100 * st.cut_off / st.total) : 0;
   $("meta").innerHTML =
@@ -602,6 +614,7 @@ function meta(d) {
     ((S.q || S.kind || S.flag || S.day || S.model) ? ` · ${S.total} shown` : "") +
     (st.total ? ` · median ${k(st.chars)} chars${st.seconds ? `, ${st.seconds}s` : ""} · ${st.tools} used tools` : "") +
     (st.flagged ? ` · <span class="warn">${st.flagged} flagged</span>` : "") +
+    usual(d) +
     (st.cut_off ? ` · <span class="${pct >= 15 ? "warn" : ""}">${st.cut_off} cut off (${pct}%)${pct >= 15 ? " - raise max_tokens or lower generation.reasoning" : ""}</span>` : "") +
     (d.enabled ? "" : ` · <span class="off">not recording - new turns aren't being kept</span>`);
   S.enabled = d.enabled;
@@ -662,6 +675,20 @@ function list() {
   pg.append(prev, el("span", null, `page ${Math.floor(S.offset / S.pageSize) + 1} of ${Math.max(1, Math.ceil(S.total / S.pageSize))}`), next);
   box.appendChild(pg);
 }
+// How sure, against this model's own normal (thoughtlog.baselines: its last
+// 300 replies): a 9B sits around 45-50% on everyday replies, so a fixed 60%
+// line painted every one of them amber. Low and high are its bottom and top
+// 15%. A model with too few replies yet is read against 60%, as before.
+function surePill(r, long) {
+  const b = (S.base || {})[r.model || ""];
+  const band = !b ? (r.conf < 0.6 ? "low" : "") : r.conf < b.low ? "low" : r.conf > b.high ? "high" : "";
+  const p = el("span", "pill" + (band === "low" ? " warn" : band === "high" ? " ok" : ""),
+    pct(r.conf) + " sure" + (long && b && band ? (band === "low" ? " · low for her" : " · high for her") : ""));
+  p.title = (b ? `her usual on this model: ${pct(b.low)} to ${pct(b.high)}, median ${pct(b.median)} (last ${b.n} replies)`
+              : "not enough replies from this model yet to know its usual: read against 60%") +
+    `\nmean probability of the reply's tokens · ${r.low_tokens} of them under 30%`;
+  return p;
+}
 function item(r) {
   const it = el("div", "item" + (r.id === S.sel ? " sel" : "")); it.dataset.id = r.id;
   it.onclick = () => select(r.id);
@@ -673,7 +700,7 @@ function item(r) {
   if (r.tools.length > 3) l1.appendChild(el("span", "pill tool", "+" + (r.tools.length - 3)));
   if (r.flags.length) l1.appendChild(el("span", "pill flag", r.flags.length === 1 ? r.flags[0].split(":")[0] : r.flags.length + " flags"));
   if (S.budget && tokens(r) > S.budget * 0.6) l1.appendChild(el("span", "pill warn", "~" + k(tokens(r)) + " tok"));
-  if (r.conf != null) l1.appendChild(el("span", "pill" + (r.conf < 0.6 ? " warn" : ""), pct(r.conf) + " sure"));
+  if (r.conf != null) l1.appendChild(surePill(r));
   it.appendChild(l1);
   const you = el("div", "you"); you.appendChild(marked(r.user_text)); it.appendChild(you);
   if (r.highlight) { const h = el("div", "hl"); h.appendChild(marked(r.highlight)); it.appendChild(h); }
@@ -715,11 +742,7 @@ function detail(r) {
   head.appendChild(tp);
   if (r.seconds) head.appendChild(el("span", "pill", r.seconds + "s"));
   if (r.rounds > 1) head.appendChild(el("span", "pill", r.rounds + " rounds"));
-  if (r.conf != null) {
-    const cp = el("span", "pill" + (r.conf < 0.6 ? " warn" : ""), `${pct(r.conf)} sure`);
-    cp.title = `mean probability of the reply's tokens · ${r.low_tokens} of them under 30%`;
-    head.appendChild(cp);
-  }
+  if (r.conf != null) head.appendChild(surePill(r, true));
   if (r.model) { const mp = el("span", "pill model", shortModel(r.model)); mp.title = `${r.model} · prompt ${r.prompt_hash || "?"} · session ${r.session || "?"}`; head.appendChild(mp); }
   head.appendChild(el("span", "sp"));
   const back = el("button", null, "← list"); back.id = "back";

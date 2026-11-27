@@ -176,8 +176,13 @@ measured, and it's the most direct look at her internal state this
 setup gets. The viewer shows it three ways:
 
 * **"N% sure"** on each turn: the average probability of the reply's
-  tokens. It turns amber under 60%. The **confidence** filter lists
-  only the turns that have this data.
+  tokens, read against that model's own usual (its last 300 replies).
+  Amber is its bottom 15% ("low for her"), green its top 15%, plain in
+  between; hover it for the range. A model with fewer than 30 replies
+  yet is read against 60%. The header shows the usual range of the model
+  you're looking at, and the `adaptive.rethink_below` that fits it (its
+  bottom 15%). The **confidence** filter lists only the turns that have
+  this data.
 * **Her reply, token by token**, coloured by how sure she was of each
   piece: plain at 90%+, faint at 60-90%, amber at 30-60%, red under
   30%. Hover or tap a token to see what she nearly said instead and how
@@ -185,8 +190,12 @@ setup gets. The viewer shows it three ways:
   is the difference between knowing and guessing. Her thinking can be
   shown the same way, round by round.
 * **The low confidence flag**: three or more tokens in a row under 30%
-  in the reply, quoted, with the lowest probability. Only the reply
-  counts; a scratchpad trying out phrasings is meant to wander.
+  in the reply, on a number or a name, quoted, with the lowest
+  probability. A run on wording ("I was hoping the patch through would
+  help") isn't flagged: on a 9B that's most replies, and the flag was on
+  822 of 1006 turns. Only the reply counts; a scratchpad trying out
+  phrasings is meant to wander. Turns kept before this rule were
+  recounted once, the first time the log was opened after it.
 
 A low probability isn't automatically a mistake. With sampling on, she
 will sometimes pick a less likely word on purpose, and that's where the
