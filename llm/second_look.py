@@ -386,8 +386,11 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence, held=False):
     same = _same_answer(answer, second_text)
 
     # Surer than the first, and sure in its own right: trading a 25%
-    # guess for a 30% guess out loud is worse than leaving it.
-    surer = (conf2 is not None and not shape2["shaky"]
+    # guess for a 30% guess out loud is worse than leaving it. And not
+    # shaky on a number or a name of its own: any unsure run blocked it
+    # before, and on a small model a run of unsure word choice is normal,
+    # so a clearly surer everyday reply was thrown away.
+    surer = (conf2 is not None and not _unsure_of_a_specific(second_text, shape2.get("span", ""))
              and conf2 >= max(conf + config.ADAPTIVE_MIN_GAIN,
                               config.ADAPTIVE_RETHINK_BELOW))
     corrected = bool(second_text) and not same and surer and config.ADAPTIVE_SPEAK_CORRECTIONS
@@ -412,6 +415,21 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence, held=False):
 
     return {"first": first, "second": second, "answer": second_text, "said": said,
             "corrected": corrected, "conf": conf, "conf2": conf2, "outcome": outcome}
+
+
+def _second_look_for(answer):
+    """Which second look this reply gets, "vote" or "rethink" (adaptive.mode):
+    auto picks the vote when the shaky part is a number or a name (asking
+    twice more and going with the majority is what catches a wrong fact),
+    and the deeper rethink for everything else (the vote only ever swaps a
+    reply whose facts differ, so on banter it always kept the first)."""
+    mode = str(getattr(config, "ADAPTIVE_MODE", "vote")).lower()
+    if mode == "auto":
+        from mind import thoughtlog
+
+        span = thoughtlog.confidence(_last_raw.get("tokens") or []).get("span", "")
+        return "vote" if _unsure_of_a_specific(answer, span) else "rethink"
+    return "vote" if mode == "vote" else "rethink"
 
 
 def _unsure_of_a_specific(answer, span):
@@ -576,11 +594,10 @@ def _vote(payload, base_messages, answer, on_text, on_sentence, held=False):
 
     shaky = _unsure_of_a_specific(answer, shape.get("span", ""))
 
-    # Under rethink_below, whatever the reply is about; or surer than that
-    # but shaky on a number or a name. Set rethink_below to fit the model:
-    # a small one sits around 40-50% on everyday replies, and 0.75 looked
-    # again at every one of them.
-    if conf is None or not (shaky or conf < config.ADAPTIVE_RETHINK_BELOW):
+    # Only a shaky number or name: the vote swaps an answer only when the
+    # facts in it differ, so on an everyday reply it would ask twice more
+    # and always keep the first. Everyday replies are rethink's (and auto's).
+    if conf is None or not shaky:
         return None
 
     reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shaky

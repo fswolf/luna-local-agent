@@ -225,10 +225,13 @@ the thought log already measures:
    normal: a 9B sits around 40-50% sure on everyday replies, so at the
    default 75% every reply gets a second look, and none is ever replaced
    (see 3). Look at the % on its replies in the thought log and set the bar a
-   little under where most of them sit (0.40 for that 9B).
+   little under where most of them sit (0.40 for that 9B). With
+   `deep_budget` at -1 a second look can think for a long while, and her
+   voice waits for it (*Held speech*, below): 2048 keeps the wait short.
 3. **The second answer replaces the first only if it's different and
    genuinely sure**: above `rethink_below`, at least `min_gain` surer than
-   the first, and with no shaky stretch of its own. Then it takes the
+   the first, and not shaky on a number or a name of its own (unsure
+   word choice is a small model's normal, and doesn't count). Then it takes the
    first one's place: on screen and in history there's only the corrected
    answer, never the first with the second added after it (she read that
    back as saying everything twice, and started doing it). Otherwise she
@@ -244,8 +247,9 @@ the thought log already measures:
 
 **Voting instead (the default, `mode: "vote"`).** Step 2 can be a vote
 in place of one deeper look. The vote only ever swaps a reply for one
-whose facts differ, so for second looks at everyday replies (banter, a
-roleplay) use `mode: "rethink"`. On a shaky reply the same question is asked
+whose facts differ, so it's only taken when a number or a name is shaky,
+never for low certainty alone. For second looks at everyday replies
+(banter, a roleplay) use `mode: "rethink"`, or `"auto"` for both (below). On a shaky reply the same question is asked
 `votes` (2) more times, silently, at the normal budget, and the answers
 are compared. Two answers count as the same when their specifics match
 (numbers, names) or, without specifics, when they say the same thing.
@@ -261,6 +265,11 @@ word and still disagree.
 
 It costs two quick extra answers, only on shaky turns. `/set
 adaptive.mode rethink` goes back to the single deeper second look.
+
+**Both (`mode: "auto"`).** Each shaky reply gets the check that suits it:
+the vote when the shaky part is a number or a name, the deeper rethink
+for everything else. The vote is what catches a wrong fact; rethink is
+what can make an everyday reply better.
 
 **Held speech (`hold_speech`, on by default).** Her voice waits until the
 reply has been checked, so a reply that gets corrected is never half-said:

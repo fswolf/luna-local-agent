@@ -406,8 +406,10 @@ SCHEMA = {
 
     # --- Adaptive thinking --------------------------------------------------
     "adaptive.enabled": ("bool", "Keep thinking short, and take a second look at replies the model wasn't sure of (llama-server)"),
-    "adaptive.mode": ("choice", "How the second look works: vote (ask again a few times, go with the majority) or rethink (think harder once)",
-                      ("vote", "rethink")),
+    "adaptive.mode": ("choice", "How the second look works: vote (ask again a few times, go with the majority: catches a wrong "
+                      "fact), rethink (think harder once: can improve any reply), or auto (vote when a number or name is shaky, "
+                      "rethink for everything else)",
+                      ("vote", "rethink", "auto")),
     "adaptive.votes": ("int", "How many extra answers a vote asks for"),
     "adaptive.first_budget": ("int", "How much the model can think on every turn (tokens)"),
     "adaptive.deep_budget": ("int", "How much it can think on a second look (tokens, -1 = no limit)"),

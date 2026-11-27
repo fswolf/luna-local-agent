@@ -27,7 +27,7 @@ from .prompts import _calibration_note, _previous_user_text, build_generation_pa
 from .replay import _demonstration, _has_tool_example, _replay, _strip_leading_timestamps, _timestamped
 from .rounds import _generate, _log_tool_call, _tool_rounds, _why_empty
 from .second_look import (_adaptive_on, _calibrate, _ONLY_WHAT_CHANGED, _follow_through, _ground,
-                          _promised_action, _rethink, _unbacked, _vote, turn_steps)
+                          _promised_action, _rethink, _second_look_for, _unbacked, _vote, turn_steps)
 from .streaming import _last_raw
 
 _window_cache = {"at": 0.0, "n": 0}
@@ -480,7 +480,7 @@ def _ask(text, model, on_text=None, on_sentence=None,
     if (adaptive and not kept_promise and not _last_raw.get("exchanges")
             and _last_raw.get("tokens")
             and answer != "...sorry, I got tangled up there. Say that again?"):
-        how = _vote if str(getattr(config, "ADAPTIVE_MODE", "vote")).lower() == "vote" else _rethink
+        how = _vote if _second_look_for(answer) == "vote" else _rethink
         try:
             second = how(payload, base_messages, answer, on_text, on_sentence, held=bool(speech))
         except Exception:

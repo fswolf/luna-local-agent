@@ -96,14 +96,54 @@ class WhenToLookAgain(unittest.TestCase):
     def test_a_shaky_specific_gets_one_even_when_sure(self):
         self.assertEqual(self.run_vote("The card has 20 GB of VRAM.", "20 GB of"), 2)
 
-    def test_under_the_bar_gets_one_whatever_it_is_about(self):
+    def test_the_vote_is_for_facts_only(self):
+        # it only swaps an answer whose facts differ: on banter it would ask
+        # twice more and always keep the first, so it isn't asked
+        self.assertEqual(self.run_vote("*pets your head* Welcome back~", "pets your", conf=0.38, bar=0.40), 0)
+
+    def rethink(self, answer, conf, bar, second=None, shape2=None):
+        shapes = iter([{"conf": conf, "shaky": "", "span": "x"}, shape2 or {}])
+        raw = {"tokens": [[("x", "a", -1.0)]], "thinking": [], "exchanges": []}
+
+        class Quiet:
+            def finish(self):
+                return second or ""
+        with mock.patch.object(second_look, "_last_raw", raw), \
+                mock.patch.object(thoughtlog, "confidence", side_effect=lambda t: next(shapes)), \
+                mock.patch.object(second_look, "_Narrator", return_value=Quiet()), \
+                mock.patch.object(second_look, "_chat_completion", return_value={}) as asked, \
+                mock.patch.object(second_look, "_log_tool_call"), \
+                mock.patch.object(second_look, "_same_answer", return_value=False), \
+                mock.patch.object(second_look.livefeed, "emit"), \
+                mock.patch("config.ADAPTIVE_RETHINK_BELOW", bar, create=True), \
+                mock.patch("config.ADAPTIVE_MIN_GAIN", 0.05, create=True), \
+                mock.patch("config.ADAPTIVE_DEEP_BUDGET", 1024, create=True), \
+                mock.patch("config.ADAPTIVE_SPEAK_CORRECTIONS", True, create=True):
+            out = second_look._rethink({"messages": []}, [], answer, None, None, held=True)
+        return asked.call_count, out
+
+    def test_rethink_under_the_bar_whatever_it_is_about(self):
         # Ryan, 2026-11-27: a fresh try at a shaky everyday reply is often better
-        self.assertEqual(self.run_vote("*pets your head* Welcome back~", "pets your", conf=0.38, bar=0.40), 2)
+        asked, _ = self.rethink("*pets your head* Welcome back~", conf=0.38, bar=0.40,
+                                second="*nuzzles your hand* Missed you~",
+                                shape2={"conf": 0.5, "shaky": "4 uncertain tokens", "span": "nuzzles your"})
+        self.assertEqual(asked, 1)
+
+    def test_a_surer_everyday_reply_replaces_the_first(self):
+        # its own unsure word choice doesn't block it; only a shaky fact would
+        _, out = self.rethink("*pets your head* Welcome back~", conf=0.38, bar=0.40,
+                              second="*nuzzles your hand* Missed you~",
+                              shape2={"conf": 0.5, "shaky": "4 uncertain tokens", "span": "nuzzles your"})
+        self.assertTrue(out["corrected"])
+        _, out = self.rethink("*pets your head* Welcome back~", conf=0.38, bar=0.40,
+                              second="It's 9:41, welcome back~",
+                              shape2={"conf": 0.5, "shaky": "4 uncertain tokens", "span": "9:41"})
+        self.assertFalse(out["corrected"])
 
     def test_the_bar_fits_the_model(self):
         # at 0.40, the Q8 9B's ordinary 44% reply is its normal: no second look
-        self.assertEqual(self.run_vote("Oh, you silly senpai~ You came crawling back already?", "silly",
-                                       conf=0.44, bar=0.40), 0)
+        asked, out = self.rethink("Oh, you silly senpai~ You came crawling back already?", conf=0.44, bar=0.40)
+        self.assertEqual((asked, out), (0, None))
 
     def test_the_deeper_look_follows_the_same_rule(self):
         shape = {"conf": 0.44, "shaky": "", "span": "leans in"}
@@ -114,6 +154,17 @@ class WhenToLookAgain(unittest.TestCase):
                 mock.patch.object(second_look, "_chat_completion") as asked:
             self.assertIsNone(second_look._rethink({"messages": []}, [], "Still on PHP? *leans in*", None, None))
         asked.assert_not_called()
+    def test_auto_picks_the_vote_for_a_fact_and_rethink_for_the_rest(self):
+        def pick(mode, answer, span):
+            with mock.patch("config.ADAPTIVE_MODE", mode, create=True), \
+                    mock.patch.object(second_look, "_last_raw", {"tokens": [[("x", "a", -1.0)]]}), \
+                    mock.patch.object(thoughtlog, "confidence", return_value={"conf": 0.3, "span": span, "shaky": "x"}):
+                return second_look._second_look_for(answer)
+        self.assertEqual(pick("auto", "The card has 20 GB of VRAM.", "20 GB of"), "vote")
+        self.assertEqual(pick("auto", "*pets your head* Welcome back~", "pets your"), "rethink")
+        self.assertEqual(pick("vote", "*pets your head* Welcome back~", "pets your"), "vote")
+        self.assertEqual(pick("rethink", "The card has 20 GB of VRAM.", "20 GB of"), "rethink")
+
 
 if __name__ == "__main__":
     unittest.main()
