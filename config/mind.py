@@ -39,6 +39,9 @@ LONG_TERM_MEMORY_ENABLED = _memory_cfg.get("enabled", True)
 # How many facts may go into one system prompt. Under this, all of them
 # do; over it, the ones relevant to what was just said.
 LONG_TERM_MEMORY_CONTEXT_FACTS = _memory_cfg.get("context_facts", 25)
+# Pinned facts: always in her prompt on top of those, never changed by the
+# background. At most this many can be pinned (mind/factstore.py pin_row).
+LONG_TERM_MEMORY_PINNED_MAX = _memory_cfg.get("pinned_max", 10)
 
 # The reasoning log - see mind/thoughtlog.py. Every turn from the keyboard
 # or the mic keeps the model's scratchpad (<think> blocks, or the

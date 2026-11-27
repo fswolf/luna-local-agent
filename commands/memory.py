@@ -92,6 +92,33 @@ def handle(text):
                 + f"\n{shown}")
             return True
 
+        if argument == "pinned" or argument.split(" ", 1)[0] in ("pin", "unpin"):
+            verb, _, what = argument.partition(" ")
+            if verb == "pinned" or not what.strip():
+                listing = factstore.pinned_rows()
+                shown = "\n".join(f"  #{i} {fact}" for i, fact in listing) or "  (none)"
+                ui.add_message(
+                    "system",
+                    f"Pinned ({len(listing)} of {factstore.pinned_max()}): always in front of her, and the "
+                    f"overnight tidy-up never changes them.\n{shown}\n/facts pin <number> pins one "
+                    "(the numbers are in /facts), /facts unpin <number> lets it go.")
+                return True
+            number = what.strip().lstrip("#")
+            if not number.isdigit():
+                ui.add_message("system", f"/facts {verb} <number> - the numbers are in /facts.")
+                return True
+            with factstore.acting("you"):
+                result = factstore.pin_row(int(number), verb == "pin")
+            fact = factstore.fact_text(int(number))
+            ui.add_message("system", {
+                "pinned": f"Pinned #{number}: {fact}",
+                "unpinned": f"Unpinned #{number}: {fact}",
+                "already": f"#{number} is already {'pinned' if verb == 'pin' else 'not pinned'}.",
+                "full": f"{factstore.pinned_max()} are pinned already (long_term_memory.pinned_max): "
+                        "/facts unpin one first. /facts pinned lists them.",
+            }.get(result, f"No current fact #{number}. /facts lists them with their numbers."))
+            return True
+
         if argument == "unsure":
             listing = [r for r in factstore.rows(limit=2000) if not factstore.is_sure(r[0])]
             shown = "\n".join(f"  ? {fact}" for _i, fact, _s, _c, _w in reversed(listing)) or "  (none)"
@@ -105,8 +132,10 @@ def handle(text):
         limit = 500 if argument == "all" else 20
         listing = factstore.rows(retired=False, limit=limit)
         real = factstore.row_details([r[0] for r in listing])
+        pins = {i for i, _f in factstore.pinned_rows()}
         shown = "\n".join(
-            f"  - {fact}" + (f"  [{subject}]" if subject else "") + _real(real.get(i), "  ")
+            f"  #{i} {fact}" + (f"  [{subject}]" if subject else "") + ("  (pinned)" if i in pins else "")
+            + _real(real.get(i), "  ")
             for i, fact, subject, _c, _w in reversed(listing)
         ) or "  (none yet)"
         more = (
@@ -119,7 +148,7 @@ def handle(text):
             + (f", {factstore.forgotten_count()} forgotten for good" if factstore.forgotten_count() else "")
             + f". Newest {min(active, limit)}:\n{shown}{more}"
             "\n/facts retired shows what's been superseded, /facts unsure what she isn't sure of, "
-            "/facts log every change and who made it.",
+            "/facts log every change and who made it, /facts pin <number> keeps one always in front of her.",
         )
         return True
 

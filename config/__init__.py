@@ -271,6 +271,7 @@ SETTINGS = {
 
     "long_term_memory.enabled":   ("LONG_TERM_MEMORY_ENABLED",     True),
     "long_term_memory.context_facts": ("LONG_TERM_MEMORY_CONTEXT_FACTS", True),
+    "long_term_memory.pinned_max": ("LONG_TERM_MEMORY_PINNED_MAX", True),
 
     "llm.stable_prompt":          ("LLM_STABLE_PROMPT",            True),
 

@@ -140,7 +140,7 @@ Slash commands:
 | `/profile` | Her short profile of you and each person she knows ([memory.md](memory.md#profiles)): `/profile <name>` (or `me`), `rebuild`, `forget <name>` |
 | `/offers` | What she's noticed on her own to offer you ([offers.md](offers.md)): `/offers now`, `on`, `off`, `unmute` |
 | `/good`, `/fix <reply>` | Keep her last reply, or your better version, as an example for her patches ([patches.md](patches.md)); `/examples` shows the count and the page |
-| `/facts` | What she remembers: `/facts all`, `/facts retired`, `/facts unsure`, `/facts log` (every change and who made it; `/facts log 42` for one fact) |
+| `/facts` | What she remembers: `/facts all`, `/facts retired`, `/facts unsure`, `/facts log` (every change and who made it; `/facts log 42` for one fact), `/facts pin 42` (always in front of her; `unpin`, `pinned`) |
 | `/skills` | Recipes she's saved: `/skills show`, `forget`, `restore <n>` |
 | `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>`, `wrong <note>`, `unplan <n>` |
 | `/situation` | The live lines she sees each turn (window, music, load, plugins, next reminder, what's in her hands, clothes that are off) |

@@ -36,10 +36,15 @@ The schema is the design:
                    a date replaces it; NULL means "until it was retired"
     embedding      reserved, unused - the column exists so adding
                    semantic search later is an UPDATE, not a migration
+    pinned         1: always in front of her, whatever the message is
+                   about, and the background (the extractor, the tidy
+                   pass) never rewrites or retires it. Only you, or she
+                   when you tell her to, change it; a replacement keeps
+                   the pin (pin_row, pinned_facts)
 
 Every change is written down too (fact_events): when, what (added,
 confirmed, dated, replaced, retired, restored, corrected, edited,
-forgotten, imported, unforgotten), which fact, the words then, and who
+forgotten, imported, unforgotten, pinned, unpinned), which fact, the words then, and who
 did it: her own tools, the background extractor, the tidy pass, the
 memory page, the import, a forget's sweep (acting(), below). It costs
 nothing in her prompt; /facts log and the memory page's History tab read
@@ -170,6 +175,23 @@ def acting(who):
         _by.reset(token)
 
 
+# The background: what never gets to rewrite or retire a pinned fact
+BACKGROUND = ("extractor", "tidy")
+
+
+def _held(db, where, args):
+    """A pinned fact the background is trying to change: refused, logged.
+    where/args pick the row(s) ("id = ?", (7,))."""
+    if _by.get() not in BACKGROUND:
+        return False
+    row = db.execute(f"SELECT id, fact FROM facts WHERE {where} AND pinned = 1 AND superseded_at IS NULL",
+                     args).fetchone()
+    if row:
+        logbook.info("factstore", "%s left pinned #%d alone: %r", _by.get(), row[0], row[1])
+        return True
+    return False
+
+
 def _record(db, action, fact_id=None, fact="", detail=""):
     """One row in the log, inside the caller's transaction (both or neither)."""
     db.execute("INSERT INTO fact_events(at, action, fact_id, fact, detail, by) VALUES (?, ?, ?, ?, ?, ?)",
@@ -281,7 +303,8 @@ def _open():
         db.executescript(_TABLE)
         have = {r[1] for r in db.execute("PRAGMA table_info(facts)")}
         for column, kind in (("valid_from", "TEXT"), ("valid_to", "TEXT"),   # a facts.db from before them
-                             ("trust", "TEXT NOT NULL DEFAULT 'confirmed'")):
+                             ("trust", "TEXT NOT NULL DEFAULT 'confirmed'"),
+                             ("pinned", "INTEGER NOT NULL DEFAULT 0")):
             if column not in have:
                 try:
                     db.execute(f"ALTER TABLE facts ADD COLUMN {column} {kind}")
@@ -678,15 +701,15 @@ def replace(old_fact, new_fact, subject="", since="", sure=True):
 
     with _lock:
         row = db.execute(
-            "SELECT id, subject FROM facts "
+            "SELECT id, subject, pinned FROM facts "
             "WHERE fact = ? AND superseded_at IS NULL",
             (str(old_fact or "").strip(),),
         ).fetchone()
 
-        if not row:
+        if not row or _held(db, "id = ?", (row[0],)):
             return False
 
-        old_id, old_subject = row
+        old_id, old_subject, pinned = row
 
         # Both or neither: a failure between them used to leave the shared
         # connection mid-transaction, and the next commit anywhere saved
@@ -694,9 +717,9 @@ def replace(old_fact, new_fact, subject="", since="", sure=True):
         since = when(since) or None
         with db:
             cursor = db.execute(
-                "INSERT INTO facts(fact, subject, created_at, valid_from, trust) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO facts(fact, subject, created_at, valid_from, trust, pinned) VALUES (?, ?, ?, ?, ?, ?)",
                 (new_fact, str(subject or old_subject or "").strip().lower(), _now(), since,
-                 "confirmed" if sure else "unconfirmed"),
+                 "confirmed" if sure else "unconfirmed", 1 if pinned else 0),
             )
             db.execute(
                 "UPDATE facts SET superseded_at = ?, superseded_by = ?, "
@@ -704,7 +727,8 @@ def replace(old_fact, new_fact, subject="", since="", sure=True):
                 (_now(), cursor.lastrowid, since, old_id),
             )
             _record(db, "replaced", cursor.lastrowid, new_fact,
-                    f"was #{old_id}" + (f", changed {since}" if since else "") + ("" if sure else ", not sure"))
+                    f"was #{old_id}" + (f", changed {since}" if since else "") + ("" if sure else ", not sure")
+                    + (", still pinned" if pinned else ""))
             _record(db, "retired", old_id, str(old_fact or "").strip(), f"replaced by #{cursor.lastrowid}")
             _trim_events(db)
 
@@ -774,6 +798,8 @@ def update(old_fact, new_fact):
     old, new = str(old_fact or "").strip(), str(new_fact or "").strip()
 
     with _lock:
+        if _held(db, "fact = ?", (old,)):
+            return False
         ids = [r[0] for r in db.execute("SELECT id FROM facts WHERE fact = ? AND superseded_at IS NULL", (old,))]
         with db:
             cursor = db.execute(
@@ -829,6 +855,8 @@ def set_row(fact_id, fact, subject):
     fact, subject = str(fact or "").strip(), str(subject or "").strip().lower()
 
     with _lock:
+        if _held(db, "id = ?", (int(fact_id),)):
+            return False
         before = db.execute("SELECT fact, subject FROM facts WHERE id = ?", (int(fact_id),)).fetchone()
         with db:
             cursor = db.execute(
@@ -848,6 +876,8 @@ def retire_row(fact_id, why=""):
     db = _connect()
 
     with _lock:
+        if _held(db, "id = ?", (int(fact_id),)):
+            return False
         with db:
             cursor = db.execute(
                 "UPDATE facts SET superseded_at = ? "
@@ -887,6 +917,75 @@ def delete_row(fact_id):
                 _forgot(db, [int(fact_id)])
 
     return cursor.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
+# Pinned: always in front of her, never touched by the background
+# ---------------------------------------------------------------------------
+def pinned_max():
+    try:
+        import config
+        return max(0, int(getattr(config, "LONG_TERM_MEMORY_PINNED_MAX", 10)))
+    except (TypeError, ValueError):
+        return 10
+
+
+def pin_row(fact_id, on=True):
+    """Pin or unpin one active fact. Returns "pinned", "unpinned", "already",
+    "full" (pinned_max() are pinned already) or "missing" (no such active fact)."""
+    db = _connect()
+    if db is None:
+        return "missing"
+
+    with _lock:
+        row = db.execute("SELECT fact, pinned FROM facts WHERE id = ? AND superseded_at IS NULL",
+                         (int(fact_id),)).fetchone()
+        if not row:
+            return "missing"
+        if bool(row[1]) == bool(on):
+            return "already"
+        if on and db.execute("SELECT count(*) FROM facts WHERE pinned = 1 AND superseded_at IS NULL"
+                             ).fetchone()[0] >= pinned_max():
+            return "full"
+        with db:
+            db.execute("UPDATE facts SET pinned = ? WHERE id = ?", (1 if on else 0, int(fact_id)))
+            _record(db, "pinned" if on else "unpinned", int(fact_id), row[0])
+
+    return "pinned" if on else "unpinned"
+
+
+def pin(fact, on=True):
+    """pin_row by the fact's exact text (her tool, which finds it by words)."""
+    db = _connect()
+    if db is None:
+        return "missing"
+    with _lock:
+        row = db.execute("SELECT id FROM facts WHERE fact = ? AND superseded_at IS NULL",
+                         (str(fact or "").strip(),)).fetchone()
+    return pin_row(row[0], on) if row else "missing"
+
+
+def fact_text(fact_id):
+    """One fact's words by its number, or ""."""
+    db = _connect()
+    if db is None:
+        return ""
+    with _lock:
+        return _text(db, fact_id)
+
+
+def pinned_rows():
+    """[(id, fact)] of the pinned active facts, oldest first."""
+    db = _connect()
+    if db is None:
+        return []
+    with _lock:
+        return db.execute("SELECT id, fact FROM facts WHERE pinned = 1 AND superseded_at IS NULL "
+                          "ORDER BY id").fetchall()
+
+
+def pinned_facts():
+    return [f for _i, f in pinned_rows()]
 
 
 # ---------------------------------------------------------------------------

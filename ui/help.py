@@ -94,6 +94,7 @@ _HELP_SECTIONS = [
         ("/facts retired", "facts that were replaced (kept, but not used)"),
         ("/facts unsure", "facts heard once and not confirmed yet"),
         ("/facts log", "every change to Luna's memory, when, and who made it; /facts log 42 for one fact"),
+        ("/facts pin 42", "keep fact #42 always in front of her; /facts unpin 42, /facts pinned lists them"),
         ("/memory", "the memory editor, in your browser"),
         "Facts are kept for good and searched when they're relevant. A new fact can replace an old one it contradicts.",
         ("/reflect", "tidy up now: lessons, conversation notes, facts, pages"),

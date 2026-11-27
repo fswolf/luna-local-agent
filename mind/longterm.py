@@ -189,7 +189,36 @@ def _words(text):
 
 
 def relevant_facts(query, limit=None):
-    """The facts worth showing for this turn, oldest first."""
+    """The facts worth showing for this turn, oldest first: the pinned ones
+    always (the owner's, never on a guest's turn), and the rest picked."""
+    chosen = _relevant(query, limit)
+    if _guest() or not ready():
+        return chosen
+    try:
+        pinned = factstore.pinned_facts()
+    except Exception:
+        return chosen
+    missing = [f for f in pinned if f not in chosen]
+    if not missing:
+        return chosen
+    keep = set(chosen) | set(missing)
+    return [f for f in get_facts() if f in keep]
+
+
+def pin_fact(phrase, on=True):
+    """Pin (or unpin) a remembered fact: (fact, result) or (None, candidates).
+    result is factstore.pin_row's word. The owner's facts only."""
+    if _guest() or not ready():
+        return None, []
+    index, found = find_fact(phrase)
+    if index is None:
+        return None, found
+    return (found, factstore.pin(found, on)), []
+
+
+def _relevant(query, limit=None):
+    """The facts picked for this turn by what was said, oldest first: all of
+    them under the limit, by meaning, by FTS, or by shared words over it."""
     limit = limit or config.LONG_TERM_MEMORY_CONTEXT_FACTS
     _announce()  # cheap, and it catches edits made in the memory manager
 

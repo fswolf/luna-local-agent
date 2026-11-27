@@ -696,6 +696,7 @@ def _tidy_facts(model, report, limit):
         return []
 
     facts = sorted(factstore.rows(limit=1000), key=lambda r: r[0])  # oldest first
+    pins = {i for i, _f in factstore.pinned_rows()}
     # strict: on a db error, stop here - an empty list read back by mistake
     # would be saved over the real one at the end
     done = list(notebook.get("tidy_done", [], strict=True) or [])
@@ -714,6 +715,12 @@ def _tidy_facts(model, report, limit):
         if asked >= limit:  # a few model calls per pass, not a marathon
             left_over = True
             break
+
+        if a[0] in pins and b[0] in pins:
+            # two pins: nothing here may change either, so don't ask
+            done.append(f"{a[0]}-{b[0]}")
+            seen.add(f"{a[0]}-{b[0]}")
+            continue
 
         prompt = (
             "Two things you have saved about the user:\n"
@@ -748,6 +755,28 @@ def _tidy_facts(model, report, limit):
             continue
 
         merged, side = (m.group(2) or "").strip(), (m.group(3) or "").upper()
+
+        # A pinned fact is never rewritten or retired here: a duplicate of
+        # one goes instead, and a contradiction that would retire it is left
+        # for him (the pin says he's vouched for it).
+        pin_a, pin_b = a[0] in pins, b[0] in pins
+        if (pin_a or pin_b) and (merged or side):
+            keep, drop = (a, b) if pin_a else (b, a)
+            # SAME (and really both: the merge still covers each): the
+            # unpinned copy goes. CONFLICT naming the pinned side as the true
+            # one: the other goes. CONFLICT against the pin: both stay, and
+            # he's told, once - the pin says he vouched for it, so it's his call.
+            same = bool(merged) and notebook.overlap(merged, a[1]) > 0.2 and notebook.overlap(merged, b[1]) > 0.2
+            if same or (side and side == ("A" if pin_a else "B")):
+                factstore.retire_row(drop[0], f"same as pinned #{keep[0]}" if same
+                                     else f"contradicted by pinned #{keep[0]}")
+                touched.update((a[0], b[0]))
+                changes.append(f"retired \"{drop[1]}\" ({'same as' if same else 'contradicted by'} "
+                               f"pinned \"{keep[1]}\")")
+            elif side:
+                changes.append(f"kept pinned \"{keep[1]}\", though \"{drop[1]}\" disagrees: "
+                               f"/facts unpin {keep[0]} if it changed, or /facts to retire the other")
+            continue
 
         if merged:
             merged = merged.strip(" \"'*")
@@ -1120,7 +1149,7 @@ def _shout(show):
         if line.startswith("Dream pass: read") and "new lesson" in line:
             show(f"{config.AGENT_NAME} reflected - " + line.split(" - ", 1)[1]
                  + "\n  (/lessons to review, /lessons forget <n> to drop one)")
-        elif line.startswith("Fact cleanup:") and ("merged" in line or "retired" in line):
+        elif line.startswith("Fact cleanup:") and ("merged" in line or "retired" in line or "kept pinned" in line):
             show(line)
         elif line.startswith("Dream pass failed"):
             show(line)

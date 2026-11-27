@@ -63,8 +63,9 @@ def state():
         for start in range(0, len(ids), 1000):                  # row_details takes 1000 at a time
             extra.update(store.row_details(ids[start:start + 1000]))
         info = lambda i: dict(zip(("since", "until", "sure"), extra.get(i, ("", "", True))))
+        pins = {i for i, _f in store.pinned_rows()} if hasattr(store, "pinned_rows") else set()
         active = [
-            {"id": i, "fact": fact, "subject": subject, "created": created[:10], **info(i)}
+            {"id": i, "fact": fact, "subject": subject, "created": created[:10], "pinned": i in pins, **info(i)}
             for i, fact, subject, created, _w in rows
         ]
         retired = [
@@ -199,6 +200,10 @@ def _apply(action, body):
         store.restore_row(fact_id)
     elif action == "confirm":
         store.confirm_row(fact_id)
+    elif action in ("pin", "unpin"):
+        result = store.pin_row(fact_id, action == "pin")
+        if result == "full":
+            raise ValueError(f"{store.pinned_max()} facts are pinned already - unpin one first")
     elif action == "delete":
         # a delete is a forget: out of everything else she keeps, and never relearned
         gone = [r[1] for r in store.rows(limit=100000) + store.rows(retired=True, limit=100000)
@@ -363,6 +368,8 @@ PAGE = r"""<!DOCTYPE html>
   .fact .date { color: var(--dim); font-size: 12px;
                 white-space: nowrap; margin-top: 3px; }
   .fact.retired { opacity: .6; }
+  .fact .pinned { color: var(--accent); font-size: 12px; border: 1px solid var(--line);
+                 border-radius: 4px; padding: 0 6px; }
   .fact .unsure { color: var(--danger); font-size: 12px; border: 1px dashed var(--line);
                   border-radius: 20px; padding: 1px 9px; white-space: nowrap; margin-top: 2px; }
   .fact.retired .text { text-decoration: line-through; }
@@ -673,6 +680,12 @@ function factRow(f, retired) {
     s.className = "subject"; s.textContent = f.subject;
     row.appendChild(s);
   }
+  if (f.pinned) {
+    const p = document.createElement("div");
+    p.className = "pinned"; p.textContent = "pinned";
+    p.title = "always in front of her, and the overnight tidy-up never changes it";
+    row.appendChild(p);
+  }
   if (!f.sure) {
     const u = document.createElement("div");
     u.className = "unsure"; u.textContent = "not sure";
@@ -705,6 +718,7 @@ function factRow(f, retired) {
 
   if (!retired) {
     if (!f.sure) btn("confirm", "", async () => { await api("confirm", {id: f.id}); refresh(true); });
+    btn(f.pinned ? "unpin" : "pin", "", async () => { await api(f.pinned ? "unpin" : "pin", {id: f.id}); refresh(true); });
     btn("edit", "", () => editRow(row, f));
     btn("retire", "", async () => { await api("retire", {id: f.id}); refresh(true); });
   } else {

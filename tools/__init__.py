@@ -192,7 +192,7 @@ _GROUPS = (
     # a "remember how" turn was sent Memory and Shell instead, and she faked
     # saving the recipe with an echo through run_command.
     ("Memory", ("remember_fact", "recall_facts", "forget_fact",
-                "update_fact", "confirm_fact", "ask_memory", "search_history", "meet_guest", "stop_offering",
+                "update_fact", "confirm_fact", "pin_fact", "ask_memory", "search_history", "meet_guest", "stop_offering",
                 "note_lesson", "save_skill")),
     ("Files", ("list_files", "read_file", "write_file", "edit_file")),
     ("Desktop", ("look_at_screen", "control_audio", "clipboard",

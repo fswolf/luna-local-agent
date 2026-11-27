@@ -202,6 +202,46 @@ def _confirm_fact(about):
 
 
 @tool(
+    "pin_fact",
+    "Pin something you remember about the user so it's always in front of you and the "
+    "overnight tidy-up never changes it - when they say never to forget it, or that it "
+    "matters. pin false unpins it.",
+    {
+        "about": {
+            "type": "string",
+            "description": "Roughly what the fact says.",
+        },
+        "pin": {
+            "type": "boolean",
+            "description": "false to unpin. Leave it out to pin.",
+        },
+    },
+    required=("about",),
+)
+@_hers
+def _pin_fact(about, pin=True):
+    on = str(pin).strip().lower() not in ("false", "0", "no")
+    if longterm._guest():
+        return f"Pins are for {config.USER_NAME or 'your owner'}'s facts; a guest's aren't pinned."
+    done, candidates = longterm.pin_fact(about, on)
+
+    if done:
+        fact, result = done
+        return {
+            "pinned": f"Pinned: {fact}",
+            "unpinned": f"Unpinned: {fact}",
+            "already": f"Already {'pinned' if on else 'not pinned'}: {fact}",
+            "full": f"Not pinned: {factstore.pinned_max()} facts are pinned already. Ask which one to unpin.",
+        }.get(result, f"Couldn't change: {fact}")
+
+    if candidates:
+        listing = "\n".join(f"- {c}" for c in candidates)
+        return f"More than one could be it:\n{listing}\nAsk which one."
+
+    return f"Nothing remembered matches {about!r}. If it's new, save it with remember_fact first."
+
+
+@tool(
     "update_fact",
     "Replace something remembered about the user when it changed - they "
     "moved, changed jobs, swapped hardware, finished the project. The old "

@@ -29,7 +29,8 @@ deleting the wrong one.
 ```json
 "long_term_memory": {
     "enabled": true,
-    "context_facts": 25
+    "context_facts": 25,
+    "pinned_max": 10
 }
 ```
 
@@ -103,6 +104,37 @@ again. An install already on facts.db had that list read in when it
 switched, and it's left alone. Your preferences in memory.json are still
 read until you move them into agent.json.
 
+## Pinned facts
+
+Some things should be in front of her whatever you're talking about:
+who your wife is, the address of the machine her model runs on. Past
+`context_facts`, a fact only travels when it matches what you said, so
+"the VM is at 192.168.0.186" can be missing the one time it matters. Pin
+it and it goes along every turn, on top of the others.
+
+```
+/facts                    the facts, with their numbers
+/facts pin 42             always in front of her
+/facts unpin 42
+/facts pinned             the pinned ones
+```
+
+Or tell her ("never forget that Shannon is my wife") and she pins it
+herself with `pin_fact`, or click **pin** on the memory page. At most
+`pinned_max` (10) are pinned at once, so pins don't crowd out the rest.
+
+A pin also protects the fact from her background work: the extractor
+never replaces or retires it, and the overnight tidy-up never rewrites
+it. A duplicate of a pinned fact is retired in its favour; a newer fact
+that contradicts it leaves both standing, and the tidy-up says so once
+("kept pinned ..., though ... disagrees"), for you to settle. That's
+also what happens when you mention a change in passing and she doesn't
+update it herself: the background notes the new version as not sure,
+beside the pin, rather than replacing something you vouched for. You can
+still change it, and so can she when you tell her it changed: the new
+version keeps the pin. Pinning and unpinning go in the change log like
+everything else.
+
 ## Forgetting
 
 "Forget that" (`forget_fact`, or delete on the memory page) means
@@ -133,7 +165,7 @@ person, so she can still talk about anime.
 
 Each change to a fact is a row in facts.db's change log: what happened
 (added, confirmed, dated, corrected, replaced, retired, restored, edited,
-forgotten, imported, unforgotten), to which fact, the words then, when,
+forgotten, imported, unforgotten, pinned, unpinned), to which fact, the words then, when,
 and who did it:
 
 | Who | When it changes something |
@@ -142,6 +174,7 @@ and who did it:
 | extractor | the background pass that picks facts out of a conversation |
 | tidy | her idle pass that merges duplicates and retires the losing side of a contradiction |
 | memory page | you, on the memory page |
+| you | `/facts pin` and `/facts unpin` |
 | import | an old install's memory.json read in |
 
 So "why does she think I have two cats?" has an answer: `/facts log`

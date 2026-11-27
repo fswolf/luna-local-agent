@@ -395,6 +395,7 @@ SCHEMA = {
     # --- Long-term memory ---------------------------------------------------
     "long_term_memory.enabled": ("bool", "Let Luna remember facts about you from one session to the next"),
     "long_term_memory.context_facts": ("int", "Most facts in one message. Past this, only the relevant ones go"),
+    "long_term_memory.pinned_max": ("int", "Most pinned facts (/facts pin): they always go along, on top of the others, and the overnight tidy-up never changes them"),
 
     # --- Thought log --------------------------------------------------------
     "thoughts.enabled": ("bool", "Keep a log of the model's thinking for each turn, to look at with /thoughts"),
