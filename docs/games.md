@@ -143,7 +143,8 @@ If your system's frotz package has no `dfrotz`, build it from
 Starcross, Planetfall and The Hitchhiker's Guide were never released as
 open source: the rights went from Infocom to Activision and now
 Microsoft, and they come out if asked. Every game has notes in
-`agent/knowledge/<game>/`: how to play it and, for Zork II and III, a map
+`agent/knowledge/<game>/` (or `agent/knowledge/games/<game>/`; one folder
+down is found too): how to play it and, for Zork II and III, a map
 of the rooms near the start. No walkthroughs.
 
 ### Telling her about a game

@@ -151,6 +151,7 @@ SETTINGS = {
     "knowledge.auto":             ("KNOWLEDGE_AUTO",               True),
     "knowledge.auto_passages":    ("KNOWLEDGE_AUTO_PASSAGES",      True),
     "knowledge.min_score":        ("KNOWLEDGE_MIN_SCORE",          True),
+    "knowledge.summaries":        ("KNOWLEDGE_SUMMARIES",          True),
 
     "comfyui.url":                ("COMFY_URL",                    True),
 

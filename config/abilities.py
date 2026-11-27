@@ -95,6 +95,7 @@ KNOWLEDGE_FOLDERS = list(_knowledge_cfg.get("folders") or [KNOWLEDGE_DEFAULT])
 KNOWLEDGE_AUTO = flag(_knowledge_cfg.get("auto", True))           # matching passages travel with the turn unasked
 KNOWLEDGE_AUTO_PASSAGES = int(_knowledge_cfg.get("auto_passages", 2))
 KNOWLEDGE_MIN_SCORE = float(_knowledge_cfg.get("min_score", 0.55))  # how close, by meaning, to come in unasked
+KNOWLEDGE_SUMMARIES = flag(_knowledge_cfg.get("summaries", True))   # what each file covers, written while idle
 KNOWLEDGE_RESCAN_MINUTES = float(_knowledge_cfg.get("rescan_minutes", 10))
 
 # ComfyUI, for make_texture (portrait/texture.py).

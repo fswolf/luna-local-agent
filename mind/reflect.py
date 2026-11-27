@@ -31,6 +31,9 @@ with /reflect:
   profiles   about (mind/pages.py), and a short profile of you and of each
              person she knows (mind/profiles.py), written from the facts
              and those conclusions.
+  docs       between batches: a sentence or two on what each file in
+             her knowledge folders covers (mind/knowledge.py), a few files
+             a pass, rewritten only when a file changes.
 
 Plus the startup part: the previous session is summarised before
 anything else, so the first thing she says can pick up where it left
@@ -860,6 +863,27 @@ def write_profiles(model, report=None):
     return written
 
 
+def _docs_due():
+    from mind import knowledge
+
+    return bool(knowledge.summaries_due())
+
+
+def write_doc_summaries(model, report=None):
+    """What each file in the knowledge folders covers (mind/knowledge.py), a
+    few files a pass. Returns the files written, or None when the model
+    call failed."""
+    from mind import knowledge
+
+    if not knowledge.summaries_enabled():
+        return []
+    written = knowledge.write_summaries(lambda prompt: _ask(_model(model), prompt, think=0, max_tokens=120),
+                                        yield_=_yield, report=report)
+    if written:
+        logbook.info("reflect", "knowledge summaries written: %d", len(written))
+    return written
+
+
 # ---------------------------------------------------------------------------
 # All of it, and when
 # ---------------------------------------------------------------------------
@@ -1191,6 +1215,11 @@ def _loop(model, show):
                             _job_ok("profiles")
                         else:
                             _job_failed("profiles")        # the server's down, or she wrote nothing: an hour's rest
+                    if not _resting("docs") and _docs_due():
+                        if write_doc_summaries(model) is None:
+                            _job_failed("docs")            # the server's down: an hour's rest
+                        else:
+                            _job_ok("docs")
         except Interrupted:
             pass
         except Exception:

@@ -120,9 +120,29 @@ things she should have known.
 Both only ever happen in your own turns: stream chat never sees your
 documents.
 
+**Knowing what's there.** While she's idle she writes a sentence or two
+per file on what it covers, a few files at a time, and again only when a
+file changes. A file that already says so, a `Summary: ...` line near its
+top, or a folder's own `00-index.md`, `index.md` or `README.md`, is used
+as written, with no model call. Ask "what's in your knowledge folder?"
+or "what game guides do you have?" and `search_docs` browses instead of
+searching:
+
+```
+The knowledge folder (66 files; browse a folder by name for more):
+- games/ (60 files): folders: hhgg, minecraft, planetfall, starcross, vibe-city, zork...
+- manuals/ (1 file): The bash manual: shell syntax, expansions, redirection, built-ins...
+```
+
+`games` then lists each game with its index file's own words, and
+`games/zork` the files in it. The summaries never ride in her prompt.
+They do help the search a little: passages from a file whose summary
+fits your question rank a bit higher, so the right file's quieter
+passages still reach her.
+
 **Game guides.** Game turns (Zork, REALITI) don't get `search_docs`.
-Instead, a folder named after the game, like `agent/knowledge/zork/`,
-is her guide to it: each turn she's shown what it says about the room
+Instead, a folder named after the game, like `agent/knowledge/zork/`
+(or one folder down, `agent/knowledge/games/zork/`), is her guide to it: each turn she's shown what it says about the room
 she's in. Only that folder is read, and a file with `Spoilers: yes`
 near its top is skipped. See [Games](games.md#her-memory-of-a-game).
 
@@ -149,6 +169,7 @@ that file, and switching embedding models re-embeds in the background.
     "auto": true,
     "auto_passages": 2,
     "min_score": 0.55,
+    "summaries": true,
     "rescan_minutes": 10
 }
 ```
@@ -160,6 +181,7 @@ that file, and switching embedding models re-embeds in the background.
 | `auto` | Whether matching passages come along unasked |
 | `auto_passages` | How many, at most |
 | `min_score` | How close (by meaning, 0 to 1) a passage has to be to come along unasked |
+| `summaries` | Write what each file covers while she's idle, for browsing and a better first pick of file |
 | `rescan_minutes` | How often she checks the folders for changes |
 
 The index lives at `~/.cache/ai-voice/knowledge.db`

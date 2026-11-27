@@ -357,6 +357,7 @@ SCHEMA = {
     "knowledge.auto": ("bool", "Bring in matching passages with your message without being asked"),
     "knowledge.auto_passages": ("int", "Most passages brought in without being asked"),
     "knowledge.min_score": ("float", "How close in meaning a passage must be to come along unasked (0 to 1)"),
+    "knowledge.summaries": ("bool", "While she's idle, write a sentence or two on what each file covers, so she can browse the folder and find the right file first. Never in her prompt"),
     "knowledge.rescan_minutes": ("float", "How often to check the folders for changes (minutes)"),
 
     # --- Reminders ----------------------------------------------------------
