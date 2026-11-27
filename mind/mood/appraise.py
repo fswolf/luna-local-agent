@@ -78,8 +78,8 @@ _APPRAISE_PROMPT = (
     "she answered and even if it might be a joke or a test; + only if it was clearly kind to her "
     "or an apology; = otherwise, which is most messages\n"
     "4. the one feeling her answer shows, from: none {feelings}\n"
-    "5. how flirtatious or intimate {user}'s own words are: 0 unless they flirt, 1 flirting or "
-    "suggestive, 2 openly intimate or sexual\n"
+    "5. how flirtatious or intimate {user}'s own words are, {their} *actions* included: "
+    "0 unless they flirt, 1 flirting or suggestive, 2 openly intimate or sexual\n"
     "6. how heavy {user}'s message is: normal (everyday, even annoyed or joking), rough (a bad "
     "day, stress, feeling down), heavy (really not okay: despair, can't cope, wanting to hurt "
     "themselves). The heaviest thing in the message counts, even said in passing\n"
@@ -214,9 +214,15 @@ def _parse_appraisal(reply, feelings):
     feeling = next((w for w in words[1:] if w in known), None)
 
     # flirt: the digit just before the heaviness word, or the last field of
-    # an answer without one ("2 + + playful 1"); never the rating itself
+    # an answer without one ("2 + + playful 1"); never the rating itself.
+    # When that isn't a score at all, field 5 where it should be: a
+    # roleplay's most explicit turns came back as "3 + = 2 2 5 normal" (the
+    # feeling as a number, then a stray 5), scored 0, and her desire never
+    # reached the heated row however the scene went.
     end = max((i for i, w in enumerate(words) if w in _HEAVINESS), default=len(words))
     flirt = words[end - 1] if end - 1 > 0 else ""
+    if not re.fullmatch(r"[0-2]", flirt):
+        flirt = words[4] if len(words) > 4 and 4 < end - 1 else ""
     flirt = int(flirt) if re.fullmatch(r"[0-2]", flirt) else 0
 
     # Two signs: energy then warmth. A third one makes warmth a guess; it

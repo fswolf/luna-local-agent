@@ -9,7 +9,9 @@
 // on her: the numbers after CLOTH change from one export to the next, the
 // shape doesn't. A model can name its pieces itself in <model>.outfits.json
 // next to it, {"pieces": {"CLOTH_02": "top"}} (part of the material name ->
-// label), for anything the guess gets wrong or a model that isn't VRoid's.
+// label), for anything the guess gets wrong. A part named there is clothing
+// whatever its material is called, so a model that isn't VRoid's, with
+// materials like "Jacket" and "Skirt", works from that file alone.
 //
 //   pieces()          [{ id, label, on, under }]
 //   set(id, on)       one piece on or off (by id or label)
@@ -33,11 +35,23 @@ const base = n => String(n || '').replace(/\s*\(Instance\)$/, '');
 export const UNDER = /^(?:bra|panties)(?: \d+)?$/;
 
 export async function createOutfits({ THREE, vrm, url = '' }) {
+  // The model's own names (<model>.outfits.json), read first: a part it names
+  // is clothing whatever its material is called, so a model that isn't
+  // VRoid's ("Jacket", "Skirt_mat") works too, not only VRoid's _CLOTH names.
+  let named = {};
+  if (url) {
+    try {
+      const r = await fetch(url.replace(/\.vrm$/i, '') + '.outfits.json', { cache: 'no-store' });
+      if (r.ok) named = (await r.json())?.pieces || {};
+      if (!named || typeof named !== 'object' || Array.isArray(named)) named = {};
+    } catch (e) { named = {}; /* no file, or not JSON: the guesses stand */ }
+  }
+  const namedAs = name => Object.entries(named).find(([part]) => part && name.includes(part));
   const groups = new Map();                       // id -> { id, label, objects: [], tris }
   vrm.scene.traverse(o => {
     if (!o.isMesh) return;
     const name = base([].concat(o.material)[0]?.name);
-    if (!CLOTHING.test(name) || NOT.test(name) || HERS.test(name)) return;
+    if (!namedAs(name) && (!CLOTHING.test(name) || NOT.test(name) || HERS.test(name))) return;
     const tris = o.geometry.index ? o.geometry.index.count / 3 : (o.geometry.attributes.position?.count || 0) / 3;
     if (!groups.has(name)) groups.set(name, { id: name, label: '', objects: [], tris: 0 });
     const g = groups.get(name);
@@ -50,15 +64,9 @@ export async function createOutfits({ THREE, vrm, url = '' }) {
   guessLabels(THREE, vrm, [...groups.values()]);
 
   // the model's own names win over the guess
-  if (url) {
-    try {
-      const r = await fetch(url.replace(/\.vrm$/i, '') + '.outfits.json', { cache: 'no-store' });
-      if (r.ok) {
-        const map = (await r.json())?.pieces || {};
-        for (const g of groups.values())
-          for (const [part, label] of Object.entries(map)) if (g.id.includes(part)) g.label = String(label);
-      }
-    } catch (e) { /* no file, or not JSON: the guesses stand */ }
+  for (const g of groups.values()) {
+    const hit = namedAs(g.id);
+    if (hit) g.label = String(hit[1]);
   }
 
   // two pieces guessed the same ("top", "top"): number them so both show

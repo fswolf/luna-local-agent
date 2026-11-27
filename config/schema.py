@@ -212,8 +212,9 @@ SCHEMA = {
                           ("tags", "meaning", "keywords", "off")),
     "portrait.gestures_offered": ("int", "In tags mode, how many gestures the model gets to pick from at once (fewer helps small models)"),
     "portrait.clothes": ("choice", "How the conversation changes her clothes on a human model. gestures: follow the gestures setting "
-                         "(meaning counts as keywords). tags: she picks [top_off], [dress] and so on herself as she answers. keywords: "
-                         "only your plain words (take off your top) and her written actions (*slips her top off*). off: /outfit and "
+                         "(meaning counts as keywords). tags: she also picks [top_off], [dress] and so on herself (taking off only "
+                         "while she's in the mood). keywords: your plain words (take off your top) and her written actions "
+                         "(*slips her top off*, *unhooks my bra*) - what works best on a small model. off: /outfit and "
                          "the pose studio only",
                          ("gestures", "tags", "keywords", "off")),
     "portrait.chat_gestures": ("bool", "Let stream viewers trigger gestures (!hug, hi, lol)"),
@@ -657,7 +658,7 @@ BASIC = (
     "tts.enabled", "voice", "tts.speed", "tts.volume",
     "stt.mode", "stt.sensitivity", "stt.silence_seconds", "stt.language", "wake_word.enabled",
     "mood.enabled", "mood.intensity", "mood.walk_away",
-    "portrait.model", "portrait.frame", "portrait.background", "portrait.gestures",
+    "portrait.model", "portrait.frame", "portrait.background", "portrait.gestures", "portrait.clothes",
     "portrait.hologram.enabled", "portrait.lights.enabled", "portrait.chat_gestures", "portrait.touch_talk",
     "camera.presence.enabled", "people.voice", "station.enabled",
     "vision.enabled", "knowledge.enabled", "reminders.enabled", "alarms.volume",

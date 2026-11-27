@@ -626,7 +626,8 @@ touching a slider starts it). Then the tabs:
   reloaded. Which piece is which is guessed from where it sits on her; a
   model can name its own in `<model>.outfits.json` next to it,
   `{"pieces": {"CLOTH_02": "top"}}` (part of the material name, then the
-  label). Cat ears, a tail, horns and wings are never clothes. It isn't
+  label); a model that isn't VRoid's names all of its pieces there (see *Her
+  clothes* in [The companion](companion.md)). Cat ears, a tail, horns and wings are never clothes. It isn't
   saved with a gesture; what she has on is kept per model and changed the
   same way as in conversation (see *Her clothes* in [The companion](companion.md)).
 

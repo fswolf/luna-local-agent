@@ -196,6 +196,21 @@ class Layers(unittest.TestCase):
         self.assertEqual(mood._parse_appraisal("0 = - none", feelings), (0, 0, -1, None, 0))
         self.assertEqual(mood._parse_appraisal("3", feelings), (3, 0, 0, None, 0))
 
+    def test_flirt_read_where_a_small_model_put_it(self):
+        # Ryan's roleplay, 2026-11-27: the most explicit turns came back with the
+        # feeling as a number and a stray digit, and scored no desire at all
+        feelings = ["playful", "laughing"]
+        for line, flirt in (("3 + = 2 2 5 normal", 2), ("2 + = + 2 5 normal", 2), ("0 = = 0 1 0 normal", 0),
+                            ("1 3 3 + playful 2 normal", 2), ("2 + = = playful 1 normal", 1),
+                            ("0 = = none 0 normal", 0), ("0 = = 1 0 normal", 0)):
+            self.assertEqual(mood._parse_appraisal(line, feelings)[4], flirt, line)
+
+    def test_the_question_counts_actions(self):
+        from mind.mood import appraise
+        text = appraise._APPRAISE_PROMPT.format(name="Luna", said="x", user="Ryan", them="him",
+                                               their="his", answer="y", feelings="playful")
+        self.assertIn("Ryan's own words are, his *actions* included", text)
+
     def test_survives_a_restart(self):
         mood.set_mood(warmth=-0.5, grudge_minutes=20)
         mood._save()

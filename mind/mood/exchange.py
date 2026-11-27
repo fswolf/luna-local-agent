@@ -22,7 +22,9 @@ from mind.mood import appraise, drift, show, walkaway
 # The lewd row's dial. Desire builds from flirting while she's warm,
 # fades a little every turn, and one hostile exchange wipes it: quick to
 # warm up, quicker to kill.
-DESIRE_FLIRT = {1: 0.12, 2: 0.22}   # per flirtatious message (field 5)
+# 0.12 / 0.22 until 2026-11-27: replayed, a whole evening's roleplay only
+# just reached the heated row at the very end, with every reading counted.
+DESIRE_FLIRT = {1: 0.15, 2: 0.28}   # per flirtatious message (field 5)
 DESIRE_AFFECTION = 0.04            # a clearly affectionate message adds a little
 DESIRE_FADE = 0.02                 # every turn
 HOSTILE_HIT = 0.27                 # warmth, on top of the exchange's own -0.08

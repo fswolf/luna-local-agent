@@ -301,14 +301,20 @@ A third dial, **desire**, from 0 to 1.
 
 | What | Desire |
 |---|---|
-| A flirty message (field 5 = 1) | **+0.12** |
-| An openly intimate one (field 5 = 2) | **+0.22** |
+| A flirty message (field 5 = 1) | **+0.15** |
+| An openly intimate one (field 5 = 2) | **+0.28** |
 | A clearly affectionate one (rating 2+) | **+0.04** more |
 | Repeats | divided by (1 + 0.2 × recent kind words) |
 | Every turn | **−0.02** |
 | Time, talking or not | halves every `mood.desire_minutes` (**20**) |
 | Any hostile message | **back to 0** at once |
 | Warmth below warm (0.35) | **back to 0** - desire only lives at warm and above |
+
+Your `*actions*` count toward field 5, not only what you say: in a roleplay that's
+where most of it is. A small model doesn't always keep the six fields in order
+("3 + = 2 2 5 normal"); when the slot before the last word isn't a score, field 5 is
+read where it should be. Before that, the most explicit turns of a scene read as 0,
+and an evening's roleplay never reached the heated row.
 
 **Getting in:** warmth very warm (≥ 0.66) **and** desire ≥ `lewd.enter`
 (**0.6**). Energy picks teasing, frisky or heated. In practice that's
@@ -678,6 +684,23 @@ them that way), her clothes can come off and go back on, piece by piece:
 *top*, *tie*, *bottoms* and so on, down to her underwear. Taking a piece
 off hides it; nothing reloads. The robot has nothing that comes off. See
 *Clothes* in [Portrait](portrait.md) for the pose studio's tab.
+
+A VRoid export works as it is: its clothes are found by VRoid's own material
+names. Any other VRM model works with a file next to it naming its pieces,
+`<model>.outfits.json`, by part of each material's name:
+
+```json
+{"pieces": {"Jacket": "top", "Skirt": "bottoms", "Bra": "bra", "Panties": "panties"}}
+```
+
+The labels are top, tie, bottoms, shoes, socks, bra and panties. A material
+named there is clothing whatever it's called; anything not named stays on.
+The same file fixes a VRoid piece the code guessed wrong.
+
+Which way it changes in a conversation is `portrait.clothes` on the settings
+page: *keywords* (your plain words and her written actions, the best fit for a
+small model), *tags* (she also picks `[top_off]` and so on herself), *gestures*
+(follows the gestures setting) or *off*.
 
 **Underwear that comes off** needs a model where the bra and panties are
 pieces of their own. VRoid paints underwear onto the skin, so a plain VRoid

@@ -456,6 +456,14 @@ import(path).then(async m => {
         got = self.run_js(mats, {"CLOTH_01": "top"}, [["wear", "underwear"], ["wear", "bare"]])
         self.assertEqual(got, ["underwear", "underwear"])
 
+    def test_a_model_that_isnt_vroid_named_in_its_file(self):
+        # materials with no VRoid naming at all: only the file says they're clothes
+        mats = ["Body", "Jacket", "Skirt_mat", "Bra", "Hair"]
+        names = {"Jacket": "top", "Skirt": "bottoms", "Bra": "bra"}
+        got = self.run_js(mats, names, [["wear", "underwear"], ["wear", "bare"], ["wear", "dressed"]])
+        self.assertEqual(got, ["underwear", "bare", "dressed"])          # body and hair never came off
+        self.assertEqual(self.run_js(["Body", "Jacket"], {}, [["wear", "bare"]]), ["dressed"])   # no file: nothing to take off
+
 
 if __name__ == "__main__":
     unittest.main()

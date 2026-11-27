@@ -1982,7 +1982,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.15,
+    "desire": 0.17,
     "grudge": 0
    },
    "bands": [
@@ -2241,7 +2241,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.3,
+    "desire": 0.36,
     "grudge": 0
    },
    "bands": [
@@ -2500,7 +2500,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.45,
+    "desire": 0.55,
     "grudge": 0
    },
    "bands": [
@@ -2746,265 +2746,6 @@
   },
   {
    "step": "flirt 2",
-   "label": "flirty",
-   "state": [
-    "flirty",
-    0.78,
-    1.0,
-    [
-     "you were warm with her (2)",
-     "that livened her up",
-     "you were warm with her (2)",
-     "that livened her up"
-    ]
-   ],
-   "layers": {
-    "desire": 0.6,
-    "grudge": 0
-   },
-   "bands": [
-    "wired",
-    "very warm"
-   ],
-   "line": "\nRight now you feel flirty and playful with him. Let that colour how you sound - length, warmth, how playful you are - and nothing else. Don't announce it or explain it unasked; if Ryan asks how you are, answer honestly and briefly. Never let it make you less helpful or less careful.\n",
-   "public_line": "\nRight now you feel flirty and playful with him. Let that colour how you sound - length, warmth, how playful you are - and nothing else. Don't announce it or explain it unasked; if Ryan asks how you are, answer honestly and briefly. Never let it make you less helpful or less careful.\n",
-   "voice": [
-    1.03,
-    0.25
-   ],
-   "face": {
-    "happy": 0.3,
-    "blush": 0.4,
-    "lids": 0.45
-   },
-   "idle": [
-    "wink",
-    "beckon_kiss"
-   ],
-   "emote": "hearts",
-   "portrait": {
-    "label": "flirty",
-    "row": "",
-    "energy": 0.78,
-    "warmth": 1.0,
-    "face": {
-     "happy": 0.3,
-     "blush": 0.4,
-     "lids": 0.45
-    },
-    "idle": [
-     "wink",
-     "beckon_kiss"
-    ],
-    "hold": "",
-    "emote": "hearts",
-    "tame": false,
-    "energy_step": 2
-   },
-   "away": 0,
-   "last_rating": 2,
-   "last_feeling": "embarrassed",
-   "tame": [],
-   "events": [
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.67,
-      "warmth": 0.94,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.67,
-      "warmth": 0.94,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.67,
-      "warmth": 0.94,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.72,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.78,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.78,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "feeling",
-     {
-      "name": "embarrassed",
-      "face": {
-       "happy": 0.3,
-       "blush": 1.0
-      },
-      "gesture": "shy",
-      "emote": "sweat",
-      "seconds": 6.0
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.78,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ]
-   ]
-  },
-  {
-   "step": "flirt 1",
    "label": "heated",
    "state": [
     "heated",
@@ -3018,7 +2759,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.73,
     "grudge": 0
    },
    "bands": [
@@ -3266,6 +3007,274 @@
    ]
   },
   {
+   "step": "flirt 1",
+   "label": "heated",
+   "state": [
+    "heated",
+    0.78,
+    1.0,
+    [
+     "you were warm with her (2)",
+     "that livened her up",
+     "you were warm with her (2)",
+     "that livened her up"
+    ]
+   ],
+   "layers": {
+    "desire": 0.83,
+    "grudge": 0
+   },
+   "bands": [
+    "wired",
+    "lewd"
+   ],
+   "line": "\nRight now you feel heated and eager, wanting him now. Let that colour how you sound and what you're in the mood for. Don't announce it unasked. Practical requests still get done.\n",
+   "public_line": "\nRight now you feel heated and eager, wanting him now. Let that colour how you sound and what you're in the mood for. Don't announce it unasked. Practical requests still get done.\n",
+   "voice": [
+    1.04,
+    0.1
+   ],
+   "face": {
+    "happy": 0.2,
+    "blush": 0.85,
+    "lids": 0.65
+   },
+   "idle": [
+    "cup_breasts",
+    "touch_self",
+    "look_back"
+   ],
+   "emote": "hearts",
+   "portrait": {
+    "label": "heated",
+    "row": "lewd",
+    "energy": 0.78,
+    "warmth": 1.0,
+    "face": {
+     "happy": 0.2,
+     "blush": 0.85,
+     "lids": 0.65
+    },
+    "idle": [
+     "cup_breasts",
+     "touch_self",
+     "look_back"
+    ],
+    "hold": "",
+    "emote": "hearts",
+    "tame": false,
+    "energy_step": 2
+   },
+   "away": 0,
+   "last_rating": 2,
+   "last_feeling": "embarrassed",
+   "tame": [],
+   "events": [
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.67,
+      "warmth": 0.94,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.67,
+      "warmth": 0.94,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.67,
+      "warmth": 0.94,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.72,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.78,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.78,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "feeling",
+     {
+      "name": "embarrassed",
+      "face": {
+       "happy": 0.3,
+       "blush": 1.0
+      },
+      "gesture": "shy",
+      "emote": "sweat",
+      "seconds": 6.0
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.78,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ]
+   ]
+  },
+  {
    "step": "tame: twitch live",
    "label": "flirty",
    "state": [
@@ -3280,7 +3289,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -3372,7 +3381,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -3465,7 +3474,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -3530,7 +3539,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -3595,7 +3604,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.52,
+    "desire": 0.68,
     "grudge": 0
    },
    "bands": [
@@ -3688,7 +3697,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.22,
+    "desire": 0.38,
     "grudge": 0
    },
    "bands": [
@@ -3737,23 +3746,24 @@
    "events": [
     [
      "ui",
-     "flirty"
+     "heated"
     ],
     [
      "mood",
      {
-      "label": "flirty",
-      "row": "",
+      "label": "heated",
+      "row": "lewd",
       "energy": 0.78,
       "warmth": 0.9,
       "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
       },
       "idle": [
-       "wink",
-       "beckon_kiss"
+       "cup_breasts",
+       "touch_self",
+       "look_back"
       ],
       "hold": "",
       "emote": "hearts",
@@ -3804,7 +3814,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.07,
+    "desire": 0.14,
     "grudge": 0
    },
    "bands": [
@@ -12142,7 +12152,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.15,
+    "desire": 0.17,
     "grudge": 0
    },
    "bands": [
@@ -12401,7 +12411,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.3,
+    "desire": 0.36,
     "grudge": 0
    },
    "bands": [
@@ -12660,7 +12670,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.45,
+    "desire": 0.55,
     "grudge": 0
    },
    "bands": [
@@ -12906,265 +12916,6 @@
   },
   {
    "step": "flirt 2",
-   "label": "flirty",
-   "state": [
-    "flirty",
-    1.0,
-    1.0,
-    [
-     "you were warm with her (2)",
-     "that livened her up",
-     "you were warm with her (2)",
-     "that livened her up"
-    ]
-   ],
-   "layers": {
-    "desire": 0.6,
-    "grudge": 0
-   },
-   "bands": [
-    "wired",
-    "very warm"
-   ],
-   "line": "\nRight now you feel flirty and playful with him. Let that colour how you sound - length, warmth, how playful you are - and nothing else. Don't announce it or explain it unasked; if Ryan asks how you are, answer honestly and briefly. Never let it make you less helpful or less careful.\n",
-   "public_line": "\nRight now you feel flirty and playful with him. Let that colour how you sound - length, warmth, how playful you are - and nothing else. Don't announce it or explain it unasked; if Ryan asks how you are, answer honestly and briefly. Never let it make you less helpful or less careful.\n",
-   "voice": [
-    1.06,
-    0.45
-   ],
-   "face": {
-    "happy": 0.3,
-    "blush": 0.4,
-    "lids": 0.45
-   },
-   "idle": [
-    "wink",
-    "beckon_kiss"
-   ],
-   "emote": "hearts",
-   "portrait": {
-    "label": "flirty",
-    "row": "",
-    "energy": 1.0,
-    "warmth": 1.0,
-    "face": {
-     "happy": 0.3,
-     "blush": 0.4,
-     "lids": 0.45
-    },
-    "idle": [
-     "wink",
-     "beckon_kiss"
-    ],
-    "hold": "",
-    "emote": "hearts",
-    "tame": false,
-    "energy_step": 2
-   },
-   "away": 0,
-   "last_rating": 2,
-   "last_feeling": "embarrassed",
-   "tame": [],
-   "events": [
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.83,
-      "warmth": 0.94,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.83,
-      "warmth": 0.94,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.83,
-      "warmth": 0.94,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 0.93,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 1.0,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 1.0,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ],
-    [
-     "feeling",
-     {
-      "name": "embarrassed",
-      "face": {
-       "happy": 0.3,
-       "blush": 1.0
-      },
-      "gesture": "shy",
-      "emote": "sweat",
-      "seconds": 6.0
-     }
-    ],
-    [
-     "ui",
-     "flirty"
-    ],
-    [
-     "mood",
-     {
-      "label": "flirty",
-      "row": "",
-      "energy": 1.0,
-      "warmth": 1.0,
-      "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
-      },
-      "idle": [
-       "wink",
-       "beckon_kiss"
-      ],
-      "hold": "",
-      "emote": "hearts",
-      "tame": false,
-      "energy_step": 2
-     }
-    ]
-   ]
-  },
-  {
-   "step": "flirt 1",
    "label": "heated",
    "state": [
     "heated",
@@ -13178,7 +12929,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.73,
     "grudge": 0
    },
    "bands": [
@@ -13426,6 +13177,274 @@
    ]
   },
   {
+   "step": "flirt 1",
+   "label": "heated",
+   "state": [
+    "heated",
+    1.0,
+    1.0,
+    [
+     "you were warm with her (2)",
+     "that livened her up",
+     "you were warm with her (2)",
+     "that livened her up"
+    ]
+   ],
+   "layers": {
+    "desire": 0.83,
+    "grudge": 0
+   },
+   "bands": [
+    "wired",
+    "lewd"
+   ],
+   "line": "\nRight now you feel heated and eager, wanting him now. Let that colour how you sound and what you're in the mood for. Don't announce it unasked. Practical requests still get done.\n",
+   "public_line": "\nRight now you feel heated and eager, wanting him now. Let that colour how you sound and what you're in the mood for. Don't announce it unasked. Practical requests still get done.\n",
+   "voice": [
+    1.07,
+    0.2
+   ],
+   "face": {
+    "happy": 0.2,
+    "blush": 0.85,
+    "lids": 0.65
+   },
+   "idle": [
+    "cup_breasts",
+    "touch_self",
+    "look_back"
+   ],
+   "emote": "hearts",
+   "portrait": {
+    "label": "heated",
+    "row": "lewd",
+    "energy": 1.0,
+    "warmth": 1.0,
+    "face": {
+     "happy": 0.2,
+     "blush": 0.85,
+     "lids": 0.65
+    },
+    "idle": [
+     "cup_breasts",
+     "touch_self",
+     "look_back"
+    ],
+    "hold": "",
+    "emote": "hearts",
+    "tame": false,
+    "energy_step": 2
+   },
+   "away": 0,
+   "last_rating": 2,
+   "last_feeling": "embarrassed",
+   "tame": [],
+   "events": [
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.83,
+      "warmth": 0.94,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.83,
+      "warmth": 0.94,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.83,
+      "warmth": 0.94,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 0.93,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 1.0,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 1.0,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ],
+    [
+     "feeling",
+     {
+      "name": "embarrassed",
+      "face": {
+       "happy": 0.3,
+       "blush": 1.0
+      },
+      "gesture": "shy",
+      "emote": "sweat",
+      "seconds": 6.0
+     }
+    ],
+    [
+     "ui",
+     "heated"
+    ],
+    [
+     "mood",
+     {
+      "label": "heated",
+      "row": "lewd",
+      "energy": 1.0,
+      "warmth": 1.0,
+      "face": {
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
+      },
+      "idle": [
+       "cup_breasts",
+       "touch_self",
+       "look_back"
+      ],
+      "hold": "",
+      "emote": "hearts",
+      "tame": false,
+      "energy_step": 2
+     }
+    ]
+   ]
+  },
+  {
    "step": "tame: twitch live",
    "label": "flirty",
    "state": [
@@ -13440,7 +13459,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -13532,7 +13551,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -13625,7 +13644,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -13690,7 +13709,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.67,
+    "desire": 0.83,
     "grudge": 0
    },
    "bands": [
@@ -13755,7 +13774,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.52,
+    "desire": 0.68,
     "grudge": 0
    },
    "bands": [
@@ -13848,7 +13867,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.22,
+    "desire": 0.38,
     "grudge": 0
    },
    "bands": [
@@ -13897,23 +13916,24 @@
    "events": [
     [
      "ui",
-     "flirty"
+     "heated"
     ],
     [
      "mood",
      {
-      "label": "flirty",
-      "row": "",
+      "label": "heated",
+      "row": "lewd",
       "energy": 1.0,
       "warmth": 0.8,
       "face": {
-       "happy": 0.3,
-       "blush": 0.4,
-       "lids": 0.45
+       "happy": 0.2,
+       "blush": 0.85,
+       "lids": 0.65
       },
       "idle": [
-       "wink",
-       "beckon_kiss"
+       "cup_breasts",
+       "touch_self",
+       "look_back"
       ],
       "hold": "",
       "emote": "hearts",
@@ -13964,7 +13984,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.07,
+    "desire": 0.14,
     "grudge": 0
    },
    "bands": [
@@ -21640,7 +21660,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.11,
+    "desire": 0.13,
     "grudge": 0
    },
    "bands": [
@@ -21827,7 +21847,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.26,
+    "desire": 0.32,
     "grudge": 0
    },
    "bands": [
@@ -22014,7 +22034,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.41,
+    "desire": 0.51,
     "grudge": 0
    },
    "bands": [
@@ -22201,7 +22221,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.56,
+    "desire": 0.7,
     "grudge": 0
    },
    "bands": [
@@ -22387,7 +22407,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.64,
+    "desire": 0.79,
     "grudge": 0
    },
    "bands": [
@@ -22573,7 +22593,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.64,
+    "desire": 0.79,
     "grudge": 0
    },
    "bands": [
@@ -22647,7 +22667,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.64,
+    "desire": 0.79,
     "grudge": 0
    },
    "bands": [
@@ -22719,7 +22739,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.64,
+    "desire": 0.79,
     "grudge": 0
    },
    "bands": [
@@ -22771,7 +22791,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.64,
+    "desire": 0.79,
     "grudge": 0
    },
    "bands": [
@@ -22823,7 +22843,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.64,
+    "desire": 0.79,
     "grudge": 0
    },
    "bands": [
@@ -22895,7 +22915,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.64,
+    "desire": 0.79,
     "grudge": 0
    },
    "bands": [
@@ -22986,7 +23006,7 @@
     ]
    ],
    "layers": {
-    "desire": 0.25,
+    "desire": 0.31,
     "grudge": 0
    },
    "bands": [
