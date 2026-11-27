@@ -209,6 +209,8 @@ their own small budgets.
 
 ## Adaptive thinking (llama-server)
 
+The practical side, setting it for your model, is on [How sure she is, thinking twice](thinking.md).
+
 An idea borrowed from [mini-AGI](https://github.com/volotat/mini-AGI):
 stop thinking when another step wouldn't change the answer. Its version
 decides per character, inside the network. Luna's is built from what

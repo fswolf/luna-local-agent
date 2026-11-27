@@ -30,6 +30,7 @@ Everything the README only touches on, one subject per page.
 - [Knowledge](knowledge.md): your notes, manuals and PDFs as something she can look things up in
 - [Memory](memory.md): facts, recall by meaning, the memory manager, conversation history
 - [Her reasoning](reasoning.md): thought log, token confidence, adaptive thinking, introspection
+- [How sure she is, thinking twice](thinking.md): what her certainty means, what moves it, second looks for your model, ↻
 - [Learning from herself](learning.md): lessons, episodes, fact cleanup, calibration
 - [Skills (recipes)](skills.md): jobs she saves the steps of, and a walkthrough turning a script of yours into "check vm health"
 - [Scheduled jobs](jobs.md): work she does on a timer, and a walkthrough copying a web server's backups to a NAS every week

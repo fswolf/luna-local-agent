@@ -20,6 +20,7 @@
 - [Knowledge](knowledge.md)
 - [Memory](memory.md)
 - [Her reasoning](reasoning.md)
+- [How sure she is, thinking twice](thinking.md)
 - [Learning from herself](learning.md)
 - [Skills (recipes)](skills.md)
 - [Scheduled jobs](jobs.md)
