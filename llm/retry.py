@@ -12,7 +12,9 @@ latest message, typed or spoken, with:
   at the desk     a station's reply was spoken there; a retry from here
                   would speak on the PC
   nothing since   a greeting, a "you're back", a touch reaction or another
-                  turn after it, in history or on screen, and it's gone
+                  turn after it, in history or on screen, and it's gone.
+                  A system line (/good's answer, a /command's) doesn't count:
+                  that's the screen talking to you, not a turn
 
 A retry takes the pair out of her history, marks it withdrawn in the
 transcript (core/transcript.py; append-only, so a marker, never an edit),
@@ -68,9 +70,20 @@ def _state():
     with ui_lock:
         conv = list(ui.conversation)
         streaming = ui.view.streaming
-    if streaming is not None or not conv or conv[-1][0] != me or conv[-1][1].strip() != last["answer"].strip():
+    at = latest_reply(conv, me)
+    if streaming is not None or at is None or conv[at][1].strip() != last["answer"].strip():
         return None, "something came after her last reply, so it can't be tried again"
-    return (last["text"], last["answer"], last["entries"], len(conv) - 1), ""
+    return (last["text"], last["answer"], last["entries"], at), ""
+
+
+def latest_reply(conv, me):
+    """Index of her latest reply when only system lines come after it, else None."""
+    for i in range(len(conv) - 1, -1, -1):
+        if conv[i][0] == me:
+            return i
+        if conv[i][0] != "system":
+            return None
+    return None
 
 
 def available():
@@ -108,7 +121,7 @@ def take():
     history.save()
     transcript.withdraw()
     with ui_lock:
-        if 0 <= at < len(ui.conversation) and ui.view.streaming is None:
+        if 0 <= at < len(ui.conversation) and ui.view.streaming is None and ui.conversation[at][1] == answer:
             ui.conversation.pop(at)
     _refresh()
     forget()

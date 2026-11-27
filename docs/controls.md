@@ -149,7 +149,8 @@ Slash commands:
 | `/conclusions` | What she's concluded about each person from talking to them ([memory.md](memory.md#conclusions)): `/conclusions <name>` (or `me`), `why <n>`, `wrong <n>`, `restore <n>` |
 | `/profile` | Her short profile of you and each person she knows ([memory.md](memory.md#profiles)): `/profile <name>` (or `me`), `rebuild`, `forget <name>` |
 | `/offers` | What she's noticed on her own to offer you ([offers.md](offers.md)): `/offers now`, `on`, `off`, `unmute` |
-| `/good`, `/fix <reply>` | Keep her last reply, or your better version, as an example for her patches ([patches.md](patches.md)); `/examples` shows the count and the page |
+| `/good`, `/fix <reply>` | Keep her last reply, or your better version, as an example for her patches ([patches.md](patches.md)); `/examples` shows the count and the page. |
+| `/retry` | Her last reply again, like ↻ on the chat page |
 | `/facts` | What she remembers: `/facts all`, `/facts retired`, `/facts unsure`, `/facts log` (every change and who made it; `/facts log 42` for one fact), `/facts pin 42` (always in front of her; `unpin`, `pinned`) |
 | `/skills` | Recipes she's saved: `/skills show`, `forget`, `restore <n>` |
 | `/projects` | Ongoing work: `/projects show`, `done`, `pause`, `resume`, `drop <n>`, `wrong <note>`, `unplan <n>` |

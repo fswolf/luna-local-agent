@@ -75,10 +75,16 @@ class Retry(unittest.TestCase):
         self.assertIsNone(retry.take()[0])
         self.assertEqual(len(history._data["messages"]), 4)
 
-    def test_not_when_the_screen_moved_on(self):
+    def test_a_system_line_after_it_is_fine_anything_else_isnt(self):
         self.turn("hello", "Hi~")
-        ui.conversation.append(("system", "a reminder fired"))
+        ui.conversation.append(("system", "Kept as a good example."))          # /good's answer
+        self.assertEqual(retry.available(), 1)
+        text, _undo = retry.take()
+        self.assertEqual(ui.conversation, [("user", "hello"), ("system", "Kept as a good example.")])
+        self.turn("hey", "Hey~")
+        ui.conversation.append(("chat:viewer", "lol"))                          # stream chat
         self.assertIsNone(retry.available())
+
 
     def test_a_failed_retry_puts_the_first_reply_back(self):
         self.turn("hello", "Hi~")
