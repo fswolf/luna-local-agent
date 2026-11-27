@@ -9,6 +9,7 @@ config.json
 # and the long-term fact database - all personal, all regenerated at
 # runtime.
 history/conversation.json
+history/conversation.json.*
 history/transcript.jsonl
 reminders/reminders.json
 # Her memory of you. Yours, never shipped: a fresh install starts empty.
