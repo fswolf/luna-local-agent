@@ -216,15 +216,18 @@ the thought log already measures:
 
 1. **Every turn thinks on a modest budget** (`first_budget`, 1024
    tokens), which also makes easy questions answer sooner.
-2. **If the reply came out shaky on a specific**, meaning a run of
-   coin-flip tokens on a number, a name, a time or a date, the same
-   question is asked again, silently, with the thinking budget lifted
-   (`deep_budget`, -1 = unlimited). Low confidence on average isn't
-   enough: a small model sits under 75% on nearly every chat reply, and
-   its unsure stretches in banter ("leans in closer") are word choice, not
-   doubt about a fact. Another answer would only change the wording.
+2. **If the reply came out shaky**, the same question is asked again,
+   silently, with the thinking budget lifted (`deep_budget`, -1 =
+   unlimited). Shaky means less sure than `rethink_below` on the whole,
+   whatever the reply is about, or surer than that but with a run of
+   coin-flip tokens on a number, a name, a time or a date.
+   **Set `rethink_below` to fit your model.** Every model has its own
+   normal: a 9B sits around 40-50% sure on everyday replies, so at the
+   default 75% every reply gets a second look, and none is ever replaced
+   (see 3). Look at the % on its replies in the thought log and set the bar a
+   little under where most of them sit (0.40 for that 9B).
 3. **The second answer replaces the first only if it's different and
-   genuinely sure**: above `rethink_below` (75%), at least `min_gain` surer than
+   genuinely sure**: above `rethink_below`, at least `min_gain` surer than
    the first, and with no shaky stretch of its own. Then it takes the
    first one's place: on screen and in history there's only the corrected
    answer, never the first with the second added after it (she read that
@@ -240,7 +243,9 @@ the thought log already measures:
    corrected answer.
 
 **Voting instead (the default, `mode: "vote"`).** Step 2 can be a vote
-in place of one deeper look. On a shaky reply the same question is asked
+in place of one deeper look. The vote only ever swaps a reply for one
+whose facts differ, so for second looks at everyday replies (banter, a
+roleplay) use `mode: "rethink"`. On a shaky reply the same question is asked
 `votes` (2) more times, silently, at the normal budget, and the answers
 are compared. Two answers count as the same when their specifics match
 (numbers, names) or, without specifics, when they say the same thing.

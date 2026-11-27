@@ -73,10 +73,11 @@ class WhenToHedge(unittest.TestCase):
 
 
 class WhenToLookAgain(unittest.TestCase):
-    """The vote and the deeper look: a high-average reply with an unsure run
-    gets another look only when that run holds a specific."""
+    """The vote and the deeper look: a reply under adaptive.rethink_below gets
+    another look, whatever it's about; one above it only when an unsure run
+    holds a specific (a number, a name)."""
 
-    def run_vote(self, answer, span, conf=0.82):
+    def run_vote(self, answer, span, conf=0.82, bar=0.75):
         shape = {"conf": conf, "shaky": f'4 uncertain tokens in a row in the answer, "{span}"', "span": span}
         raw = {"tokens": [[("x", "a", -1.0)]], "thinking": [], "exchanges": []}
         with mock.patch.object(second_look, "_last_raw", raw), \
@@ -84,36 +85,35 @@ class WhenToLookAgain(unittest.TestCase):
                 mock.patch.object(second_look, "_chat_completion", side_effect=RuntimeError("offline")) as asked, \
                 mock.patch.object(second_look, "_log_tool_call"), \
                 mock.patch.object(second_look.livefeed, "emit"), \
-                mock.patch("config.ADAPTIVE_RETHINK_BELOW", 0.75, create=True), \
+                mock.patch("config.ADAPTIVE_RETHINK_BELOW", bar, create=True), \
                 mock.patch("config.ADAPTIVE_VOTES", 2, create=True):
             second_look._vote({"messages": []}, [], answer, None, None)
         return asked.call_count
 
-    def test_banter_gets_no_vote(self):
+    def test_sure_banter_gets_no_vote(self):
         self.assertEqual(self.run_vote("*leans in closer, voice warm* Stay up with me?", "leans in closer, voice"), 0)
 
-    def test_a_shaky_specific_gets_one(self):
+    def test_a_shaky_specific_gets_one_even_when_sure(self):
         self.assertEqual(self.run_vote("The card has 20 GB of VRAM.", "20 GB of"), 2)
 
-    def test_unsure_on_average_with_the_doubt_on_a_specific_does(self):
-        self.assertEqual(self.run_vote("*smiles* Jellyfin is up on port 8096.", "port 8096", conf=0.5), 2)
+    def test_under_the_bar_gets_one_whatever_it_is_about(self):
+        # Ryan, 2026-11-27: a fresh try at a shaky everyday reply is often better
+        self.assertEqual(self.run_vote("*pets your head* Welcome back~", "pets your", conf=0.38, bar=0.40), 2)
 
-    def test_unsure_on_average_alone_does_not(self):
-        # the Q8 model: every chat reply under 0.75, and banter names things in
-        # passing (PHP, Tarkov, the time) without being unsure of them
-        self.assertEqual(self.run_vote("Oh, you silly senpai~ You came crawling back already?", "silly", conf=0.44), 0)
-        self.assertEqual(self.run_vote("Still debugging that PHP framework at 1:28? *leans in*", "leans in", conf=0.39), 0)
-        self.assertEqual(self.run_vote("*smiles* Sure, it's running.", "smiles", conf=0.5), 0)
+    def test_the_bar_fits_the_model(self):
+        # at 0.40, the Q8 9B's ordinary 44% reply is its normal: no second look
+        self.assertEqual(self.run_vote("Oh, you silly senpai~ You came crawling back already?", "silly",
+                                       conf=0.44, bar=0.40), 0)
 
     def test_the_deeper_look_follows_the_same_rule(self):
-        shape = {"conf": 0.4, "shaky": "", "span": "leans in"}
+        shape = {"conf": 0.44, "shaky": "", "span": "leans in"}
         raw = {"tokens": [[("x", "a", -1.0)]], "thinking": [], "exchanges": []}
         with mock.patch.object(second_look, "_last_raw", raw), \
                 mock.patch.object(thoughtlog, "confidence", return_value=shape), \
+                mock.patch("config.ADAPTIVE_RETHINK_BELOW", 0.40, create=True), \
                 mock.patch.object(second_look, "_chat_completion") as asked:
-            self.assertIsNone(second_look._rethink({"messages": []}, [], "Still on PHP at 1:28? *leans in*", None, None))
+            self.assertIsNone(second_look._rethink({"messages": []}, [], "Still on PHP? *leans in*", None, None))
         asked.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

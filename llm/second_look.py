@@ -294,13 +294,15 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence, held=False):
     first reply was sure enough, otherwise a dict with both passes'
     thinking and tokens, the outcome, and what (if anything) was said.
 
-    Shaky means a run of coin-flip tokens on a specific - a number, a name,
-    a time. Low confidence on average isn't enough: a small model sits under
-    75% on nearly every chat reply, and its unsure runs there are word
-    choice. Another look can't make "leans in closer" more right, so it
-    costs a generation for nothing, and banter that names PHP or Tarkov in
-    passing isn't unsure of them (_vote the same). rethink_below is the bar
-    the second answer has to clear to replace the first."""
+    Shaky means less sure than adaptive.rethink_below on the whole, or a
+    run of coin-flip tokens on a specific - a number, a name, a time.
+    rethink_below has to fit the model: a small one sits around 40-50% on
+    everyday replies, so at 0.75 every turn got a second look (2026-11-26
+    that was narrowed to specifics only; Ryan found a fresh try at a shaky
+    everyday reply often better, so it's back, with the bar set per setup).
+    It's also the bar the second answer has to clear to replace the first.
+    For everyday replies use adaptive.mode "rethink": the vote (_vote) only
+    swaps an answer when the facts in it differ."""
     from mind import thoughtlog
 
     first = {"thinking": _last_raw.get("thinking") or [],
@@ -311,7 +313,11 @@ def _rethink(payload, base_messages, answer, on_text, on_sentence, held=False):
 
     shaky = _unsure_of_a_specific(answer, shape.get("span", ""))
 
-    if conf is None or not shaky:
+    # Under rethink_below, whatever the reply is about; or surer than that
+    # but shaky on a number or a name. Set rethink_below to fit the model:
+    # a small one sits around 40-50% on everyday replies, and 0.75 looked
+    # again at every one of them.
+    if conf is None or not (shaky or conf < config.ADAPTIVE_RETHINK_BELOW):
         return None
 
     reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shaky
@@ -570,7 +576,11 @@ def _vote(payload, base_messages, answer, on_text, on_sentence, held=False):
 
     shaky = _unsure_of_a_specific(answer, shape.get("span", ""))
 
-    if conf is None or not shaky:
+    # Under rethink_below, whatever the reply is about; or surer than that
+    # but shaky on a number or a name. Set rethink_below to fit the model:
+    # a small one sits around 40-50% on everyday replies, and 0.75 looked
+    # again at every one of them.
+    if conf is None or not (shaky or conf < config.ADAPTIVE_RETHINK_BELOW):
         return None
 
     reason = (f"shaky: {shape['shaky'].split(',')[0]}" if shaky
