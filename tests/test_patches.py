@@ -131,7 +131,6 @@ except ImportError:
     jinja2 = None
 
 
-@unittest.skipIf(jinja2 is None, "jinja2 isn't installed")
 class Style(unittest.TestCase):
     """A style patch: text from agent/dataset/style/[name]/ in pieces, your chat examples mixed in."""
 
@@ -203,6 +202,7 @@ class Style(unittest.TestCase):
         self.assertEqual(len(train.encode_text(Tok(), "x" * 100, 10)["input_ids"]), 10)
 
 
+@unittest.skipIf(jinja2 is None, "jinja2 isn't installed")
 class Masking(unittest.TestCase):
     """training/train.py learns only her last reply (no model or GPU: a stand-in template)."""
 
