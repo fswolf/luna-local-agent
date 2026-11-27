@@ -343,14 +343,18 @@ class MicDictates(unittest.TestCase):
             self.addCleanup(p.stop)
         self.start = chat_web.DICTATED["id"]
 
-    def _dictate(self, heard):
+    def _dictate(self, heard, drafts=()):
         import threading
         done = threading.Event()
-        def fake(mode):
+        def fake(mode, on_draft=None):
             try:
+                for words in drafts:
+                    on_draft(words)
+                    self.seen.append(dict(chat_web.state(wait=0)["draft"]))
                 return heard
             finally:
                 done.set()
+        self.seen = []
         with mock.patch("core.assistant.dictation", side_effect=fake) as dictation, \
                 mock.patch("ui.set_status"):
             self.assertIsNone(chat_web.dictate("pg1"))
@@ -364,11 +368,17 @@ class MicDictates(unittest.TestCase):
     def test_words_wait_for_the_page_and_nothing_is_answered(self):
         with mock.patch("core.assistant.respond") as respond:
             dictation = self._dictate("turn the lights down")
-        dictation.assert_called_once_with("auto")
+        self.assertEqual(dictation.call_args.args, ("auto",))
         respond.assert_not_called()
         self.assertNotEqual(chat_web.DICTATED["id"], self.start)
         self.assertEqual((chat_web.DICTATED["page"], chat_web.DICTATED["text"]), ("pg1", "turn the lights down"))
         self.assertEqual(chat_web.state(wait=0)["dictated"]["text"], "turn the lights down")
+
+    def test_words_so_far_while_talking(self):
+        self._dictate("hello there you", drafts=("hello", "hello there"))
+        self.assertEqual([(d["page"], d["text"]) for d in self.seen], [("pg1", "hello"), ("pg1", "hello there")])
+        self.assertEqual(self.seen[0]["id"], chat_web.DICTATED["id"])       # the same dictation as the final words
+        self.assertEqual(chat_web.DICTATED["text"], "hello there you")
 
     def test_cancelled_is_not_nothing_heard(self):
         self._dictate(None)

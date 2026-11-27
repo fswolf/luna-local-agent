@@ -125,7 +125,7 @@ def _calibrate(stream):
 _INPUT_WAV = os.path.join(tempfile.gettempdir(), "luna-input.wav")
 
 
-def _record_energy(mode):
+def _record_energy(mode, on_audio=None, cap=None):
     """RMS fallback. Only loudness to work with, so it is late to start
     and prone to cutting off - see _record_silero for the good path."""
     record_immediately = mode == "manual"
@@ -133,7 +133,7 @@ def _record_energy(mode):
     # Read through safe: these are typed settings, and a hand-edited inf or
     # NaN would otherwise record for ever or never stop on silence.
     give_up_after = safe.seconds(config.STT_NO_SPEECH_TIMEOUT, 8) if mode == "auto" else None
-    max_seconds = safe.seconds(
+    max_seconds = cap or safe.seconds(
         config.STT_MANUAL_MAX_SECONDS if mode == "manual" else config.STT_MAX_SECONDS, 60, lo=1, hi=3600)
     silence_seconds = safe.seconds(config.STT_SILENCE_SECONDS, 1.2, lo=0.1, hi=60)
 
@@ -192,11 +192,15 @@ def _record_energy(mode):
                     levels["triggered"] = True
                     chunks.extend(pre_roll)
                     chunks.append(block)
+                    if on_audio:
+                        on_audio(list(pre_roll) + [block])
                     ui.set_status("Recording...")
                 elif give_up_after is not None and elapsed >= give_up_after:
                     return None  # you never said anything
             else:
                 chunks.append(block)
+                if on_audio:
+                    on_audio([block])
 
                 if stop_on_silence:
                     # Smoothed level to *stop*: a pause between words
@@ -239,7 +243,7 @@ def _record_energy(mode):
     return filename
 
 
-def _record_silero(mode):
+def _record_silero(mode, on_audio=None, cap=None):
     """Silero VAD path.
 
     VADIterator hands back {'start': ...} the first frame that crosses
@@ -253,7 +257,7 @@ def _record_silero(mode):
     # int(inf * 1000) raised OverflowError here on every turn ("Silero VAD
     # failed"), so the numbers are clamped before anything counts with them.
     threshold = safe.number(config.STT_VAD_THRESHOLD, 0.5, lo=0.1, hi=0.9)
-    max_seconds = safe.seconds(config.STT_MAX_SECONDS, 60, lo=1, hi=3600)
+    max_seconds = cap or safe.seconds(config.STT_MAX_SECONDS, 60, lo=1, hi=3600)
 
     iterator = VADIterator(
         _vad_model,
@@ -306,11 +310,15 @@ def _record_silero(mode):
                     started = True
                     levels["triggered"] = True
                     chunks.extend(pre_roll)
+                    if on_audio:
+                        on_audio(list(pre_roll))
                     ui.set_status("Recording...")
                 elif give_up_after is not None and elapsed >= give_up_after:
                     return None
             else:
                 chunks.append(block)
+                if on_audio:
+                    on_audio([block])
 
                 if event and "end" in event:
                     break
@@ -345,9 +353,12 @@ def _record_silero(mode):
     return filename
 
 
-def record_audio(mode=None):
+def record_audio(mode=None, on_audio=None, max_seconds=None):
     """Record a turn. Returns a wav path, or None if there was nothing
-    worth transcribing.
+    worth transcribing. on_audio([blocks]) is told each piece of what's
+    kept as it's recorded (the chat page's live dictation, voice/drafts.py),
+    and on_audio(None) when the recording starts over;
+    max_seconds, when given, is the cap instead of the stt settings'.
 
     Three shapes, because one size genuinely doesn't fit:
 
@@ -365,11 +376,13 @@ def record_audio(mode=None):
     # Manual has nothing to detect - you decide both ends.
     if mode != "manual" and _vad_model is not None:
         try:
-            return _record_silero(mode)
+            return _record_silero(mode, on_audio, max_seconds)
         except Exception as e:
             logbook.exception("stt", "silero failed, falling back to levels")
+            if on_audio:
+                on_audio(None)              # the fallback records afresh
             ui.add_message(
                 "system", f"Silero VAD failed ({e}) - falling back to levels."
             )
 
-    return _record_energy(mode)
+    return _record_energy(mode, on_audio, max_seconds)

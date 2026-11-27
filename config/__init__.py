@@ -107,6 +107,7 @@ SETTINGS = {
     "stt.silence_seconds":        ("STT_SILENCE_SECONDS",          True),
     "stt.max_seconds":            ("STT_MAX_SECONDS",              True),
     "stt.manual_max_seconds":     ("STT_MANUAL_MAX_SECONDS",       True),
+    "stt.live_text":              ("STT_LIVE_TEXT",                True),
     "stt.no_speech_timeout":      ("STT_NO_SPEECH_TIMEOUT",        True),
     "stt.settle_seconds":         ("STT_SETTLE_SECONDS",           True),
     "stt.send_audio":             ("STT_SEND_AUDIO",               True),

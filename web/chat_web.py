@@ -132,7 +132,7 @@ def state(version=None, have=0, epoch=None, wait=WAIT, head=False):
             "status": status, "name": name,
             "mood": mood, "rows": rows, "ask": ui.pending_approval(), "notify_asks": _notify_asks(), "retry": _retry_at(), "mic": _mic(), "voice_mode": ui.state.get("mode", ""),
             "can_talk": bool(ui.view.on_hotkey), "rate": _rateable(now_epoch, convo),
-            "dictated": dict(DICTATED), "replay": replaying()}
+            "dictated": dict(DICTATED), "draft": dict(DRAFT), "replay": replaying()}
 
 
 def _retry_at():
@@ -369,6 +369,9 @@ def stop():
 # heard; None: cancelled.
 _BOOT = secrets.token_hex(3)
 DICTATED = {"id": f"{_BOOT}-0", "page": "", "text": None}
+# ...and while you're still talking, the words so far (stt.live_text): the
+# same id as the dictation they're for, until DICTATED has it
+DRAFT = {"id": "", "page": "", "text": ""}
 _dictating = threading.Lock()     # a double click: one check-and-open at a time
 _count = itertools.count(1)
 
@@ -399,6 +402,14 @@ def dictate(page=""):
         interrupts.stop_all(generating=False, listening=False)
         stop = interrupts.open("voice")       # opened at the click: a second click finds it
     page = str(page or "")[:40]
+    this = f"{_BOOT}-{next(_count)}"
+
+    def draft(words):
+        from ui.shared import _refresh
+
+        with ui.changes:
+            DRAFT.update(id=this, page=page, text=str(words))
+        _refresh()                            # wakes the pages' long poll with the words so far
 
     def run():
         text = None
@@ -406,11 +417,11 @@ def dictate(page=""):
             from core import assistant
 
             with interrupts.using(stop):
-                text = assistant.dictation(mode)
+                text = assistant.dictation(mode, on_draft=draft)
         finally:
             interrupts.close(stop)            # however it ended: an open one reads as "busy" for good
             with ui.changes:
-                DICTATED.update(id=f"{_BOOT}-{next(_count)}", page=page, text=text)
+                DICTATED.update(id=this, page=page, text=text)
             ui.set_status("Idle")             # wakes the pages' long poll with the words
 
     threading.Thread(target=run, daemon=True, name="dictation").start()

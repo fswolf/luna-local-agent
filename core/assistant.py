@@ -473,25 +473,39 @@ def assistant_task(model, mode=None):
         return _spoken_turn(model, mode, stop)
 
 
-def dictation(mode=None):
+# A dictation is yours to stop (a second click, or the pause in auto mode),
+# so stt.max_seconds and manual_max_seconds, meant for a turn sent to her,
+# don't cut it short. This is only a backstop for a mic left running.
+DICTATION_MAX_SECONDS = 3600
+
+
+def dictation(mode=None, on_draft=None):
     """The chat page's mic: record and transcribe like a spoken turn, but
     hand the words back for its text box instead of answering them, so you
     can fix what Whisper misheard before you send it. Runs as the caller's
     Stop (web/chat_web.py opens a "voice" one at the click, so HOME, Stop and
-    a second click find it). Returns the words, "" for nothing heard, or
-    None when it was cancelled (Stop, HOME), so the page says nothing then."""
+    a second click find it). on_draft(words so far) is told the words while
+    you're still talking (voice/drafts.py, stt.live_text). Returns the words,
+    "" for nothing heard, or None when it was cancelled (Stop, HOME), so the
+    page says nothing then."""
+    from voice import drafts as live
+
     with interrupts.ensure("voice") as stop:
         if not speech.ready():
             ui.add_message("system", "Still loading the speech models - one moment.")
             return None
 
         ui.set_status("Listening..." if mode != "manual" else "Recording...")
+        drafts = live.Drafts(on_draft).start() if on_draft and live.on() else None
         try:
             stop.recording = True
             try:
-                filename = record_audio(mode)
+                filename = record_audio(mode, on_audio=drafts.feed if drafts else None,
+                                        max_seconds=DICTATION_MAX_SECONDS)
             finally:
                 stop.recording = False
+                if drafts:
+                    drafts.close()      # before the full transcription: one Whisper at a time
 
             if stop.generating.is_set():
                 return None

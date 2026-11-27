@@ -156,12 +156,12 @@ def transcribe(filename):
 
     text = "".join(segment.text for segment in segments).strip()
 
-    if text.lower().strip(" .!?,") in {
-        h.strip(" .!?,") for h in _HALLUCINATIONS
-    }:
-        return ""
+    return "" if hallucination(text) else text
 
-    return text
+
+def hallucination(text):
+    """Whisper's usual words for silence ("Thank you.", "you")."""
+    return text.lower().strip(" .!?,") in {h.strip(" .!?,") for h in _HALLUCINATIONS}
 
 
 def voice_on():

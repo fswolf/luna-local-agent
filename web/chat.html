@@ -68,6 +68,7 @@ cursor:pointer;display:grid;place-items:center;padding:0;transition:color .15s,b
 #mic svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 #mic:hover{color:var(--text);background:#2a2040}
 #mic[hidden]{display:none}
+#text.drafting{opacity:.7}
 #mic.on{color:#14081c;background:var(--accent);box-shadow:0 0 0 6px #ff87d733;animation:hear 1.4s ease-in-out infinite}
 @keyframes hear{50%{box-shadow:0 0 0 10px #ff87d722}}
 #text{flex:1;min-width:0;font:inherit;color:var(--text);background:none;border:0;resize:none;padding:10px 16px;max-height:40vh;outline:none}
@@ -253,6 +254,7 @@ function apply(s) {
     ? (s.mic ? 'hands-free is on - click to turn it off' : 'turn hands-free on (the same as HOME)')
     : s.mic ? (s.voice_mode === 'manual' ? 'listening - click when you\'re done' : 'listening - it stops when you go quiet')
     : 'dictate into the box: you send it (HOME still talks to Luna straight away)';
+  drafting(s.draft, s.dictated);
   dictated(s.dictated);
   buttons();
 }
@@ -460,6 +462,8 @@ function buttons() {
 
 async function go() {
   if (send.classList.contains('stop')) { post('stop'); return; }
+  // still listening: what's in the box is a draft, and the real words are coming
+  if (draftFor !== null) { toast('still listening - your words land when you stop'); return; }
   const words = text.value.trim();
   if (!words && !attached) return;
   if (words.length > BOOT.max) { toast(`keep it under ${BOOT.max} characters`); return; }
@@ -478,17 +482,32 @@ send.onclick = go;
 // anything already typed, for you to fix and send; only in the page whose
 // mic was clicked. The first state a page gets only notes the id: an old
 // dictation isn't pasted into a new page.
+// While you're still talking, the words so far show in the box, dimmed and
+// read-only (stt.live_text), after what you'd typed; the final words replace them.
 const PAGE = Math.random().toString(36).slice(2, 10);
 $('#mic').onclick = () => post('dictate', {page: PAGE});
-let heardId = null;
+let heardId = null, draftFor = null, beforeDraft = '';
+const after = (before, words) => before + (before && !/\s$/.test(before) ? ' ' : '') + words;
+function drafting(d, done) {
+  if (!d || !d.id || d.page !== PAGE || heardId === null || (done && done.id === d.id)) return;
+  if (draftFor !== d.id) { draftFor = d.id; beforeDraft = text.value; }      // a new dictation: keep what was there
+  text.value = after(beforeDraft, d.text);
+  text.readOnly = true; text.classList.add('drafting');
+  grow(); buttons();
+  text.scrollTop = text.scrollHeight;
+}
 function dictated(d) {
   if (!d || d.id === heardId) return;
   const first = heardId === null;
   heardId = d.id;
-  if (first || d.page !== PAGE || d.text === null) return;   // old, another page's, or stopped
-  if (!d.text) { toast("didn't catch anything"); return; }
-  const before = text.value;
-  text.value = before + (before && !/\s$/.test(before) ? ' ' : '') + d.text;
+  const drafted = draftFor === d.id;
+  draftFor = null;
+  text.readOnly = false; text.classList.remove('drafting');
+  if (first || d.page !== PAGE) return;                       // old, or another page's
+  if (drafted) text.value = beforeDraft;                      // the draft goes; the final words take its place
+  if (d.text === null) { grow(); buttons(); return; }         // stopped
+  if (!d.text) { grow(); buttons(); toast("didn't catch anything"); return; }
+  text.value = after(text.value, d.text);
   grow(); buttons(); text.focus();
   text.setSelectionRange(text.value.length, text.value.length);
 }

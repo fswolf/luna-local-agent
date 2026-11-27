@@ -95,6 +95,7 @@ SCHEMA = {
     "stt.silence_seconds": ("float", "How long a pause ends what you're saying (seconds)"),
     "stt.max_seconds": ("float", "Longest you can talk in one go (seconds)"),
     "stt.manual_max_seconds": ("float", "Longest you can talk in one go in manual mode (seconds)"),
+    "stt.live_text": ("bool", "The chat page's mic shows your words as you talk, not all at the end (uses some CPU while you dictate)"),
     "stt.no_speech_timeout": ("float", "How long to wait for you to start talking before giving up, in auto mode (seconds)"),
     "stt.settle_seconds": ("float", "In open mode, the pause after Luna speaks before the mic listens again (seconds)"),
     "stt.send_audio": ("bool", "Send the recording too, not just the words, for models that can hear (omni models)"),

@@ -58,6 +58,9 @@ STT_MAX_SECONDS = float(_stt_cfg.get("max_seconds", 60))
 STT_NO_SPEECH_TIMEOUT = float(_stt_cfg.get("no_speech_timeout", 8))
 # Backstop for manual mode, where nothing else stops the recording.
 STT_MANUAL_MAX_SECONDS = float(_stt_cfg.get("manual_max_seconds", 300))
+# The chat page's mic: your words appear in the box as you talk (voice/drafts.py),
+# replaced by the full transcription when you stop. Costs CPU while you dictate.
+STT_LIVE_TEXT = flag(_stt_cfg.get("live_text", True))
 # Pause after Luna finishes speaking before the mic re-arms in open
 # mode, so the tail of her own voice doesn't retrigger it.
 STT_SETTLE_SECONDS = float(_stt_cfg.get("settle_seconds", 0.6))

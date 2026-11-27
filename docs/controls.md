@@ -36,8 +36,12 @@ starts with the conversation as it stands.
 - The mic in the text box dictates: click it and talk, through the mic she
   already uses on this PC, and what you said lands in the text box (after
   anything already typed) for you to fix and send. It lights up while it's
-  listening; in manual mode click it again when you're done. Whisper writes it
-  all out once you stop, not word by word. While she's answering, a click
+  listening; in manual mode click it again when you're done. Your words show
+  in the box as you talk (dimmed, about once a second), and when you stop the
+  full transcription replaces them, as accurate as ever (`stt.live_text`; off,
+  it all lands at the end). It has no time limit of its own (an hour at most, in
+  case the mic is left on): `max_seconds` and `manual_max_seconds` are for what
+  you say to her, not dictation. While she's answering, a click
   stops her, as HOME does. In hands-free mode (`open`) it still switches
   hands-free on and off. HOME, the tray's Talk and the terminal send what you
   say straight to her.
@@ -313,8 +317,9 @@ Triggering on background noise? Raise it to 0.5-0.6.
 | `language` | `en` | `null` to auto-detect (unreliable on short clips) |
 | `sensitivity` | `1.0` | Energy fallback only. >1 triggers more easily |
 | `silence_seconds` | `1.2` | Quiet time before it stops and transcribes |
-| `max_seconds` | `60` | Cap on one recording in auto/open |
-| `manual_max_seconds` | `300` | Backstop in manual |
+| `max_seconds` | `60` | Cap on one recording in auto/open (not the chat page's mic: dictation runs until you stop) |
+| `manual_max_seconds` | `300` | Backstop in manual (the same) |
+| `live_text` | `true` | The chat page's mic shows your words as you talk. A Whisper pass about once a second while you dictate: some CPU |
 | `no_speech_timeout` | `8` | Give up if you never start talking (auto only) |
 | `settle_seconds` | `0.6` | Pause before re-arming in open mode |
 
