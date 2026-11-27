@@ -172,11 +172,20 @@ class Style(unittest.TestCase):
         self.assertTrue(0 < chat < 20)                                     # approved ones, not the held-back ones
         self.assertGreater(pieces, n_test)
 
-    def test_no_text_or_a_path(self):
+    def test_no_text_or_a_bad_name(self):
         with self.assertRaises(ValueError):
             export.export_style("", os.path.join(self.tmp, "export"))
-        with self.assertRaises(ValueError):
-            export.style_folder("../secrets")
+        for bad in ("../secrets", "my books", ".hidden", "a/b"):
+            with self.assertRaises(ValueError, msg=bad):
+                export.style_folder(bad)
+        self.assertTrue(export.style_folder("dark-romance_2").endswith("dark-romance_2"))
+
+    def test_a_book_with_one_paragraph_per_line_keeps_them(self):
+        text = "\n".join(f"Line {i} of the book, a paragraph of its own." + " More." * 20 for i in range(30))
+        piece = export.chunks(text, size=3000)[0]
+        self.assertIn("\n\nLine 1 of", piece)                       # paragraph breaks kept
+        wrapped = "First paragraph wrapped\nover two lines." + " x" * 300 + "\n\nSecond one."
+        self.assertIn("wrapped over two lines", export.chunks(wrapped)[0])   # wrapping joined as before
 
     def test_text_is_learned_whole(self):
         sys.path.insert(0, os.path.join(HERE, "training"))

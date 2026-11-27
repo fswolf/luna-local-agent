@@ -46,7 +46,12 @@ export async function createOutfits({ THREE, vrm, url = '' }) {
       if (!named || typeof named !== 'object' || Array.isArray(named)) named = {};
     } catch (e) { named = {}; /* no file, or not JSON: the guesses stand */ }
   }
-  const namedAs = name => Object.entries(named).find(([part]) => part && name.includes(part));
+  // a part as a whole word of the name: "Bra" is in "Underwear_Bra_CLOTH",
+  // not in "Hair_Braid" or "Cobra"; "CLOTH_02" is in "..._CLOTH_02 (Instance)"
+  const esc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = Object.entries(named).filter(([part]) => part)
+    .map(([part, label]) => [new RegExp(`(?<![A-Za-z])${esc(part)}(?![a-z0-9])`), label]);
+  const namedAs = name => parts.find(([re]) => re.test(name));
   const groups = new Map();                       // id -> { id, label, objects: [], tris }
   vrm.scene.traverse(o => {
     if (!o.isMesh) return;

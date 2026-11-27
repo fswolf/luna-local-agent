@@ -210,14 +210,14 @@ A style patch learns how a pile of writing reads: novels in a genre, an author's
 the way a kind of book talks. It learns from text instead of examples:
 
 ```
-mkdir -p agent/dataset/style/novels         # any name; one folder per style
+mkdir -p agent/dataset/style/novels         # one folder per style: letters, numbers, - and _
 cp ~/books/*.txt agent/dataset/style/novels/
 training/train.sh style novels --check
 training/train.sh style novels               # overnight, like the others
 ```
 
 Plain text (`.txt` or `.md`, in subfolders too) is cut into pieces of about 1,000
-words at paragraph breaks, and every word of each piece is learned. A few MB
+words at paragraph breaks (blank lines, or every line in a file that has none), and every word of each piece is learned. A few MB
 of text is plenty for a first try. Strip anything that isn't the writing first: a
 licence block, a table of contents, page numbers.
 

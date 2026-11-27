@@ -387,6 +387,13 @@ CASES_HER = {
     "lets her hair fall": None,
     "slides my hand off your shirt": None,
     "start to take my top off": None,
+    "watches you undress": None,
+    "helps you get undressed": None,
+    "pulls the shirt off you": None,
+    "slips the tie off your neck": None,
+    "don't take my top off yet": None,
+    "about to slip my bra off": None,
+    "slides the top off over my head and smiles at you": {"off": ["top"]},
 }
 
 
@@ -463,6 +470,10 @@ import(path).then(async m => {
         got = self.run_js(mats, names, [["wear", "underwear"], ["wear", "bare"], ["wear", "dressed"]])
         self.assertEqual(got, ["underwear", "bare", "dressed"])          # body and hair never came off
         self.assertEqual(self.run_js(["Body", "Jacket"], {}, [["wear", "bare"]]), ["dressed"])   # no file: nothing to take off
+        # a name is a whole word of the material's: "Bra" isn't her braid
+        self.assertEqual(self.run_js(["Hair_Braid", "Bra"], {"Bra": "bra"}, [["wear", "bare"], ["wear", "dressed"]]),
+                         ["bare", "dressed"])
+        self.assertEqual(self.run_js(["Hair_Braid"], {"Bra": "bra"}, [["wear", "bare"]]), ["dressed"])
 
 
 if __name__ == "__main__":

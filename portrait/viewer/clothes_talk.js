@@ -77,9 +77,16 @@ const HER_OFF = her(String.raw`\bVOFF\s+off\s+ANY\s+(W)|\bVOFF\s+ANY\s+(W)\s+off
 // "back": *pulls my panties back into place*, *pulls her shorts back up* - after they were off
 const HER_ON = her(String.raw`\b(?:put|pull|slip|tug)${S}\s+ANY\s+(W)\s+(?:back\s+)?on\b|\b(?:put|pull|slip)${S}\s+(?:back\s+)?on\s+ANY\s+(W)|\b(?:pull|tug|slip)${S}\s+ANY\s+(W)\s+back\s+(?:up|into\s+place)\b`);
 
+// Not hers: what she does to you (*watches you undress*, *helps you get
+// undressed*, *pulls the shirt off you*), in the first person as much as the third.
+const ABOUT_YOU = /\byou\s+(?:undress|get\s+undressed|strip|get\s+naked)\b|\b(?:off|from|out\s+of)\s+(?:of\s+)?(?:you|him|your|his)\b/;
+// Not yet, or not at all: *doesn't take her top off*, *don't take my top off yet*,
+// *starts to take off her top*, *about to slip my bra off*
+const NOT_NOW = /\b(?:doesn'?t|does not|don'?t|do not|won'?t|will not|not yet|keeps?|refuses?|teases?|pretends?|almost|starts?\s+to|starting\s+to|about\s+to|going\s+to|gonna|wants?\s+to|thinks?\s+about)\b/;
+
 export function clothesActed(text) {
   const t = String(text || '').toLowerCase().replace(/[’`]/g, "'");
-  if (/\b(?:doesn'?t|does not|won'?t|keeps|refuses|teases|pretends|almost|starts?\s+to)\b/.test(t)) return null;
+  if (NOT_NOW.test(t) || ABOUT_YOU.test(t)) return null;
   if (HER_DRESS.test(t)) return { wear: 'dressed' };
   if (HER_NAKED.test(t)) return { wear: 'bare' };
   if (HER_STRIP.test(t)) return { wear: 'underwear' };

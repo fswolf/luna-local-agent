@@ -19,6 +19,7 @@ every time you export, however many more you collect.
 import hashlib
 import json
 import os
+import re
 import sys
 
 from training import dataset
@@ -124,9 +125,12 @@ TEXT_FILES = (".txt", ".md")
 
 
 def style_folder(name=""):
+    """agent/dataset/style/<name>/. The name goes into the patch's file name,
+    and her server reads its list of patches split on spaces: letters,
+    numbers, - and _ only."""
     name = str(name or "").strip()
-    if name and (os.sep in name or name.startswith(".")):
-        raise ValueError(f"{name!r}: a folder name in {STYLE}, not a path")
+    if name and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,39}", name):
+        raise ValueError(f"{name!r}: a style's folder name is letters, numbers, - and _ (novels, dark-romance)")
     return os.path.join(STYLE, name) if name else STYLE
 
 
@@ -134,7 +138,11 @@ def chunks(text, size=CHUNK):
     """The text in pieces of about size characters, cut between paragraphs
     (or, inside a paragraph longer than that, between sentences)."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    paras = [" ".join(p.split()) for p in text.split("\n\n")]
+    # Paragraphs are blank-line apart in most books (the lines inside one are
+    # just wrapped); a file without a single blank line has one per line,
+    # and joining those would lose every paragraph break the style has.
+    blocks = re.split(r"\n[ \t]*\n", text) if re.search(r"\n[ \t]*\n", text) else text.split("\n")
+    paras = [" ".join(p.split()) for p in blocks]
     out, cur = [], ""
     for para in (p for p in paras if p):
         pieces = [para]

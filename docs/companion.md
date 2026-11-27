@@ -693,8 +693,10 @@ names. Any other VRM model works with a file next to it naming its pieces,
 {"pieces": {"Jacket": "top", "Skirt": "bottoms", "Bra": "bra", "Panties": "panties"}}
 ```
 
-The labels are top, tie, bottoms, shoes, socks, bra and panties. A material
-named there is clothing whatever it's called; anything not named stays on.
+The labels are top, tie, bottoms, shoes, socks, bra and panties. Each name is
+a whole word of the material's name, capitals as they are ("Bra" is in
+"Underwear_Bra", not in "Hair_Braid"). A material named there is clothing
+whatever it's called; anything not named stays on.
 The same file fixes a VRoid piece the code guessed wrong.
 
 Which way it changes in a conversation is `portrait.clothes` on the settings

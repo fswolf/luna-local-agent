@@ -26,9 +26,10 @@ case "$KIND" in
     gesture|habit|style) ;;
     *) echo "usage: training/train.sh gesture|habit [--check]   or   training/train.sh style [name] [--check]" >&2; exit 2 ;;
 esac
-case "$STYLE" in
-    */*|.*) echo "style name: a folder in agent/dataset/style/, not a path" >&2; exit 2 ;;
-esac
+# it goes into the patch's file name, and start.sh splits its PATCHES list on spaces
+if [ -n "$STYLE" ] && ! [[ "$STYLE" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$ ]]; then
+    echo "style name: a folder in agent/dataset/style/, letters, numbers, - and _ (novels, dark-romance)" >&2; exit 2
+fi
 TAG="$KIND${STYLE:+-$STYLE}"        # style-novels: the export's files and the patch's name
 
 # shellcheck disable=SC1091
