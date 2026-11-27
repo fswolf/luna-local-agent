@@ -38,6 +38,7 @@ Talk to her as usual. When a reply is right, or you know how it should have gone
 ```
 /good                 keep her last reply as an example, as it is
 /fix <better reply>   keep your version of her last reply instead
+/unrate               take back the rating on her last reply
 /examples             how many there are, and the page to look through them
 ```
 
@@ -59,11 +60,15 @@ on a phone), so you can keep any of her recent replies, not only the last one:
   hers to keep.
 - A reply with gesture tags in it goes to the **gesture** examples, the rest to **habit**.
   You can still switch it on the examples page.
-- Changed your mind? Click the other thumb: it's still one example.
+- Changed your mind? Click the other thumb: it's still one example. Click the lit
+  thumb again and the rating is taken back, the example with it (`/unrate` in the console
+  does the same for her last reply).
 - **Thumbs down, ↻, thumbs up:** mark a reply bad, have her try again, and
   give the new one a thumbs up, and the two are kept as one example: the bad
   reply as the original and the new one as the reply, the same as typing the
   better version yourself. No thumb on the new one and nothing extra is kept.
+  Take back the thumbs up and the first reply is a plain thumbs down again; take
+  back the thumbs down and both go.
 
 She never sees these: commands don't go into her history, her transcript or her notes,
 so collecting examples doesn't change the conversation you're having.

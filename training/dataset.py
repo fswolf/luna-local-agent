@@ -234,6 +234,55 @@ def rate(epoch, shown, up, better=None):
     return ex
 
 
+def unrate(epoch=None, shown=None):
+    """Take back the thumbs on her reply (as it shows on screen), or on her
+    last reply when none is given (/unrate): its example goes. An up that
+    paired a ↻ with the thumbs-down reply before it takes the pair apart,
+    and that reply is a plain thumbs down again. Returns what it was
+    ("up" | "fix" | "down"); ValueError when there was nothing to take back."""
+    ref = _ui_ref() if epoch is None else None
+    with _lock:
+        key = ref if epoch is None else _find(int(epoch), str(shown or "").strip())
+        turn = _recent.get(key) if key else None
+        if epoch is None and not (turn and turn.get("kept")) and _last.get("kept"):
+            turn, key = _last, None                 # her last turn, not (or no longer) on screen
+        if not turn or not turn.get("kept"):
+            raise ValueError("there's no thumbs on that reply to take back")
+        ex_id = turn["kept"]
+        mark = _rated.get(key) if key else None
+    if mark is None:            # kept, but not on screen: what the example says it is
+        row = next((r for r in examples() if r.get("id") == ex_id), {})
+        mark = {"good": "up", "fix": "fix", "bad": "down"}.get(row.get("source"), "up")
+    with _lock:
+        old_key = tuple(turn["replaces"]) if turn.get("replaces") else None
+        old = _recent.get(old_key) if old_key else None
+        paired = bool(old) and old.get("kept") == ex_id and _rated.get(old_key) == "fix"
+        if paired:
+            # this one was the better reply in the pair: the first goes back to a thumbs down
+            _rated[old_key] = "down"
+        else:
+            for k, t in _recent.items():            # whatever else shares the example (the other half of a pair)
+                if t.get("kept") == ex_id:
+                    t.pop("kept", None)
+                    _rated.pop(k, None)
+        if key:
+            _rated.pop(key, None)
+        turn.pop("kept", None)
+        if _last and _last.get("kept") == ex_id:
+            _last.pop("kept", None)
+    if paired:
+        with _lock:
+            rows = _read()
+            for r in rows:
+                if isinstance(r, dict) and r.get("id") == ex_id:
+                    r.update(reply=old["reply"], original=None, source="bad", approved=False, rated="down",
+                             kind=kind_of(old["reply"]))
+            _rewrite(rows)
+    else:
+        remove(ex_id)
+    return mark
+
+
 _NOT_WHOLE = ("that turn's tool calls can't be kept: the reply was put right afterwards "
               "(a second look or a follow-through) or stopped partway")
 
@@ -386,6 +435,7 @@ def keep(source="good", reply=None, kind="habit", turn=None):
     # One example per reply: /good twice keeps it once, and /fix after /good
     # turns that same example into your version.
     bad = source == "bad"
+    mark = "down" if bad else "fix" if corrected else "up"
     if turn.get("kept"):
         if bad:
             update(turn["kept"], approved=False, source="bad", rated="down")
@@ -396,6 +446,8 @@ def keep(source="good", reply=None, kind="habit", turn=None):
             update(turn["kept"], approved=True, source="good", rated="up")   # a thumbs down changed to up
         else:
             raise ValueError("you already kept that one")
+        with _lock:
+            _mark(turn, mark)
         return next((r for r in examples() if r.get("id") == turn["kept"]), None) or {}
     example = {
         "id": uuid.uuid4().hex[:12],
@@ -419,8 +471,17 @@ def keep(source="good", reply=None, kind="habit", turn=None):
         for t in _recent.values():
             if t.get("at") == turn["at"]:
                 t["kept"] = example["id"]
+        _mark(turn, mark)
 
     return example
+
+
+def _mark(turn, mark):
+    """The page's thumbs for this turn ("up" | "fix" | "down"), however it was
+    kept: /good and /fix in the console light them too. Caller holds _lock."""
+    for k, t in _recent.items():
+        if t.get("at") == turn.get("at"):
+            _rated[k] = mark
 
 
 def _read():

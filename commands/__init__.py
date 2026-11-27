@@ -8,7 +8,7 @@
     portrait   /monitor /holo /outfit /lights /portrait ...
     memory     /facts /thoughts /memory /reflect /lessons /skills /projects /knowledge /episodes
     people     /camera /presence /people
-    patches    /good /fix /examples /patches (her patches and their examples)
+    patches    /good /fix /unrate /examples /patches (her patches and their examples)
     plugins    /<plugin name> ... (last, so a core command always wins)
 
 Each module has handle(text) -> True when the text was one of its

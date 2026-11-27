@@ -26,7 +26,7 @@ class Clock(unittest.TestCase):
 
     def test_about_time_gets_the_minute(self):
         for q in ("what time is it?", "remind me in 20 minutes", "set an alarm for 7am",
-                  "is it 3:30 yet", "how late is it", "what are we doing tonight"):
+                  "is it 3:30 yet", "how late is it", "back in an hour", "how many hours until morning"):
             self.assertIn("02:43", self.now(q), q)
 
     def test_ordinary_words_dont(self):
@@ -36,11 +36,13 @@ class Clock(unittest.TestCase):
     def test_roleplay_words_dont(self):
         for q in ("*kisses your lips softly and tenderly reminding you how much he loves you*",
                   "every time I see you I smile", "*checks the time* come here",
-                  "(remind me later) hi", "I had the best time"):
+                  "I had the best time", "I could kiss you for hours",
+                  "you look beautiful tonight"):
             self.assertNotIn("02:43", self.now(q), q)
 
     def test_asking_outside_an_action_still_does(self):
-        for q in ("*yawns* what time is it", "remind me at 5", "*stretches* set a timer"):
+        for q in ("*yawns* what time is it", "remind me at 5", "*stretches* set a timer",
+                  "*kisses you* (ooc: what time is it?)"):
             self.assertIn("02:43", self.now(q), q)
 
     def test_exact_setting(self):

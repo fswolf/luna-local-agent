@@ -209,5 +209,80 @@ class Pairing(unittest.TestCase):
         self.assertEqual(sorted(r["source"] for r in self.d.examples()), ["bad", "good"])
 
 
+class Unrate(unittest.TestCase):
+    """A lit thumb clicked again (or /unrate) takes the rating back."""
+    setUp, note = Pairing.setUp, Pairing.note
+
+    def test_up_taken_back(self):
+        self.note("It's fine.")
+        self.d.rate(0, "It's fine.", True)
+        self.assertEqual(self.d.unrate(0, "It's fine."), "up")
+        self.assertEqual(self.d.examples(), [])
+        self.assertEqual(self.d.rateable(0, [["luna", "It's fine."]]), {0: ""})
+        self.d.rate(0, "It's fine.", False)                # and it can be rated again
+        self.assertEqual([r["source"] for r in self.d.examples()], ["bad"])
+
+    def test_down_and_fix_taken_back(self):
+        self.note("It is on fire.")
+        self.d.rate(0, "It is on fire.", False, "It's fine.")
+        self.assertEqual(self.d.unrate(0, "It is on fire."), "fix")
+        self.assertEqual(self.d.examples(), [])
+
+    def test_the_paired_up_taken_back_leaves_the_down(self):
+        self.note("It is on fire.")
+        self.d.rate(0, "It is on fire.", False)
+        self.d.retrying(0, "It is on fire.", "how's the NUC?")
+        self.note("It's fine, load is low.")
+        self.d.rate(0, "It's fine, load is low.", True)
+        self.assertEqual(self.d.unrate(0, "It's fine, load is low."), "up")
+        rows = self.d.examples()
+        self.assertEqual([(r["source"], r["reply"], r["original"], r["approved"], r["rated"]) for r in rows],
+                         [("bad", "It is on fire.", None, False, "down")])
+        got = self.d.rateable(0, [["luna", "It is on fire."], ["luna", "It's fine, load is low."]])
+        self.assertEqual(got, {0: "down", 1: ""})
+
+    def test_the_paired_down_taken_back_clears_both(self):
+        self.note("It is on fire.")
+        self.d.rate(0, "It is on fire.", False)
+        self.d.retrying(0, "It is on fire.", "how's the NUC?")
+        self.note("It's fine, load is low.")
+        self.d.rate(0, "It's fine, load is low.", True)
+        self.d.unrate(0, "It is on fire.")
+        self.assertEqual(self.d.examples(), [])
+        got = self.d.rateable(0, [["luna", "It is on fire."], ["luna", "It's fine, load is low."]])
+        self.assertEqual(got, {0: "", 1: ""})
+
+    def test_nothing_to_take_back(self):
+        self.note("Hi!")
+        with self.assertRaises(ValueError):
+            self.d.unrate(0, "Hi!")
+
+    def test_console_fix_then_good_keeps_the_fix_lit(self):
+        self.note("Hi!")
+        with mock.patch.object(self.d, "_ui_ref", return_value=(0, "Hi!")):
+            self.d.keep("fix", reply="Hey you~")
+            with self.assertRaises(ValueError):
+                self.d.keep("good")                         # already kept: nothing changes
+            self.assertEqual(self.d.rateable(0, [["luna", "Hi!"]]), {0: "fix"})
+            self.assertEqual(self.d.unrate(), "fix")
+
+    def test_off_screen_says_what_it_was(self):
+        self.note("Hi!")
+        with mock.patch.object(self.d, "_ui_ref", return_value=(0, "Hi!")):
+            self.d.keep("fix", reply="Hey you~")
+        self.d._recent.clear()                              # scrolled out of what she keeps track of
+        with mock.patch.object(self.d, "_ui_ref", return_value=None):
+            self.assertEqual(self.d.unrate(), "fix")
+        self.assertEqual(self.d.examples(), [])
+
+    def test_console_good_then_unrate(self):
+        self.note("Hi!")
+        with mock.patch.object(self.d, "_ui_ref", return_value=(0, "Hi!")):
+            self.d.keep("good")
+            self.assertEqual(self.d.rateable(0, [["luna", "Hi!"]]), {0: "up"})   # the page shows /good too
+            self.assertEqual(self.d.unrate(), "up")
+        self.assertEqual(self.d.examples(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

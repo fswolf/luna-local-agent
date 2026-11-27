@@ -67,6 +67,9 @@ class Report(unittest.TestCase):
                 self.assertEqual("tie_off" in got, keen, band)
             with mock.patch("life.gestures._band", side_effect=RuntimeError):
                 self.assertNotIn("undress", clothes.offered())
+            with mock.patch("life.gestures._band", return_value=("neutral", "")), \
+                 mock.patch("config.MOOD_ENABLED", False):
+                self.assertIn("undress", clothes.offered())   # mood off: nothing to go by, offered
         finally:
             for p in tags:
                 p.stop()

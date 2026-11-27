@@ -713,7 +713,7 @@ It works the way `portrait.gestures` does, and by default follows it:
   words and her written actions still work as the fallback. Taking
   things off is only offered in your own turns, never on a tame stream,
   and only while her mood is teasing, frisky or heated (the same rule as
-  the lewd gestures). Otherwise a small model can read the list as
+  the lewd gestures; with mood switched off, always). Otherwise a small model can read the list as
   something to do. Asking her still works in any mood she isn't cool or
   sulking in, and a tag she writes anyway still plays.
 - **keywords**: your plain words and her written actions only. Nothing

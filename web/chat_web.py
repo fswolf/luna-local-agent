@@ -22,9 +22,9 @@ in the page too, and either side can answer it.
                            under it); again on the same one stops it
     POST /chat/stop        stop her (and anything physical), like ai-voice-ctl stop
     POST /chat/answer      {"id", "answer": "yes" | "no" | "all"}
-    POST /chat/rate        {"e", "i", "up": true|false, "better"}: the thumbs on her
+    POST /chat/rate        {"e", "i", "up": true|false, "better"} or {"e", "i", "clear": true}: the thumbs on her
                            reply at conversation index i (matched by its text), kept as an example for her
-                           patches (training/dataset.py rate)
+                           patches (training/dataset.py rate); clear takes it back (unrate)
     POST /chat/tray        {"action": "chat" | "portrait" | "settings" | "voice" | "quit"}: the
                            tray icon's menu (chat opens her window; voice flips tts.enabled)
 """
@@ -185,6 +185,7 @@ def _rate(body):
     try:
         data = json.loads(body or b"{}")
         epoch, index, up = int(data.get("e")), int(data.get("i")), data.get("up") is True
+        clear = data.get("clear") is True
         better = str(data.get("better") or "")[:MAX_TYPED]
         note = data.get("note") is True and not up
     except (ValueError, TypeError, AttributeError):
@@ -194,6 +195,12 @@ def _rate(body):
     try:
         if shown is None:
             raise ValueError("that reply has gone from the conversation")
+        if clear:           # a lit thumb clicked again: taken back
+            was = dataset.unrate(epoch, shown)
+            with _lock:
+                convo = list(ui.conversation)
+            # every reply's thumbs: taking back a ↻ pair changes the reply above it too
+            return _json(200, {"ok": True, "rated": "", "was": was, "rates": _rateable(epoch, convo)})
         if note:            # her own model writes it from your note, in the background
             # what she wrote answers your click, so it shows open (ui.Asked), not folded like a tool log
             ex = dataset.rate_note(epoch, shown, better, done=lambda said: ui.add_message("system", ui.Asked(said)))

@@ -294,8 +294,11 @@ function thumbs() {
       dn.title = "not like this: say how it should have gone";
       up.classList.toggle('on', st === 'up');
       dn.classList.toggle('on', st === 'down' || st === 'fix');
-      up.onclick = ev => { ev.stopPropagation(); rate(idx, true, ''); };
-      dn.onclick = ev => { ev.stopPropagation(); better(el, b, idx); };
+      // the lit one clicked again takes it back
+      up.onclick = ev => { ev.stopPropagation(); st === 'up' ? unrate(idx) : rate(idx, true, ''); };
+      dn.onclick = ev => { ev.stopPropagation(); st === 'down' || st === 'fix' ? unrate(idx) : better(el, b, idx); };
+      if (st === 'up') up.title = 'kept as a good example: click again to take it back';
+      if (st === 'down' || st === 'fix') dn.title = 'kept: click again to take it back';
     }
     b.querySelector('[data-r=copy]').onclick = ev => { ev.stopPropagation(); copy(msgs[at] ? msgs[at][1] : '', ev.currentTarget); };
     b.querySelector('[data-r=speak]').onclick = ev => { ev.stopPropagation(); post('speak', {e, i: idx}); };
@@ -357,6 +360,16 @@ async function rate(idx, up, better, note) {
     rates[idx] = out.rated; thumbs();
     return true;
   } catch (err) { toast("can't reach Luna - is it running?"); return false; }
+}
+
+async function unrate(idx) {
+  try {
+    const r = await fetch('rate', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({e, i: idx, clear: true})});
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(out.error || ('error ' + r.status)); return; }
+    rates = out.rates || Object.assign(rates, {[idx]: ''}); thumbs();   // a pair taken apart changes the reply above too
+  } catch (err) { toast("can't reach Luna - is it running?"); }
 }
 
 // --- a tool asking first --------------------------------------------------

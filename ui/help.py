@@ -83,6 +83,7 @@ _HELP_SECTIONS = [
     ("Patches", [
         ("/good", "keep the last reply as a good example"),
         ("/fix <reply>", "keep your better version of the last reply instead"),
+        ("/unrate", "take back the thumbs or /good /fix on her last reply"),
         ("/examples", "how many examples there are, and the page to look through them"),
         ("/patches", "trained patches: loaded, waiting, or made for another model"),
         ("/patches <name> <0-1>", "change a loaded patch's strength while Luna runs"),

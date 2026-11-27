@@ -301,16 +301,19 @@ def _profile(private):
         return ""
 
 
-# A message about the time: the exact clock goes in for that turn
-# A message about the clock: "what time is it", "remind me", "set an alarm
-# for 7am", "is it 3:30 yet". Bare "time" and "reminding" aren't: "every
-# time", "reminding you how much I love you" in a roleplay gave her the
-# minute, and she worked it into the scene. Your *actions* don't count at all.
+# A message about the clock, which gets the exact minute for that turn:
+# "what time is it", "remind me", "set an alarm for 7am", "in 20 minutes",
+# "is it 3:30 yet". Bare "time", "hours", "tonight" and "reminding" aren't:
+# "every time", "I could kiss you for hours", "reminding you how much I love
+# you" in a roleplay gave her the minute, and she worked it into the scene.
+# Your *actions* don't count at all; an aside in brackets does.
 _ABOUT_TIME = re.compile(
-    r"\b(?:what|the)\s+time\b|\btime\s+is\s+it\b|\b(?:clock|o'?clock|hours?|minutes?|mins?|remind|reminders?"
-    r"|alarms?|timers?|how late|how early|tonight)\b|\d\s*(?:am|pm|a\.m|p\.m)\b|\b\d{1,2}:\d{2}\b",
+    r"\b(?:what|the)\s+time\b|\btime\s+is\s+it\b|\b(?:clock|o'?clock|remind|reminders?|alarms?|timers?"
+    r"|how late|how early|how long until|how many (?:hours|minutes|mins))\b"
+    r"|\b(?:\d+|an?|half an?)\s*(?:hours?|hrs?|minutes?|mins?)\b"
+    r"|\d\s*(?:am|pm|a\.m|p\.m)\b|\b\d{1,2}:\d{2}\b",
     re.IGNORECASE)
-_ACTION = re.compile(r"\*[^*\n]*\*|\([^()\n]*\)")
+_ACTION = re.compile(r"\*[^*\n]*\*")     # not (...): "(ooc: what time is it?)" is a real question
 
 
 def about_time(query):

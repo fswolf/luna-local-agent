@@ -135,11 +135,13 @@ def _in_the_mood():
     taking-off tags aren't on her menu, so a small model doesn't read the
     list as something to do ("we're testing" and she strips). His own
     words and a tag she writes anyway still work: this only trims what's
-    offered."""
+    offered. With mood switched off there's no mood to go by: offered, as
+    before."""
     try:
+        import config
         from life import gestures
 
-        return gestures._band()[0] == "lewd"
+        return not config.MOOD_ENABLED or gestures._band()[0] == "lewd"
     except Exception:
         return False
 

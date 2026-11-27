@@ -1,4 +1,4 @@
-"""Her patches: /good, /fix, /examples for the examples, /patches for the trained ones (docs/patches.md).
+"""Her patches: /good, /fix, /unrate, /examples for the examples, /patches for the trained ones (docs/patches.md).
 
 Slash commands never reach her history, transcript or notes, so keeping
 or correcting a reply here teaches a future patch without her hearing
@@ -48,6 +48,19 @@ def handle(text):
                        + ("" if ex["original"] else " - it was the same as hers, so kept as good") + ".")
         return True
 
+    if text == "/unrate":
+        from training import dataset
+
+        try:
+            was = dataset.unrate()
+        except ValueError as e:
+            ui.add_message("system", f"Nothing taken back: {e}.")
+            return True
+        ui.add_message("system", "Taken back: her last reply isn't " + {
+            "up": "kept as a good example", "fix": "kept with your version", "down": "kept as a bad one"}[was]
+            + " any more.")
+        return True
+
     if text == "/examples":
         from training import dataset
 
@@ -55,7 +68,7 @@ def handle(text):
         lines = ["Examples for her patches (agent/dataset/, never committed):"]
         for kind, n in c.items():
             lines.append(f"  {kind:8} {n['approved']} approved, {n['waiting']} waiting, {n['dropped']} dropped")
-        lines.append("/good keeps her last reply, /fix <better> keeps your version. "
+        lines.append("/good keeps her last reply, /fix <better> keeps your version, /unrate takes it back. "
                      "A first patch wants 300 to 500.")
         try:
             from web import dataset_web
