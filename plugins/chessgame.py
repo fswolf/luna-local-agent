@@ -477,7 +477,7 @@ def _step():
         _emit()
         if not react:
             _loop.wait(_game.seconds(s["think_seconds"], DEFAULTS["think_seconds"], hi=60))
-        prompt = (REACT_PROMPT if react else STEP_PROMPT).format(game=describe(), result=_ended())
+        prompt = (REACT_PROMPT if react else STEP_PROMPT).format(game=describe(), result=_ended()) + _game.player_said()
         answer = assistant.respond_to_job(prompt, _g["model"], "chess", allowed, speak=bool(s["speak"]),
                                           max_rounds=1 if react else 4, exchanges=exchanges,
                                           time_limit=_game.turn_limit(s["turn_seconds"],

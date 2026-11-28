@@ -9,6 +9,13 @@ notes, plays on its own when the conversation goes quiet, and can be
 watched while she does. How plugins work in general is on
 [Plugins](plugins.md).
 
+**You can coach her while she plays.** Each of her game turns is its own
+short job with only the game in front of it, so it never saw the chat. Now
+your last few messages from the last 10 minutes ride along at the end of
+each turn ("forget the leaves, move the rug"), as a suggestion from a friend
+on the couch: she takes them into account and can note a good tip, but it's
+still her game. Messages that aren't about the game she just carries on past.
+
 ## Minecraft
 
 ```

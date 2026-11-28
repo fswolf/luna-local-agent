@@ -328,7 +328,7 @@ def _step():
     prompt = prompt.replace("{project}", projects.game_block(pid)).replace(
         "{guide}", _guide(" ".join([_goal(), plan] + _state["notes"][-1:])))
     exchanges = []
-    answer = assistant.respond_to_job(prompt, _state["model"], "vibecity", allowed,
+    answer = assistant.respond_to_job(prompt + _game.player_said(), _state["model"], "vibecity", allowed,
                                       speak=bool(s["speak"]),
                                       max_rounds=_game.whole(s["max_rounds"], 12, 1, 50),
                                       project_id=pid, exchanges=exchanges) or ""

@@ -272,7 +272,7 @@ def _step():
                                 guide=_guide(" ".join([_state["goal"]] + _state["notes"][-2:])))
 
     exchanges = []
-    answer = assistant.respond_to_job(prompt, _state["model"], "minecraft", allowed,
+    answer = assistant.respond_to_job(prompt + _game.player_said(), _state["model"], "minecraft", allowed,
                                       speak=bool(s["speak"]), project_id=pid, exchanges=exchanges) or ""
     lines = [ln.strip() for ln in answer.strip().splitlines() if ln.strip()]
     line = lines[-1][:200] if lines else "(no report)"

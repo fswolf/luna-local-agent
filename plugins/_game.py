@@ -18,6 +18,7 @@ from treating it as a plugin).
 """
 import os
 import threading
+from datetime import datetime, timedelta
 
 import config
 from core import logbook
@@ -76,6 +77,58 @@ WEB_TOOLS = ["web_search", "research"]
 
 ERROR_PAUSE = 30        # seconds after a failed turn, so a broken connection doesn't spin
 MAX_FAILURES = 3        # failed turns in a row, then she stops and says why once
+
+
+# What you said in the chat while she plays: each turn is a fresh job and
+# never saw it, so "move the rug!" went unheard while she kept at the leaves.
+SAID_MINUTES = 10       # how far back
+SAID_MOST = 3           # how many of your messages
+_said_seen = {}         # (timestamp, text) -> shown to a turn already
+
+
+def player_said(minutes=SAID_MINUTES, most=SAID_MOST, now=None):
+    """Your last few chat messages from the last few minutes, as a block for
+    the end of a game turn's prompt, or "". A suggestion, not an order: she
+    still plays her own game."""
+    try:
+        from core import history
+
+        msgs = history.get_messages_full()[-30:]
+    except Exception:
+        return ""
+    now = now or datetime.now()
+    found = []
+    for m in reversed(msgs):
+        if m.get("role") != "user":
+            continue
+        text = " ".join(str(m.get("content") or "").split())
+        if not text or (text.startswith("(") and text.endswith(")")):      # "(started the app)"
+            continue
+        try:
+            age = now - datetime.fromisoformat(str(m.get("timestamp") or ""))
+        except ValueError:
+            continue
+        if age > timedelta(minutes=minutes):
+            break
+        found.append((age, text[:300], (m.get("timestamp"), text)))
+        if len(found) >= most:
+            break
+    if not found:
+        return ""
+    ago = lambda a: "just now" if a < timedelta(minutes=1) else f"{int(a.total_seconds() // 60)} min ago"
+    # every turn for ten minutes she'd answer the same tip again ("like you said, the rug!"):
+    # one she's already been shown is marked, and she's asked not to keep bringing it up
+    lines = "\n".join(f'- {ago(a)}{" (seen before)" if key in _said_seen else ""}: "{t}"'
+                      for a, t, key in reversed(found))
+    for _a, _t, key in found:
+        _said_seen[key] = True
+    if len(_said_seen) > 200:
+        _said_seen.clear()
+    return ("\n\n(The player watching you said this in the chat lately:\n" + lines + "\n"
+            "Like a friend on the couch: if it's about the game, take it into account for this "
+            "move, and if your notes keep tips, note a useful one so you remember it. It's your "
+            "game; you still decide. If it isn't about the game, carry on. Don't keep answering "
+            "the ones marked seen before: you've already heard them.)")
 
 
 def settings(name, defaults):

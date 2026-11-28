@@ -430,7 +430,7 @@ class ZGame:
             # her trying to play several moves blind.
             answer = assistant.respond_to_job(
                 self.prompt(notes, screen, _game.guide_by_room(self.name, here, s["guide"]),
-                            projects.game_block(pid, here=here)),
+                            projects.game_block(pid, here=here)) + _game.player_said(),
                 st["model"], self.name, allowed, speak=bool(s["speak"]), project_id=pid,
                 max_rounds=4 if s["web"] else 3, exchanges=exchanges,
                 time_limit=_game.turn_limit(s["turn_seconds"], DEFAULTS["turn_seconds"])) or ""

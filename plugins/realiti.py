@@ -506,7 +506,7 @@ def _step():
             STEP_PROMPT.format(project=projects.game_block(pid, here=here), guide=_guide(here),
                                last=last, earlier=earlier,
                                where=_door("where") or "(couldn't read it - try realiti_look)",
-                               felt=_door("feel words") or "(no report)"),
+                               felt=_door("feel words") or "(no report)") + _game.player_said(),
             _state["model"], NAME, allowed, speak=bool(s["speak"]), project_id=pid, max_rounds=4) or ""
     finally:
         _turn["active"] = False

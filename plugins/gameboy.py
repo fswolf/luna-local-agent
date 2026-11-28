@@ -693,7 +693,7 @@ def _step():
         answer = assistant.respond_to_job(
             STEP_PROMPT.format(game=game, goal=f" Your goal: {goal}." if goal else "",
                                project=project, guide=guide, notes=notes,
-                               screen=screen, picture=picture, moves=moves_per_turn()),
+                               screen=screen, picture=picture, moves=moves_per_turn()) + _game.player_said(),
             _state["model"], NAME, allowed, speak=bool(s["speak"]), project_id=pid,
             # her moves, a note and the reply; a look first when there's no reader
             max_rounds=moves_per_turn() + (3 if s["web"] else 2) + (1 if pictures and not reader else 0),
