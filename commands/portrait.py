@@ -12,6 +12,28 @@ _blanket = {"on": False}      # what /blanket last did, so /blanket alone toggle
 _rave = {"on": False}         # the same for /rave
 
 
+def _outfit_set(name):
+    """/outfit set [name]: the same bra and panties in another set's pictures
+    (outfits.json "sets", outfits.js wearSet). The page reports which it has."""
+    from life import clothes
+
+    now = clothes.current()
+    names = now["sets"]
+    if not name:
+        ui.add_message("system", (f"Underwear set: {now['set']}. Sets: {', '.join(names)}  (/outfit set <name>)")
+                       if len(names) > 1 else "This model has no other underwear sets (outfits.json \"sets\"), "
+                                              "or her portrait isn't open.")
+        return
+    if names and name not in names:
+        ui.add_message("system", f"No set called {name}. Sets: {', '.join(names)}")
+        return
+    if not clothes._open():
+        ui.add_message("system", "Her portrait isn't open, so there's nothing to change. Open it first (/portrait).")
+        return
+    livefeed.emit("outfit", set=name)
+    ui.add_message("system", f"Underwear set: {name}.")
+
+
 def handle(text):
     """True when text was one of these commands (and it ran)."""
     if text == "/monitor":
@@ -80,13 +102,18 @@ def handle(text):
         from life import clothes
 
         words = text.split()[1:]
+        if words and words[0] == "set":
+            _outfit_set(words[1].lower() if len(words) > 1 else "")
+            return True
         if not words:
             now = clothes.current()
             said = {"dressed": "dressed", "underwear": "in her underwear", "bare": "wearing nothing",
                     "none": "on a model whose clothes don't come off",
                     "partly": "dressed, without her " + ", ".join(now["off"])}.get(now["wearing"], "not reported yet (is the portrait open?)")
+            sets = (f"\n  Underwear set: {now['set']} (/outfit set <name>: {', '.join(now['sets'])})"
+                    if len(now["sets"]) > 1 else "")
             ui.add_message("system", f"She's {said}.\n  /outfit dressed | underwear | bare | off <piece> | on <piece>   "
-                           "(pieces: top, tie, bottoms..., and bra, panties on a model whose underwear comes off)")
+                           "(pieces: top, tie, bottoms..., and bra, panties on a model whose underwear comes off)" + sets)
             return True
         piece = " ".join(words[1:]).lower()
         if words[0] == "dressed":

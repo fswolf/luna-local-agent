@@ -346,7 +346,7 @@ class _Handler(BaseHTTPRequestHandler):
             from life import clothes
 
             ok = isinstance(data, dict) and clothes.note(data.get("wearing"), data.get("off") or [],
-                                                         data.get("pieces"))
+                                                         data.get("pieces"), data.get("set"), data.get("sets"))
         except Exception:
             ok = False
         self.send_response(204 if ok else 400)

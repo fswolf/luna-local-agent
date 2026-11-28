@@ -31,7 +31,7 @@ import time
 import config
 
 _lock = threading.Lock()
-_state = {"wearing": "", "off": [], "pieces": [], "at": 0.0}
+_state = {"wearing": "", "off": [], "pieces": [], "set": "", "sets": [], "at": 0.0}
 
 WEARING = ("dressed", "underwear", "bare", "partly", "none")
 # pieces that are underwear (outfits.js UNDER): "underwear" keeps them on, "bare" doesn't
@@ -51,25 +51,29 @@ def _labels(items):
     return [x for x in out if _LABEL.match(x)]
 
 
-def note(wearing, off=(), pieces=None):
+def note(wearing, off=(), pieces=None, set_=None, sets=None):
     """The page's report. wearing: dressed, underwear, bare (underwear off too,
     on a model whose underwear is its own pieces), partly, or none (a model
     without separate clothes). off: the labels of the pieces off.
-    pieces: every piece's label (older pages don't send it)."""
+    pieces: every piece's label (older pages don't send it). set_, sets: the
+    underwear set she's in and the ones the model has (outfits.json "sets")."""
     wearing = str(wearing or "").strip().lower()
     if wearing not in WEARING:
         return False
     off = _labels(off)[:8]
     allp = _labels(pieces) if pieces is not None else list(dict.fromkeys(off))
+    names = _labels(sets) if sets is not None else []
+    now = str(set_ or "").strip().lower()
     with _lock:
-        _state.update(wearing=wearing, off=off, pieces=allp, at=time.time())
+        _state.update(wearing=wearing, off=off, pieces=allp, at=time.time(),
+                      set=now if _LABEL.match(now) else "", sets=names)
     return True
 
 
 def current():
     """{'wearing', 'off', 'pieces', 'at'}; wearing is '' before any report."""
     with _lock:
-        return dict(_state, off=list(_state["off"]), pieces=list(_state["pieces"]))
+        return dict(_state, off=list(_state["off"]), pieces=list(_state["pieces"]), sets=list(_state["sets"]))
 
 
 def _open():

@@ -320,7 +320,7 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
     el('div', { className: 'row' }, el('label', {}, propHold, ' hold her last pose while she carries it')));
   // -- clothes page: her clothes piece by piece (outfits.js), to see them come off ----
   const clothesList = el('div');
-  let clothesHeard = null;
+  let clothesHeard = null, setHeard = null;
   function fillClothes() {
     const o = O();
     // kept up to date while it's open: a gesture taking a piece off ticks its box
@@ -336,6 +336,16 @@ export function createStudio({ vrm, moves, GESTURES, gesture, THREE, orbit, came
       clothesList.append(el('div', { className: 'row' }, el('label', { title: p.id }, box, ' ' + p.label)));
     }
     clothesList.append(el('div', { className: 'dim', textContent: 'wearing: ' + o.state() }));
+    // the same underwear in other pictures (outfits.json "sets"), when the model has any
+    const names = o.sets?.() || [];
+    if (names.length > 1) {
+      if (o.onSet && setHeard !== o) { setHeard = o; o.onSet(() => { if (tabNow === 'clothes') fillClothes(); }); }
+      const pick = el('select', { title: 'the bra and panties in another set: only the picture changes' });
+      for (const n of names) pick.add(new Option(n === o.defaultSet ? n + ' (her own)' : n, n));
+      pick.value = o.wearing;
+      pick.onchange = () => o.wearSet(pick.value);
+      clothesList.append(el('div', { className: 'row' }, el('label', {}, 'underwear set ', pick)));
+    }
   }
   pages.clothes.append(
     el('h4', { textContent: 'her clothes' }),

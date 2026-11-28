@@ -19,6 +19,8 @@
 //                     the underwear off) or 'bare' (everything off)
 //   state()           'dressed', 'underwear', 'bare' or 'partly'
 //   onChange(fn)      called after any change, with state()
+//   sets()            the underwear sets: the model's own first, then outfits.json "sets"
+//   wearSet(name)     put one on (its pictures on those pieces); wearing: which one is on
 //
 // Underwear is a piece labelled bra or panties (<model>.outfits.json names
 // them: a VRoid export paints underwear on the skin, so a model only has
@@ -38,13 +40,15 @@ export async function createOutfits({ THREE, vrm, url = '' }) {
   // The model's own names (<model>.outfits.json), read first: a part it names
   // is clothing whatever its material is called, so a model that isn't
   // VRoid's ("Jacket", "Skirt_mat") works too, not only VRoid's _CLOTH names.
-  let named = {};
+  let named = {}, file = {};
   if (url) {
     try {
       const r = await fetch(url.replace(/\.vrm$/i, '') + '.outfits.json', { cache: 'no-store' });
-      if (r.ok) named = (await r.json())?.pieces || {};
+      if (r.ok) file = (await r.json()) || {};
+      if (!file || typeof file !== 'object' || Array.isArray(file)) file = {};
+      named = file.pieces || {};
       if (!named || typeof named !== 'object' || Array.isArray(named)) named = {};
-    } catch (e) { named = {}; /* no file, or not JSON: the guesses stand */ }
+    } catch (e) { named = {}; file = {}; /* no file, or not JSON: the guesses stand */ }
   }
   // a part as a whole word of the name: "Bra" is in "Underwear_Bra_CLOTH",
   // not in "Hair_Braid" or "Cobra"; "CLOTH_02" is in "..._CLOTH_02 (Instance)"
@@ -82,6 +86,7 @@ export async function createOutfits({ THREE, vrm, url = '' }) {
     if (seen[g.label] > 1) g.label = `${g.label} ${(count[g.label] = (count[g.label] || 0) + 1)}`;
 
   const listeners = [];
+  const kind = label => String(label).replace(/ \d+$/, '');
   const isOn = g => g.objects.some(o => o.visible);
   const isUnder = g => UNDER.test(g.label);
   function state() {
@@ -117,7 +122,69 @@ export async function createOutfits({ THREE, vrm, url = '' }) {
   }
   const pieces = () => [...groups.values()].map(g => ({ id: g.id, label: g.label, on: isOn(g), under: isUnder(g) }));
 
-  return { pieces, set, wear, state, onChange: fn => listeners.push(fn), get has() { return groups.size > 0; } };
+  // -- sets: the same pieces in other textures (outfits.json "sets") ----------
+  // {"sets": {"mint": {"bra": "sets/mint-bra.png", "panties": "sets/mint-panties.png"}},
+  //  "default_name": "white"}: by piece label, a picture next to the model. The
+  // model's own textures are the default set. Only the picture changes: the
+  // pieces stay where they are, on or off.
+  const SAFE = /^[A-Za-z0-9][A-Za-z0-9_./-]*\.(png|jpe?g|webp)$/i;
+  const dir = url.replace(/[^/]*$/, '');
+  const defaultName = String(file.default_name || 'default');
+  const sets = {};
+  for (const [name, parts] of Object.entries(file.sets || {})) {
+    if (!/^[a-z0-9][a-z0-9_-]{0,23}$/.test(name) || name === defaultName || !parts || typeof parts !== 'object') continue;
+    const ok = Object.entries(parts).filter(([, f]) => typeof f === 'string' && SAFE.test(f) && !f.includes('..'));
+    if (ok.length) sets[name] = Object.fromEntries(ok);
+  }
+  const originals = new Map();                     // material -> { map, shade }, the model's own
+  const textures = new Map();                      // file -> Promise<Texture>
+  const setListeners = [];
+  let wearing = defaultName, asked = 0;
+  const materialsOf = label => [...groups.values()].filter(g => kind(g.label) === label)
+    .flatMap(g => g.objects.flatMap(o => [].concat(o.material)));
+  const load = f => {
+    if (!textures.has(f))   // a failed load is forgotten, so picking the set again tries again
+      textures.set(f, new THREE.TextureLoader().loadAsync(dir + f).catch(e => { textures.delete(f); throw e; }));
+    return textures.get(f);
+  };
+  async function wearSet(name) {
+    name = String(name || defaultName);
+    if (name !== defaultName && !sets[name]) return false;
+    const mine = ++asked;                          // a quicker pick after this one wins
+    const pick = sets[name] || {};
+    const labels = new Set(Object.values(sets).flatMap(p => Object.keys(p)));
+    const want = [];
+    for (const label of labels) for (const m of materialsOf(label)) {
+      if (!m || !m.map) continue;
+      if (!originals.has(m)) originals.set(m, { map: m.map, shade: m.shadeMultiplyTexture });
+      want.push([m, pick[label] ? load(pick[label]) : null]);
+    }
+    let pics;
+    try { pics = await Promise.all(want.map(([, p]) => p)); }
+    catch (e) { console.error('outfit set', name, e); return false; }
+    if (mine !== asked) return false;
+    want.forEach(([m], i) => {
+      const own = originals.get(m), t = pics[i];
+      if (t) {                                     // as the model's own was read: VRM textures aren't flipped
+        t.flipY = own.map.flipY; t.colorSpace = own.map.colorSpace;
+        t.wrapS = own.map.wrapS; t.wrapT = own.map.wrapT; t.needsUpdate = true;
+      }
+      m.map = t || own.map;
+      if ('shadeMultiplyTexture' in m && own.shade) m.shadeMultiplyTexture = t || own.shade;
+      m.needsUpdate = true;
+    });
+    wearing = name;
+    // the other sets' pictures leave the GPU (2048² each); picked again, they go back up
+    const inUse = new Set(pics.filter(Boolean));
+    for (const p of textures.values()) p.then(t => { if (!inUse.has(t) && mine === asked) t.dispose(); }, () => {});
+    for (const fn of setListeners) { try { fn(name); } catch (e) { console.error(e); } }
+    return true;
+  }
+  const setNames = () => [defaultName, ...Object.keys(sets)];
+
+  return { pieces, set, wear, state, onChange: fn => listeners.push(fn), get has() { return groups.size > 0; },
+           sets: setNames, wearSet, get wearing() { return wearing; }, defaultSet: defaultName,
+           onSet: fn => setListeners.push(fn) };
 }
 
 // Where each piece sits on her, from its vertices in the rest pose: a piece

@@ -114,6 +114,29 @@ class Command(unittest.TestCase):
             self.assertTrue(portrait.handle("/outfit sideways"))
             emit.assert_not_called()
 
+    def test_underwear_sets(self):
+        from commands import portrait
+
+        clothes.note("underwear", [], ["bra", "panties"], "white", ["white", "mint", "midnight"])
+        self.assertEqual((clothes.current()["set"], clothes.current()["sets"]), ("white", ["white", "mint", "midnight"]))
+        with mock.patch("web.livefeed.emit") as emit, mock.patch("ui.add_message") as say, \
+                mock.patch.object(clothes, "_open", return_value=False):
+            portrait.handle("/outfit set mint")
+            emit.assert_not_called()
+            self.assertIn("isn't open", say.call_args[0][1])
+        with mock.patch("web.livefeed.emit") as emit, mock.patch("ui.add_message") as say, \
+                mock.patch.object(clothes, "_open", return_value=True):
+            portrait.handle("/outfit set mint")
+            emit.assert_called_with("outfit", set="mint")
+            emit.reset_mock()
+            portrait.handle("/outfit set plaid")
+            emit.assert_not_called()
+            self.assertIn("No set called plaid", say.call_args[0][1])
+            portrait.handle("/outfit set")
+            self.assertIn("Sets: white, mint, midnight", say.call_args[0][1])
+        clothes.note("dressed", [], ["top"])                  # a model without sets
+        self.assertEqual(clothes.current()["sets"], [])
+
     def test_outfit_says_what_it_did(self):
         from commands import portrait
 

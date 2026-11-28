@@ -127,7 +127,7 @@ _HELP_SECTIONS = [
         ("/portrait frame", "bust (head and shoulders) or full. Click the avatar to touch it"),
         ("/holo", "hologram look on or off"),
         ("/lights", "light strips on the robot avatar on or off"),
-        ("/outfit", "clothes on a human avatar: dressed, underwear, or one piece off or on"),
+        ("/outfit", "clothes on a human avatar: dressed, underwear, or one piece off or on; /outfit set <name> for another underwear set"),
         ("/blanket", "a blanket round the avatar's shoulders, on or off"),
         ("/rave", "rave gear (a pacifier and glow sticks), on or off"),
         ("/coffee", "a coffee now (it also happens by itself in the morning; /coffee off, sip)"),

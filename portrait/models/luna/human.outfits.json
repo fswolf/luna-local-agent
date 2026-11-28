@@ -1,1 +1,10 @@
-{"pieces": {"Underwear_Bra": "bra", "Underwear_Panties": "panties"}}
+{
+ "pieces": {"Underwear_Bra": "bra", "Underwear_Panties": "panties"},
+ "default_name": "white",
+ "sets": {
+  "midnight": {"bra": "sets/midnight-bra.png", "panties": "sets/midnight-panties.png"},
+  "sakura": {"bra": "sets/sakura-bra.png", "panties": "sets/sakura-panties.png"},
+  "mint": {"bra": "sets/mint-bra.png", "panties": "sets/mint-panties.png"},
+  "lavender": {"bra": "sets/lavender-bra.png", "panties": "sets/lavender-panties.png"}
+ }
+}

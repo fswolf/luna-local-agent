@@ -361,6 +361,7 @@ function handle(ev) {
       if (ev.p === 'a' && ev.s && gmode.mode !== 'off') { said.text = (said.text + ev.s).slice(-400); actOut(said.text); }
       break;
     case 'outfit':      // /outfit in her terminal, or a clothes [tag] she wrote (src: tag)
+      if (ev.set) { outfits?.wearSet?.(String(ev.set)); break; }   // /outfit set mint: the same pieces in other pictures
       if (ev.src === 'tag') { if (gmode.clothes !== 'off') clothes(ev, 'her'); }
       else clothes(ev, 'command');
       break;
@@ -650,8 +651,12 @@ function wireOutfits(o) {
     const off = o.pieces().filter(p => !p.on);
     fetch('outfit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ wearing: o.has ? o.state() : 'none', off: off.map(p => p.label),
-                             pieces: o.pieces().map(p => p.label) }) }).catch(() => {});
+                             pieces: o.pieces().map(p => p.label), set: o.wearing, sets: o.sets() }) }).catch(() => {});
   };
+  // the underwear set she's in (outfits.json "sets"): kept like the pieces, per model
+  const setKey = 'luna.outfitset.' + (cfg.model || '');
+  try { const was = localStorage.getItem(setKey); if (was && was !== o.wearing) o.wearSet(was); } catch (e) {}
+  o.onSet(name => { try { localStorage.setItem(setKey, name); } catch (e) {} tell(); });
   if (o.has && !mind.tame) {
     try { for (const id of JSON.parse(localStorage.getItem(key) || '[]')) o.set(id, false); } catch (e) {}
   }
