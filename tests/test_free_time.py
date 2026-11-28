@@ -105,6 +105,15 @@ class Doing(Base):
         self.assertIn("wrote in her journal: A quiet afternoon", items[0]["text"])
         self.assertEqual(freetime.recent_entries()[0]["why"], "get today down")
 
+    def test_the_hint_comes_once(self):
+        freetime._hinted.clear()
+        lines = []
+        self.replies = ["journal - a", "Note one.", "journal - b", "Note two."]
+        freetime.spend("m", show=lines.append)
+        freetime.spend("m", show=lines.append)
+        self.assertIn("/freetime", lines[0])
+        self.assertNotIn("/freetime", lines[1])
+
     def test_a_rest_is_kept_but_not_announced(self):
         self.replies = ["rest - long day"]
         self.assertEqual(freetime.spend("m")["what"], "rest")

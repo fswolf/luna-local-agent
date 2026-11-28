@@ -48,6 +48,7 @@ PASSAGE = 3500          # characters read in one sitting (about 900 tokens)
 KEEP_DONE = 200         # finished files remembered, so a new one is picked next
 _PERSONA = 600          # characters of her personality in the choice prompt
 _now_running = threading.Lock()
+_hinted = threading.Event()
 
 
 def busy():
@@ -345,8 +346,10 @@ def spend(model, show=None):
             from life import away
 
             away.note("free time", text)
-            if show:
-                show(f"{config.AGENT_NAME} {said} in her free time (/freetime to see it)")
+            if show:                     # the hint once a run, not on every line
+                show(f"{config.AGENT_NAME} {said} in her free time"
+                     + ("" if _hinted.is_set() else " (/freetime to see what she made of it)"))
+                _hinted.set()
         return entry
     finally:
         _now_running.release()

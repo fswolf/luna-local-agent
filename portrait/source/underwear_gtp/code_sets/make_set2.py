@@ -112,6 +112,6 @@ def make(piece, spec, out):
 
 
 if __name__ == "__main__":
-    spec = json.load(open(sys.argv[1]))
+    spec = json.load(open(sys.argv[1], encoding="utf-8"))
     for piece in ("bra", "panties"):
         make(piece, spec, f"{sys.argv[2]}/{spec['name']}-{piece}.png")
