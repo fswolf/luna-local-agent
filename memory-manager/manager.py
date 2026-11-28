@@ -112,11 +112,21 @@ def notebook_state():
                           "turns": e["turns"], "summary": e["summary"], "game": games.get(e["id"], "")}
                          for e in nb.episodes(100000)],
             "lessons": [lesson(l) for l in nb.lessons()],
+            "journal": _journal(),
             "retired_lessons": [lesson(l) for l in nb.lessons(retired=True)],
             **conclusions_state(),
         }
     except Exception:
         return None
+
+
+def _journal():
+    """Her free time (mind/freetime.py): what she did, why, and what she wrote."""
+    from mind import freetime
+
+    return [{"id": e["id"], "at": str(e["at"])[:16].replace("T", " "), "what": e["what"],
+             "why": e["why"], "title": e["title"], "note": e["note"]}
+            for e in freetime.recent_entries(100000)]
 
 
 def conclusions_state():
@@ -161,6 +171,10 @@ def _apply(action, body):
             nb.forget_game_feeling(str(body.get("game", "")))
         elif action == "nb_episode_forget":
             nb.delete_episode(int(body.get("id", -1)))
+        elif action == "nb_journal_forget":
+            from mind import freetime
+
+            freetime.delete_entry(int(body.get("id", -1)))
         elif action == "nb_lesson_retire":
             nb.retire_lesson(int(body.get("id", -1)))
         elif action == "nb_lesson_restore":
@@ -373,6 +387,7 @@ PAGE = r"""<!DOCTYPE html>
   .fact .unsure { color: var(--danger); font-size: 12px; border: 1px dashed var(--line);
                   border-radius: 20px; padding: 1px 9px; white-space: nowrap; margin-top: 2px; }
   .fact.retired .text { text-decoration: line-through; }
+  #journal .text { white-space: pre-line; }
   button {
     background: none; border: 1px solid var(--line); color: var(--dim);
     border-radius: 6px; padding: 3px 10px; font-size: 12px;
@@ -396,11 +411,13 @@ PAGE = r"""<!DOCTYPE html>
             color: var(--ok); opacity: 0; transition: opacity .3s; }
   .empty { color: var(--dim); font-size: 13px; padding: 8px 2px; }
   .meta-note { color: var(--dim); font-size: 13px; }
-  #epsearch, #hsearch, #csearch, #rsearch {
+  #epsearch, #hsearch, #csearch, #rsearch, #jsearch, #jkind {
     width: 100%; padding: 9px 12px; border-radius: 8px;
     border: 1px solid var(--line); background: var(--panel);
     color: var(--text); font-size: 14px; outline: none;
   }
+  #jfilter { display: flex; gap: 8px; margin: 12px 0 4px; }
+  #jkind { width: auto; flex: 0 0 auto; }
   #csearch, #rsearch { margin: 12px 0 4px; }
   #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 6px 0 16px; flex-wrap: wrap; }
   #tabs a { color: var(--dim); text-decoration: none; padding: 7px 14px; border-radius: 8px 8px 0 0;
@@ -420,6 +437,7 @@ PAGE = r"""<!DOCTYPE html>
   <a href="#concluded" data-tab="concluded">What she's concluded <span id="n-concluded"></span></a>
   <a href="#retired" data-tab="retired">Retired <span id="n-retired"></span></a>
   <a href="#notebook" data-tab="notebook">Her notebook <span id="n-notebook"></span></a>
+  <a href="#journal" data-tab="journal">Her journal <span id="n-journal"></span></a>
   <a href="#lessons" data-tab="lessons">Her lessons <span id="n-lessons"></span></a>
   <a href="#history" data-tab="history">History</a>
 </nav>
@@ -474,6 +492,21 @@ PAGE = r"""<!DOCTYPE html>
 <h2>Her notes on conversations and games</h2>
 <input id="epsearch" placeholder="filter..." oninput="renderNotebook()">
 <div id="episodes"></div>
+</div>
+</section>
+
+<section data-tab="journal" hidden>
+<div class="meta-note">Her free time: what she chose to do while nobody was talking to her, why, and what she wrote about it. A journal entry, a few lines on what she read or looked up, or the underwear set she picked.</div>
+<div class="empty nb-missing" style="display:none">Her journal (agent/notebook.db) can't be read right now.</div>
+<div id="nb-journal">
+<div id="jfilter">
+  <select id="jkind" onchange="renderNotebook()">
+    <option value="">everything</option><option value="journal">journal</option><option value="read">reading</option>
+    <option value="look_up">looked up</option><option value="wear">what she wore</option><option value="rest">rests</option>
+  </select>
+  <input id="jsearch" placeholder="filter..." oninput="renderNotebook()">
+</div>
+<div id="journal"></div>
 </div>
 </section>
 
@@ -602,7 +635,7 @@ function editFeeling(row, f) {
 // the address (#notebook), so a reload or a link lands on the same one.
 function showTab() {
   const want = (location.hash || "#facts").slice(1);
-  const tab = ["facts", "concluded", "retired", "notebook", "lessons", "history"].includes(want) ? want : "facts";
+  const tab = ["facts", "concluded", "retired", "notebook", "journal", "lessons", "history"].includes(want) ? want : "facts";
   document.querySelectorAll("section[data-tab]").forEach(s => s.hidden = s.dataset.tab !== tab);
   document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
 }
@@ -613,14 +646,29 @@ function count(id, n) { document.getElementById(id).textContent = n ? `(${n})` :
 
 function renderNotebook() {
   const N = S.notebook;
-  for (const id of ["nb", "nb-lessons", "nb-conclusions"]) document.getElementById(id).style.display = N ? "" : "none";
+  for (const id of ["nb", "nb-lessons", "nb-conclusions", "nb-journal"]) document.getElementById(id).style.display = N ? "" : "none";
   document.querySelectorAll(".nb-missing").forEach(el => el.style.display = N ? "none" : "");
   count("n-facts", S.active.length);
   count("n-retired", S.retired.length);
   count("n-concluded", N ? N.conclusions.length : 0);
   count("n-notebook", N ? N.episodes.length + N.feelings.length : 0);
   count("n-lessons", N ? N.lessons.length : 0);
+  count("n-journal", N ? N.journal.filter(j => j.what !== "rest").length : 0);
   if (!N) return;
+
+  // her free time: what she did, why, what she wrote; rests only when asked for
+  const JKIND = {journal: "journal", read: "reading", look_up: "looked up", wear: "wore", rest: "rest"};
+  const jk = document.getElementById("jkind").value, jq = document.getElementById("jsearch").value.toLowerCase();
+  fill("journal", N.journal
+    .filter(j => jk ? j.what === jk : j.what !== "rest")
+    .filter(j => !jq || (j.note + " " + j.why + " " + j.title).toLowerCase().includes(jq))
+    .map(j => nbRow((j.title ? j.title + (j.note ? ": " : "") : "") + (j.note || (j.title ? "" : "(nothing written)"))
+                    + (j.why ? "\n\nwhy: " + j.why : ""),
+                    [["game", JKIND[j.what] || j.what], ["date", j.at]], [
+      ["forget", "danger", async () => {
+        if (!confirm("Forget this entry?")) return;
+        await api("nb_journal_forget", {id: j.id}); refresh(true); }],
+    ])), "nothing yet - she writes here in her free time (/freetime now for some now)");
 
   fill("feelings", N.feelings.map(f => {
     const row = nbRow(f.title + ": " + f.feeling, [["date", f.at]], [

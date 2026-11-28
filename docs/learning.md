@@ -174,6 +174,9 @@ thing that leaves the house is the search for `look_up`: she's asked for a
 general subject, nothing private, but it comes from your conversations, so
 take `look_up` off the list if you'd rather it didn't.
 
+All of it is on the memory page too (127.0.0.1:8792/memory/), under **Her journal**: every
+entry, newest first, filtered by kind or by words, each one forgettable.
+
 ```
 /freetime                what she did lately, and why she picked it
 /freetime now            some free time now

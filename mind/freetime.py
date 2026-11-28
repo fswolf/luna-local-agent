@@ -379,7 +379,15 @@ def recent_entries(limit=10):
     """Newest first."""
     def read(c):
         c.execute(_SCHEMA)
-        return c.execute("SELECT at, what, why, title, note FROM free_time ORDER BY id DESC LIMIT ?",
+        return c.execute("SELECT id, at, what, why, title, note FROM free_time ORDER BY id DESC LIMIT ?",
                          (int(limit),)).fetchall()
     rows = notebook._run(read, default=[]) or []
-    return [dict(zip(("at", "what", "why", "title", "note"), r)) for r in rows]
+    return [dict(zip(("id", "at", "what", "why", "title", "note"), r)) for r in rows]
+
+
+def delete_entry(entry_id):
+    """One entry gone (her journal page's forget)."""
+    def drop(c):
+        c.execute(_SCHEMA)
+        return c.execute("DELETE FROM free_time WHERE id=?", (int(entry_id),)).rowcount
+    return bool(notebook._run(drop, default=0))

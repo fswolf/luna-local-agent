@@ -194,5 +194,27 @@ class Doing(Base):
         self.assertEqual(freetime.recent_entries(), [])
 
 
+class JournalPage(Base):
+    """Her journal on the memory page (memory-manager/manager.py)."""
+
+    def setUp(self):
+        super().setUp()
+        import importlib.util
+
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "memory-manager", "manager.py")
+        spec = importlib.util.spec_from_file_location("manager_journal", path)
+        self.m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.m)
+
+    def test_entries_on_the_page_and_forgotten_from_it(self):
+        freetime.add_entry("journal", "get it down", "", "A quiet day.")
+        freetime.add_entry("read", "more", "moonlit library", "The cat kept reading.")
+        page = self.m.notebook_state()["journal"]
+        self.assertEqual([j["what"] for j in page], ["read", "journal"])          # newest first
+        self.assertEqual(page[1]["note"], "A quiet day.")
+        self.m._apply("nb_journal_forget", {"id": page[1]["id"]})
+        self.assertEqual([j["what"] for j in self.m.notebook_state()["journal"]], ["read"])
+
+
 if __name__ == "__main__":
     unittest.main()
