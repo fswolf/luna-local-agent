@@ -30,7 +30,8 @@ account.
   the model you're looking at and the `rethink_below` that fits it.
 - **The red "low confidence" tag** is a run of three or more coin-flip
   tokens on a number or a name: a guess at a fact. A run on wording isn't
-  flagged; on a 9B that's most replies.
+  flagged; on a 9B that's most replies. Nor is a name or number already in
+  the conversation: she's repeating it, not guessing.
 
 ## What moves it
 

@@ -231,7 +231,9 @@ the thought log already measures:
    silently, with the thinking budget lifted (`deep_budget`, -1 =
    unlimited). Shaky means less sure than `rethink_below` on the whole,
    whatever the reply is about, or surer than that but with a run of
-   coin-flip tokens on a number, a name, a time or a date.
+   coin-flip tokens on a number, a name, a time or a date. A name or a
+   number that's already in the last few messages doesn't count: she's
+   repeating it, not guessing it.
    **Set `rethink_below` to fit your model.** Every model has its own
    normal: a 9B sits around 40-50% sure on everyday replies, so at the
    default 75% every reply gets a second look, and none is ever replaced

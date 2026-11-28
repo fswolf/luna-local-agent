@@ -210,3 +210,36 @@ class CheckingAfterTheReply(unittest.TestCase):
         from llm import turns
         self.assertIn("_ONLY_WHAT_CHANGED", inspect.getsource(turns))
         self.assertIn("don't repeat it", second_look._ONLY_WHAT_CHANGED)
+
+
+class NamesAlreadySaid(unittest.TestCase):
+    """A name or number already in the conversation is repeated, not guessed (2026-11-28:
+    "And Claude meeting Luna" in banter about Claude got voted on and hedged)."""
+
+    def test_a_name_from_the_conversation_isnt_a_guess(self):
+        from core import specifics
+
+        answer = "*grins* So when Claude meets me, what will he say?"
+        self.assertTrue(specifics._unsure_of_a_specific(answer, "So when Claude meets", ""))
+        self.assertFalse(specifics._unsure_of_a_specific(answer, "So when Claude meets",
+                                                         "we should do a video where Claude meets Luna"))
+
+    def test_a_new_name_still_is(self):
+        from core import specifics
+
+        answer = "*thinks* The card has 16 GB, I think it was a Radeon."
+        self.assertTrue(specifics._unsure_of_a_specific(answer, "16 GB I think", "what card is in the server?"))
+
+    def test_whole_words_only(self):
+        from core import specifics
+
+        answer = "It runs on the NUC upstairs, right next to Nucleus."
+        self.assertTrue(specifics._unsure_of_a_specific(answer, "next to Nucleus", "the nuc is upstairs"))
+
+    def test_the_conversation_is_read_when_none_is_given(self):
+        from core import history, specifics
+
+        with mock.patch.object(history, "get_messages", return_value=[
+                {"role": "user", "content": "let's make a Claude meets Luna video"},
+                {"role": "assistant", "content": "So when Claude meets me?"}]):
+            self.assertFalse(specifics._unsure_of_a_specific("So when Claude meets me?", "So when Claude meets"))

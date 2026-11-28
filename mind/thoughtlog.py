@@ -198,7 +198,7 @@ def record(user_text, rounds, answer, source="typed", tools=(),
                    checks=checks)
     shape = confidence(runs)
 
-    low, over = _unsure(shape, str(answer or ""), names, source)
+    low, over = _unsure(shape, str(answer or ""), names, source, str(user_text or ""))
 
     if low and (checks is None or "low confidence" in checks):
         flags.append(f"low confidence: {shape['shaky']}")
@@ -309,7 +309,7 @@ SHAKY_RUN = 3       # this many low tokens in a row is a shaky span
 FLAGS_VERSION = 2   # 2: low confidence and overconfident only on a shaky fact (2026-11-27)
 
 
-def _unsure(shape, answer, tools=(), source="typed"):
+def _unsure(shape, answer, tools=(), source="typed", known=""):
     """(low confidence, overconfident) for a reply, by the same rule the
     hedge line uses (llm/second_look.py _calibrate). Low confidence: a run
     of coin-flip tokens on a number or a name, a guess at a fact. A run on
@@ -318,7 +318,7 @@ def _unsure(shape, answer, tools=(), source="typed"):
     self.hedge_below, with no tool to read from and no hedge said."""
     from core.specifics import _unsure_of_a_specific
 
-    low = bool(shape.get("shaky")) and _unsure_of_a_specific(answer, shape.get("span", ""))
+    low = bool(shape.get("shaky")) and _unsure_of_a_specific(answer, shape.get("span", ""), known)
     hedge_below = float(getattr(config, "SELF_HEDGE_BELOW", 0.6))
     over = (low and shape.get("conf") is not None and shape["conf"] < hedge_below
             and not tools and source in ("typed", "voice", "station")

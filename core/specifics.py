@@ -61,10 +61,32 @@ something someone everyone here very really well please thank thanks sorry hey h
 """.split())
 
 
-def _unsure_of_a_specific(answer, span):
+def _said_lately(answer=""):
+    """The last few messages of the conversation, lower case: a name or a
+    number already in them isn't one she could be guessing at. Her reply
+    itself is left out, if it's been saved already."""
+    try:
+        from core import history
+
+        msgs = [m for m in history.get_messages()[-8:] if isinstance(m.get("content"), str)]
+    except Exception:
+        return ""
+    return " ".join(m["content"] for m in msgs if m["content"].strip() != str(answer or "").strip()).lower()
+
+
+def _unsure_of_a_specific(answer, span, known=None):
     """Does the unsure run hold one of the reply's specifics - a number, or
     a name (a capitalised word that doesn't just start a sentence)? Those
     are read off the whole reply, where a sentence start can be told apart;
-    the run alone can start mid-sentence."""
+    the run alone can start mid-sentence.
+
+    One that's already in the conversation (known: that text; None reads the
+    last few messages) is something she's repeating, not guessing: "Claude",
+    "Zork" or "the NUC" in banter about them had a roleplay reply voted on and
+    hedged at 42% sure (2026-11-28)."""
     span = " ".join(str(span or "").lower().replace(",", "").split())
-    return bool(span) and any(term in span for term in _key_terms(answer))
+    if not span:
+        return False
+    known = _said_lately(answer) if known is None else str(known or "").lower()
+    word = lambda t, text: re.search(rf"(?<![a-z0-9]){re.escape(t)}(?![a-z0-9])", text)
+    return any(word(term, span) and not word(term, known) for term in _key_terms(answer))
