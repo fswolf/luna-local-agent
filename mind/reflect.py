@@ -34,6 +34,9 @@ with /reflect:
   docs       between batches: a sentence or two on what each file in
              her knowledge folders covers (mind/knowledge.py), a few files
              a pass, rewritten only when a file changes.
+  free time  between batches, not at night: every so often she picks
+             something to do with her own time - read, look something up,
+             write in her journal, or rest (mind/freetime.py).
 
 Plus the startup part: the previous session is summarised before
 anything else, so the first thing she says can pick up where it left
@@ -1025,6 +1028,30 @@ def _night(model, show):
         notebook.put("night_at", datetime.now().isoformat(timespec="seconds"))
 
 
+def _free_time_due(now=None):
+    """Her own time (mind/freetime.py): due, and not her night."""
+    from mind import freetime
+
+    now = now or datetime.now()
+    hours = _quiet_hours()
+    if hours is not None and _in_hours(hours, now.hour):
+        return False
+    return freetime.due(now)
+
+
+def _free_time(model, show):
+    from mind import freetime
+
+    try:
+        freetime.spend(model, show)
+        _job_ok("free_time")
+    except Interrupted:
+        raise
+    except Exception as e:
+        logbook.warn("reflect", "free time failed: %s", e)
+        _job_failed("free_time")            # the server's down: an hour's rest
+
+
 def _busy():
     try:
         from core import assistant
@@ -1250,6 +1277,8 @@ def _loop(model, show):
                             _job_failed("docs")            # the server's down: an hour's rest
                         else:
                             _job_ok("docs")
+                    if not _resting("free_time") and _free_time_due():
+                        _free_time(model, show)
         except Interrupted:
             pass
         except Exception:
@@ -1260,7 +1289,7 @@ def start(model, show=None):
     """Called once at startup. show(line) puts a line on screen."""
     if not any(getattr(config, k, True) for k in
                ("SELF_EPISODES", "SELF_LESSONS", "SELF_TIDY_FACTS", "SELF_GREET", "SELF_PAGES",
-                "SELF_PROFILES", "SELF_CONCLUSIONS")):
+                "SELF_PROFILES", "SELF_CONCLUSIONS", "SELF_FREE_TIME")):
         return
 
     threading.Thread(target=_loop, args=(model, show), daemon=True,

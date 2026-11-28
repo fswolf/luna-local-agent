@@ -1,4 +1,4 @@
-"""Her own life: /mood, /coffee, /read, /doze, /plushie, /music, /situation.
+"""Her own life: /mood, /coffee, /read, /freetime, /doze, /plushie, /music, /situation.
 
 Part of the commands package; see commands/__init__.py.
 """
@@ -45,6 +45,54 @@ def _mood_check(count):
         logbook.info("mood", "mood check:\n%s", "\n".join(lines))
 
     threading.Thread(target=run, daemon=True, name="mood-check").start()
+
+
+def _free_time(word):
+    """/freetime: what she did with her free time. /freetime now: some now."""
+    import sys
+
+    from mind import freetime
+
+    if word in ("now", "go"):
+        model = getattr(sys.modules.get("__main__"), "MODEL", None)
+        if freetime.busy():
+            ui.add_message("system", "She's already having some free time.")
+            return
+        if not model or not freetime.menu():
+            ui.add_message("system", "No model loaded." if not model else
+                           "Nothing on her free-time menu right now (self.free_time_choices).")
+            return
+
+        def run():
+            from mind import reflect
+
+            try:
+                entry = freetime.spend(model)
+            except reflect.Interrupted:
+                return
+            except Exception as e:
+                logbook.exception("freetime", "/freetime now failed")
+                ui.add_message("system", f"Free time failed: {e}")
+                return
+            ui.add_message("system", _entry_lines(entry) if entry else "She didn't pick anything.")
+
+        ui.add_message("system", "She has some free time...")
+        threading.Thread(target=run, daemon=True, name="free-time").start()
+        return
+
+    entries = freetime.recent_entries(10)
+    if not entries:
+        ui.add_message("system", "No free time yet. It comes every "
+                       f"{int(freetime._every())} minutes or so while she's idle (not at night); /freetime now for some now."
+                       + ("" if freetime.on() else " It's off: /set self.free_time true"))
+        return
+    ui.add_message("system", "\n\n".join(_entry_lines(e) for e in entries))
+
+
+def _entry_lines(e):
+    head = f"{e['at'][5:16].replace('T', ' ')}  {e['what']}" + (f": {e['title']}" if e.get("title") else "")
+    return "\n".join(x for x in (head, f"  why: {e['why']}" if e.get("why") else "",
+                                 f"  {e['note']}" if e.get("note") else "") if x)
 
 
 def handle(text):
@@ -162,6 +210,10 @@ def handle(text):
             ui.add_message("system", "She turns a page." if reading.page(lookup=False) else "She isn't reading - /read first.")
         elif word in ("look", "up"):
             ui.add_message("system", "She looks up at you." if reading.page(lookup=True) else "She isn't reading - /read first.")
+        return True
+
+    if text == "/freetime" or text.startswith("/freetime "):
+        _free_time(text[len("/freetime"):].strip().lower())
         return True
 
     if text == "/doze" or text.startswith("/doze "):

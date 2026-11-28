@@ -1,6 +1,6 @@
 # Learning from herself
 
-Ten things that make her a little better each day, and more aware of what's around her. None of them
+Eleven things that make her a little better each day, and more aware of what's around her. None of them
 changes the model's weights. They change what she gets told about
 herself, and all of it is written down where you can read it, edit it,
 or switch it off.
@@ -9,6 +9,7 @@ or switch it off.
 |---|---|---|
 | Lessons (the dream pass) | reads back her own turns that went wrong and writes one-line lessons she follows from then on; she can also note one herself, with your OK | `/lessons` |
 | Episodic memory | a few sentences of her own notes on each conversation, and on each time she played a game | `/episodes` |
+| Free time | every so often while idle, she picks what to do with her own time: read, look something up, write in her journal, or rest | `/freetime` |
 | Fact cleanup | merges facts that say the same thing twice, retires the losing side of a contradiction | `/facts retired` |
 | Pages | a short joined-up note on each subject she knows a lot about (a person, your hardware), brought along when you talk about it ([memory.md](memory.md#pages)) | `/pages` |
 | Conclusions | what she's worked out about each person from reading back her conversations while idle: said or inferred, with the exchanges behind it ([memory.md](memory.md#conclusions)) | `/conclusions` |
@@ -144,6 +145,40 @@ The prompt only carries older notes that are clearly about what's being
 said. For anything else she has **`recall_episodes`**: she searches her
 own notes when you ask "what did we decide about the waybar last
 month?", and uses `search_history` when she needs the exact words.
+
+## Free time: what she picks herself
+
+Most of what she does on her own runs on timers: coffee in the morning, a
+book after ten quiet minutes, dozing late at night, the chores above. Her
+free time is the part she chooses. Every `self.free_time_every` minutes
+(90) of being left alone, once she's been idle ten minutes and it isn't her
+night (`self.dream_hours`), she's told the time of day, her mood and what
+she did last time, and asked what she feels like doing:
+
+| Choice | What she does |
+|---|---|
+| `read` | The next few pages of something in her knowledge folders, picking up where she left off, and a few lines on it. Files marked as spoilers are left alone |
+| `look_up` | Something she got curious about in a recent conversation, searched on the web (only with `web_search.enabled`), and a few lines on what she found |
+| `journal` | A few lines on how her day's going |
+| `rest` | Nothing |
+
+She answers with one of them and a sentence on why. What she did, why, and
+what she wrote are kept in `agent/notebook.db`. Anything but a rest is
+noted for her hello when you come back ("while you were out"), so she can
+tell you about the book. It's one or two small model calls, never during a
+turn: talk to her and it's dropped.
+
+Nothing on the list runs a tool, writes a file or needs your OK. The one
+thing that leaves the house is the search for `look_up`: she's asked for a
+general subject, nothing private, but it comes from your conversations, so
+take `look_up` off the list if you'd rather it didn't.
+
+```
+/freetime                what she did lately, and why she picked it
+/freetime now            some free time now
+/set self.free_time_choices read, journal, rest
+/set self.free_time false
+```
 
 ## Recipes: the skill library
 

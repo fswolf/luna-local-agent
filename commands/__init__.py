@@ -4,7 +4,7 @@
     reminders  /reminders /cancel /alarms /alarm /snooze /when /repair
     settings   /settings /preset /set /tools /tooltest /context /allow /mcp /plugins
     voice      /look /mic /voice /barge /hear /wake
-    life       /mood /coffee /read /doze /plushie /music /situation
+    life       /mood /coffee /read /freetime /doze /plushie /music /situation
     portrait   /monitor /holo /outfit /lights /portrait ...
     memory     /facts /thoughts /memory /reflect /lessons /skills /projects /knowledge /episodes
     people     /camera /presence /people

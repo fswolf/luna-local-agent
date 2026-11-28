@@ -132,6 +132,7 @@ _HELP_SECTIONS = [
         ("/rave", "rave gear (a pacifier and glow sticks), on or off"),
         ("/coffee", "a coffee now (it also happens by itself in the morning; /coffee off, sip)"),
         ("/read", "read a book (it also happens by itself when you're quiet; /read off, page, look)"),
+        ("/freetime", "what she did with her free time, and why she picked it (/freetime now for some now)"),
         ("/doze", "doze under a blanket (it also happens by itself late at night; /doze off wakes it)"),
         ("/plushie", "hug Mochi the plushie (it also happens by itself when the mood is low; /plushie off, squeeze)"),
     ]),

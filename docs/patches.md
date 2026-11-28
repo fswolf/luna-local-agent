@@ -365,8 +365,9 @@ they carry over to every model you use.
   `training/train.env` may leave some out: the trainer says how many. Keep patches gentle
   and check tools still work after loading one (`/tooltest`).
 - **Gesture tagging.** Gesture examples have to be tagged by hand for now: `/fix` with
-  the tags where they belong (or edit them in on the examples page), then switch the
-  example to **gesture** there; `/good` and `/fix` keep examples as habits. Tagging her real
-  replies automatically, and scripted practice conversations, are planned.
+  the tags where they belong, or edit them in on the examples page. A reply with a tag in
+  it is filed as **gesture** by itself. Also switch some good replies with no tag to
+  **gesture**, so the patch learns that most replies need none. Tagging her real replies
+  automatically, and scripted practice conversations, are planned.
 - **No before-and-after check yet.** Compare her with the patch at 0 and at 1 yourself
   until the automatic test run exists.

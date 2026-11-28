@@ -45,6 +45,7 @@ _SELF_FEATURES = (
     ("pages", "SELF_PAGES", "self.pages", "/pages"),
     ("profiles", "SELF_PROFILES", "self.profiles", "/profile"),
     ("conclusions", "SELF_CONCLUSIONS", "self.conclusions", "/conclusions"),
+    ("free time", "SELF_FREE_TIME", "self.free_time", "/freetime"),
     ("calibration", "SELF_CALIBRATION", "self.calibration", "says when unsure"),
     ("startup greeting", "SELF_GREET", "self.greet", "after a break"),
     ("skill recipes", "SELF_SKILLS", "self.skills", "/skills"),

@@ -443,6 +443,9 @@ SCHEMA = {
     "self.pages_in_prompt": ("int", "Most summary pages in one message (the ones your message is about)"),
     "self.profiles": ("bool", "Let Luna keep a short profile of you, and of each person it knows, always on hand"),
     "self.conclusions": ("bool", "Let Luna read back its conversations while idle and note what it concludes about each person"),
+    "self.free_time": ("bool", "Let Luna spend some of its idle time as it likes: reading, looking something up, writing in its journal, or resting"),
+    "self.free_time_every": ("float", "How often Luna gets some free time while idle (minutes)"),
+    "self.free_time_choices": ("text", "What Luna can choose from in its free time, comma-separated: read (its knowledge folders), look_up (a web search), journal, rest"),
     "self.calibration": ("bool", "Let Luna say when it isn't sure, based on how confident the model was (llama-server)"),
     "self.hedge_below": ("float", "Below this confidence, Luna says it isn't sure (0 to 1)"),
     "self.hedge_line": ("text", "What Luna says when it isn't sure. Empty says nothing"),
@@ -665,7 +668,7 @@ BASIC = (
     "portrait.hologram.enabled", "portrait.lights.enabled", "portrait.chat_gestures", "portrait.touch_talk",
     "camera.presence.enabled", "people.voice", "station.enabled",
     "vision.enabled", "knowledge.enabled", "reminders.enabled", "alarms.volume",
-    "long_term_memory.enabled", "self.greet", "thoughts.enabled", "tools.notify_asks", "ui.mouse",
+    "long_term_memory.enabled", "self.greet", "self.free_time", "thoughts.enabled", "tools.notify_asks", "ui.mouse",
     # toys: on at startup and the limits, for each way of connecting them
     "plugins.lovense.enabled", "plugins.lovense.max_strength", "plugins.lovense.max_motion",
     "plugins.lovense.max_seconds",
