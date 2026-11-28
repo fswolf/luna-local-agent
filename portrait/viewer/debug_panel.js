@@ -223,8 +223,29 @@ export function debugPanel() {
       dress.onclick = () => ctx.outfits?.wear('dressed');
       const key = document.createElement('div');
       key.className = 'dim';
-      key.textContent = 'pick to play · ✎ edit opens it in the pose studio · 👕 puts her clothes back on · 🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
-      box.append(sel, again, edit, dress, key);
+      key.textContent = 'pick to play · ✎ edit opens it in the pose studio · 👕 puts her clothes back on · 👙 her underwear set · 🔥 lewd · 🔒 never from stream chat · 🧍 full body only · ⛓ a chain';
+      // the same underwear in other pictures (outfits.json "sets"); the model's clothes load a moment after her,
+      // so the menu fills in when they have
+      const set = document.createElement('select');
+      set.title = 'underwear set: the bra and panties in other pictures (only the picture changes)';
+      set.style.display = 'none';
+      const fillSets = () => {
+        const o = ctx.outfits, names = o?.sets?.() || [];
+        if (names.length < 2) return false;
+        set.textContent = '';
+        for (const n of names) set.add(new Option('👙 ' + (n === o.defaultSet ? n + ' (her own)' : n), n));
+        set.value = o.wearing;
+        set.style.display = '';
+        return true;
+      };
+      set.onchange = () => ctx.outfits?.wearSet(set.value);
+      const wait = setInterval(() => {
+        if (!fillSets()) return;
+        clearInterval(wait);
+        ctx.outfits.onSet?.(() => { set.value = ctx.outfits.wearing; });
+      }, 500);
+      setTimeout(() => clearInterval(wait), 30000);
+      box.append(sel, again, edit, dress, set, key);
       continue;
     }
     for (const label of list) {

@@ -160,6 +160,7 @@ she did last time, and asked what she feels like doing:
 | `read` | The next few pages of something in her knowledge folders, picking up where she left off, and a few lines on it. Files marked as spoilers are left alone |
 | `look_up` | Something she got curious about in a recent conversation, searched on the web (only with `web_search.enabled`), and a few lines on what she found |
 | `journal` | A few lines on how her day's going |
+| `wear` | Which underwear set to have on: only on a model with sets (`outfits.json`, see [Companion](companion.md#her-clothes)) and while her portrait is open. Just the picture on the bra and panties; nothing comes off |
 | `rest` | Nothing |
 
 She answers with one of them and a sentence on why. What she did, why, and

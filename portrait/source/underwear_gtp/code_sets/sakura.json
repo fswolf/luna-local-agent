@@ -1,0 +1,28 @@
+{
+ "emblem_bra": [
+  [
+   1126,
+   522,
+   36
+  ]
+ ],
+ "emblem_panties": [
+  [
+   1024,
+   1084,
+   38
+  ]
+ ],
+ "piping": 4,
+ "edge_shade": 0.1,
+ "grain": 0.035,
+ "base": "#fde4ea",
+ "trim": "#e0708c",
+ "motif": "blossom",
+ "motif_color": "#ec8aa3",
+ "motif_centre": "#fff0f3",
+ "motif_size": 6,
+ "spacing": 38,
+ "seed": 3,
+ "name": "sakura"
+}

@@ -136,7 +136,7 @@ SELF_CONCLUSIONS = flag(_self_cfg.get("conclusions", True))
 # Free time (mind/freetime.py): every so often while idle she picks what to do.
 SELF_FREE_TIME = flag(_self_cfg.get("free_time", True))
 SELF_FREE_TIME_EVERY = float(_self_cfg.get("free_time_every", 90))
-SELF_FREE_TIME_CHOICES = str(_self_cfg.get("free_time_choices", "read, look_up, journal, rest") or "")
+SELF_FREE_TIME_CHOICES = str(_self_cfg.get("free_time_choices", "read, look_up, journal, wear, rest") or "")
 
 # The situation block (mind/situation.py): focused window, music, machine load,
 # running plugins, next reminder, what's in her hands - a few live lines in

@@ -1,0 +1,29 @@
+{
+ "emblem_bra": [
+  [
+   1126,
+   522,
+   36
+  ]
+ ],
+ "emblem_panties": [
+  [
+   1024,
+   1084,
+   38
+  ]
+ ],
+ "piping": 4,
+ "edge_shade": 0.1,
+ "grain": 0.035,
+ "base": "#bfead0",
+ "trim": "#f4fbf6",
+ "stitch_color": "#7fbf98",
+ "motif": "daisy",
+ "motif_color": "#ffffff",
+ "motif_centre": "#f2c81a",
+ "motif_size": 8,
+ "spacing": 62,
+ "seed": 7,
+ "name": "mint"
+}

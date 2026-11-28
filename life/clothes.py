@@ -62,11 +62,11 @@ def note(wearing, off=(), pieces=None, set_=None, sets=None):
         return False
     off = _labels(off)[:8]
     allp = _labels(pieces) if pieces is not None else list(dict.fromkeys(off))
-    names = _labels(sets) if sets is not None else []
-    now = str(set_ or "").strip().lower()
     with _lock:
-        _state.update(wearing=wearing, off=off, pieces=allp, at=time.time(),
-                      set=now if _LABEL.match(now) else "", sets=names)
+        _state.update(wearing=wearing, off=off, pieces=allp, at=time.time())
+        if sets is not None:                 # a page that doesn't send them leaves them as they were
+            now = str(set_ or "").strip().lower()
+            _state.update(set=now if _LABEL.match(now) else "", sets=_labels(sets))
     return True
 
 
@@ -93,11 +93,14 @@ def describe():
     if not _open():
         return ""
     if s["wearing"] == "underwear":
-        return "Wearing: just your underwear, your clothes are off"
+        which = f" (the {s['set']} set)" if s.get("set") and len(s.get("sets") or []) > 1 else ""
+        return f"Wearing: just your underwear{which}, your clothes are off"
     if s["wearing"] == "bare":
         return "Wearing: nothing, your clothes and underwear are off"
     if s["wearing"] == "partly" and s["off"]:
-        return "Wearing: your clothes, without your " + _join(s["off"])
+        shows = "top" in [re.sub(r" \d+$", "", p) for p in s["off"]] and not any(_under(p) for p in s["off"])
+        which = f" (underwear: the {s['set']} set)" if shows and s.get("set") and len(s.get("sets") or []) > 1 else ""
+        return "Wearing: your clothes, without your " + _join(s["off"]) + which
     return ""
 
 

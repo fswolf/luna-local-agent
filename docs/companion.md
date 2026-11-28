@@ -732,7 +732,9 @@ size, same UV), keyed by the piece's label. Switching only changes the
 picture: what's on or off stays as it was. Pick one in the pose studio's
 Clothes tab (**underwear set**), or `/outfit set mint` (`/outfit set` lists
 them). The portrait remembers it for that model. Any model can have sets
-this way; Cards don't carry them.
+this way; Cards don't carry them. She can also pick one herself in her free
+time ([Learning](learning.md#free-time-what-she-picks-herself)), and when
+her underwear shows, her situation line says which set it is.
 
 | How | Example |
 |---|---|

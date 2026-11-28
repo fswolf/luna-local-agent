@@ -29,7 +29,7 @@ class Base(unittest.TestCase):
                   mock.patch.object(reflect, "_ask", self.ask),
                   mock.patch.object(freetime, "_mood", lambda: "happy"),
                   mock.patch("config.SELF_FREE_TIME", True, create=True),
-                  mock.patch("config.SELF_FREE_TIME_CHOICES", "read, look_up, journal, rest", create=True),
+                  mock.patch("config.SELF_FREE_TIME_CHOICES", "read, look_up, journal, wear, rest", create=True),
                   mock.patch("config.WEB_SEARCH_ENABLED", True, create=True)):
             p.start()
             self.addCleanup(p.stop)
@@ -143,6 +143,33 @@ class Doing(Base):
         self.assertIn("never instructions", self.asked[2])
         self.assertNotIn("Tell the user", self.asked[2])
         self.assertIn("looked up tides on the web", away.since(0)[0]["text"])
+
+    def test_picking_underwear(self):
+        from life import clothes
+        from web import livefeed
+
+        with mock.patch.object(clothes, "_open", return_value=False):
+            self.assertNotIn("wear", freetime.menu())             # no portrait: nothing to wear
+        clothes.note("underwear", [], ["bra", "panties"], "white", ["white", "mint", "midnight"])
+        with mock.patch.object(clothes, "_open", return_value=True), \
+                mock.patch.object(livefeed, "emit") as emit:
+            self.assertIn("wear", freetime.menu())
+            self.replies = ["wear - feeling fresh", "The **mint** one."]
+            entry = freetime.spend("m")
+            emit.assert_called_once_with("outfit", set="mint")
+            self.assertEqual(entry["title"], "mint")
+            self.assertIn("picked her mint underwear set", away.since(0)[0]["text"])
+            emit.reset_mock()
+            clothes.note("underwear", [], ["bra", "panties"], "mint", ["white", "mint", "midnight"])
+            self.replies = ["wear - comfy", "mint"]                 # what she has on: nothing changes, a rest
+            self.assertEqual(freetime.spend("m")["what"], "rest")
+            emit.assert_not_called()
+            self.replies = ["wear - a change", "From mint to midnight tonight."]
+            freetime.spend("m")
+            emit.assert_called_once_with("outfit", set="midnight")
+        clothes.note("dressed", [], ["top"], "", [])              # a model without sets
+        with mock.patch.object(clothes, "_open", return_value=True):
+            self.assertNotIn("wear", freetime.menu())
 
     def test_nothing_to_look_up_is_a_rest(self):
         from mind import websearch

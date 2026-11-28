@@ -1,0 +1,31 @@
+{
+ "emblem_bra": [
+  [
+   1126,
+   522,
+   36
+  ]
+ ],
+ "emblem_panties": [
+  [
+   1024,
+   1084,
+   38
+  ]
+ ],
+ "piping": 4,
+ "edge_shade": 0.18,
+ "grain": 0.035,
+ "base": "#2a1b4a",
+ "trim": "#c4a5f8",
+ "motif": "sparkle",
+ "motif_color": "#f1eaff",
+ "motif_size": 8,
+ "spacing": 70,
+ "seed": 5,
+ "emblem_colors": {
+  "violet": "#8a66d9",
+  "mark": "#e3d4ff"
+ },
+ "name": "midnight"
+}

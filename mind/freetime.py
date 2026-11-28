@@ -14,6 +14,9 @@ picks one and says why:
             searched on the web, then a few lines on what she found
             (only with web_search.enabled)
   journal   a few lines on how her day's going
+  wear      which underwear set to have on (only on a model with sets,
+            outfits.json "sets", and while her portrait is open); just the
+            picture on the bra and panties, nothing comes off
   rest      nothing at all
 
 self.free_time_choices is the menu. What she did and why is kept in
@@ -37,9 +40,10 @@ CHOICES = {
     "read": "read some more of something in your knowledge folder",
     "look_up": "look up something you got curious about lately",
     "journal": "write a few lines in your journal",
+    "wear": "pick which underwear set to have on",
     "rest": "rest and do nothing for a while",
 }
-DEFAULT_CHOICES = "read, look_up, journal, rest"
+DEFAULT_CHOICES = "read, look_up, journal, wear, rest"
 PASSAGE = 3500          # characters read in one sitting (about 900 tokens)
 KEEP_DONE = 200         # finished files remembered, so a new one is picked next
 _PERSONA = 600          # characters of her personality in the choice prompt
@@ -78,7 +82,22 @@ def _usable(choice):
         return bool(_books())
     if choice == "look_up":
         return bool(getattr(config, "WEB_SEARCH_ENABLED", True))
+    if choice == "wear":
+        return len(_sets()[1]) > 1
     return True
+
+
+def _sets():
+    """(the set she has on, every set her model has), as her open portrait reports them."""
+    try:
+        from life import clothes
+
+        if not clothes._open():
+            return "", []
+        now = clothes.current()
+        return now.get("set") or "", list(now.get("sets") or [])
+    except Exception:
+        return "", []
 
 
 def due(now=None):
@@ -272,8 +291,26 @@ def _do_journal(ask):
     return {"title": "", "note": note}
 
 
-_DOING = {"read": _do_read, "look_up": _do_look_up, "journal": _do_journal}
-_SAID = {"read": "read {title}", "look_up": "looked up {title} on the web", "journal": "wrote in her journal"}
+def _do_wear(ask):
+    on, names = _sets()
+    if len(names) < 2:
+        return None
+    pick = ask(f"Your underwear sets: {', '.join(names)}. You have the {on or names[0]} set on. "
+               "Which do you want to wear now? Answer with just the name.", 20)
+    said = [w for w in re.findall(r"[a-z0-9_-]+", (pick or "").lower()) if w in names]
+    # "from white to mint": a set she names besides the one she has on is the one she wants
+    name = next((w for w in said if w != on), None)
+    if not name:
+        return None                 # no answer, or the one she has on: nothing changes, so it's a rest
+    from web import livefeed
+
+    livefeed.emit("outfit", set=name)
+    return {"title": name, "note": ""}
+
+
+_DOING = {"read": _do_read, "look_up": _do_look_up, "journal": _do_journal, "wear": _do_wear}
+_SAID = {"read": "read {title}", "look_up": "looked up {title} on the web", "journal": "wrote in her journal",
+         "wear": "picked her {title} underwear set"}
 
 
 def spend(model, show=None):

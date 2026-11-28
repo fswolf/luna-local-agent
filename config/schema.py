@@ -445,7 +445,7 @@ SCHEMA = {
     "self.conclusions": ("bool", "Let Luna read back its conversations while idle and note what it concludes about each person"),
     "self.free_time": ("bool", "Let Luna spend some of its idle time as it likes: reading, looking something up, writing in its journal, or resting"),
     "self.free_time_every": ("float", "How often Luna gets some free time while idle (minutes)"),
-    "self.free_time_choices": ("text", "What Luna can choose from in its free time, comma-separated: read (its knowledge folders), look_up (a web search), journal, rest"),
+    "self.free_time_choices": ("text", "What Luna can choose from in its free time, comma-separated: read (its knowledge folders), look_up (a web search), journal, wear (which underwear set, on a model that has sets), rest"),
     "self.calibration": ("bool", "Let Luna say when it isn't sure, based on how confident the model was (llama-server)"),
     "self.hedge_below": ("float", "Below this confidence, Luna says it isn't sure (0 to 1)"),
     "self.hedge_line": ("text", "What Luna says when it isn't sure. Empty says nothing"),

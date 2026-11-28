@@ -1,0 +1,28 @@
+{
+ "emblem_bra": [
+  [
+   1126,
+   522,
+   36
+  ]
+ ],
+ "emblem_panties": [
+  [
+   1024,
+   1084,
+   38
+  ]
+ ],
+ "piping": 4,
+ "edge_shade": 0.1,
+ "grain": 0.035,
+ "base": "#d4c0f3",
+ "trim": "#f6f1fd",
+ "stitch_color": "#9d84cf",
+ "motif": "moon",
+ "motif_color": "#ffffff",
+ "motif_size": 6,
+ "spacing": 58,
+ "seed": 2,
+ "name": "lavender"
+}

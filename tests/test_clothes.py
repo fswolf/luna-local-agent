@@ -94,6 +94,17 @@ class Report(unittest.TestCase):
         with mock.patch("web.livefeed.watching", return_value=False):
             self.assertEqual(clothes.describe(), "")
 
+    def test_situation_names_the_set(self):
+        with mock.patch.object(clothes, "_open", return_value=True):
+            clothes.note("underwear", [], ["top", "bra", "panties"], "mint", ["white", "mint"])
+            self.assertIn("just your underwear (the mint set)", clothes.describe())
+            clothes.note("partly", ["top"], ["top", "bra", "panties"], "mint", ["white", "mint"])
+            self.assertIn("without your top (underwear: the mint set)", clothes.describe())
+            clothes.note("partly", ["tie"], ["tie", "top", "bra"], "mint", ["white", "mint"])
+            self.assertNotIn("mint", clothes.describe())
+            clothes.note("underwear", [], ["bra", "panties"], "", [])   # no sets: as before
+            self.assertEqual(clothes.describe(), "Wearing: just your underwear, your clothes are off")
+
     def test_situation_line(self):
         from mind import situation
 
@@ -134,7 +145,9 @@ class Command(unittest.TestCase):
             self.assertIn("No set called plaid", say.call_args[0][1])
             portrait.handle("/outfit set")
             self.assertIn("Sets: white, mint, midnight", say.call_args[0][1])
-        clothes.note("dressed", [], ["top"])                  # a model without sets
+        clothes.note("dressed", [], ["top"])                  # an older page: the sets stay as reported
+        self.assertEqual(clothes.current()["sets"], ["white", "mint", "midnight"])
+        clothes.note("dressed", [], ["top"], "", [])          # a model without sets
         self.assertEqual(clothes.current()["sets"], [])
 
     def test_outfit_says_what_it_did(self):
